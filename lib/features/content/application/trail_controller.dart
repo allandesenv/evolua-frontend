@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/content/data/repositories/trail_repository_impl.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
@@ -11,19 +12,39 @@ final trailRepositoryProvider = Provider<TrailRepository>((ref) {
 });
 
 final trailControllerProvider =
-    AsyncNotifierProvider<TrailController, List<Trail>>(TrailController.new);
+    AsyncNotifierProvider<TrailController, PaginatedResponse<Trail>>(TrailController.new);
 
-class TrailController extends AsyncNotifier<List<Trail>> {
+class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
+  static const _pageSize = 4;
+  String? _search;
+  bool? _premium;
+  String? _category;
+
   @override
-  Future<List<Trail>> build() async {
-    return ref.watch(trailRepositoryProvider).list();
+  Future<PaginatedResponse<Trail>> build() async {
+    return _fetch(page: 0);
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      return ref.read(trailRepositoryProvider).list();
-    });
+    state = await AsyncValue.guard(() async => _fetch(page: state.asData?.value.page ?? 0));
+  }
+
+  Future<void> applyFilters({
+    String? search,
+    bool? premium,
+    String? category,
+  }) async {
+    _search = search;
+    _premium = premium;
+    _category = category;
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async => _fetch(page: 0));
+  }
+
+  Future<void> goToPage(int page) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async => _fetch(page: page));
   }
 
   Future<void> create({
@@ -33,18 +54,26 @@ class TrailController extends AsyncNotifier<List<Trail>> {
     required bool premium,
   }) async {
     final repository = ref.read(trailRepositoryProvider);
-    final currentItems = state.asData?.value ?? const <Trail>[];
-
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final created = await repository.create(
+      await repository.create(
         title: title,
         description: description,
         category: category,
         premium: premium,
       );
 
-      return [created, ...currentItems];
+      return _fetch(page: 0);
     });
+  }
+
+  Future<PaginatedResponse<Trail>> _fetch({required int page}) {
+    return ref.read(trailRepositoryProvider).list(
+          page: page,
+          size: _pageSize,
+          search: _search,
+          premium: _premium,
+          category: _category,
+        );
   }
 }

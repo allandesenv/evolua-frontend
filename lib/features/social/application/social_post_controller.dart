@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/social/data/repositories/social_post_repository_impl.dart';
 import 'package:evolua_frontend/features/social/domain/entities/social_post.dart';
 import 'package:evolua_frontend/features/social/domain/repositories/social_post_repository.dart';
@@ -11,19 +12,39 @@ final socialPostRepositoryProvider = Provider<SocialPostRepository>((ref) {
 });
 
 final socialPostControllerProvider =
-    AsyncNotifierProvider<SocialPostController, List<SocialPost>>(SocialPostController.new);
+    AsyncNotifierProvider<SocialPostController, PaginatedResponse<SocialPost>>(SocialPostController.new);
 
-class SocialPostController extends AsyncNotifier<List<SocialPost>> {
+class SocialPostController extends AsyncNotifier<PaginatedResponse<SocialPost>> {
+  static const _pageSize = 4;
+  String? _search;
+  String? _community;
+  String? _visibility;
+
   @override
-  Future<List<SocialPost>> build() async {
-    return ref.watch(socialPostRepositoryProvider).list();
+  Future<PaginatedResponse<SocialPost>> build() async {
+    return _fetch(page: 0);
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      return ref.read(socialPostRepositoryProvider).list();
-    });
+    state = await AsyncValue.guard(() async => _fetch(page: state.asData?.value.page ?? 0));
+  }
+
+  Future<void> applyFilters({
+    String? search,
+    String? community,
+    String? visibility,
+  }) async {
+    _search = search;
+    _community = community;
+    _visibility = visibility;
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async => _fetch(page: 0));
+  }
+
+  Future<void> goToPage(int page) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async => _fetch(page: page));
   }
 
   Future<void> create({
@@ -32,17 +53,25 @@ class SocialPostController extends AsyncNotifier<List<SocialPost>> {
     required String visibility,
   }) async {
     final repository = ref.read(socialPostRepositoryProvider);
-    final currentItems = state.asData?.value ?? const <SocialPost>[];
-
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final created = await repository.create(
+      await repository.create(
         content: content,
         community: community,
         visibility: visibility,
       );
 
-      return [created, ...currentItems];
+      return _fetch(page: 0);
     });
+  }
+
+  Future<PaginatedResponse<SocialPost>> _fetch({required int page}) {
+    return ref.read(socialPostRepositoryProvider).list(
+          page: page,
+          size: _pageSize,
+          search: _search,
+          community: _community,
+          visibility: _visibility,
+        );
   }
 }

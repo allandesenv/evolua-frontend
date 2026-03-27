@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/core/network/pagination_query.dart';
 import 'package:evolua_frontend/features/emotional/data/models/check_in_dto.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
@@ -10,13 +12,33 @@ class CheckInRepositoryImpl implements CheckInRepository {
   final Dio _dio;
 
   @override
-  Future<List<CheckIn>> list() async {
-    final response = await _dio.get<dynamic>('/v1/check-ins');
+  Future<PaginatedResponse<CheckIn>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? mood,
+  }) async {
+    final query = PaginationQuery(
+      page: page,
+      size: size,
+      search: search,
+      sortBy: sortBy,
+      sortDir: sortDir,
+    );
 
-    return ApiPayloadParser.dataList(response.data)
-        .map(CheckInDto.fromJson)
-        .map((item) => item.toEntity())
-        .toList();
+    final response = await _dio.get<dynamic>(
+      '/v1/check-ins',
+      queryParameters: query.toQueryParameters({
+        'mood': mood,
+      }),
+    );
+
+    return ApiPayloadParser.paginatedData(
+      response.data,
+      (item) => CheckInDto.fromJson(item).toEntity(),
+    );
   }
 
   @override

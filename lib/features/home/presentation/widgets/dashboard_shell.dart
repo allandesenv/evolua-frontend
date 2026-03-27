@@ -201,16 +201,16 @@ class _DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(profileControllerProvider).asData?.value ?? const [];
-    final trails = ref.watch(trailControllerProvider).asData?.value ?? const [];
-    final checkIns = ref.watch(checkInControllerProvider).asData?.value ?? const [];
-    final posts = ref.watch(socialPostControllerProvider).asData?.value ?? const [];
+    final trailsCount = ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
+    final checkInsCount = ref.watch(checkInControllerProvider).asData?.value.totalItems ?? 0;
+    final postsCount = ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
 
     final sections = [
       HomeHubView(
         profilesCount: profiles.length,
-        trailsCount: trails.length,
-        checkInsCount: checkIns.length,
-        postsCount: posts.length,
+        trailsCount: trailsCount,
+        checkInsCount: checkInsCount,
+        postsCount: postsCount,
         onOpenTrails: () => onNavigate(1),
         onOpenCommunity: () => onNavigate(2),
         onOpenChat: () => onNavigate(3),

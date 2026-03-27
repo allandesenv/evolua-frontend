@@ -45,4 +45,10 @@ class AppConfig {
     'EVOLUA_NOTIFICATION_BASE_URL',
     defaultValue: 'http://localhost:8088',
   );
+
+  static String get chatSocketUrl {
+    return chatBaseUrl
+        .replaceFirst('https://', 'wss://')
+        .replaceFirst('http://', 'ws://');
+  }
 }
