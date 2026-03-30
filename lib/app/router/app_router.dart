@@ -13,6 +13,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/auth',
     routes: [
       GoRoute(
+        path: '/',
+        redirect: (context, state) => isAuthenticated ? '/home' : '/auth',
+      ),
+      GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthPage(),
       ),

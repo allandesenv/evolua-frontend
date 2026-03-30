@@ -19,6 +19,9 @@ class CheckInRepositoryImpl implements CheckInRepository {
     String sortBy = 'createdAt',
     String sortDir = 'desc',
     String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
   }) async {
     final query = PaginationQuery(
       page: page,
@@ -32,6 +35,9 @@ class CheckInRepositoryImpl implements CheckInRepository {
       '/v1/check-ins',
       queryParameters: query.toQueryParameters({
         'mood': mood,
+        'energyRange': energyRange,
+        'from': _formatDate(from),
+        'to': _formatDate(to),
       }),
     );
 
@@ -59,5 +65,16 @@ class CheckInRepositoryImpl implements CheckInRepository {
     );
 
     return CheckInDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+  }
+
+  String? _formatDate(DateTime? value) {
+    if (value == null) {
+      return null;
+    }
+
+    final normalized = DateTime(value.year, value.month, value.day);
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '${normalized.year}-$month-$day';
   }
 }

@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/network/pagination_query.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 
 class TrailRepositoryImpl implements TrailRepository {
@@ -46,17 +47,29 @@ class TrailRepositoryImpl implements TrailRepository {
   @override
   Future<Trail> create({
     required String title,
-    required String description,
+    required String summary,
+    required String content,
     required String category,
     required bool premium,
+    required List<TrailMediaLink> mediaLinks,
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/trails',
       data: {
         'title': title,
-        'description': description,
+        'summary': summary,
+        'content': content,
         'category': category,
         'premium': premium,
+        'mediaLinks': mediaLinks
+            .map(
+              (link) => {
+                'label': link.label,
+                'url': link.url,
+                'type': link.type,
+              },
+            )
+            .toList(),
       },
     );
 

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -235,15 +236,7 @@ class _SubscriptionLoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const PrimaryPanel(
-      child: Row(
-        children: [
-          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 12),
-          Text('Carregando assinaturas...'),
-        ],
-      ),
-    );
+    return const FeedSkeleton(cards: 2);
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/user/data/repositories/profile_repository_impl.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
@@ -12,6 +13,23 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 
 final profileControllerProvider =
     AsyncNotifierProvider<ProfileController, List<Profile>>(ProfileController.new);
+
+final currentProfileProvider = Provider<Profile?>((ref) {
+  final session = ref.watch(authControllerProvider).asData?.value;
+  final profiles = ref.watch(profileControllerProvider).asData?.value ?? const <Profile>[];
+
+  if (session == null) {
+    return null;
+  }
+
+  for (final profile in profiles) {
+    if (profile.userId == session.userId) {
+      return profile;
+    }
+  }
+
+  return null;
+});
 
 class ProfileController extends AsyncNotifier<List<Profile>> {
   @override

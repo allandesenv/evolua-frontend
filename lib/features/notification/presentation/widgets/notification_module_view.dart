@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -205,15 +206,7 @@ class _NotificationLoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const PrimaryPanel(
-      child: Row(
-        children: [
-          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 12),
-          Text('Carregando notificacoes...'),
-        ],
-      ),
-    );
+    return const FeedSkeleton(cards: 2);
   }
 }
 

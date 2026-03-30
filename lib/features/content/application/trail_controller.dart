@@ -3,6 +3,7 @@ import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/content/data/repositories/trail_repository_impl.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,18 +50,22 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
 
   Future<void> create({
     required String title,
-    required String description,
+    required String summary,
+    required String content,
     required String category,
     required bool premium,
+    required List<TrailMediaLink> mediaLinks,
   }) async {
     final repository = ref.read(trailRepositoryProvider);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       await repository.create(
         title: title,
-        description: description,
+        summary: summary,
+        content: content,
         category: category,
         premium: premium,
+        mediaLinks: mediaLinks,
       );
 
       return _fetch(page: 0);

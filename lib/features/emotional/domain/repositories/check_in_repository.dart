@@ -9,6 +9,9 @@ abstract class CheckInRepository {
     String sortBy = 'createdAt',
     String sortDir = 'desc',
     String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
   });
 
   Future<CheckIn> create({

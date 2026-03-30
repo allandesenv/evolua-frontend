@@ -6,14 +6,18 @@ class PrimaryPanel extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(24),
+    this.semanticLabel,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final panel = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
       padding: padding,
       decoration: BoxDecoration(
         color: AppColors.surface.withValues(alpha: 0.78),
@@ -30,6 +34,16 @@ class PrimaryPanel extends StatelessWidget {
         ],
       ),
       child: child,
+    );
+
+    if (semanticLabel == null) {
+      return panel;
+    }
+
+    return Semantics(
+      container: true,
+      label: semanticLabel,
+      child: panel,
     );
   }
 }

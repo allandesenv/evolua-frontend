@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,8 +37,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
               : error.message ?? 'Falha ao autenticar.')
           : error.toString();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+      AppSnackBar.show(
+        context,
+        message: message,
+        icon: Icons.info_outline_rounded,
       );
     });
   }
@@ -74,29 +78,35 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
     final theme = Theme.of(context);
+    final compact = ResponsiveBreakpoints.isCompact(context);
 
     return PrimaryPanel(
       padding: const EdgeInsets.all(28),
+      semanticLabel: 'Formulario de autenticacao',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment<bool>(
-                value: false,
-                icon: Icon(Icons.login_rounded),
-                label: Text('Entrar'),
-              ),
-              ButtonSegment<bool>(
-                value: true,
-                icon: Icon(Icons.person_add_alt_1_rounded),
-                label: Text('Criar conta'),
-              ),
-            ],
-            selected: {_isRegisterMode},
-            onSelectionChanged: (selection) {
-              setState(() => _isRegisterMode = selection.first);
-            },
+          SizedBox(
+            width: compact ? double.infinity : null,
+            child: SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment<bool>(
+                  value: false,
+                  icon: Icon(Icons.login_rounded),
+                  label: Text('Entrar'),
+                ),
+                ButtonSegment<bool>(
+                  value: true,
+                  icon: Icon(Icons.person_add_alt_1_rounded),
+                  label: Text('Criar conta'),
+                ),
+              ],
+              selected: {_isRegisterMode},
+              onSelectionChanged: (selection) {
+                setState(() => _isRegisterMode = selection.first);
+              },
+            ),
           ),
           const SizedBox(height: 24),
           Text(
@@ -111,9 +121,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
-          Form(
-            key: _formKey,
-            child: Column(
+          AutofillGroup(
+            child: Form(
+              key: _formKey,
+              child: Column(
               children: [
                 TextFormField(
                   controller: _emailController,
@@ -168,6 +179,40 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
               ],
             ),
           ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Perfis de desenvolvimento',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _DevCredentialChip(
+                      label: 'Admin',
+                      value: 'clara@evolua.local / 123456',
+                    ),
+                    _DevCredentialChip(
+                      label: 'Gratuito',
+                      value: 'leo@evolua.local / 123456',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -181,6 +226,36 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DevCredentialChip extends StatelessWidget {
+  const _DevCredentialChip({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 4),
+          Text(value, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

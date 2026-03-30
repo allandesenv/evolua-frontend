@@ -100,8 +100,10 @@ flutter run -d emulator-5554 `
 1. Abra a tela de autenticacao.
 2. Crie uma conta nova ou entre com um usuario existente.
 3. Ao autenticar com sucesso, o app redireciona para o dashboard.
-4. Use os modulos para criar perfil, trilhas, check-ins, posts, mensagens, assinaturas e notificacoes.
-5. A sessao fica salva localmente.
+4. O admin `clara@evolua.local / 123456` pode criar novas trilhas.
+5. O usuario gratuito `leo@evolua.local / 123456` pode explorar trilhas essenciais e visualizar as premium bloqueadas.
+6. Use os modulos para criar perfil, trilhas, check-ins, posts, mensagens, assinaturas e notificacoes.
+7. A sessao fica salva localmente enquanto o token for valido.
 
 ## Qualidade
 

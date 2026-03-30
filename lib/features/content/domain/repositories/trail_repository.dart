@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 
 abstract class TrailRepository {
   Future<PaginatedResponse<Trail>> list({
@@ -14,8 +15,10 @@ abstract class TrailRepository {
 
   Future<Trail> create({
     required String title,
-    required String description,
+    required String summary,
+    required String content,
     required String category,
     required bool premium,
+    required List<TrailMediaLink> mediaLinks,
   });
 }

@@ -2,13 +2,16 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/chat/application/chat_message_controller.dart';
 import 'package:evolua_frontend/features/chat/data/models/chat_message_dto.dart';
 import 'package:evolua_frontend/features/chat/domain/entities/chat_message.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/panel_skeleton.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -44,8 +47,10 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                 : error.message ?? 'Nao foi possivel enviar a mensagem.')
             : 'Nao foi possivel enviar a mensagem.';
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+        AppSnackBar.show(
+          context,
+          message: message,
+          icon: Icons.chat_bubble_outline_rounded,
         );
       }
     });
@@ -145,10 +150,12 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
   Widget build(BuildContext context) {
     final messagesState = ref.watch(chatMessageControllerProvider);
     final liveInboxId = ref.watch(authControllerProvider).asData?.value?.email ?? 'sem sessao';
+    final compact = ResponsiveBreakpoints.isCompact(context);
 
     return Column(
       children: [
         PrimaryPanel(
+          semanticLabel: 'Modulo de chat em tempo real',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -160,7 +167,9 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                   ),
-                  Container(
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
@@ -186,16 +195,34 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    TextFormField(
-                      controller: _recipientController,
-                      decoration: const InputDecoration(
-                        labelText: 'Com quem voce quer falar?',
-                        prefixIcon: Icon(Icons.person_search_rounded),
+                    if (compact)
+                      TextFormField(
+                        controller: _recipientController,
+                        decoration: const InputDecoration(
+                          labelText: 'Com quem voce quer falar?',
+                          prefixIcon: Icon(Icons.person_search_rounded),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? 'Informe o destinatario.'
+                            : null,
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _recipientController,
+                              decoration: const InputDecoration(
+                                labelText: 'Com quem voce quer falar?',
+                                prefixIcon: Icon(Icons.person_search_rounded),
+                              ),
+                              validator: (value) => value == null || value.trim().isEmpty
+                                  ? 'Informe o destinatario.'
+                                  : null,
+                            ),
+                          ),
+                        ],
                       ),
-                      validator: (value) => value == null || value.trim().isEmpty
-                          ? 'Informe o destinatario.'
-                          : null,
-                    ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _contentController,
@@ -232,7 +259,9 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
             onSearchChanged: (_) => _applyFilters(),
             onPageChanged: (page) => ref.read(chatMessageControllerProvider.notifier).goToPage(page),
           ),
-          error: (error, stackTrace) => const _ChatErrorState(),
+          error: (error, stackTrace) => _ChatErrorState(
+            onRetry: () => ref.read(chatMessageControllerProvider.notifier).refresh(),
+          ),
           loading: () => const _ChatLoadingState(),
         ),
       ],
@@ -258,6 +287,7 @@ class _ChatHistory extends StatelessWidget {
     return Column(
       children: [
         PrimaryPanel(
+          semanticLabel: 'Historico de conversas',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -329,20 +359,16 @@ class _ChatLoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const PrimaryPanel(
-      child: Row(
-        children: [
-          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 12),
-          Text('Carregando mensagens...'),
-        ],
-      ),
-    );
+    return const PanelSkeleton(rows: 3, tileHeight: 88);
   }
 }
 
 class _ChatErrorState extends StatelessWidget {
-  const _ChatErrorState();
+  const _ChatErrorState({
+    required this.onRetry,
+  });
+
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -351,7 +377,7 @@ class _ChatErrorState extends StatelessWidget {
       title: 'Nao conseguimos abrir o chat agora.',
       subtitle: 'Atualize a pagina ou aguarde a reconexao do canal ao vivo.',
       actionLabel: 'Tentar novamente',
-      onAction: () {},
+      onAction: onRetry,
     );
   }
 }

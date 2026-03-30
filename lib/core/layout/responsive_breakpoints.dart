@@ -3,14 +3,33 @@ import 'package:flutter/widgets.dart';
 class ResponsiveBreakpoints {
   const ResponsiveBreakpoints._();
 
+  static double width(BuildContext context) => MediaQuery.sizeOf(context).width;
+
   static bool isCompact(BuildContext context) =>
-      MediaQuery.sizeOf(context).width < 720;
+      width(context) < 720;
 
   static bool isMedium(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    return width >= 720 && width < 1200;
+    final currentWidth = width(context);
+    return currentWidth >= 720 && currentWidth < 1200;
   }
 
   static bool isExpanded(BuildContext context) =>
-      MediaQuery.sizeOf(context).width >= 1200;
+      width(context) >= 1200;
+
+  static double pagePadding(BuildContext context) {
+    final currentWidth = width(context);
+    if (currentWidth < 720) {
+      return 16;
+    }
+    if (currentWidth < 1200) {
+      return 20;
+    }
+    return 24;
+  }
+
+  static double panelPadding(BuildContext context) {
+    return isCompact(context) ? 18 : 24;
+  }
+
+  static bool useStackedStats(BuildContext context) => width(context) < 860;
 }

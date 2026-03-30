@@ -8,6 +8,7 @@ import 'package:evolua_frontend/features/content/presentation/widgets/content_mo
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
+import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
@@ -43,6 +44,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   Widget build(BuildContext context) {
     final isCompact = ResponsiveBreakpoints.isCompact(context);
+    final pagePadding = ResponsiveBreakpoints.pagePadding(context);
     final session = ref.watch(authControllerProvider).asData?.value;
 
     final content = _DashboardContent(
@@ -53,46 +55,43 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        isCompact ? 16 : 24,
-        16,
-        isCompact ? 16 : 24,
-        isCompact ? 10 : 24,
-      ),
+      padding: EdgeInsets.fromLTRB(pagePadding, 16, pagePadding, isCompact ? 10 : 24),
       child: isCompact
           ? Column(
               children: [
+                Expanded(child: content),
+                const SizedBox(height: 12),
                 PrimaryPanel(
-                  padding: const EdgeInsets.all(16),
-                  child: DropdownButtonFormField<int>(
-                    initialValue: _selectedIndex,
-                    decoration: const InputDecoration(
-                      labelText: 'Onde voce quer seguir agora?',
-                    ),
-                    items: List.generate(
-                      _destinations.length,
-                      (index) => DropdownMenuItem<int>(
-                        value: index,
-                        child: Text(_destinations[index].label),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      if (value != null) {
-                        _goTo(value);
-                      }
-                    },
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  semanticLabel: 'Navegacao principal',
+                  child: NavigationBar(
+                    selectedIndex: _selectedIndex,
+                    height: 72,
+                    labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                    onDestinationSelected: _goTo,
+                    destinations: _destinations
+                        .map(
+                          (item) => NavigationDestination(
+                            icon: Tooltip(
+                              message: item.label,
+                              child: Icon(item.icon),
+                            ),
+                            selectedIcon: Icon(item.icon),
+                            label: item.label,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Expanded(child: content),
               ],
             )
           : Row(
               children: [
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 290),
+                  constraints: const BoxConstraints(maxWidth: 308),
                   child: PrimaryPanel(
                     padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                    semanticLabel: 'Menu lateral',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -110,37 +109,25 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 24),
-                        ...List.generate(_destinations.length, (index) {
-                          final item = _destinations[index];
-                          final selected = index == _selectedIndex;
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: FilledButton.tonal(
-                              onPressed: () => _goTo(index),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(54),
-                                backgroundColor: selected
-                                    ? AppColors.accent.withValues(alpha: 0.18)
-                                    : Colors.transparent,
-                                foregroundColor: selected
-                                    ? AppColors.textPrimary
-                                    : AppColors.textSecondary,
-                                alignment: Alignment.centerLeft,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
+                        NavigationRail(
+                          selectedIndex: _selectedIndex,
+                          onDestinationSelected: _goTo,
+                          minWidth: 240,
+                          labelType: NavigationRailLabelType.all,
+                          leading: const SizedBox.shrink(),
+                          destinations: _destinations
+                              .map(
+                                (item) => NavigationRailDestination(
+                                  icon: Tooltip(
+                                    message: item.label,
+                                    child: Icon(item.icon),
+                                  ),
+                                  selectedIcon: Icon(item.icon),
+                                  label: Text(item.label),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(item.icon),
-                                  const SizedBox(width: 12),
-                                  Text(item.label),
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
+                              )
+                              .toList(),
+                        ),
                         const Spacer(),
                         Container(
                           width: double.infinity,
@@ -202,8 +189,9 @@ class _DashboardContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(profileControllerProvider).asData?.value ?? const [];
     final trailsCount = ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
-    final checkInsCount = ref.watch(checkInControllerProvider).asData?.value.totalItems ?? 0;
+    final checkInsCount = ref.watch(checkInControllerProvider).asData?.value.result.totalItems ?? 0;
     final postsCount = ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
+    final communitiesCount = ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
 
     final sections = [
       HomeHubView(
@@ -211,6 +199,7 @@ class _DashboardContent extends ConsumerWidget {
         trailsCount: trailsCount,
         checkInsCount: checkInsCount,
         postsCount: postsCount,
+        communitiesCount: communitiesCount,
         onOpenTrails: () => onNavigate(1),
         onOpenCommunity: () => onNavigate(2),
         onOpenChat: () => onNavigate(3),
@@ -222,39 +211,52 @@ class _DashboardContent extends ConsumerWidget {
       const _ProfileArea(),
     ];
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          PrimaryPanel(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 760;
+    return Column(
+      children: [
+        PrimaryPanel(
+          semanticLabel: 'Cabecalho da area autenticada',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 760;
 
-                return compact
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _HeaderText(email: email),
-                          const SizedBox(height: 20),
-                          _HeaderActions(onLogout: onLogout),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(child: _HeaderText(email: email)),
-                          const SizedBox(width: 20),
-                          _HeaderActions(onLogout: onLogout),
-                        ],
-                      );
-              },
-            ),
+              return compact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _HeaderText(email: email),
+                        const SizedBox(height: 20),
+                        _HeaderActions(
+                          onContinue: () => onNavigate(0),
+                          onLogout: onLogout,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: _HeaderText(email: email)),
+                        const SizedBox(width: 20),
+                        _HeaderActions(
+                          onContinue: () => onNavigate(0),
+                          onLogout: onLogout,
+                        ),
+                      ],
+                    );
+            },
           ),
-          const SizedBox(height: 18),
-          sections[selectedIndex],
-          const SizedBox(height: 12),
-          if (selectedIndex == 4) const _DevelopmentInfo(),
-        ],
-      ),
+        ),
+        const SizedBox(height: 18),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: KeyedSubtree(
+            key: ValueKey(selectedIndex),
+            child: sections[selectedIndex],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (selectedIndex == 4) const _DevelopmentInfo(),
+      ],
     );
   }
 }
@@ -321,8 +323,12 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _HeaderActions extends StatelessWidget {
-  const _HeaderActions({required this.onLogout});
+  const _HeaderActions({
+    required this.onContinue,
+    required this.onLogout,
+  });
 
+  final VoidCallback onContinue;
   final VoidCallback onLogout;
 
   @override
@@ -331,15 +337,21 @@ class _HeaderActions extends StatelessWidget {
       spacing: 12,
       runSpacing: 12,
       children: [
-        FilledButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.favorite_outline_rounded),
-          label: const Text('Seguir no meu ritmo'),
+        Tooltip(
+          message: 'Continuar sua jornada com menos friccao',
+          child: FilledButton.icon(
+            onPressed: onContinue,
+            icon: const Icon(Icons.favorite_outline_rounded),
+            label: const Text('Seguir no meu ritmo'),
+          ),
         ),
-        OutlinedButton.icon(
-          onPressed: onLogout,
-          icon: const Icon(Icons.logout_rounded),
-          label: const Text('Sair'),
+        Tooltip(
+          message: 'Encerrar sessao',
+          child: OutlinedButton.icon(
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Sair'),
+          ),
         ),
       ],
     );

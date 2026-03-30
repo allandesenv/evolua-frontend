@@ -44,13 +44,20 @@ class AuthController extends AsyncNotifier<AuthSession?> {
       return null;
     }
 
-    final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
+    try {
+      final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
+      final session = AuthSession.fromJson(decoded);
 
-    return AuthSession(
-      email: decoded['email'].toString(),
-      accessToken: decoded['accessToken'].toString(),
-      refreshToken: decoded['refreshToken']?.toString(),
-    );
+      if (session.isExpired) {
+        await preferences.remove(_sessionStorageKey);
+        return null;
+      }
+
+      return session;
+    } catch (_) {
+      await preferences.remove(_sessionStorageKey);
+      return null;
+    }
   }
 
   Future<void> login({

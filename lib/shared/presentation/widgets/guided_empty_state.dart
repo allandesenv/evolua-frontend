@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,7 @@ class GuidedEmptyState extends StatelessWidget {
     required this.subtitle,
     required this.actionLabel,
     required this.onAction,
+    this.centered = false,
   });
 
   final IconData icon;
@@ -17,12 +19,16 @@ class GuidedEmptyState extends StatelessWidget {
   final String subtitle;
   final String actionLabel;
   final VoidCallback onAction;
+  final bool centered;
 
   @override
   Widget build(BuildContext context) {
+    final compact = ResponsiveBreakpoints.isCompact(context);
     return PrimaryPanel(
+      semanticLabel: title,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            centered || compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
         children: [
           Container(
             width: 52,
@@ -36,6 +42,7 @@ class GuidedEmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             title,
+            textAlign: centered || compact ? TextAlign.center : TextAlign.start,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: AppColors.textPrimary,
                 ),
@@ -43,6 +50,7 @@ class GuidedEmptyState extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             subtitle,
+            textAlign: centered || compact ? TextAlign.center : TextAlign.start,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 16),

@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/emotional_module_view.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/insight_metric_card.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -11,6 +12,7 @@ class HomeHubView extends StatefulWidget {
     required this.trailsCount,
     required this.checkInsCount,
     required this.postsCount,
+    required this.communitiesCount,
     required this.onOpenTrails,
     required this.onOpenCommunity,
     required this.onOpenChat,
@@ -21,6 +23,7 @@ class HomeHubView extends StatefulWidget {
   final int trailsCount;
   final int checkInsCount;
   final int postsCount;
+  final int communitiesCount;
   final VoidCallback onOpenTrails;
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenChat;
@@ -35,9 +38,11 @@ class _HomeHubViewState extends State<HomeHubView> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = ResponsiveBreakpoints.isCompact(context);
     return Column(
       children: [
         PrimaryPanel(
+          semanticLabel: 'Painel principal da home',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -55,19 +60,22 @@ class _HomeHubViewState extends State<HomeHubView> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      final checkInContext = _checkInKey.currentContext;
-                      if (checkInContext != null) {
-                        Scrollable.ensureVisible(
-                          checkInContext,
-                          duration: const Duration(milliseconds: 280),
-                          curve: Curves.easeOutCubic,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.favorite_rounded),
-                    label: const Text('Fazer check-in'),
+                  Tooltip(
+                    message: 'Ir direto para o registro emocional do dia',
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        final checkInContext = _checkInKey.currentContext;
+                        if (checkInContext != null) {
+                          Scrollable.ensureVisible(
+                            checkInContext,
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.favorite_rounded),
+                      label: const Text('Fazer check-in'),
+                    ),
                   ),
                   OutlinedButton.icon(
                     onPressed: widget.onOpenTrails,
@@ -102,15 +110,26 @@ class _HomeHubViewState extends State<HomeHubView> {
               tone: AppColors.accentWarm,
             ),
             InsightMetricCard(
-              label: 'Rede de apoio',
-              value: '${widget.postsCount} conversas',
-              change: widget.postsCount == 0 ? 'Compartilhe quando fizer sentido' : 'Ha vida social acontecendo',
+              label: 'Comunidades ativas',
+              value: '${widget.communitiesCount} grupos',
+              change: widget.communitiesCount == 0
+                  ? 'Descubra ou crie a primeira comunidade'
+                  : 'Voce ja tem espacos para trocar',
+              tone: AppColors.accentGold,
+            ),
+            InsightMetricCard(
+              label: 'Feed em movimento',
+              value: '${widget.postsCount} posts',
+              change: widget.postsCount == 0
+                  ? 'Seu feed ainda pode ganhar a primeira publicacao'
+                  : 'Seu espaco social ja esta vivo',
               tone: AppColors.accentGold,
             ),
           ],
         ),
         const SizedBox(height: 16),
         PrimaryPanel(
+          semanticLabel: 'Sugestao do dia',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -124,7 +143,9 @@ class _HomeHubViewState extends State<HomeHubView> {
               Text(
                 widget.trailsCount == 0
                     ? 'Assim que suas trilhas estiverem prontas, este espaco vai sugerir a melhor proxima pratica.'
-                    : 'Voce ja tem trilhas publicadas. Use este espaco para destacar a pratica certa para o estado emocional atual.',
+                    : widget.communitiesCount == 0
+                        ? 'Voce ja tem trilhas publicadas. O proximo passo natural pode ser entrar em uma comunidade relevante.'
+                        : 'Voce ja tem trilhas e comunidades ativas. Use este espaco para destacar a melhor proxima acao do dia.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 18),
@@ -154,26 +175,30 @@ class _HomeHubViewState extends State<HomeHubView> {
         ),
         const SizedBox(height: 16),
         PrimaryPanel(
-          child: Row(
+          semanticLabel: 'Resumo rapido da jornada',
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              Expanded(
+              SizedBox(
+                width: compact ? double.infinity : 220,
                 child: _MiniProgress(
                   label: 'Perfil pronto',
-                    value: widget.profilesCount > 0 ? 'Sim' : 'Nao ainda',
+                  value: widget.profilesCount > 0 ? 'Sim' : 'Nao ainda',
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              SizedBox(
+                width: compact ? double.infinity : 220,
                 child: _MiniProgress(
                   label: 'Habito do dia',
-                    value: widget.checkInsCount > 0 ? 'Registrado' : 'Pendente',
+                  value: widget.checkInsCount > 0 ? 'Registrado' : 'Pendente',
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              SizedBox(
+                width: compact ? double.infinity : 220,
                 child: _MiniProgress(
                   label: 'Proximo passo',
-                    value: widget.trailsCount > 0 ? 'Praticar' : 'Criar trilha',
+                  value: widget.trailsCount > 0 ? 'Praticar' : 'Criar trilha',
                 ),
               ),
             ],
@@ -202,15 +227,18 @@ class _QuickActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ActionChip(
-      onPressed: onTap,
-      avatar: Icon(icon, size: 18, color: AppColors.accent),
-      label: Text(label),
-      side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
-      backgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.6),
-      labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppColors.textPrimary,
-          ),
+    return Tooltip(
+      message: 'Abrir $label',
+      child: ActionChip(
+        onPressed: onTap,
+        avatar: Icon(icon, size: 18, color: AppColors.accent),
+        label: Text(label),
+        side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
+        backgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.6),
+        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.textPrimary,
+            ),
+      ),
     );
   }
 }
