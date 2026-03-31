@@ -20,16 +20,16 @@ class PrimaryPanel extends StatelessWidget {
       curve: Curves.easeOutCubic,
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(30),
+        color: AppColors.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.outline.withValues(alpha: 0.42),
+          color: AppColors.outline.withValues(alpha: 0.45),
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 30,
-            offset: Offset(0, 18),
+            color: Color(0x33000000),
+            blurRadius: 24,
+            offset: Offset(0, 8),
           ),
         ],
       ),

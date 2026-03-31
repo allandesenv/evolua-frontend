@@ -68,7 +68,7 @@ class SocialCommunitiesArea extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${result.totalItems} comunidades encontradas. Explore, entre nas que fazem sentido ou crie a sua.',
+                '${result.totalItems} comunidades para explorar sem pressa.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -82,8 +82,8 @@ class SocialCommunitiesArea extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: 16,
+                runSpacing: 16,
                 children: [
                   SizedBox(
                     width: 220,
@@ -169,7 +169,7 @@ class SocialCommunitiesArea extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 community.name,
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                       color: AppColors.textPrimary,
                                     ),
                               ),

@@ -32,6 +32,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _destinations = [
     _NavItem(label: 'Home', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
+    _NavItem(label: 'Feed', icon: Icons.dynamic_feed_rounded),
     _NavItem(label: 'Comunidade', icon: Icons.groups_rounded),
     _NavItem(label: 'Chat', icon: Icons.chat_bubble_rounded),
     _NavItem(label: 'Perfil', icon: Icons.person_rounded),
@@ -85,88 +86,167 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                 ),
               ],
             )
-          : Row(
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 308),
-                  child: PrimaryPanel(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                    semanticLabel: 'Menu lateral',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const EvoluaLogo(compact: true),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Clareza para agir, calma para continuar.',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: AppColors.textPrimary,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Escolha um unico foco por vez e avance sem sobrecarga.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 24),
-                        NavigationRail(
-                          selectedIndex: _selectedIndex,
-                          onDestinationSelected: _goTo,
-                          minWidth: 240,
-                          labelType: NavigationRailLabelType.all,
-                          leading: const SizedBox.shrink(),
-                          destinations: _destinations
-                              .map(
-                                (item) => NavigationRailDestination(
-                                  icon: Tooltip(
-                                    message: item.label,
-                                    child: Icon(item.icon),
-                                  ),
-                                  selectedIcon: Icon(item.icon),
-                                  label: Text(item.label),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                        const Spacer(),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: AppColors.surfaceStrong.withValues(alpha: 0.7),
-                          ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                return Row(
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 308),
+                      child: SizedBox(
+                        height: constraints.maxHeight,
+                        child: PrimaryPanel(
+                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                          semanticLabel: 'Menu lateral',
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const EvoluaLogo(compact: true),
+                              const SizedBox(height: 24),
                               Text(
-                                'Acesso rapido',
-                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                'Continue de onde parou.',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                       color: AppColors.textPrimary,
                                     ),
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 8),
                               Text(
-                                'Check-in rapido',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: AppColors.textPrimary,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Uma acao pequena vale mais do que muitas opcoes abertas.',
+                                'Menos ruido, mais clareza para seguir no seu proprio ritmo.',
                                 style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 24),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          children: List.generate(
+                                            _destinations.length,
+                                            (index) {
+                                              final item = _destinations[index];
+                                              final isSelected = index == _selectedIndex;
+                                              return Padding(
+                                                padding: const EdgeInsets.only(bottom: 10),
+                                                child: Tooltip(
+                                                  message: item.label,
+                                                  child: InkWell(
+                                                    borderRadius: BorderRadius.circular(18),
+                                                    onTap: () => _goTo(index),
+                                                    child: AnimatedContainer(
+                                                      duration:
+                                                          const Duration(milliseconds: 180),
+                                                      curve: Curves.easeOutCubic,
+                                                      width: double.infinity,
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 14,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius.circular(18),
+                                                        color: isSelected
+                                                            ? AppColors.accent
+                                                                .withValues(alpha: 0.18)
+                                                            : Colors.transparent,
+                                                        border: Border.all(
+                                                          color: isSelected
+                                                              ? AppColors.accent.withValues(
+                                                                  alpha: 0.45,
+                                                                )
+                                                              : AppColors.outline.withValues(
+                                                                  alpha: 0.22,
+                                                                ),
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(
+                                                            item.icon,
+                                                            color: isSelected
+                                                                ? AppColors.accent
+                                                                : AppColors.textSecondary,
+                                                          ),
+                                                          const SizedBox(width: 12),
+                                                          Expanded(
+                                                            child: Text(
+                                                              item.label,
+                                                              style: Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodyLarge
+                                                                  ?.copyWith(
+                                                                    color: isSelected
+                                                                        ? AppColors.textPrimary
+                                                                        : AppColors
+                                                                            .textSecondary,
+                                                                    fontWeight: isSelected
+                                                                        ? FontWeight.w700
+                                                                        : FontWeight.w500,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        color: AppColors.surfaceStrong.withValues(alpha: 0.7),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Acesso rapido',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelLarge
+                                                ?.copyWith(
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            'Ritual rapido',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.copyWith(
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Abra a home, registre como voce esta e deixe o resto aparecer aos poucos.',
+                                            style: Theme.of(context).textTheme.bodyMedium,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 18),
-                Expanded(child: content),
-              ],
+                    const SizedBox(width: 18),
+                    Expanded(child: content),
+                  ],
+                );
+              },
             ),
     );
   }
@@ -201,11 +281,16 @@ class _DashboardContent extends ConsumerWidget {
         postsCount: postsCount,
         communitiesCount: communitiesCount,
         onOpenTrails: () => onNavigate(1),
-        onOpenCommunity: () => onNavigate(2),
-        onOpenChat: () => onNavigate(3),
-        onOpenProfile: () => onNavigate(4),
+        onOpenFeed: () => onNavigate(2),
+        onOpenCommunity: () => onNavigate(3),
+        onOpenChat: () => onNavigate(4),
+        onOpenProfile: () => onNavigate(5),
       ),
       const ContentModuleView(),
+      const SocialModuleView(
+        initialTab: SocialModuleTab.feed,
+        showTabs: false,
+      ),
       const _CommunityView(),
       const ChatModuleView(),
       const _ProfileArea(),
@@ -245,13 +330,15 @@ class _DashboardContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 18),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          child: KeyedSubtree(
-            key: ValueKey(selectedIndex),
-            child: sections[selectedIndex],
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: SingleChildScrollView(
+              key: ValueKey(selectedIndex),
+              child: sections[selectedIndex],
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -268,7 +355,10 @@ class _CommunityView extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        SocialModuleView(),
+        SocialModuleView(
+          initialTab: SocialModuleTab.communities,
+          showTabs: false,
+        ),
         SizedBox(height: 16),
         NotificationModuleView(),
       ],
@@ -302,20 +392,20 @@ class _HeaderText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Bom te ver por aqui',
+          'Sessao ativa',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: AppColors.accent,
               ),
         ),
         const SizedBox(height: 10),
         Text(
-          'Um lugar simples para entender o que voce sente e seguir com consistencia.',
+          'Continue de onde parou',
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         const SizedBox(height: 12),
         Text(
-          'Sessao ativa para $email. Escolha um foco de cada vez: cuidar de voce, praticar, conversar ou acompanhar seu progresso.',
-          style: Theme.of(context).textTheme.bodyLarge,
+          '$email conectado. Abra um foco por vez: praticar, publicar, conversar ou acompanhar seu ritmo.',
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
     );
@@ -338,11 +428,11 @@ class _HeaderActions extends StatelessWidget {
       runSpacing: 12,
       children: [
         Tooltip(
-          message: 'Continuar sua jornada com menos friccao',
+          message: 'Voltar para a home principal',
           child: FilledButton.icon(
             onPressed: onContinue,
             icon: const Icon(Icons.favorite_outline_rounded),
-            label: const Text('Seguir no meu ritmo'),
+            label: const Text('Ir para home'),
           ),
         ),
         Tooltip(

@@ -12,8 +12,17 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+enum SocialModuleTab { feed, communities }
+
 class SocialModuleView extends ConsumerStatefulWidget {
-  const SocialModuleView({super.key});
+  const SocialModuleView({
+    super.key,
+    this.initialTab = SocialModuleTab.feed,
+    this.showTabs = true,
+  });
+
+  final SocialModuleTab initialTab;
+  final bool showTabs;
 
   @override
   ConsumerState<SocialModuleView> createState() => _SocialModuleViewState();
@@ -38,6 +47,10 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.index = switch (widget.initialTab) {
+      SocialModuleTab.feed => 0,
+      SocialModuleTab.communities => 1,
+    };
 
     ref.listenManual(socialPostControllerProvider, (previous, next) {
       if (next.hasError) {
@@ -218,12 +231,31 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Comunidade em movimento',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.initialTab == SocialModuleTab.feed
+                              ? 'Feed do dia'
+                              : 'Comunidades em movimento',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.initialTab == SocialModuleTab.feed
+                              ? 'Passe pelo que importa agora, publique algo curto e siga em frente sem peso.'
+                              : 'Explore grupos, encontre recortes que fazem sentido e crie um espaco quando for a hora.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                     ),
                   ),
                   Wrap(
@@ -238,32 +270,30 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Atualizar'),
                       ),
-                      FilledButton.icon(
-                        onPressed: _openCreateCommunityModal,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Nova comunidade'),
-                      ),
+                      if (widget.initialTab == SocialModuleTab.communities)
+                        FilledButton.icon(
+                          onPressed: _openCreateCommunityModal,
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Nova comunidade'),
+                        ),
                     ],
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Acompanhe o feed principal, descubra grupos e crie um espaco novo quando fizer sentido para sua jornada.',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 18),
-              TabBar(
-                controller: _tabController,
-                dividerColor: Colors.transparent,
-                labelColor: AppColors.textPrimary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.accent,
-                tabs: const [
-                  Tab(text: 'Feed'),
-                  Tab(text: 'Comunidades'),
-                ],
-              ),
+              if (widget.showTabs) ...[
+                const SizedBox(height: 18),
+                TabBar(
+                  controller: _tabController,
+                  dividerColor: Colors.transparent,
+                  labelColor: AppColors.textPrimary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  indicatorColor: AppColors.accent,
+                  tabs: const [
+                    Tab(text: 'Feed'),
+                    Tab(text: 'Comunidades'),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

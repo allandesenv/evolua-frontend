@@ -18,28 +18,28 @@ class GradientScaffold extends StatelessWidget {
             colors: [
               AppColors.background,
               AppColors.backgroundSecondary,
-              AppColors.background,
+              Color(0xFF0F1828),
             ],
             begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            end: Alignment.bottomCenter,
           ),
         ),
         child: Stack(
           children: [
             Positioned(
-              top: -120,
-              left: -40,
+              top: -140,
+              left: -60,
               child: _GlowOrb(
-                color: AppColors.accent.withValues(alpha: 0.18),
-                size: 280,
+                color: AppColors.accent.withValues(alpha: 0.12),
+                size: 300,
               ),
             ),
             Positioned(
-              bottom: -80,
-              right: -20,
+              bottom: -120,
+              right: -40,
               child: _GlowOrb(
-                color: AppColors.accentWarm.withValues(alpha: 0.16),
-                size: 240,
+                color: AppColors.accentWarm.withValues(alpha: 0.1),
+                size: 260,
               ),
             ),
             SafeArea(child: child),
@@ -70,8 +70,8 @@ class _GlowOrb extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: color,
-              blurRadius: 120,
-              spreadRadius: 30,
+              blurRadius: 140,
+              spreadRadius: 24,
             ),
           ],
         ),

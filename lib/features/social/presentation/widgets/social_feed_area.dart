@@ -47,7 +47,7 @@ class SocialFeedArea extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${result.totalItems} publicacoes encontradas no seu feed.',
+                '${result.totalItems} publicacoes no ritmo de hoje.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -60,9 +60,12 @@ class SocialFeedArea extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              Row(
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 280,
                     child: DropdownButtonFormField<String>(
                       initialValue: communityFilter,
                       decoration: const InputDecoration(labelText: 'Comunidade'),
@@ -82,7 +85,8 @@ class SocialFeedArea extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  SizedBox(
+                    width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: visibilityFilter,
                       decoration: const InputDecoration(labelText: 'Visibilidade'),
@@ -133,7 +137,7 @@ class SocialFeedArea extends StatelessWidget {
                           children: [
                             Text(
                               post.community,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                     color: AppColors.textPrimary,
                                   ),
                             ),

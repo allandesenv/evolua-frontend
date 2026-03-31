@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
+import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -73,6 +74,14 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     );
   }
 
+  void _handleGoogleStub() {
+    AppSnackBar.show(
+      context,
+      message: 'Google login entra na proxima etapa. Por agora, siga com email e senha.',
+      icon: Icons.info_outline_rounded,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
@@ -110,15 +119,24 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
           ),
           const SizedBox(height: 24),
           Text(
-            _isRegisterMode ? 'Comece sua jornada hoje' : 'Seu espaco seguro para evoluir',
+            _isRegisterMode ? 'Crie sua conta e comece leve' : 'Entre e continue sua jornada',
             style: theme.textTheme.headlineMedium,
           ),
           const SizedBox(height: 12),
           Text(
             _isRegisterMode
-                ? 'Crie sua conta em poucos segundos e siga para o primeiro check-in.'
-                : 'Entre para retomar sua jornada com clareza e consistencia.',
-            style: theme.textTheme.bodyMedium,
+                ? 'Cadastro direto, sem ruido, para voce chegar logo ao primeiro check-in.'
+                : 'Continue de onde parou com um login simples e sem excesso de passos.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: isLoading ? null : _handleGoogleStub,
+              icon: const Icon(Icons.account_circle_rounded),
+              label: const Text('Continuar com Google'),
+            ),
           ),
           const SizedBox(height: 24),
           AutofillGroup(
@@ -166,15 +184,18 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                   },
                 ),
                 const SizedBox(height: 22),
-                ElevatedButton(
-                  onPressed: isLoading ? null : _submit,
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_isRegisterMode ? 'Criar conta' : 'Entrar'),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _submit,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_isRegisterMode ? 'Criar conta' : 'Entrar'),
+                  ),
                 ),
               ],
             ),
@@ -185,8 +206,8 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(18),
+              color: AppColors.surfaceStrong.withValues(alpha: 0.38),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,7 +241,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Sessao persistente e acesso rapido para voce voltar ao app sem friccao.',
+                  'Sessao persistente para voce voltar rapido ao app quando quiser.',
                   style: theme.textTheme.bodySmall,
                 ),
               ),
@@ -246,9 +267,9 @@ class _DevCredentialChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: AppColors.surface.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

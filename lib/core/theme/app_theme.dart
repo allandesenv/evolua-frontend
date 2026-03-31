@@ -63,21 +63,21 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface.withValues(alpha: 0.84),
+        fillColor: AppColors.surfaceStrong.withValues(alpha: 0.52),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
-          vertical: 18,
+          vertical: 16,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: const BorderSide(color: AppColors.outline),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
-          borderSide: const BorderSide(color: AppColors.outline),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         hintStyle: baseTextTheme.bodyMedium?.copyWith(
@@ -87,29 +87,32 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.72)),
+          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
+          backgroundColor: AppColors.accent.withValues(alpha: 0.16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          side: BorderSide(color: AppColors.accent.withValues(alpha: 0.26)),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.background,
-          minimumSize: const Size.fromHeight(56),
+          elevation: 0,
+          minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
           ),
           textStyle: baseTextTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
@@ -124,8 +127,8 @@ class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        indicatorColor: AppColors.accent.withValues(alpha: 0.18),
+        backgroundColor: AppColors.surface.withValues(alpha: 0.95),
+        indicatorColor: AppColors.accent.withValues(alpha: 0.14),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => baseTextTheme.labelMedium?.copyWith(
             color: states.contains(WidgetState.selected)
@@ -151,16 +154,16 @@ class AppTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.52),
-        selectedColor: AppColors.accent.withValues(alpha: 0.18),
+        backgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.42),
+        selectedColor: AppColors.accent.withValues(alpha: 0.14),
         disabledColor: AppColors.surfaceStrong.withValues(alpha: 0.25),
-        side: BorderSide(color: AppColors.outline.withValues(alpha: 0.55)),
+        side: BorderSide(color: AppColors.outline.withValues(alpha: 0.42)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         labelStyle: baseTextTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
         secondaryLabelStyle: baseTextTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
-        secondarySelectedColor: AppColors.accent.withValues(alpha: 0.18),
+        secondarySelectedColor: AppColors.accent.withValues(alpha: 0.14),
         checkmarkColor: AppColors.accent,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       ),
       tabBarTheme: TabBarThemeData(
         dividerColor: Colors.transparent,
@@ -173,24 +176,24 @@ class AppTheme {
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
           color: AppColors.surfaceStrong,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.outline.withValues(alpha: 0.6)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
         ),
         textStyle: baseTextTheme.bodySmall?.copyWith(color: AppColors.textPrimary),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.backgroundSecondary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.4)),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.35)),
         ),
       ),
-      dividerColor: AppColors.outline.withValues(alpha: 0.4),
+      dividerColor: AppColors.outline.withValues(alpha: 0.3),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,

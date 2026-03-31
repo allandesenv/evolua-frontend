@@ -13,6 +13,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Evolua'), findsWidgets);
-    expect(find.textContaining('Seu espaco seguro'), findsOneWidget);
+    expect(find.textContaining('Entre e continue sua jornada'), findsWidgets);
   });
 }

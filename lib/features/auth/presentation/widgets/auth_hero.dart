@@ -14,70 +14,70 @@ class AuthHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const EvoluaLogo(),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         Text(
-          'Um espaco calmo para voltar a si e seguir com mais clareza.',
+          'Entre e continue sua jornada.',
           style: theme.textTheme.displayMedium,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620),
+          constraints: const BoxConstraints(maxWidth: 560),
           child: Text(
-            'Entenda como voce esta, receba uma direcao simples para o agora e transforme pequenas praticas em progresso perceptivel.',
-            style: theme.textTheme.bodyLarge?.copyWith(
+            'Check-in rapido, proxima acao clara e um feed leve para voce voltar todos os dias sem cansar.',
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         Wrap(
-          spacing: 16,
-          runSpacing: 16,
+          spacing: 12,
+          runSpacing: 12,
           children: const [
             _SignalChip(
-              icon: Icons.track_changes_rounded,
-              label: 'Check-ins e diario emocional',
+              icon: Icons.favorite_border_rounded,
+              label: 'Check-in rapido',
             ),
             _SignalChip(
-              icon: Icons.library_books_rounded,
-              label: 'Trilhas, audios e exercicios',
+              icon: Icons.auto_stories_rounded,
+              label: 'Trilhas curtas',
             ),
             _SignalChip(
-              icon: Icons.groups_rounded,
-              label: 'Rede social e comunidade',
+              icon: Icons.dynamic_feed_rounded,
+              label: 'Feed diario',
             ),
           ],
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
         const PrimaryPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'O que voce encontra aqui',
+                'O que voce encontra ao entrar',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 18),
-              _HeroMetric(
-                value: '7',
-                title: 'frentes da experiencia',
-                subtitle: 'Cuidado pessoal, trilhas, comunidade, conversa, progresso e planos.',
-              ),
               SizedBox(height: 16),
               _HeroMetric(
-                value: '<2s',
-                title: 'resposta rapida',
-                subtitle: 'Fluxos pensados para caber no ritmo do dia a dia.',
+                value: '1 min',
+                title: 'para registrar como voce esta',
+                subtitle: 'Sem formularios longos e sem sobrecarga logo na entrada.',
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 14),
               _HeroMetric(
-                value: 'Web + Mobile',
-                title: 'uma experiencia continua',
-                subtitle: 'A mesma jornada no navegador e no celular, com linguagem consistente.',
+                value: '1 foco',
+                title: 'de cada vez',
+                subtitle: 'A experiencia inteira foi organizada para reduzir ruido e scroll.',
+              ),
+              SizedBox(height: 14),
+              _HeroMetric(
+                value: 'Feed',
+                title: 'sempre ao alcance',
+                subtitle: 'Publicacoes e comunidades aparecem no momento certo, sem se esconderem.',
               ),
             ],
           ),
@@ -99,12 +99,12 @@ class _SignalChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 280),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      constraints: const BoxConstraints(maxWidth: 220),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.45)),
+        color: AppColors.surfaceStrong.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [
@@ -143,7 +143,7 @@ class _HeroMetric extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 82,
+          width: 72,
           child: Text(
             value,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(

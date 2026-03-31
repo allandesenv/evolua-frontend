@@ -34,15 +34,15 @@ class SocialPostComposer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Publicar no feed',
+              'Compartilhar algo rapido',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: AppColors.textPrimary,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Escolha uma comunidade real, controle a visibilidade e publique sem depender de texto livre para o grupo.',
-              style: Theme.of(context).textTheme.bodyLarge,
+              'Uma mensagem curta basta. Escolha a comunidade e publique sem transformar isso em uma tarefa longa.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
             TextFormField(
@@ -57,9 +57,12 @@ class SocialPostComposer extends StatelessWidget {
                   value == null || value.trim().isEmpty ? 'Escreva o conteudo.' : null,
             ),
             const SizedBox(height: 14),
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
               children: [
-                Expanded(
+                SizedBox(
+                  width: 280,
                   child: DropdownButtonFormField<String>(
                     initialValue: selectedCommunitySlug,
                     decoration: const InputDecoration(
@@ -80,7 +83,8 @@ class SocialPostComposer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
+                SizedBox(
+                  width: 220,
                   child: DropdownButtonFormField<String>(
                     initialValue: visibility,
                     decoration: const InputDecoration(labelText: 'Visibilidade'),

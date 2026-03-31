@@ -1,11 +1,14 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
+import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/emotional_module_view.dart';
-import 'package:evolua_frontend/features/home/presentation/widgets/insight_metric_card.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomeHubView extends StatefulWidget {
+class HomeHubView extends ConsumerStatefulWidget {
   const HomeHubView({
     super.key,
     required this.profilesCount,
@@ -14,6 +17,7 @@ class HomeHubView extends StatefulWidget {
     required this.postsCount,
     required this.communitiesCount,
     required this.onOpenTrails,
+    required this.onOpenFeed,
     required this.onOpenCommunity,
     required this.onOpenChat,
     required this.onOpenProfile,
@@ -25,67 +29,174 @@ class HomeHubView extends StatefulWidget {
   final int postsCount;
   final int communitiesCount;
   final VoidCallback onOpenTrails;
+  final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenChat;
   final VoidCallback onOpenProfile;
 
   @override
-  State<HomeHubView> createState() => _HomeHubViewState();
+  ConsumerState<HomeHubView> createState() => _HomeHubViewState();
 }
 
-class _HomeHubViewState extends State<HomeHubView> {
-  final GlobalKey _checkInKey = GlobalKey();
+class _HomeHubViewState extends ConsumerState<HomeHubView> {
+  final List<String> _moodOptions = const ['Calmo', 'Presente', 'Cansado', 'Ansioso'];
+  String _selectedMood = 'Calmo';
+  double _energyLevel = 7;
+  bool _showDetails = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(checkInControllerProvider, (previous, next) {
+      if (!next.hasError || !mounted) {
+        return;
+      }
+
+      final error = next.error;
+      final message = error is DioException
+          ? (error.response?.data is Map<String, dynamic>
+              ? ((error.response?.data['details'] as List?)?.join(', ') ??
+                  error.message ??
+                  'Nao foi possivel salvar o check-in.')
+              : error.message ?? 'Nao foi possivel salvar o check-in.')
+          : 'Nao foi possivel salvar o check-in.';
+
+      AppSnackBar.show(
+        context,
+        message: message,
+        icon: Icons.favorite_border_rounded,
+      );
+    });
+  }
+
+  Future<void> _submitQuickCheckIn() async {
+    await ref.read(checkInControllerProvider.notifier).create(
+          mood: _selectedMood.toLowerCase(),
+          reflection: 'Check-in rapido da home com energia ${_energyLevel.round()}/10.',
+          energyLevel: _energyLevel.round(),
+          recommendedPractice: _recommendedPractice,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    AppSnackBar.show(
+      context,
+      message: 'Check-in registrado. Continue no seu ritmo.',
+      icon: Icons.check_circle_outline_rounded,
+    );
+  }
+
+  String get _recommendedPractice {
+    if (_energyLevel <= 4) {
+      return 'pausa curta com respiracao guiada';
+    }
+    if (_selectedMood == 'Ansioso') {
+      return 'respiracao guiada de 5 minutos';
+    }
+    if (_selectedMood == 'Cansado') {
+      return 'alongamento leve e agua';
+    }
+    return 'pratica curta de foco';
+  }
 
   @override
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
+    final checkInState = ref.watch(checkInControllerProvider);
+    final result = checkInState.asData?.value.result;
+    final recentItems = result?.items ?? const [];
+    final streak = _calculateStreak(recentItems);
+    final averageEnergy = recentItems.isEmpty
+        ? _energyLevel.round()
+        : (recentItems.fold<int>(0, (sum, item) => sum + item.energyLevel) / recentItems.length)
+            .round();
+    final paceLabel = switch (widget.trailsCount) {
+      0 => 'Monte sua primeira trilha pessoal',
+      _ when widget.checkInsCount == 0 => 'Registre como voce esta para receber a direcao do dia',
+      _ when widget.postsCount == 0 => 'Passe no feed e encontre uma conversa para hoje',
+      _ => 'Respiracao guiada - 5 min',
+    };
+    final paceAction = switch (widget.trailsCount) {
+      0 => widget.onOpenTrails,
+      _ when widget.checkInsCount == 0 => _submitQuickCheckIn,
+      _ when widget.postsCount == 0 => widget.onOpenFeed,
+      _ => widget.onOpenTrails,
+    };
+    final paceButtonLabel = switch (widget.trailsCount) {
+      0 => 'Ver trilhas',
+      _ when widget.checkInsCount == 0 => 'Fazer check-in',
+      _ when widget.postsCount == 0 => 'Abrir feed',
+      _ => 'Comecar agora',
+    };
+
     return Column(
       children: [
         PrimaryPanel(
-          semanticLabel: 'Painel principal da home',
+          semanticLabel: 'Foco do dia',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Seu momento de agora',
+                'Hoje',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.accent,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Como voce esta se sentindo?',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Comece pelo check-in, receba uma direcao clara e siga em frente com uma unica proxima acao.',
-                style: Theme.of(context).textTheme.bodyLarge,
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _moodOptions
+                    .map(
+                      (mood) => ChoiceChip(
+                        label: Text(mood),
+                        selected: _selectedMood == mood,
+                        onSelected: (_) => setState(() => _selectedMood = mood),
+                      ),
+                    )
+                    .toList(),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
+              Text(
+                'Energia: ${_energyLevel.round()}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+              ),
+              Slider(
+                min: 1,
+                max: 10,
+                divisions: 9,
+                value: _energyLevel,
+                onChanged: (value) => setState(() => _energyLevel = value),
+              ),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  Tooltip(
-                    message: 'Ir direto para o registro emocional do dia',
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        final checkInContext = _checkInKey.currentContext;
-                        if (checkInContext != null) {
-                          Scrollable.ensureVisible(
-                            checkInContext,
-                            duration: const Duration(milliseconds: 280),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.favorite_rounded),
-                      label: const Text('Fazer check-in'),
+                  ElevatedButton.icon(
+                    onPressed: checkInState.isLoading && !checkInState.hasValue
+                        ? null
+                        : _submitQuickCheckIn,
+                    icon: const Icon(Icons.favorite_rounded),
+                    label: const Text('Fazer check-in'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => _showDetails = !_showDetails),
+                    icon: Icon(
+                      _showDetails ? Icons.expand_less_rounded : Icons.insights_rounded,
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenTrails,
-                    icon: const Icon(Icons.auto_stories_rounded),
-                    label: const Text('Ver trilhas'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenCommunity,
-                    icon: const Icon(Icons.groups_rounded),
-                    label: const Text('Explorar comunidade'),
+                    label: Text(
+                      _showDetails ? 'Ocultar detalhes' : 'Ver detalhes do seu ritmo',
+                    ),
                   ),
                 ],
               ),
@@ -93,80 +204,48 @@ class _HomeHubViewState extends State<HomeHubView> {
           ),
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: [
-            InsightMetricCard(
-              label: 'Progresso visivel',
-              value: '${widget.checkInsCount} check-ins',
-              change: widget.checkInsCount == 0 ? 'Seu primeiro registro comeca aqui' : 'Voce ja esta construindo um historico',
-              tone: AppColors.accent,
-            ),
-            InsightMetricCard(
-              label: 'Trilhas disponiveis',
-              value: widget.trailsCount.toString(),
-              change: widget.trailsCount == 0 ? 'Nenhuma pratica publicada ainda' : 'Escolha uma jornada e continue',
-              tone: AppColors.accentWarm,
-            ),
-            InsightMetricCard(
-              label: 'Comunidades ativas',
-              value: '${widget.communitiesCount} grupos',
-              change: widget.communitiesCount == 0
-                  ? 'Descubra ou crie a primeira comunidade'
-                  : 'Voce ja tem espacos para trocar',
-              tone: AppColors.accentGold,
-            ),
-            InsightMetricCard(
-              label: 'Feed em movimento',
-              value: '${widget.postsCount} posts',
-              change: widget.postsCount == 0
-                  ? 'Seu feed ainda pode ganhar a primeira publicacao'
-                  : 'Seu espaco social ja esta vivo',
-              tone: AppColors.accentGold,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
         PrimaryPanel(
-          semanticLabel: 'Sugestao do dia',
+          semanticLabel: 'Proxima acao',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Sugestao do dia',
+                'Proximo passo',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.accentWarm,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                paceLabel,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: AppColors.textPrimary,
                     ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
-                widget.trailsCount == 0
-                    ? 'Assim que suas trilhas estiverem prontas, este espaco vai sugerir a melhor proxima pratica.'
-                    : widget.communitiesCount == 0
-                        ? 'Voce ja tem trilhas publicadas. O proximo passo natural pode ser entrar em uma comunidade relevante.'
-                        : 'Voce ja tem trilhas e comunidades ativas. Use este espaco para destacar a melhor proxima acao do dia.',
-                style: Theme.of(context).textTheme.bodyLarge,
+                'Uma unica acao agora vale mais do que abrir muitas frentes ao mesmo tempo.',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  _QuickActionChip(
-                    label: 'Perfil',
-                    icon: Icons.person_rounded,
-                      onTap: widget.onOpenProfile,
+                  FilledButton.icon(
+                    onPressed: paceAction,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text(paceButtonLabel),
                   ),
-                  _QuickActionChip(
-                    label: 'Chat',
-                    icon: Icons.chat_bubble_rounded,
-                      onTap: widget.onOpenChat,
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenCommunity,
+                    icon: const Icon(Icons.groups_rounded),
+                    label: const Text('Comunidade'),
                   ),
-                  _QuickActionChip(
-                    label: 'Comunidade',
-                    icon: Icons.forum_rounded,
-                      onTap: widget.onOpenCommunity,
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenChat,
+                    icon: const Icon(Icons.chat_bubble_rounded),
+                    label: const Text('Chat'),
                   ),
                 ],
               ),
@@ -175,105 +254,139 @@ class _HomeHubViewState extends State<HomeHubView> {
         ),
         const SizedBox(height: 16),
         PrimaryPanel(
-          semanticLabel: 'Resumo rapido da jornada',
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          semanticLabel: 'Seu ritmo',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: compact ? double.infinity : 220,
-                child: _MiniProgress(
-                  label: 'Perfil pronto',
-                  value: widget.profilesCount > 0 ? 'Sim' : 'Nao ainda',
-                ),
+              Text(
+                'Seu ritmo',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.accentGold,
+                    ),
               ),
-              SizedBox(
-                width: compact ? double.infinity : 220,
-                child: _MiniProgress(
-                  label: 'Habito do dia',
-                  value: widget.checkInsCount > 0 ? 'Registrado' : 'Pendente',
-                ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _RhythmMetric(
+                    width: compact ? double.infinity : 170,
+                    label: 'Sequencia',
+                    value: '$streak dias',
+                    hint: streak == 0 ? 'Seu ritmo comeca hoje' : 'Consistencia em construo',
+                  ),
+                  _RhythmMetric(
+                    width: compact ? double.infinity : 170,
+                    label: 'Energia media',
+                    value: '$averageEnergy/10',
+                    hint: 'Baseada nos registros recentes',
+                  ),
+                  _RhythmMetric(
+                    width: compact ? double.infinity : 170,
+                    label: 'Feed ativo',
+                    value: '${widget.postsCount}',
+                    hint: widget.postsCount == 0 ? 'Ainda sem posts para hoje' : 'Conversas em movimento',
+                  ),
+                ],
               ),
-              SizedBox(
-                width: compact ? double.infinity : 220,
-                child: _MiniProgress(
-                  label: 'Proximo passo',
-                  value: widget.trailsCount > 0 ? 'Praticar' : 'Criar trilha',
-                ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenFeed,
+                    icon: const Icon(Icons.dynamic_feed_rounded),
+                    label: const Text('Abrir feed'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenProfile,
+                    icon: const Icon(Icons.person_rounded),
+                    label: const Text('Ver perfil'),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        KeyedSubtree(
-          key: _checkInKey,
-          child: const EmotionalModuleView(),
-        ),
+        if (_showDetails) ...[
+          const SizedBox(height: 16),
+          const EmotionalModuleView(),
+        ],
       ],
     );
   }
-}
 
-class _QuickActionChip extends StatelessWidget {
-  const _QuickActionChip({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
+  int _calculateStreak(List<dynamic> items) {
+    if (items.isEmpty) {
+      return 0;
+    }
 
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
+    final days = items
+        .map((item) => DateTime(item.createdAt.year, item.createdAt.month, item.createdAt.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
 
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Abrir $label',
-      child: ActionChip(
-        onPressed: onTap,
-        avatar: Icon(icon, size: 18, color: AppColors.accent),
-        label: Text(label),
-        side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
-        backgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.6),
-        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textPrimary,
-            ),
-      ),
-    );
+    var streak = 0;
+    var cursor = DateTime.now();
+    cursor = DateTime(cursor.year, cursor.month, cursor.day);
+
+    for (final day in days) {
+      final expected = cursor.subtract(Duration(days: streak));
+      if (day == expected) {
+        streak++;
+        continue;
+      }
+
+      if (streak == 0 && day == expected.subtract(const Duration(days: 1))) {
+        streak++;
+        continue;
+      }
+
+      break;
+    }
+
+    return streak;
   }
 }
 
-class _MiniProgress extends StatelessWidget {
-  const _MiniProgress({
+class _RhythmMetric extends StatelessWidget {
+  const _RhythmMetric({
+    required this.width,
     required this.label,
     required this.value,
+    required this.hint,
   });
 
+  final double width;
   final String label;
   final String value;
+  final String hint;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: width,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: AppColors.surfaceStrong.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(16),
+        color: AppColors.surfaceStrong.withValues(alpha: 0.42),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.36)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: AppColors.textPrimary,
                 ),
           ),
+          const SizedBox(height: 6),
+          Text(hint, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
