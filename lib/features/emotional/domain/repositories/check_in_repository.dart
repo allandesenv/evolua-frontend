@@ -16,8 +16,7 @@ abstract class CheckInRepository {
 
   Future<CheckIn> create({
     required String mood,
-    required String reflection,
+    String? reflection,
     required int energyLevel,
-    required String recommendedPractice,
   });
 }

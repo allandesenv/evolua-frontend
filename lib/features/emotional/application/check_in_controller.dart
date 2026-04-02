@@ -18,6 +18,7 @@ class CheckInHistoryState {
   const CheckInHistoryState({
     required this.result,
     required this.selectedGrouping,
+    this.latestCreatedCheckIn,
     this.search,
     this.mood,
     this.energyRange,
@@ -27,6 +28,7 @@ class CheckInHistoryState {
 
   final PaginatedResponse<CheckIn> result;
   final String selectedGrouping;
+  final CheckIn? latestCreatedCheckIn;
   final String? search;
   final String? mood;
   final String? energyRange;
@@ -107,6 +109,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       CheckInHistoryState(
         result: current.result,
         selectedGrouping: grouping,
+        latestCreatedCheckIn: current.latestCreatedCheckIn,
         search: current.search,
         mood: current.mood,
         energyRange: current.energyRange,
@@ -118,21 +121,19 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
 
   Future<void> create({
     required String mood,
-    required String reflection,
+    String? reflection,
     required int energyLevel,
-    required String recommendedPractice,
   }) async {
     final repository = ref.read(checkInRepositoryProvider);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await repository.create(
+      final created = await repository.create(
         mood: mood,
         reflection: reflection,
         energyLevel: energyLevel,
-        recommendedPractice: recommendedPractice,
       );
 
-      return _stateFromResult(await _fetch(page: 0));
+      return _stateFromResult(await _fetch(page: 0), latestCreatedCheckIn: created);
     });
   }
 
@@ -148,10 +149,14 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         );
   }
 
-  CheckInHistoryState _stateFromResult(PaginatedResponse<CheckIn> result) {
+  CheckInHistoryState _stateFromResult(
+    PaginatedResponse<CheckIn> result, {
+    CheckIn? latestCreatedCheckIn,
+  }) {
     return CheckInHistoryState(
       result: result,
       selectedGrouping: _selectedGrouping,
+      latestCreatedCheckIn: latestCreatedCheckIn ?? state.asData?.value.latestCreatedCheckIn,
       search: _search,
       mood: _mood,
       energyRange: _energyRange,

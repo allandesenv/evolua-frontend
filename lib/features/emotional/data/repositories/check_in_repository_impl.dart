@@ -50,9 +50,8 @@ class CheckInRepositoryImpl implements CheckInRepository {
   @override
   Future<CheckIn> create({
     required String mood,
-    required String reflection,
+    String? reflection,
     required int energyLevel,
-    required String recommendedPractice,
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/check-ins',
@@ -60,7 +59,6 @@ class CheckInRepositoryImpl implements CheckInRepository {
         'mood': mood,
         'reflection': reflection,
         'energyLevel': energyLevel,
-        'recommendedPractice': recommendedPractice,
       },
     );
 

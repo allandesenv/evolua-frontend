@@ -3,6 +3,7 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
+import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
@@ -22,7 +23,6 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
   final _formKey = GlobalKey<FormState>();
   final _moodController = TextEditingController(text: 'calmo');
   final _reflectionController = TextEditingController();
-  final _practiceController = TextEditingController(text: 'respiracao guiada');
   final _searchController = TextEditingController();
   double _energyLevel = 7;
   String _selectedMood = 'Todos';
@@ -54,7 +54,6 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
   void dispose() {
     _moodController.dispose();
     _reflectionController.dispose();
-    _practiceController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -63,14 +62,13 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
     if (!_formKey.currentState!.validate()) return;
     await ref.read(checkInControllerProvider.notifier).create(
           mood: _moodController.text.trim(),
-          reflection: _reflectionController.text.trim(),
+          reflection:
+              _reflectionController.text.trim().isEmpty ? null : _reflectionController.text.trim(),
           energyLevel: _energyLevel.round(),
-          recommendedPractice: _practiceController.text.trim(),
         );
     if (!mounted) return;
     _moodController.text = 'calmo';
     _reflectionController.clear();
-    _practiceController.text = 'respiracao guiada';
     setState(() => _energyLevel = 7);
   }
 
@@ -131,6 +129,7 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
   Widget build(BuildContext context) {
     final checkInState = ref.watch(checkInControllerProvider);
     final isSaving = checkInState.isLoading && !checkInState.hasValue;
+    final latestInsight = checkInState.asData?.value.latestCreatedCheckIn?.aiInsight;
     final compact = ResponsiveBreakpoints.isCompact(context);
 
     return Column(
@@ -157,7 +156,7 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Em menos de um minuto, registre como voce esta e deixe o app acompanhar seu ritmo emocional.',
+                'Em menos de um minuto, registre como voce esta. Se quiser, conte o que influenciou esse momento para a IA responder com mais contexto.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 24),
@@ -175,20 +174,12 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
                       controller: _reflectionController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'O que mais influenciou seu momento?',
+                        labelText: 'Se quiser, conte o motivo do seu estado atual',
+                        hintText: 'Ex.: dormi pouco, tive uma conversa dificil, consegui terminar algo importante...',
                         alignLabelWithHint: true,
                         prefixIcon: Icon(Icons.auto_fix_high_rounded),
                       ),
-                      validator: (value) => value == null || value.trim().isEmpty ? 'Escreva uma reflexao curta.' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _practiceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Qual pratica combina com voce agora?',
-                        prefixIcon: Icon(Icons.self_improvement_rounded),
-                      ),
-                      validator: (value) => value == null || value.trim().isEmpty ? 'Informe a pratica sugerida.' : null,
+                      validator: (_) => null,
                     ),
                     const SizedBox(height: 16),
                     Semantics(
@@ -217,6 +208,10 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
             ],
           ),
         ),
+        if (latestInsight != null) ...[
+          const SizedBox(height: 16),
+          CheckInAiInsightCard(insight: latestInsight),
+        ],
         const SizedBox(height: 16),
         checkInState.when(
           data: (historyState) => _HistoryPanel(
@@ -547,8 +542,10 @@ class _TimelineEntry extends StatelessWidget {
                     _InfoChip(icon: Icons.self_improvement_rounded, label: item.recommendedPractice),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(item.reflection, style: Theme.of(context).textTheme.bodyLarge),
+                if (item.reflection.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(item.reflection, style: Theme.of(context).textTheme.bodyLarge),
+                ],
               ],
             ),
           ),

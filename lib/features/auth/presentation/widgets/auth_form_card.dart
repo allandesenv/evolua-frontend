@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_redirect.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -74,12 +76,24 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     );
   }
 
-  void _handleGoogleStub() {
-    AppSnackBar.show(
-      context,
-      message: 'Google login entra na proxima etapa. Por agora, siga com email e senha.',
-      icon: Icons.info_outline_rounded,
+  void _handleGoogleLogin() {
+    final frontendRedirectUri =
+        Uri.parse(Uri.base.origin).resolve('/auth/google/callback').toString();
+    final startUri = Uri.parse('${AppConfig.apiBaseUrl}/v1/public/auth/google/start').replace(
+      queryParameters: {
+        'frontendRedirectUri': frontendRedirectUri,
+      },
     );
+
+    try {
+      openGoogleOAuthRedirect(startUri.toString());
+    } catch (_) {
+      AppSnackBar.show(
+        context,
+        message: 'Google login esta disponivel apenas no Flutter Web.',
+        icon: Icons.info_outline_rounded,
+      );
+    }
   }
 
   @override
@@ -133,7 +147,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: isLoading ? null : _handleGoogleStub,
+              onPressed: isLoading ? null : _handleGoogleLogin,
               icon: const Icon(Icons.account_circle_rounded),
               label: const Text('Continuar com Google'),
             ),
