@@ -40,6 +40,22 @@ class AuthRepositoryImpl implements AuthRepository {
     return dto.toEntity();
   }
 
+  @override
+  Future<AuthSession> exchangeGoogleCode({
+    required String code,
+  }) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/public/auth/google/exchange',
+      data: {
+        'code': code,
+      },
+    );
+
+    final payload = _normalizePayload(response.data);
+    final dto = AuthSessionDto.fromJson(payload, fallbackEmail: '');
+    return dto.toEntity();
+  }
+
   Map<String, dynamic> _normalizePayload(dynamic data) {
     if (data is Map<String, dynamic>) {
       if (data['data'] is Map<String, dynamic>) {

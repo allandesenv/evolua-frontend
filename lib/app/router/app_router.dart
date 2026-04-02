@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
+import 'package:evolua_frontend/features/auth/presentation/pages/google_auth_callback_page.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +22,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AuthPage(),
       ),
       GoRoute(
+        path: '/auth/google/callback',
+        builder: (context, state) => GoogleAuthCallbackPage(
+          code: state.uri.queryParameters['code'],
+          error: state.uri.queryParameters['error'],
+        ),
+      ),
+      GoRoute(
         path: '/home',
         builder: (context, state) => const HomePage(),
       ),
@@ -30,7 +38,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      final goingToAuth = state.matchedLocation == '/auth';
+      final goingToAuth = state.matchedLocation.startsWith('/auth');
 
       if (!isAuthenticated && !goingToAuth) {
         return '/auth';

@@ -23,7 +23,9 @@ class AuthSessionDto {
     }
 
     return AuthSessionDto(
-      email: (json['email'] ?? json['username'] ?? fallbackEmail).toString(),
+      email: ((json['email'] ?? json['username'])?.toString().isNotEmpty ?? false)
+          ? (json['email'] ?? json['username']).toString()
+          : fallbackEmail,
       accessToken: accessToken,
       refreshToken: (json['refreshToken'] ?? json['refresh_token'])?.toString(),
     );
@@ -32,7 +34,7 @@ class AuthSessionDto {
   AuthSession toEntity() {
     return AuthSession.fromJson(
       {
-        'email': email,
+        'email': email.isEmpty ? null : email,
         'accessToken': accessToken,
         'refreshToken': refreshToken,
       },

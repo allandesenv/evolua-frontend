@@ -1,3 +1,5 @@
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+
 class CheckIn {
   const CheckIn({
     required this.id,
@@ -6,6 +8,7 @@ class CheckIn {
     required this.reflection,
     required this.energyLevel,
     required this.recommendedPractice,
+    required this.aiInsight,
     required this.createdAt,
   });
 
@@ -15,5 +18,6 @@ class CheckIn {
   final String reflection;
   final int energyLevel;
   final String recommendedPractice;
+  final CheckInAiInsight? aiInsight;
   final DateTime createdAt;
 }

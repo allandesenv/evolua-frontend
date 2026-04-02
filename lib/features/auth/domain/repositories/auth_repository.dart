@@ -10,4 +10,8 @@ abstract class AuthRepository {
     required String email,
     required String password,
   });
+
+  Future<AuthSession> exchangeGoogleCode({
+    required String code,
+  });
 }

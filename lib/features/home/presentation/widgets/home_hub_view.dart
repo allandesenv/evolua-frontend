@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/emotional_module_view.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -40,6 +41,7 @@ class HomeHubView extends ConsumerStatefulWidget {
 
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   final List<String> _moodOptions = const ['Calmo', 'Presente', 'Cansado', 'Ansioso'];
+  final _reflectionController = TextEditingController();
   String _selectedMood = 'Calmo';
   double _energyLevel = 7;
   bool _showDetails = false;
@@ -69,17 +71,25 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     });
   }
 
+  @override
+  void dispose() {
+    _reflectionController.dispose();
+    super.dispose();
+  }
+
   Future<void> _submitQuickCheckIn() async {
     await ref.read(checkInControllerProvider.notifier).create(
           mood: _selectedMood.toLowerCase(),
-          reflection: 'Check-in rapido da home com energia ${_energyLevel.round()}/10.',
+          reflection:
+              _reflectionController.text.trim().isEmpty ? null : _reflectionController.text.trim(),
           energyLevel: _energyLevel.round(),
-          recommendedPractice: _recommendedPractice,
         );
 
     if (!mounted) {
       return;
     }
+
+    _reflectionController.clear();
 
     AppSnackBar.show(
       context,
@@ -88,23 +98,11 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     );
   }
 
-  String get _recommendedPractice {
-    if (_energyLevel <= 4) {
-      return 'pausa curta com respiracao guiada';
-    }
-    if (_selectedMood == 'Ansioso') {
-      return 'respiracao guiada de 5 minutos';
-    }
-    if (_selectedMood == 'Cansado') {
-      return 'alongamento leve e agua';
-    }
-    return 'pratica curta de foco';
-  }
-
   @override
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final checkInState = ref.watch(checkInControllerProvider);
+    final latestInsight = checkInState.asData?.value.latestCreatedCheckIn?.aiInsight;
     final result = checkInState.asData?.value.result;
     final recentItems = result?.items ?? const [];
     final streak = _calculateStreak(recentItems);
@@ -178,6 +176,18 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
                 onChanged: (value) => setState(() => _energyLevel = value),
               ),
               const SizedBox(height: 8),
+              TextFormField(
+                controller: _reflectionController,
+                minLines: 2,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Se quiser, conte o motivo do seu estado atual',
+                  hintText: 'Isso ajuda a IA a responder com mais precisao.',
+                  alignLabelWithHint: true,
+                  prefixIcon: Icon(Icons.edit_note_rounded),
+                ),
+              ),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -203,6 +213,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
             ],
           ),
         ),
+        if (latestInsight != null) ...[
+          const SizedBox(height: 16),
+          CheckInAiInsightCard(
+            insight: latestInsight,
+            onOpenTrails: widget.onOpenTrails,
+          ),
+        ],
         const SizedBox(height: 16),
         PrimaryPanel(
           semanticLabel: 'Proxima acao',

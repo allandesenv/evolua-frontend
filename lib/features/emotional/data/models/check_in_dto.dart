@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 
 class CheckInDto {
   const CheckInDto({
@@ -8,6 +9,7 @@ class CheckInDto {
     required this.reflection,
     required this.energyLevel,
     required this.recommendedPractice,
+    required this.aiInsight,
     required this.createdAt,
   });
 
@@ -17,6 +19,7 @@ class CheckInDto {
   final String reflection;
   final int energyLevel;
   final String recommendedPractice;
+  final CheckInAiInsight? aiInsight;
   final DateTime createdAt;
 
   factory CheckInDto.fromJson(Map<String, dynamic> json) {
@@ -27,6 +30,7 @@ class CheckInDto {
       reflection: json['reflection'].toString(),
       energyLevel: (json['energyLevel'] as num).toInt(),
       recommendedPractice: json['recommendedPractice'].toString(),
+      aiInsight: _parseInsight(json['aiInsight']),
       createdAt: DateTime.parse(json['createdAt'].toString()),
     );
   }
@@ -39,7 +43,24 @@ class CheckInDto {
       reflection: reflection,
       energyLevel: energyLevel,
       recommendedPractice: recommendedPractice,
+      aiInsight: aiInsight,
       createdAt: createdAt,
+    );
+  }
+
+  static CheckInAiInsight? _parseInsight(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+
+    return CheckInAiInsight(
+      insight: value['insight']?.toString() ?? '',
+      suggestedAction: value['suggestedAction']?.toString() ?? '',
+      riskLevel: value['riskLevel']?.toString() ?? 'low',
+      suggestedTrailId: (value['suggestedTrailId'] as num?)?.toInt(),
+      suggestedTrailTitle: value['suggestedTrailTitle']?.toString(),
+      suggestedTrailReason: value['suggestedTrailReason']?.toString() ?? '',
+      fallbackUsed: value['fallbackUsed'] as bool? ?? false,
     );
   }
 }
