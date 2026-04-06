@@ -1,6 +1,5 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
-import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
 class AuthHero extends StatelessWidget {
@@ -23,7 +22,7 @@ class AuthHero extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
           child: Text(
-            'Check-in rapido, proxima acao clara e um feed leve para voce voltar todos os dias sem cansar.',
+            'Check-in rapido, proxima acao clara e reflexoes leves para voce voltar todos os dias sem cansar.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -44,43 +43,9 @@ class AuthHero extends StatelessWidget {
             ),
             _SignalChip(
               icon: Icons.dynamic_feed_rounded,
-              label: 'Feed diario',
+              label: 'Reflexoes do momento',
             ),
           ],
-        ),
-        const SizedBox(height: 28),
-        const PrimaryPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'O que voce encontra ao entrar',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 16),
-              _HeroMetric(
-                value: '1 min',
-                title: 'para registrar como voce esta',
-                subtitle: 'Sem formularios longos e sem sobrecarga logo na entrada.',
-              ),
-              SizedBox(height: 14),
-              _HeroMetric(
-                value: '1 foco',
-                title: 'de cada vez',
-                subtitle: 'A experiencia inteira foi organizada para reduzir ruido e scroll.',
-              ),
-              SizedBox(height: 14),
-              _HeroMetric(
-                value: 'Feed',
-                title: 'sempre ao alcance',
-                subtitle: 'Publicacoes e comunidades aparecem no momento certo, sem se esconderem.',
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -122,52 +87,6 @@ class _SignalChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({
-    required this.value,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final String value;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 72,
-          child: Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.accentGold,
-                ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

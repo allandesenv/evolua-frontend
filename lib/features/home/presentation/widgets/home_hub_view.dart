@@ -20,7 +20,6 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenTrails,
     required this.onOpenFeed,
     required this.onOpenCommunity,
-    required this.onOpenChat,
     required this.onOpenProfile,
   });
 
@@ -32,7 +31,6 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenTrails;
   final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
-  final VoidCallback onOpenChat;
   final VoidCallback onOpenProfile;
 
   @override
@@ -113,7 +111,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final paceLabel = switch (widget.trailsCount) {
       0 => 'Monte sua primeira trilha pessoal',
       _ when widget.checkInsCount == 0 => 'Registre como voce esta para receber a direcao do dia',
-      _ when widget.postsCount == 0 => 'Passe no feed e encontre uma conversa para hoje',
+      _ when widget.postsCount == 0 => 'Passe pelas reflexoes e encontre algo que converse com o seu momento',
       _ => 'Respiracao guiada - 5 min',
     };
     final paceAction = switch (widget.trailsCount) {
@@ -125,7 +123,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final paceButtonLabel = switch (widget.trailsCount) {
       0 => 'Ver trilhas',
       _ when widget.checkInsCount == 0 => 'Fazer check-in',
-      _ when widget.postsCount == 0 => 'Abrir feed',
+      _ when widget.postsCount == 0 => 'Abrir reflexoes',
       _ => 'Comecar agora',
     };
 
@@ -257,12 +255,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
                   OutlinedButton.icon(
                     onPressed: widget.onOpenCommunity,
                     icon: const Icon(Icons.groups_rounded),
-                    label: const Text('Comunidade'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenChat,
-                    icon: const Icon(Icons.chat_bubble_rounded),
-                    label: const Text('Chat'),
+                    label: const Text('Espacos'),
                   ),
                 ],
               ),
@@ -300,9 +293,11 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
                   ),
                   _RhythmMetric(
                     width: compact ? double.infinity : 170,
-                    label: 'Feed ativo',
+                    label: 'Reflexoes',
                     value: '${widget.postsCount}',
-                    hint: widget.postsCount == 0 ? 'Ainda sem posts para hoje' : 'Conversas em movimento',
+                    hint: widget.postsCount == 0
+                        ? 'Ainda sem reflexoes para este momento'
+                        : 'Aprendizados e relatos em movimento',
                   ),
                 ],
               ),
@@ -314,7 +309,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
                   OutlinedButton.icon(
                     onPressed: widget.onOpenFeed,
                     icon: const Icon(Icons.dynamic_feed_rounded),
-                    label: const Text('Abrir feed'),
+                    label: const Text('Abrir reflexoes'),
                   ),
                   OutlinedButton.icon(
                     onPressed: widget.onOpenProfile,

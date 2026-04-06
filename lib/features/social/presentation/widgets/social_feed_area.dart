@@ -15,6 +15,7 @@ class SocialFeedArea extends StatelessWidget {
     required this.visibilityFilter,
     required this.communityFilter,
     required this.communityOptions,
+    required this.contextualHint,
     required this.onSearchChanged,
     required this.onVisibilityFilterChanged,
     required this.onCommunityFilterChanged,
@@ -26,6 +27,7 @@ class SocialFeedArea extends StatelessWidget {
   final String visibilityFilter;
   final String communityFilter;
   final List<String> communityOptions;
+  final String contextualHint;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onVisibilityFilterChanged;
   final ValueChanged<String> onCommunityFilterChanged;
@@ -40,14 +42,12 @@ class SocialFeedArea extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Feed principal',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
+                contextualHint,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
-                '${result.totalItems} publicacoes no ritmo de hoje.',
+                '${result.totalItems} reflexoes no ritmo de hoje.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -55,7 +55,7 @@ class SocialFeedArea extends StatelessWidget {
                 controller: searchController,
                 onChanged: onSearchChanged,
                 decoration: const InputDecoration(
-                  labelText: 'Buscar por conteudo ou comunidade',
+                  labelText: 'Buscar por reflexao ou espaco',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
@@ -68,12 +68,12 @@ class SocialFeedArea extends StatelessWidget {
                     width: 280,
                     child: DropdownButtonFormField<String>(
                       initialValue: communityFilter,
-                      decoration: const InputDecoration(labelText: 'Comunidade'),
+                      decoration: const InputDecoration(labelText: 'Espaco'),
                       items: communityOptions
                           .map(
                             (item) => DropdownMenuItem<String>(
                               value: item,
-                              child: Text(item == 'TODAS' ? 'Todas as comunidades' : item),
+                              child: Text(item == 'TODAS' ? 'Todos os espacos' : item),
                             ),
                           )
                           .toList(),
@@ -111,9 +111,9 @@ class SocialFeedArea extends StatelessWidget {
         if (result.items.isEmpty)
           GuidedEmptyState(
             icon: Icons.dynamic_feed_rounded,
-            title: 'Seu feed nao encontrou publicacoes com esses filtros.',
+            title: 'Nenhuma reflexao apareceu com esse recorte.',
             subtitle:
-                'Limpe a busca, troque a comunidade ou publique algo novo para movimentar esse espaco.',
+                'Limpe a busca, troque o espaco ou compartilhe uma nova reflexao para movimentar esse momento.',
             actionLabel: 'Ver tudo',
             onAction: () {
               searchController.clear();
@@ -146,6 +146,25 @@ class SocialFeedArea extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         Text(post.content, style: Theme.of(context).textTheme.bodyLarge),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: const [
+                            _LightInteractionChip(
+                              icon: Icons.favorite_border_rounded,
+                              label: 'Isso ressoou comigo',
+                            ),
+                            _LightInteractionChip(
+                              icon: Icons.auto_awesome_outlined,
+                              label: 'Quero aplicar isso',
+                            ),
+                            _LightInteractionChip(
+                              icon: Icons.bookmark_border_rounded,
+                              label: 'Salvei',
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -159,6 +178,41 @@ class SocialFeedArea extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+}
+
+class _LightInteractionChip extends StatelessWidget {
+  const _LightInteractionChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: AppColors.surfaceStrong.withValues(alpha: 0.38),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }

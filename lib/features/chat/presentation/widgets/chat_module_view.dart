@@ -155,7 +155,7 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
     return Column(
       children: [
         PrimaryPanel(
-          semanticLabel: 'Modulo de chat em tempo real',
+          semanticLabel: 'Modulo de conversas',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -163,7 +163,7 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Conversa em tempo real',
+                      'Conversas',
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                   ),
@@ -187,7 +187,7 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Mensagens novas destinadas ao seu canal entram sozinhas. Canal atual: $liveInboxId',
+                'Continue trocas leves e acolhedoras no seu ritmo. Canal atual: $liveInboxId',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 24),
@@ -199,7 +199,7 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                       TextFormField(
                         controller: _recipientController,
                         decoration: const InputDecoration(
-                          labelText: 'Com quem voce quer falar?',
+                          labelText: 'Com quem voce quer continuar a conversa?',
                           prefixIcon: Icon(Icons.person_search_rounded),
                         ),
                         validator: (value) => value == null || value.trim().isEmpty
@@ -213,7 +213,7 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                             child: TextFormField(
                               controller: _recipientController,
                               decoration: const InputDecoration(
-                                labelText: 'Com quem voce quer falar?',
+                                labelText: 'Com quem voce quer continuar a conversa?',
                                 prefixIcon: Icon(Icons.person_search_rounded),
                               ),
                               validator: (value) => value == null || value.trim().isEmpty
@@ -228,7 +228,8 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                       controller: _contentController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Escreva sua mensagem',
+                        labelText: 'Escreva uma mensagem breve',
+                        hintText: 'Acolha, compartilhe ou siga a conversa sem pressa.',
                         alignLabelWithHint: true,
                         prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
                       ),
@@ -242,7 +243,7 @@ class _ChatModuleViewState extends ConsumerState<ChatModuleView> {
                       child: ElevatedButton.icon(
                         onPressed: messagesState.isLoading && !messagesState.hasValue ? null : _submit,
                         icon: const Icon(Icons.send_and_archive_rounded),
-                        label: const Text('Enviar mensagem'),
+                        label: const Text('Enviar conversa'),
                       ),
                     ),
                   ],
@@ -295,7 +296,7 @@ class _ChatHistory extends StatelessWidget {
                 controller: searchController,
                 onChanged: onSearchChanged,
                 decoration: const InputDecoration(
-                  labelText: 'Buscar por pessoa ou mensagem',
+                  labelText: 'Buscar por pessoa ou conversa',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
@@ -312,7 +313,7 @@ class _ChatHistory extends StatelessWidget {
           GuidedEmptyState(
             icon: Icons.chat_bubble_outline_rounded,
             title: 'Nenhuma conversa apareceu por aqui.',
-            subtitle: 'Envie a primeira mensagem ou limpe a busca para enxergar melhor o historico.',
+            subtitle: 'Envie a primeira mensagem ou limpe a busca para enxergar melhor esse espaco de trocas leves.',
             actionLabel: 'Limpar busca',
             onAction: () {
               searchController.clear();
@@ -330,7 +331,7 @@ class _ChatHistory extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Para ${message.recipientId}',
+                          'Conversa com ${message.recipientId}',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 color: AppColors.textPrimary,
                               ),
