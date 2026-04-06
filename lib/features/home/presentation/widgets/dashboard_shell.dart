@@ -1,8 +1,6 @@
-import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
-import 'package:evolua_frontend/features/chat/presentation/widgets/chat_module_view.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
@@ -32,9 +30,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _destinations = [
     _NavItem(label: 'Home', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
-    _NavItem(label: 'Feed', icon: Icons.dynamic_feed_rounded),
-    _NavItem(label: 'Comunidade', icon: Icons.groups_rounded),
-    _NavItem(label: 'Chat', icon: Icons.chat_bubble_rounded),
+    _NavItem(label: 'Reflexoes', icon: Icons.dynamic_feed_rounded),
+    _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
     _NavItem(label: 'Perfil', icon: Icons.person_rounded),
   ];
 
@@ -102,139 +99,83 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                             children: [
                               const EvoluaLogo(compact: true),
                               const SizedBox(height: 24),
-                              Text(
-                                'Continue de onde parou.',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      color: AppColors.textPrimary,
-                                    ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Menos ruido, mais clareza para seguir no seu proprio ritmo.',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 24),
                               Expanded(
-                                child: Column(
-                                  children: [
-                                    Expanded(
-                                      child: SingleChildScrollView(
-                                        child: Column(
-                                          children: List.generate(
-                                            _destinations.length,
-                                            (index) {
-                                              final item = _destinations[index];
-                                              final isSelected = index == _selectedIndex;
-                                              return Padding(
-                                                padding: const EdgeInsets.only(bottom: 10),
-                                                child: Tooltip(
-                                                  message: item.label,
-                                                  child: InkWell(
-                                                    borderRadius: BorderRadius.circular(18),
-                                                    onTap: () => _goTo(index),
-                                                    child: AnimatedContainer(
-                                                      duration:
-                                                          const Duration(milliseconds: 180),
-                                                      curve: Curves.easeOutCubic,
-                                                      width: double.infinity,
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                        horizontal: 14,
-                                                        vertical: 14,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        borderRadius:
-                                                            BorderRadius.circular(18),
-                                                        color: isSelected
-                                                            ? AppColors.accent
-                                                                .withValues(alpha: 0.18)
-                                                            : Colors.transparent,
-                                                        border: Border.all(
-                                                          color: isSelected
-                                                              ? AppColors.accent.withValues(
-                                                                  alpha: 0.45,
-                                                                )
-                                                              : AppColors.outline.withValues(
-                                                                  alpha: 0.22,
-                                                                ),
-                                                        ),
-                                                      ),
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(
-                                                            item.icon,
-                                                            color: isSelected
-                                                                ? AppColors.accent
-                                                                : AppColors.textSecondary,
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    children: List.generate(
+                                      _destinations.length,
+                                      (index) {
+                                        final item = _destinations[index];
+                                        final isSelected = index == _selectedIndex;
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 10),
+                                          child: Tooltip(
+                                            message: item.label,
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(18),
+                                              onTap: () => _goTo(index),
+                                              child: AnimatedContainer(
+                                                duration:
+                                                    const Duration(milliseconds: 180),
+                                                curve: Curves.easeOutCubic,
+                                                width: double.infinity,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 14,
+                                                  vertical: 14,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(18),
+                                                  color: isSelected
+                                                      ? AppColors.accent
+                                                          .withValues(alpha: 0.18)
+                                                      : Colors.transparent,
+                                                  border: Border.all(
+                                                    color: isSelected
+                                                        ? AppColors.accent.withValues(
+                                                            alpha: 0.45,
+                                                          )
+                                                        : AppColors.outline.withValues(
+                                                            alpha: 0.22,
                                                           ),
-                                                          const SizedBox(width: 12),
-                                                          Expanded(
-                                                            child: Text(
-                                                              item.label,
-                                                              style: Theme.of(context)
-                                                                  .textTheme
-                                                                  .bodyLarge
-                                                                  ?.copyWith(
-                                                                    color: isSelected
-                                                                        ? AppColors.textPrimary
-                                                                        : AppColors
-                                                                            .textSecondary,
-                                                                    fontWeight: isSelected
-                                                                        ? FontWeight.w700
-                                                                        : FontWeight.w500,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
                                                   ),
                                                 ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                        color: AppColors.surfaceStrong.withValues(alpha: 0.7),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Acesso rapido',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelLarge
-                                                ?.copyWith(
-                                                  color: AppColors.textPrimary,
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      item.icon,
+                                                      color: isSelected
+                                                          ? AppColors.accent
+                                                          : AppColors.textSecondary,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Text(
+                                                        item.label,
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodyLarge
+                                                            ?.copyWith(
+                                                              color: isSelected
+                                                                  ? AppColors.textPrimary
+                                                                  : AppColors
+                                                                      .textSecondary,
+                                                              fontWeight: isSelected
+                                                                  ? FontWeight.w700
+                                                                  : FontWeight.w500,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
+                                              ),
+                                            ),
                                           ),
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            'Ritual rapido',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyLarge
-                                                ?.copyWith(
-                                                  color: AppColors.textPrimary,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Abra a home, registre como voce esta e deixe o resto aparecer aos poucos.',
-                                            style: Theme.of(context).textTheme.bodyMedium,
-                                          ),
-                                        ],
-                                      ),
+                                        );
+                                      },
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -283,8 +224,7 @@ class _DashboardContent extends ConsumerWidget {
         onOpenTrails: () => onNavigate(1),
         onOpenFeed: () => onNavigate(2),
         onOpenCommunity: () => onNavigate(3),
-        onOpenChat: () => onNavigate(4),
-        onOpenProfile: () => onNavigate(5),
+        onOpenProfile: () => onNavigate(4),
       ),
       const ContentModuleView(),
       const SocialModuleView(
@@ -292,7 +232,6 @@ class _DashboardContent extends ConsumerWidget {
         showTabs: false,
       ),
       const _CommunityView(),
-      const ChatModuleView(),
       const _ProfileArea(),
     ];
 
@@ -341,8 +280,6 @@ class _DashboardContent extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        if (selectedIndex == 4) const _DevelopmentInfo(),
       ],
     );
   }
@@ -392,19 +329,14 @@ class _HeaderText extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Sessao ativa',
+          'Usuario logado',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: AppColors.accent,
               ),
         ),
         const SizedBox(height: 10),
         Text(
-          'Continue de onde parou',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '$email conectado. Abra um foco por vez: praticar, publicar, conversar ou acompanhar seu ritmo.',
+          '$email conectado.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
@@ -444,32 +376,6 @@ class _HeaderActions extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DevelopmentInfo extends StatelessWidget {
-  const _DevelopmentInfo();
-
-  @override
-  Widget build(BuildContext context) {
-    return PrimaryPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Ambiente de desenvolvimento',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Auth: ${AppConfig.authBaseUrl}\nUser: ${AppConfig.userBaseUrl}\nContent: ${AppConfig.contentBaseUrl}\nEmotional: ${AppConfig.emotionalBaseUrl}\nSocial: ${AppConfig.socialBaseUrl}\nChat: ${AppConfig.chatBaseUrl}\nSubscription: ${AppConfig.subscriptionBaseUrl}\nNotification: ${AppConfig.notificationBaseUrl}',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ),
     );
   }
 }

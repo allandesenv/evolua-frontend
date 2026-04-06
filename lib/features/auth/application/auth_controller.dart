@@ -91,11 +91,13 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     final preferences = await ref.read(sharedPreferencesProvider.future);
 
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    final nextState = await AsyncValue.guard(() async {
       final session = await repository.exchangeGoogleCode(code: code);
       await preferences.setString(_sessionStorageKey, jsonEncode(session.toJson()));
       return session;
     });
+
+    state = nextState;
   }
 
   Future<void> logout() async {

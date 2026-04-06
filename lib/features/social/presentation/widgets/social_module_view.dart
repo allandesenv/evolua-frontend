@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
@@ -54,13 +56,13 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
 
     ref.listenManual(socialPostControllerProvider, (previous, next) {
       if (next.hasError) {
-        _showError(next.error, fallback: 'Nao foi possivel atualizar o feed.');
+        _showError(next.error, fallback: 'Nao foi possivel atualizar as reflexoes.');
       }
     });
 
     ref.listenManual(communityControllerProvider, (previous, next) {
       if (next.hasError) {
-        _showError(next.error, fallback: 'Nao foi possivel atualizar as comunidades.');
+        _showError(next.error, fallback: 'Nao foi possivel atualizar os espacos.');
       }
     });
   }
@@ -83,7 +85,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     if (selectedCommunity == null || selectedCommunity.isEmpty) {
       AppSnackBar.show(
         context,
-        message: 'Escolha uma comunidade para publicar.',
+        message: 'Escolha um espaco para compartilhar sua reflexao.',
         icon: Icons.groups_rounded,
       );
       return;
@@ -102,7 +104,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     _postContentController.clear();
     AppSnackBar.show(
       context,
-      message: 'Post publicado com sucesso.',
+      message: 'Reflexao publicada com sucesso.',
       icon: Icons.check_circle_outline_rounded,
     );
   }
@@ -169,7 +171,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
               _tabController.animateTo(1);
               AppSnackBar.show(
                 this.context,
-                message: 'Comunidade criada com sucesso.',
+                message: 'Espaco criado com sucesso.',
                 icon: Icons.groups_rounded,
               );
             },
@@ -202,13 +204,17 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
         .trim()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
-    return slug.isEmpty ? 'nova-comunidade' : slug;
+    return slug.isEmpty ? 'novo-espaco' : slug;
   }
 
   @override
   Widget build(BuildContext context) {
     final postsState = ref.watch(socialPostControllerProvider);
     final communitiesState = ref.watch(communityControllerProvider);
+    final session = ref.watch(authControllerProvider).asData?.value;
+    final canCreateCommunity = session?.isAdmin ?? false;
+    final latestCheckIn = ref.watch(checkInControllerProvider).asData?.value.latestCreatedCheckIn;
+    final contextualHint = _contextualHint(latestCheckIn?.mood);
     final joinedCommunities =
         communitiesState.asData?.value.items.where((item) => item.joined).toList() ??
             const <Community>[];
@@ -244,15 +250,8 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                       children: [
                         Text(
                           widget.initialTab == SocialModuleTab.feed
-                              ? 'Feed do dia'
-                              : 'Comunidades em movimento',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          widget.initialTab == SocialModuleTab.feed
-                              ? 'Passe pelo que importa agora, publique algo curto e siga em frente sem peso.'
-                              : 'Explore grupos, encontre recortes que fazem sentido e crie um espaco quando for a hora.',
+                              ? contextualHint
+                              : 'Explore espacos tematicos, encontre pertencimento sem pressao social e crie um novo espaco quando fizer sentido.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
@@ -270,11 +269,11 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Atualizar'),
                       ),
-                      if (widget.initialTab == SocialModuleTab.communities)
+                      if (widget.initialTab == SocialModuleTab.communities && canCreateCommunity)
                         FilledButton.icon(
                           onPressed: _openCreateCommunityModal,
                           icon: const Icon(Icons.add_rounded),
-                          label: const Text('Nova comunidade'),
+                          label: const Text('Novo espaco'),
                         ),
                     ],
                   ),
@@ -289,8 +288,8 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   unselectedLabelColor: AppColors.textSecondary,
                   indicatorColor: AppColors.accent,
                   tabs: const [
-                    Tab(text: 'Feed'),
-                    Tab(text: 'Comunidades'),
+                    Tab(text: 'Reflexoes'),
+                    Tab(text: 'Espacos'),
                   ],
                 ),
               ],
@@ -322,6 +321,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                       visibilityFilter: _feedVisibilityFilter,
                       communityFilter: _feedCommunityFilter,
                       communityOptions: communityFilterOptions,
+                      contextualHint: contextualHint,
                       onSearchChanged: (_) => _applyFeedFilters(),
                       onVisibilityFilterChanged: (value) {
                         setState(() => _feedVisibilityFilter = value);
@@ -335,10 +335,10 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                           ref.read(socialPostControllerProvider.notifier).goToPage(page),
                     ),
                     error: (error, stackTrace) => SocialActionableErrorState(
-                      title: 'Nao conseguimos abrir o feed agora.',
+                      title: 'Nao conseguimos abrir as reflexoes agora.',
                       onRetry: () => ref.read(socialPostControllerProvider.notifier).refresh(),
                     ),
-                    loading: () => const SocialLoadingState(label: 'Carregando feed...'),
+                    loading: () => const SocialLoadingState(label: 'Carregando reflexoes...'),
                   ),
                 ],
               );
@@ -387,18 +387,33 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                     );
                   }
                 },
+                canCreate: canCreateCommunity,
                 onCreate: _openCreateCommunityModal,
               ),
               error: (error, stackTrace) => SocialActionableErrorState(
-                title: 'Nao conseguimos abrir as comunidades agora.',
+                title: 'Nao conseguimos abrir os espacos agora.',
                 onRetry: () => ref.read(communityControllerProvider.notifier).refresh(),
               ),
-              loading: () => const SocialLoadingState(label: 'Carregando comunidades...'),
+              loading: () => const SocialLoadingState(label: 'Carregando espacos...'),
             );
           },
         ),
       ],
     );
+  }
+
+  String _contextualHint(String? mood) {
+    final normalized = mood?.toLowerCase() ?? '';
+    if (normalized.contains('ans')) {
+      return 'Seu momento recente pede mais regulacao. Estas reflexoes priorizam ansiedade, acolhimento e pequenas praticas aplicaveis agora.';
+    }
+    if (normalized.contains('cans')) {
+      return 'Seu momento recente pede mais leveza. Estas reflexoes puxam recuperacao, ritmo sustentavel e menos cobranca.';
+    }
+    if (normalized.contains('calm') || normalized.contains('presen')) {
+      return 'Seu momento recente abre espaco para clareza. Estas reflexoes priorizam presenca, constancia e aplicacao pratica.';
+    }
+    return 'Leia reflexoes curtas, aprendizados e relatos leves sem entrar no ritmo de uma rede social.';
   }
 }
 
@@ -453,19 +468,19 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Criar nova comunidade',
+                'Criar novo espaco',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 10),
               Text(
-                'Defina um nome claro, uma descricao curta e a visibilidade desse grupo.',
+                'Defina um nome claro, uma descricao curta e a abertura desse espaco.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 18),
               TextFormField(
                 controller: widget.nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Nome da comunidade',
+                  labelText: 'Nome do espaco',
                   prefixIcon: Icon(Icons.groups_rounded),
                 ),
                 onChanged: (_) => setState(() {}),
@@ -492,7 +507,7 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                 controller: widget.descriptionController,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                  labelText: 'Descricao',
+                  labelText: 'Descricao do espaco',
                   alignLabelWithHint: true,
                   prefixIcon: Icon(Icons.edit_note_rounded),
                 ),

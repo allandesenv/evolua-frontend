@@ -27,6 +27,8 @@ class SocialPostComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 760;
+
     return PrimaryPanel(
       child: Form(
         key: formKey,
@@ -34,14 +36,14 @@ class SocialPostComposer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Compartilhar algo rapido',
+              'Registrar uma reflexao curta',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: AppColors.textPrimary,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Uma mensagem curta basta. Escolha a comunidade e publique sem transformar isso em uma tarefa longa.',
+              'Um insight, um aprendizado ou um relato curto ja basta. Compartilhe sem transformar isso em uma tarefa longa.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
@@ -49,70 +51,154 @@ class SocialPostComposer extends StatelessWidget {
               controller: contentController,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'O que voce quer compartilhar?',
+                labelText: 'Hoje percebi que...',
+                hintText: 'Ou: estou aprendendo a... / assumir meu estado me ajudou a...',
                 alignLabelWithHint: true,
                 prefixIcon: Icon(Icons.forum_rounded),
               ),
-              validator: (value) =>
-                  value == null || value.trim().isEmpty ? 'Escreva o conteudo.' : null,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Escreva sua reflexao.'
+                  : null,
             ),
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: [
-                SizedBox(
-                  width: 280,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: selectedCommunitySlug,
-                    decoration: const InputDecoration(
-                      labelText: 'Publicar em',
-                      prefixIcon: Icon(Icons.groups_rounded),
+            if (compact)
+              Column(
+                children: [
+                  _SpaceSelector(
+                    selectedCommunitySlug: selectedCommunitySlug,
+                    joinedCommunities: joinedCommunities,
+                    onCommunityChanged: onCommunityChanged,
+                  ),
+                  const SizedBox(height: 16),
+                  _VisibilitySelector(
+                    visibility: visibility,
+                    onVisibilityChanged: onVisibilityChanged,
+                  ),
+                ],
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _SpaceSelector(
+                      selectedCommunitySlug: selectedCommunitySlug,
+                      joinedCommunities: joinedCommunities,
+                      onCommunityChanged: onCommunityChanged,
                     ),
-                    items: joinedCommunities
-                        .map(
-                          (community) => DropdownMenuItem<String>(
-                            value: community.slug,
-                            child: Text(community.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: onCommunityChanged,
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Escolha uma comunidade.' : null,
                   ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 220,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: visibility,
-                    decoration: const InputDecoration(labelText: 'Visibilidade'),
-                    items: const [
-                      DropdownMenuItem(value: 'PUBLIC', child: Text('Publica')),
-                      DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        onVisibilityChanged(value);
-                      }
-                    },
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: _VisibilitySelector(
+                      visibility: visibility,
+                      onVisibilityChanged: onVisibilityChanged,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             const SizedBox(height: 14),
+            if (joinedCommunities.isEmpty)
+              Text(
+                'Entre em um espaco para compartilhar reflexoes sem quebrar o seu ritmo.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              )
+            else
+              const SizedBox.shrink(),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
                 onPressed: onSubmit,
                 icon: const Icon(Icons.send_rounded),
-                label: const Text('Publicar'),
+                label: const Text('Compartilhar reflexao'),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SpaceSelector extends StatelessWidget {
+  const _SpaceSelector({
+    required this.selectedCommunitySlug,
+    required this.joinedCommunities,
+    required this.onCommunityChanged,
+  });
+
+  final String? selectedCommunitySlug;
+  final List<Community> joinedCommunities;
+  final ValueChanged<String?> onCommunityChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: selectedCommunitySlug,
+      decoration: const InputDecoration(
+        labelText: 'Compartilhar em',
+        prefixIcon: Icon(Icons.groups_rounded),
+      ),
+      items: joinedCommunities
+          .map(
+            (community) => DropdownMenuItem<String>(
+              value: community.slug,
+              child: Text(
+                community.name,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          )
+          .toList(),
+      selectedItemBuilder: (context) {
+        return joinedCommunities
+            .map(
+              (community) => Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  community.name,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            )
+            .toList();
+      },
+      onChanged: onCommunityChanged,
+      validator: (value) => value == null || value.isEmpty ? 'Escolha um espaco.' : null,
+    );
+  }
+}
+
+class _VisibilitySelector extends StatelessWidget {
+  const _VisibilitySelector({
+    required this.visibility,
+    required this.onVisibilityChanged,
+  });
+
+  final String visibility;
+  final ValueChanged<String> onVisibilityChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: visibility,
+      decoration: const InputDecoration(labelText: 'Visibilidade'),
+      items: const [
+        DropdownMenuItem(value: 'PUBLIC', child: Text('Publica')),
+        DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
+      ],
+      onChanged: (value) {
+        if (value != null) {
+          onVisibilityChanged(value);
+        }
+      },
     );
   }
 }

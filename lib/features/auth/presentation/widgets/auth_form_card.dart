@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
-import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_redirect.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -215,82 +214,6 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
             ),
           ),
           ),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceStrong.withValues(alpha: 0.38),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Perfis de desenvolvimento',
-                  style: theme.textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _DevCredentialChip(
-                      label: 'Admin',
-                      value: 'clara@evolua.local / 123456',
-                    ),
-                    _DevCredentialChip(
-                      label: 'Gratuito',
-                      value: 'leo@evolua.local / 123456',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Icon(Icons.bolt_rounded, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Sessao persistente para voce voltar rapido ao app quando quiser.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DevCredentialChip extends StatelessWidget {
-  const _DevCredentialChip({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 4),
-          Text(value, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
