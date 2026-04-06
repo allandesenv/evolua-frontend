@@ -47,7 +47,10 @@ class _GoogleAuthCallbackPageState extends ConsumerState<GoogleAuthCallbackPage>
         if (!mounted) {
           return;
         }
-        context.go('/home');
+        final session = ref.read(authControllerProvider).asData?.value;
+        if (session == null) {
+          setState(() => _errorMessage = 'Falha ao concluir o login com Google.');
+        }
       } catch (_) {
         if (!mounted) {
           return;
