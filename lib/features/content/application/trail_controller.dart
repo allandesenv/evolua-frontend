@@ -15,6 +15,10 @@ final trailRepositoryProvider = Provider<TrailRepository>((ref) {
 final trailControllerProvider =
     AsyncNotifierProvider<TrailController, PaginatedResponse<Trail>>(TrailController.new);
 
+final currentJourneyTrailProvider = FutureProvider<Trail?>((ref) async {
+  return ref.watch(trailRepositoryProvider).currentJourney();
+});
+
 class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
   static const _pageSize = 4;
   String? _search;

@@ -21,4 +21,6 @@ abstract class TrailRepository {
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
   });
+
+  Future<Trail?> currentJourney();
 }

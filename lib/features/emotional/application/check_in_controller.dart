@@ -1,6 +1,7 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/emotional/data/repositories/check_in_repository_impl.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
@@ -132,6 +133,9 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         reflection: reflection,
         energyLevel: energyLevel,
       );
+
+      ref.invalidate(currentJourneyTrailProvider);
+      ref.invalidate(trailControllerProvider);
 
       return _stateFromResult(await _fetch(page: 0), latestCreatedCheckIn: created);
     });

@@ -102,6 +102,47 @@ class CheckInAiInsightCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
+          if (insight.journeyPlan != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceStrong.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    insight.journeyPlan!.journeyTitle,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${insight.journeyPlan!.phaseLabel} • ${insight.journeyPlan!.summary}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (insight.suggestedSpace != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Espaco sugerido: ${insight.suggestedSpace!.name}',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              insight.suggestedSpace!.reason,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           if (onOpenTrails != null && insight.suggestedTrailId != null) ...[
             const SizedBox(height: 16),
             OutlinedButton.icon(

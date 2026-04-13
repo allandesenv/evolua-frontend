@@ -75,4 +75,14 @@ class TrailRepositoryImpl implements TrailRepository {
 
     return TrailDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
   }
+
+  @override
+  Future<Trail?> currentJourney() async {
+    final response = await _dio.get<dynamic>('/v1/trails/journey/current');
+    final data = (response.data as Map<String, dynamic>)['data'];
+    if (data is! Map<String, dynamic>) {
+      return null;
+    }
+    return TrailDto.fromJson(data).toEntity();
+  }
 }
