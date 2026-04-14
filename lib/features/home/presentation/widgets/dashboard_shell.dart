@@ -9,6 +9,7 @@ import 'package:evolua_frontend/features/notification/presentation/widgets/notif
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
@@ -16,6 +17,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class DashboardShell extends ConsumerStatefulWidget {
   const DashboardShell({super.key});
@@ -29,18 +31,39 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ContentModuleSection _trailSection = ContentModuleSection.journey;
   SocialFeedScope _reflectionScope = SocialFeedScope.moment;
   SocialCommunityScope _spaceScope = SocialCommunityScope.explore;
+  bool _handledBillingReturn = false;
 
   static const _destinations = [
     _NavItem(label: 'Home', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
     _NavItem(label: 'Reflexoes', icon: Icons.dynamic_feed_rounded),
     _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
-    _NavItem(label: 'Notificacoes', icon: Icons.notifications_active_rounded),
     _NavItem(label: 'Perfil', icon: Icons.person_rounded),
   ];
 
   void _goTo(int index) {
     setState(() => _selectedIndex = index);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_handledBillingReturn) {
+      return;
+    }
+    final checkoutId = Uri.base.queryParameters['billingCheckoutId'];
+    if (checkoutId == null || checkoutId.isEmpty) {
+      _handledBillingReturn = true;
+      return;
+    }
+    _handledBillingReturn = true;
+    _selectedIndex = 4;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(subscriptionControllerProvider.notifier).trackCheckout(checkoutId);
+      if (mounted) {
+        context.go('/home');
+      }
+    });
   }
 
   @override
@@ -289,7 +312,7 @@ class _DashboardContent extends ConsumerWidget {
         onOpenTrails: () => onNavigate(1),
         onOpenFeed: () => onNavigate(2),
         onOpenCommunity: () => onNavigate(3),
-        onOpenProfile: () => onNavigate(5),
+        onOpenProfile: () => onNavigate(4),
       ),
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),
@@ -304,7 +327,6 @@ class _DashboardContent extends ConsumerWidget {
         showScopeChips: true,
       ),
       _CommunityView(scope: spaceScope),
-      const NotificationModuleView(),
       const _ProfileArea(),
     ];
 
@@ -323,6 +345,7 @@ class _DashboardContent extends ConsumerWidget {
                         _HeaderText(email: email),
                         const SizedBox(height: 20),
                         _HeaderActions(
+                          notificationBell: const NotificationBellButton(),
                           onContinue: () => onNavigate(0),
                           onLogout: onLogout,
                         ),
@@ -333,6 +356,7 @@ class _DashboardContent extends ConsumerWidget {
                         Expanded(child: _HeaderText(email: email)),
                         const SizedBox(width: 20),
                         _HeaderActions(
+                          notificationBell: const NotificationBellButton(),
                           onContinue: () => onNavigate(0),
                           onLogout: onLogout,
                         ),
@@ -468,8 +492,13 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _HeaderActions extends StatelessWidget {
-  const _HeaderActions({required this.onContinue, required this.onLogout});
+  const _HeaderActions({
+    required this.notificationBell,
+    required this.onContinue,
+    required this.onLogout,
+  });
 
+  final Widget notificationBell;
   final VoidCallback onContinue;
   final VoidCallback onLogout;
 
@@ -479,6 +508,7 @@ class _HeaderActions extends StatelessWidget {
       spacing: 12,
       runSpacing: 12,
       children: [
+        notificationBell,
         Tooltip(
           message: 'Voltar para a home principal',
           child: FilledButton.icon(

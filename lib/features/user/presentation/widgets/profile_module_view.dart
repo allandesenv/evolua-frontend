@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
@@ -29,15 +31,15 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         final error = next.error;
         final message = error is DioException
             ? (error.response?.data is Map<String, dynamic>
-                ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                    error.message ??
-                    'Nao foi possivel salvar o perfil.')
-                : error.message ?? 'Nao foi possivel salvar o perfil.')
+                  ? ((error.response?.data['details'] as List?)?.join(', ') ??
+                        error.message ??
+                        'Nao foi possivel salvar o perfil.')
+                  : error.message ?? 'Nao foi possivel salvar o perfil.')
             : 'Nao foi possivel salvar o perfil.';
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     });
   }
@@ -54,7 +56,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       return;
     }
 
-    await ref.read(profileControllerProvider.notifier).create(
+    await ref
+        .read(profileControllerProvider.notifier)
+        .create(
           displayName: _displayNameController.text.trim(),
           bio: _bioController.text.trim(),
           journeyLevel: _journeyLevel.round(),
@@ -77,6 +81,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   Widget build(BuildContext context) {
     final profilesState = ref.watch(profileControllerProvider);
     final isSaving = profilesState.isLoading && !(profilesState.hasValue);
+    final session = ref.watch(authControllerProvider).asData?.value;
+    final isAdmin = session?.isAdmin ?? false;
 
     return Column(
       children: [
@@ -93,7 +99,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => ref.read(profileControllerProvider.notifier).refresh(),
+                    onPressed: () =>
+                        ref.read(profileControllerProvider.notifier).refresh(),
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Atualizar'),
                   ),
@@ -115,7 +122,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                         labelText: 'Nome de exibicao',
                         prefixIcon: Icon(Icons.badge_rounded),
                       ),
-                      validator: (value) => value == null || value.trim().isEmpty
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
                           ? 'Informe o nome do perfil.'
                           : null,
                     ),
@@ -128,7 +136,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                         alignLabelWithHint: true,
                         prefixIcon: Icon(Icons.notes_rounded),
                       ),
-                      validator: (value) => value == null || value.trim().isEmpty
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
                           ? 'Informe uma bio curta.'
                           : null,
                     ),
@@ -141,9 +150,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                             children: [
                               Text(
                                 'Nivel da jornada: ${_journeyLevel.round()}',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: AppColors.textPrimary,
-                                    ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(color: AppColors.textPrimary),
                               ),
                               Slider(
                                 min: 1,
@@ -191,8 +199,13 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           error: (error, stackTrace) => const _ModuleErrorState(
             title: 'Nao foi possivel carregar perfis.',
           ),
-          loading: () => const _ModuleLoadingState(label: 'Carregando perfis...'),
+          loading: () =>
+              const _ModuleLoadingState(label: 'Carregando perfis...'),
         ),
+        if (isAdmin) ...[
+          const SizedBox(height: 16),
+          const NotificationAdminConsole(),
+        ],
       ],
     );
   }
@@ -208,7 +221,8 @@ class _ProfileList extends StatelessWidget {
     if (profiles.isEmpty) {
       return const _ModuleEmptyState(
         title: 'Nenhum perfil criado ainda.',
-        subtitle: 'Preencha o formulario acima para iniciar a jornada do usuario.',
+        subtitle:
+            'Preencha o formulario acima para iniciar a jornada do usuario.',
       );
     }
 
@@ -226,29 +240,40 @@ class _ProfileList extends StatelessWidget {
                         Expanded(
                           child: Text(
                             profile.displayName,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  color: AppColors.textPrimary,
-                                ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(color: AppColors.textPrimary),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: (profile.premium ? AppColors.accentGold : AppColors.accent)
-                                .withValues(alpha: 0.16),
+                            color:
+                                (profile.premium
+                                        ? AppColors.accentGold
+                                        : AppColors.accent)
+                                    .withValues(alpha: 0.16),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             profile.premium ? 'Premium' : 'Essencial',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: profile.premium ? AppColors.accentGold : AppColors.accent,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: profile.premium
+                                      ? AppColors.accentGold
+                                      : AppColors.accent,
                                 ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text(profile.bio, style: Theme.of(context).textTheme.bodyLarge),
+                    Text(
+                      profile.bio,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
                     const SizedBox(height: 14),
                     Text(
                       'Nivel da jornada ${profile.journeyLevel} · criado em ${profile.createdAt.day.toString().padLeft(2, '0')}/${profile.createdAt.month.toString().padLeft(2, '0')}/${profile.createdAt.year}',
@@ -276,10 +301,7 @@ class _ModuleLoadingState extends StatelessWidget {
 }
 
 class _ModuleEmptyState extends StatelessWidget {
-  const _ModuleEmptyState({
-    required this.title,
-    required this.subtitle,
-  });
+  const _ModuleEmptyState({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -292,9 +314,9 @@ class _ModuleEmptyState extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
           ),
           const SizedBox(height: 8),
           Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
@@ -314,9 +336,9 @@ class _ModuleErrorState extends StatelessWidget {
     return PrimaryPanel(
       child: Text(
         title,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.danger,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(color: AppColors.danger),
       ),
     );
   }
