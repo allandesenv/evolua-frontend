@@ -12,13 +12,17 @@ final socialPostRepositoryProvider = Provider<SocialPostRepository>((ref) {
 });
 
 final socialPostControllerProvider =
-    AsyncNotifierProvider<SocialPostController, PaginatedResponse<SocialPost>>(SocialPostController.new);
+    AsyncNotifierProvider<SocialPostController, PaginatedResponse<SocialPost>>(
+      SocialPostController.new,
+    );
 
-class SocialPostController extends AsyncNotifier<PaginatedResponse<SocialPost>> {
+class SocialPostController
+    extends AsyncNotifier<PaginatedResponse<SocialPost>> {
   static const _pageSize = 4;
   String? _search;
   String? _community;
   String? _visibility;
+  bool? _mine;
 
   @override
   Future<PaginatedResponse<SocialPost>> build() async {
@@ -27,17 +31,21 @@ class SocialPostController extends AsyncNotifier<PaginatedResponse<SocialPost>> 
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: state.asData?.value.page ?? 0));
+    state = await AsyncValue.guard(
+      () async => _fetch(page: state.asData?.value.page ?? 0),
+    );
   }
 
   Future<void> applyFilters({
     String? search,
     String? community,
     String? visibility,
+    bool? mine,
   }) async {
     _search = search;
     _community = community;
     _visibility = visibility;
+    _mine = mine;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async => _fetch(page: 0));
   }
@@ -66,12 +74,15 @@ class SocialPostController extends AsyncNotifier<PaginatedResponse<SocialPost>> 
   }
 
   Future<PaginatedResponse<SocialPost>> _fetch({required int page}) {
-    return ref.read(socialPostRepositoryProvider).list(
+    return ref
+        .read(socialPostRepositoryProvider)
+        .list(
           page: page,
           size: _pageSize,
           search: _search,
           community: _community,
           visibility: _visibility,
+          mine: _mine,
         );
   }
 }

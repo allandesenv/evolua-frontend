@@ -16,15 +16,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum SocialModuleTab { feed, communities }
 
+enum SocialFeedScope { moment, mine }
+
+enum SocialCommunityScope { explore, mine }
+
 class SocialModuleView extends ConsumerStatefulWidget {
   const SocialModuleView({
     super.key,
     this.initialTab = SocialModuleTab.feed,
     this.showTabs = true,
+    this.feedScope = SocialFeedScope.moment,
+    this.communityScope = SocialCommunityScope.explore,
+    this.showScopeChips = true,
   });
 
   final SocialModuleTab initialTab;
   final bool showTabs;
+  final SocialFeedScope feedScope;
+  final SocialCommunityScope communityScope;
+  final bool showScopeChips;
 
   @override
   ConsumerState<SocialModuleView> createState() => _SocialModuleViewState();
@@ -44,10 +54,14 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
   String _communityCategoryFilter = 'TODAS';
   String _communityMembershipFilter = 'TODAS';
   String? _postCommunitySlug;
+  late SocialFeedScope _feedScope;
+  late SocialCommunityScope _communityScope;
 
   @override
   void initState() {
     super.initState();
+    _feedScope = widget.feedScope;
+    _communityScope = widget.communityScope;
     _tabController = TabController(length: 2, vsync: this);
     _tabController.index = switch (widget.initialTab) {
       SocialModuleTab.feed => 0,
@@ -56,15 +70,43 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
 
     ref.listenManual(socialPostControllerProvider, (previous, next) {
       if (next.hasError) {
-        _showError(next.error, fallback: 'Nao foi possivel atualizar as reflexoes.');
+        _showError(
+          next.error,
+          fallback: 'Nao foi possivel atualizar as reflexoes.',
+        );
       }
     });
 
     ref.listenManual(communityControllerProvider, (previous, next) {
       if (next.hasError) {
-        _showError(next.error, fallback: 'Nao foi possivel atualizar os espacos.');
+        _showError(
+          next.error,
+          fallback: 'Nao foi possivel atualizar os espacos.',
+        );
       }
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncScopes(force: true);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant SocialModuleView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.feedScope != widget.feedScope ||
+        oldWidget.communityScope != widget.communityScope ||
+        oldWidget.initialTab != widget.initialTab) {
+      _feedScope = widget.feedScope;
+      _communityScope = widget.communityScope;
+      _tabController.index = switch (widget.initialTab) {
+        SocialModuleTab.feed => 0,
+        SocialModuleTab.communities => 1,
+      };
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncScopes(force: true);
+      });
+    }
   }
 
   @override
@@ -91,7 +133,9 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       return;
     }
 
-    await ref.read(socialPostControllerProvider.notifier).create(
+    await ref
+        .read(socialPostControllerProvider.notifier)
+        .create(
           content: _postContentController.text.trim(),
           community: selectedCommunity,
           visibility: _postVisibility,
@@ -110,26 +154,57 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
   }
 
   Future<void> _applyFeedFilters() {
-    return ref.read(socialPostControllerProvider.notifier).applyFilters(
-          search: _feedSearchController.text.trim().isEmpty ? null : _feedSearchController.text.trim(),
-          community: _feedCommunityFilter == 'TODAS' ? null : _feedCommunityFilter,
-          visibility: _feedVisibilityFilter == 'TODAS' ? null : _feedVisibilityFilter,
+    return ref
+        .read(socialPostControllerProvider.notifier)
+        .applyFilters(
+          search: _feedSearchController.text.trim().isEmpty
+              ? null
+              : _feedSearchController.text.trim(),
+          community: _feedCommunityFilter == 'TODAS'
+              ? null
+              : _feedCommunityFilter,
+          visibility: _feedVisibilityFilter == 'TODAS'
+              ? null
+              : _feedVisibilityFilter,
+          mine: _feedScope == SocialFeedScope.mine,
         );
   }
 
   Future<void> _applyCommunityFilters() {
-    return ref.read(communityControllerProvider.notifier).applyFilters(
+    return ref
+        .read(communityControllerProvider.notifier)
+        .applyFilters(
           search: _communitySearchController.text.trim().isEmpty
               ? null
               : _communitySearchController.text.trim(),
-          visibility: _communityVisibilityFilter == 'TODAS' ? null : _communityVisibilityFilter,
-          category: _communityCategoryFilter == 'TODAS' ? null : _communityCategoryFilter,
+          visibility: _communityVisibilityFilter == 'TODAS'
+              ? null
+              : _communityVisibilityFilter,
+          category: _communityCategoryFilter == 'TODAS'
+              ? null
+              : _communityCategoryFilter,
           joined: switch (_communityMembershipFilter) {
             'INGRESSADAS' => true,
             'DESCOBRIR' => false,
             _ => null,
           },
         );
+  }
+
+  Future<void> _syncScopes({bool force = false}) async {
+    if (_tabController.index == 0) {
+      if (force) {
+        await _applyFeedFilters();
+      }
+      return;
+    }
+
+    if (_communityScope == SocialCommunityScope.mine) {
+      _communityMembershipFilter = 'INGRESSADAS';
+    } else if (force || _communityMembershipFilter == 'INGRESSADAS') {
+      _communityMembershipFilter = 'TODAS';
+    }
+    await _applyCommunityFilters();
   }
 
   Future<void> _openCreateCommunityModal() async {
@@ -152,29 +227,32 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
             initialVisibility: visibility,
             initialCategory: category,
             slugify: _slugify,
-            onSubmit: (name, slug, description, nextVisibility, nextCategory) async {
-              visibility = nextVisibility;
-              category = nextCategory;
-              await ref.read(communityControllerProvider.notifier).create(
-                    name: name,
-                    slug: slug,
-                    description: description,
-                    visibility: visibility,
-                    category: category,
+            onSubmit:
+                (name, slug, description, nextVisibility, nextCategory) async {
+                  visibility = nextVisibility;
+                  category = nextCategory;
+                  await ref
+                      .read(communityControllerProvider.notifier)
+                      .create(
+                        name: name,
+                        slug: slug,
+                        description: description,
+                        visibility: visibility,
+                        category: category,
+                      );
+
+                  if (!mounted) {
+                    return;
+                  }
+
+                  Navigator.of(this.context).pop();
+                  _tabController.animateTo(1);
+                  AppSnackBar.show(
+                    this.context,
+                    message: 'Espaco criado com sucesso.',
+                    icon: Icons.groups_rounded,
                   );
-
-              if (!mounted) {
-                return;
-              }
-
-              Navigator.of(this.context).pop();
-              _tabController.animateTo(1);
-              AppSnackBar.show(
-                this.context,
-                message: 'Espaco criado com sucesso.',
-                icon: Icons.groups_rounded,
-              );
-            },
+                },
           );
         },
       );
@@ -187,8 +265,10 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
   void _showError(Object? error, {required String fallback}) {
     final message = error is DioException
         ? (error.response?.data is Map<String, dynamic>
-            ? ((error.response?.data['details'] as List?)?.join(', ') ?? error.message ?? fallback)
-            : error.message ?? fallback)
+              ? ((error.response?.data['details'] as List?)?.join(', ') ??
+                    error.message ??
+                    fallback)
+              : error.message ?? fallback)
         : fallback;
 
     AppSnackBar.show(
@@ -213,14 +293,23 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     final communitiesState = ref.watch(communityControllerProvider);
     final session = ref.watch(authControllerProvider).asData?.value;
     final canCreateCommunity = session?.isAdmin ?? false;
-    final latestCheckIn = ref.watch(checkInControllerProvider).asData?.value.latestCreatedCheckIn;
+    final latestCheckIn = ref
+        .watch(checkInControllerProvider)
+        .asData
+        ?.value
+        .latestCreatedCheckIn;
     final contextualHint = _contextualHint(latestCheckIn?.mood);
     final joinedCommunities =
-        communitiesState.asData?.value.items.where((item) => item.joined).toList() ??
-            const <Community>[];
-    final allCommunities = communitiesState.asData?.value.items ?? const <Community>[];
+        communitiesState.asData?.value.items
+            .where((item) => item.joined)
+            .toList() ??
+        const <Community>[];
+    final allCommunities =
+        communitiesState.asData?.value.items ?? const <Community>[];
 
-    _postCommunitySlug ??= joinedCommunities.isNotEmpty ? joinedCommunities.first.slug : null;
+    _postCommunitySlug ??= joinedCommunities.isNotEmpty
+        ? joinedCommunities.first.slug
+        : null;
 
     final communityFilterOptions = <String>{
       'TODAS',
@@ -263,13 +352,18 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                     children: [
                       OutlinedButton.icon(
                         onPressed: () {
-                          ref.read(socialPostControllerProvider.notifier).refresh();
-                          ref.read(communityControllerProvider.notifier).refresh();
+                          ref
+                              .read(socialPostControllerProvider.notifier)
+                              .refresh();
+                          ref
+                              .read(communityControllerProvider.notifier)
+                              .refresh();
                         },
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Atualizar'),
                       ),
-                      if (widget.initialTab == SocialModuleTab.communities && canCreateCommunity)
+                      if (widget.initialTab == SocialModuleTab.communities &&
+                          canCreateCommunity)
                         FilledButton.icon(
                           onPressed: _openCreateCommunityModal,
                           icon: const Icon(Icons.add_rounded),
@@ -279,6 +373,70 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   ),
                 ],
               ),
+              if (widget.showScopeChips) ...[
+                const SizedBox(height: 16),
+                AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) {
+                    if (_tabController.index == 0) {
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Do momento'),
+                            selected: _feedScope == SocialFeedScope.moment,
+                            onSelected: (_) async {
+                              setState(
+                                () => _feedScope = SocialFeedScope.moment,
+                              );
+                              await _applyFeedFilters();
+                            },
+                          ),
+                          ChoiceChip(
+                            label: const Text('Minhas reflexoes'),
+                            selected: _feedScope == SocialFeedScope.mine,
+                            onSelected: (_) async {
+                              setState(() => _feedScope = SocialFeedScope.mine);
+                              await _applyFeedFilters();
+                            },
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Explorar'),
+                          selected:
+                              _communityScope == SocialCommunityScope.explore,
+                          onSelected: (_) async {
+                            setState(
+                              () => _communityScope =
+                                  SocialCommunityScope.explore,
+                            );
+                            await _syncScopes(force: true);
+                          },
+                        ),
+                        ChoiceChip(
+                          label: const Text('Meus espacos'),
+                          selected:
+                              _communityScope == SocialCommunityScope.mine,
+                          onSelected: (_) async {
+                            setState(
+                              () => _communityScope = SocialCommunityScope.mine,
+                            );
+                            await _syncScopes(force: true);
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
               if (widget.showTabs) ...[
                 const SizedBox(height: 18),
                 TabBar(
@@ -309,9 +467,13 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                     visibility: _postVisibility,
                     selectedCommunitySlug: _postCommunitySlug,
                     joinedCommunities: joinedCommunities,
-                    onVisibilityChanged: (value) => setState(() => _postVisibility = value),
-                    onCommunityChanged: (value) => setState(() => _postCommunitySlug = value),
-                    onSubmit: postsState.isLoading && !postsState.hasValue ? null : _submitPost,
+                    onVisibilityChanged: (value) =>
+                        setState(() => _postVisibility = value),
+                    onCommunityChanged: (value) =>
+                        setState(() => _postCommunitySlug = value),
+                    onSubmit: postsState.isLoading && !postsState.hasValue
+                        ? null
+                        : _submitPost,
                   ),
                   const SizedBox(height: 16),
                   postsState.when(
@@ -321,7 +483,12 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                       visibilityFilter: _feedVisibilityFilter,
                       communityFilter: _feedCommunityFilter,
                       communityOptions: communityFilterOptions,
-                      contextualHint: contextualHint,
+                      contextualHint: _feedScope == SocialFeedScope.mine
+                          ? 'Revise o que voce mesmo compartilhou, encontre padroes no seu jeito de refletir e recupere aprendizados que ainda fazem sentido.'
+                          : contextualHint,
+                      sectionLabel: _feedScope == SocialFeedScope.mine
+                          ? 'Minhas reflexoes'
+                          : 'Reflexoes do momento',
                       onSearchChanged: (_) => _applyFeedFilters(),
                       onVisibilityFilterChanged: (value) {
                         setState(() => _feedVisibilityFilter = value);
@@ -331,14 +498,19 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                         setState(() => _feedCommunityFilter = value);
                         _applyFeedFilters();
                       },
-                      onPageChanged: (page) =>
-                          ref.read(socialPostControllerProvider.notifier).goToPage(page),
+                      onPageChanged: (page) => ref
+                          .read(socialPostControllerProvider.notifier)
+                          .goToPage(page),
                     ),
                     error: (error, stackTrace) => SocialActionableErrorState(
                       title: 'Nao conseguimos abrir as reflexoes agora.',
-                      onRetry: () => ref.read(socialPostControllerProvider.notifier).refresh(),
+                      onRetry: () => ref
+                          .read(socialPostControllerProvider.notifier)
+                          .refresh(),
                     ),
-                    loading: () => const SocialLoadingState(label: 'Carregando reflexoes...'),
+                    loading: () => const SocialLoadingState(
+                      label: 'Carregando reflexoes...',
+                    ),
                   ),
                 ],
               );
@@ -365,10 +537,13 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   setState(() => _communityMembershipFilter = value);
                   _applyCommunityFilters();
                 },
-                onPageChanged: (page) =>
-                    ref.read(communityControllerProvider.notifier).goToPage(page),
+                onPageChanged: (page) => ref
+                    .read(communityControllerProvider.notifier)
+                    .goToPage(page),
                 onJoin: (community) async {
-                  await ref.read(communityControllerProvider.notifier).join(community.id);
+                  await ref
+                      .read(communityControllerProvider.notifier)
+                      .join(community.id);
                   if (mounted) {
                     AppSnackBar.show(
                       this.context,
@@ -378,7 +553,9 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   }
                 },
                 onLeave: (community) async {
-                  await ref.read(communityControllerProvider.notifier).leave(community.id);
+                  await ref
+                      .read(communityControllerProvider.notifier)
+                      .leave(community.id);
                   if (mounted) {
                     AppSnackBar.show(
                       this.context,
@@ -389,12 +566,17 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                 },
                 canCreate: canCreateCommunity,
                 onCreate: _openCreateCommunityModal,
+                headline: _communityScope == SocialCommunityScope.mine
+                    ? 'Meus espacos'
+                    : 'Espacos',
               ),
               error: (error, stackTrace) => SocialActionableErrorState(
                 title: 'Nao conseguimos abrir os espacos agora.',
-                onRetry: () => ref.read(communityControllerProvider.notifier).refresh(),
+                onRetry: () =>
+                    ref.read(communityControllerProvider.notifier).refresh(),
               ),
-              loading: () => const SocialLoadingState(label: 'Carregando espacos...'),
+              loading: () =>
+                  const SocialLoadingState(label: 'Carregando espacos...'),
             );
           },
         ),
@@ -440,7 +622,8 @@ class _CreateCommunitySheet extends StatefulWidget {
     String description,
     String visibility,
     String category,
-  ) onSubmit;
+  )
+  onSubmit;
 
   @override
   State<_CreateCommunitySheet> createState() => _CreateCommunitySheetState();
@@ -484,8 +667,9 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                   prefixIcon: Icon(Icons.groups_rounded),
                 ),
                 onChanged: (_) => setState(() {}),
-                validator: (value) =>
-                    value == null || value.trim().length < 3 ? 'Use pelo menos 3 caracteres.' : null,
+                validator: (value) => value == null || value.trim().length < 3
+                    ? 'Use pelo menos 3 caracteres.'
+                    : null,
               ),
               const SizedBox(height: 14),
               Container(
@@ -498,8 +682,8 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                 child: Text(
                   'Slug: $slugPreview',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -520,9 +704,18 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Categoria'),
                 items: const [
-                  DropdownMenuItem(value: 'acolhimento', child: Text('Acolhimento')),
-                  DropdownMenuItem(value: 'emocional', child: Text('Emocional')),
-                  DropdownMenuItem(value: 'bem-estar', child: Text('Bem-estar')),
+                  DropdownMenuItem(
+                    value: 'acolhimento',
+                    child: Text('Acolhimento'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'emocional',
+                    child: Text('Emocional'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'bem-estar',
+                    child: Text('Bem-estar'),
+                  ),
                   DropdownMenuItem(value: 'habitos', child: Text('Habitos')),
                   DropdownMenuItem(value: 'presenca', child: Text('Presenca')),
                   DropdownMenuItem(value: 'reflexao', child: Text('Reflexao')),

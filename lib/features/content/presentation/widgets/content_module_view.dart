@@ -17,8 +17,17 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
+enum ContentModuleSection { journey, catalog }
+
 class ContentModuleView extends ConsumerStatefulWidget {
-  const ContentModuleView({super.key});
+  const ContentModuleView({
+    super.key,
+    this.section = ContentModuleSection.journey,
+    this.showSectionChips = true,
+  });
+
+  final ContentModuleSection section;
+  final bool showSectionChips;
 
   @override
   ConsumerState<ContentModuleView> createState() => _ContentModuleViewState();
@@ -34,10 +43,12 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   final List<_EditableMediaLink> _mediaLinks = [_EditableMediaLink.live()];
   bool _premium = false;
   bool? _premiumFilter;
+  late ContentModuleSection _section;
 
   @override
   void initState() {
     super.initState();
+    _section = widget.section;
     ref.listenManual(trailControllerProvider, (previous, next) {
       if (!next.hasError) {
         return;
@@ -57,6 +68,14 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentModuleView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.section != widget.section) {
+      _section = widget.section;
+    }
   }
 
   @override
@@ -191,6 +210,29 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                     : 'No plano gratuito, voce explora trilhas essenciais e pode ver onde o premium aprofunda a experiencia.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
+              if (widget.showSectionChips) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Minha jornada'),
+                      selected: _section == ContentModuleSection.journey,
+                      onSelected: (_) => setState(
+                        () => _section = ContentModuleSection.journey,
+                      ),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Catalogo'),
+                      selected: _section == ContentModuleSection.catalog,
+                      onSelected: (_) => setState(
+                        () => _section = ContentModuleSection.catalog,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 18),
               if (isAdmin)
                 _AdminTrailEditor(
@@ -221,32 +263,83 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         currentJourney.when(
           data: (trail) => trail == null
               ? const SizedBox.shrink()
+              : _section == ContentModuleSection.catalog
+              ? _CurrentJourneyBanner(
+                  trail: trail,
+                  onOpenJourney: () =>
+                      setState(() => _section = ContentModuleSection.journey),
+                )
               : _CurrentJourneyPanel(trail: trail),
           error: (_, _) => const SizedBox.shrink(),
           loading: () => const SizedBox.shrink(),
         ),
-        const SizedBox(height: 16),
-        trailsState.when(
-          data: (result) => _TrailExplorer(
-            result: result,
-            isAdmin: isAdmin,
-            hasPremiumAccess: hasPremiumAccess,
-            searchController: _searchController,
-            premiumFilter: _premiumFilter,
-            onSearchChanged: (_) => _applyFilters(),
-            onPremiumFilterChanged: (value) {
-              setState(() => _premiumFilter = value);
-              _applyFilters();
-            },
-            onPageChanged: (page) =>
-                ref.read(trailControllerProvider.notifier).goToPage(page),
+        if (_section == ContentModuleSection.catalog ||
+            currentJourney.asData?.value == null) ...[
+          const SizedBox(height: 16),
+          trailsState.when(
+            data: (result) => _TrailExplorer(
+              result: result,
+              isAdmin: isAdmin,
+              hasPremiumAccess: hasPremiumAccess,
+              searchController: _searchController,
+              premiumFilter: _premiumFilter,
+              onSearchChanged: (_) => _applyFilters(),
+              onPremiumFilterChanged: (value) {
+                setState(() => _premiumFilter = value);
+                _applyFilters();
+              },
+              onPageChanged: (page) =>
+                  ref.read(trailControllerProvider.notifier).goToPage(page),
+            ),
+            error: (error, stackTrace) => _ContentErrorState(
+              onRetry: () =>
+                  ref.read(trailControllerProvider.notifier).refresh(),
+            ),
+            loading: () => const _ContentLoadingState(),
           ),
-          error: (error, stackTrace) => _ContentErrorState(
-            onRetry: () => ref.read(trailControllerProvider.notifier).refresh(),
-          ),
-          loading: () => const _ContentLoadingState(),
-        ),
+        ],
       ],
+    );
+  }
+}
+
+class _CurrentJourneyBanner extends StatelessWidget {
+  const _CurrentJourneyBanner({
+    required this.trail,
+    required this.onOpenJourney,
+  });
+
+  final Trail trail;
+  final VoidCallback onOpenJourney;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Minha jornada ativa',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(trail.title, style: Theme.of(context).textTheme.bodyLarge),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: onOpenJourney,
+            icon: const Icon(Icons.auto_awesome_rounded),
+            label: const Text('Abrir jornada'),
+          ),
+        ],
+      ),
     );
   }
 }

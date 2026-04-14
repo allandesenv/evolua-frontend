@@ -16,6 +16,7 @@ class SocialFeedArea extends StatelessWidget {
     required this.communityFilter,
     required this.communityOptions,
     required this.contextualHint,
+    required this.sectionLabel,
     required this.onSearchChanged,
     required this.onVisibilityFilterChanged,
     required this.onCommunityFilterChanged,
@@ -28,6 +29,7 @@ class SocialFeedArea extends StatelessWidget {
   final String communityFilter;
   final List<String> communityOptions;
   final String contextualHint;
+  final String sectionLabel;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onVisibilityFilterChanged;
   final ValueChanged<String> onCommunityFilterChanged;
@@ -42,12 +44,21 @@ class SocialFeedArea extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
+                sectionLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 8),
+              Text(
                 contextualHint,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 10),
               Text(
-                '${result.totalItems} reflexoes no ritmo de hoje.',
+                sectionLabel == 'Minhas reflexoes'
+                    ? '${result.totalItems} reflexoes suas neste recorte.'
+                    : '${result.totalItems} reflexoes no ritmo de hoje.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -73,7 +84,9 @@ class SocialFeedArea extends StatelessWidget {
                           .map(
                             (item) => DropdownMenuItem<String>(
                               value: item,
-                              child: Text(item == 'TODAS' ? 'Todos os espacos' : item),
+                              child: Text(
+                                item == 'TODAS' ? 'Todos os espacos' : item,
+                              ),
                             ),
                           )
                           .toList(),
@@ -89,11 +102,19 @@ class SocialFeedArea extends StatelessWidget {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: visibilityFilter,
-                      decoration: const InputDecoration(labelText: 'Visibilidade'),
+                      decoration: const InputDecoration(
+                        labelText: 'Visibilidade',
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(value: 'PUBLIC', child: Text('Publicas')),
-                        DropdownMenuItem(value: 'PRIVATE', child: Text('Privadas')),
+                        DropdownMenuItem(
+                          value: 'PUBLIC',
+                          child: Text('Publicas'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'PRIVATE',
+                          child: Text('Privadas'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -137,15 +158,17 @@ class SocialFeedArea extends StatelessWidget {
                           children: [
                             Text(
                               post.community,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: AppColors.textPrimary,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: AppColors.textPrimary),
                             ),
                             SocialMetaPill(label: post.visibility),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        Text(post.content, style: Theme.of(context).textTheme.bodyLarge),
+                        Text(
+                          post.content,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
                         const SizedBox(height: 14),
                         Wrap(
                           spacing: 10,
@@ -183,10 +206,7 @@ class SocialFeedArea extends StatelessWidget {
 }
 
 class _LightInteractionChip extends StatelessWidget {
-  const _LightInteractionChip({
-    required this.icon,
-    required this.label,
-  });
+  const _LightInteractionChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -207,9 +227,9 @@ class _LightInteractionChip extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),

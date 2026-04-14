@@ -20,6 +20,7 @@ class SocialPostRepositoryImpl implements SocialPostRepository {
     String sortDir = 'desc',
     String? community,
     String? visibility,
+    bool? mine,
   }) async {
     final query = PaginationQuery(
       page: page,
@@ -34,6 +35,7 @@ class SocialPostRepositoryImpl implements SocialPostRepository {
       queryParameters: query.toQueryParameters({
         'community': community,
         'visibility': visibility,
+        'mine': mine,
       }),
     );
 
@@ -58,6 +60,8 @@ class SocialPostRepositoryImpl implements SocialPostRepository {
       },
     );
 
-    return SocialPostDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return SocialPostDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 }

@@ -25,6 +25,7 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.onLeave,
     required this.canCreate,
     required this.onCreate,
+    required this.headline,
   });
 
   final PaginatedResponse<Community> result;
@@ -42,6 +43,7 @@ class SocialCommunitiesArea extends StatelessWidget {
   final Future<void> Function(Community community) onLeave;
   final bool canCreate;
   final VoidCallback onCreate;
+  final String headline;
 
   @override
   Widget build(BuildContext context) {
@@ -55,10 +57,10 @@ class SocialCommunitiesArea extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Espacos',
+                      headline,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                   if (canCreate)
@@ -71,7 +73,9 @@ class SocialCommunitiesArea extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${result.totalItems} espacos para explorar sem pressa.',
+                headline == 'Meus espacos'
+                    ? '${result.totalItems} espacos em que voce ja entrou.'
+                    : '${result.totalItems} espacos para explorar sem pressa.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -95,8 +99,14 @@ class SocialCommunitiesArea extends StatelessWidget {
                       decoration: const InputDecoration(labelText: 'Recorte'),
                       items: const [
                         DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(value: 'INGRESSADAS', child: Text('Participando')),
-                        DropdownMenuItem(value: 'DESCOBRIR', child: Text('Descobrir')),
+                        DropdownMenuItem(
+                          value: 'INGRESSADAS',
+                          child: Text('Participando'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'DESCOBRIR',
+                          child: Text('Descobrir'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -109,11 +119,19 @@ class SocialCommunitiesArea extends StatelessWidget {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: visibilityFilter,
-                      decoration: const InputDecoration(labelText: 'Visibilidade'),
+                      decoration: const InputDecoration(
+                        labelText: 'Visibilidade',
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(value: 'PUBLIC', child: Text('Publicas')),
-                        DropdownMenuItem(value: 'PRIVATE', child: Text('Privadas')),
+                        DropdownMenuItem(
+                          value: 'PUBLIC',
+                          child: Text('Publicas'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'PRIVATE',
+                          child: Text('Privadas'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -181,9 +199,8 @@ class SocialCommunitiesArea extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 community.name,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: AppColors.textPrimary,
-                                    ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(color: AppColors.textPrimary),
                               ),
                             ),
                             SocialMetaPill(label: community.visibility),
@@ -195,8 +212,14 @@ class SocialCommunitiesArea extends StatelessWidget {
                           runSpacing: 8,
                           children: [
                             SocialMetaPill(label: community.category),
-                            SocialMetaPill(label: '${community.memberCount} pessoas'),
-                            SocialMetaPill(label: community.joined ? 'Participando' : 'Explorar'),
+                            SocialMetaPill(
+                              label: '${community.memberCount} pessoas',
+                            ),
+                            SocialMetaPill(
+                              label: community.joined
+                                  ? 'Participando'
+                                  : 'Explorar',
+                            ),
                           ],
                         ),
                         const SizedBox(height: 12),
