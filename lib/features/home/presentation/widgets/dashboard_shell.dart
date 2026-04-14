@@ -26,12 +26,16 @@ class DashboardShell extends ConsumerStatefulWidget {
 
 class _DashboardShellState extends ConsumerState<DashboardShell> {
   int _selectedIndex = 0;
+  ContentModuleSection _trailSection = ContentModuleSection.journey;
+  SocialFeedScope _reflectionScope = SocialFeedScope.moment;
+  SocialCommunityScope _spaceScope = SocialCommunityScope.explore;
 
   static const _destinations = [
     _NavItem(label: 'Home', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
     _NavItem(label: 'Reflexoes', icon: Icons.dynamic_feed_rounded),
     _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
+    _NavItem(label: 'Notificacoes', icon: Icons.notifications_active_rounded),
     _NavItem(label: 'Perfil', icon: Icons.person_rounded),
   ];
 
@@ -48,24 +52,36 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final content = _DashboardContent(
       selectedIndex: _selectedIndex,
       email: session?.email ?? 'voce@evolua.app',
+      trailSection: _trailSection,
+      reflectionScope: _reflectionScope,
+      spaceScope: _spaceScope,
       onNavigate: _goTo,
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(pagePadding, 16, pagePadding, isCompact ? 10 : 24),
+      padding: EdgeInsets.fromLTRB(
+        pagePadding,
+        16,
+        pagePadding,
+        isCompact ? 10 : 24,
+      ),
       child: isCompact
           ? Column(
               children: [
                 Expanded(child: content),
                 const SizedBox(height: 12),
                 PrimaryPanel(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   semanticLabel: 'Navegacao principal',
                   child: NavigationBar(
                     selectedIndex: _selectedIndex,
                     height: 72,
-                    labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                    labelBehavior:
+                        NavigationDestinationLabelBehavior.alwaysShow,
                     onDestinationSelected: _goTo,
                     destinations: _destinations
                         .map(
@@ -106,71 +122,108 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                       _destinations.length,
                                       (index) {
                                         final item = _destinations[index];
-                                        final isSelected = index == _selectedIndex;
+                                        final isSelected =
+                                            index == _selectedIndex;
                                         return Padding(
-                                          padding: const EdgeInsets.only(bottom: 10),
-                                          child: Tooltip(
-                                            message: item.label,
-                                            child: InkWell(
-                                              borderRadius: BorderRadius.circular(18),
-                                              onTap: () => _goTo(index),
-                                              child: AnimatedContainer(
-                                                duration:
-                                                    const Duration(milliseconds: 180),
-                                                curve: Curves.easeOutCubic,
-                                                width: double.infinity,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 14,
-                                                  vertical: 14,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(18),
-                                                  color: isSelected
-                                                      ? AppColors.accent
-                                                          .withValues(alpha: 0.18)
-                                                      : Colors.transparent,
-                                                  border: Border.all(
-                                                    color: isSelected
-                                                        ? AppColors.accent.withValues(
-                                                            alpha: 0.45,
-                                                          )
-                                                        : AppColors.outline.withValues(
-                                                            alpha: 0.22,
-                                                          ),
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      item.icon,
-                                                      color: isSelected
-                                                          ? AppColors.accent
-                                                          : AppColors.textSecondary,
+                                          padding: const EdgeInsets.only(
+                                            bottom: 10,
+                                          ),
+                                          child: _NavEntry(
+                                            item: item,
+                                            isSelected: isSelected,
+                                            onTap: () => _goTo(index),
+                                            submenu: switch (index) {
+                                              1 when isSelected =>
+                                                _buildDesktopSubmenu(
+                                                  context,
+                                                  entries: [
+                                                    _SubnavEntry(
+                                                      label: 'Minha jornada',
+                                                      selected:
+                                                          _trailSection ==
+                                                          ContentModuleSection
+                                                              .journey,
+                                                      onTap: () => setState(
+                                                        () => _trailSection =
+                                                            ContentModuleSection
+                                                                .journey,
+                                                      ),
                                                     ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Text(
-                                                        item.label,
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .bodyLarge
-                                                            ?.copyWith(
-                                                              color: isSelected
-                                                                  ? AppColors.textPrimary
-                                                                  : AppColors
-                                                                      .textSecondary,
-                                                              fontWeight: isSelected
-                                                                  ? FontWeight.w700
-                                                                  : FontWeight.w500,
-                                                            ),
+                                                    _SubnavEntry(
+                                                      label: 'Catalogo',
+                                                      selected:
+                                                          _trailSection ==
+                                                          ContentModuleSection
+                                                              .catalog,
+                                                      onTap: () => setState(
+                                                        () => _trailSection =
+                                                            ContentModuleSection
+                                                                .catalog,
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                              ),
-                                            ),
+                                              2 when isSelected =>
+                                                _buildDesktopSubmenu(
+                                                  context,
+                                                  entries: [
+                                                    _SubnavEntry(
+                                                      label: 'Do momento',
+                                                      selected:
+                                                          _reflectionScope ==
+                                                          SocialFeedScope
+                                                              .moment,
+                                                      onTap: () => setState(
+                                                        () => _reflectionScope =
+                                                            SocialFeedScope
+                                                                .moment,
+                                                      ),
+                                                    ),
+                                                    _SubnavEntry(
+                                                      label: 'Minhas reflexoes',
+                                                      selected:
+                                                          _reflectionScope ==
+                                                          SocialFeedScope.mine,
+                                                      onTap: () => setState(
+                                                        () => _reflectionScope =
+                                                            SocialFeedScope
+                                                                .mine,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              3 when isSelected =>
+                                                _buildDesktopSubmenu(
+                                                  context,
+                                                  entries: [
+                                                    _SubnavEntry(
+                                                      label: 'Explorar',
+                                                      selected:
+                                                          _spaceScope ==
+                                                          SocialCommunityScope
+                                                              .explore,
+                                                      onTap: () => setState(
+                                                        () => _spaceScope =
+                                                            SocialCommunityScope
+                                                                .explore,
+                                                      ),
+                                                    ),
+                                                    _SubnavEntry(
+                                                      label: 'Meus espacos',
+                                                      selected:
+                                                          _spaceScope ==
+                                                          SocialCommunityScope
+                                                              .mine,
+                                                      onTap: () => setState(
+                                                        () => _spaceScope =
+                                                            SocialCommunityScope
+                                                                .mine,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              _ => null,
+                                            },
                                           ),
                                         );
                                       },
@@ -197,22 +250,34 @@ class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({
     required this.selectedIndex,
     required this.email,
+    required this.trailSection,
+    required this.reflectionScope,
+    required this.spaceScope,
     required this.onNavigate,
     required this.onLogout,
   });
 
   final int selectedIndex;
   final String email;
+  final ContentModuleSection trailSection;
+  final SocialFeedScope reflectionScope;
+  final SocialCommunityScope spaceScope;
   final void Function(int index) onNavigate;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profiles = ref.watch(profileControllerProvider).asData?.value ?? const [];
-    final trailsCount = ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
-    final checkInsCount = ref.watch(checkInControllerProvider).asData?.value.result.totalItems ?? 0;
-    final postsCount = ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
-    final communitiesCount = ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
+    final profiles =
+        ref.watch(profileControllerProvider).asData?.value ?? const [];
+    final trailsCount =
+        ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
+    final checkInsCount =
+        ref.watch(checkInControllerProvider).asData?.value.result.totalItems ??
+        0;
+    final postsCount =
+        ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
+    final communitiesCount =
+        ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
 
     final sections = [
       HomeHubView(
@@ -224,14 +289,22 @@ class _DashboardContent extends ConsumerWidget {
         onOpenTrails: () => onNavigate(1),
         onOpenFeed: () => onNavigate(2),
         onOpenCommunity: () => onNavigate(3),
-        onOpenProfile: () => onNavigate(4),
+        onOpenProfile: () => onNavigate(5),
       ),
-      const ContentModuleView(),
-      const SocialModuleView(
+      ContentModuleView(
+        key: ValueKey('trails-${trailSection.name}'),
+        section: trailSection,
+        showSectionChips: true,
+      ),
+      SocialModuleView(
+        key: ValueKey('feed-${reflectionScope.name}'),
         initialTab: SocialModuleTab.feed,
+        feedScope: reflectionScope,
         showTabs: false,
+        showScopeChips: true,
       ),
-      const _CommunityView(),
+      _CommunityView(scope: spaceScope),
+      const NotificationModuleView(),
       const _ProfileArea(),
     ];
 
@@ -285,19 +358,69 @@ class _DashboardContent extends ConsumerWidget {
   }
 }
 
+Widget? _buildDesktopSubmenu(
+  BuildContext context, {
+  required List<_SubnavEntry> entries,
+}) {
+  return Padding(
+    padding: const EdgeInsets.only(top: 8, left: 18),
+    child: Column(
+      children: entries
+          .map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: entry.onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: entry.selected
+                        ? AppColors.surfaceStrong.withValues(alpha: 0.62)
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: entry.selected
+                          ? AppColors.accent.withValues(alpha: 0.3)
+                          : AppColors.outline.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Text(
+                    entry.label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: entry.selected
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    ),
+  );
+}
+
 class _CommunityView extends StatelessWidget {
-  const _CommunityView();
+  const _CommunityView({required this.scope});
+
+  final SocialCommunityScope scope;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       children: [
         SocialModuleView(
           initialTab: SocialModuleTab.communities,
           showTabs: false,
+          communityScope: scope,
+          showScopeChips: true,
         ),
-        SizedBox(height: 16),
-        NotificationModuleView(),
       ],
     );
   }
@@ -330,9 +453,9 @@ class _HeaderText extends StatelessWidget {
       children: [
         Text(
           'Usuario logado',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppColors.accent,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: AppColors.accent),
         ),
         const SizedBox(height: 10),
         Text(
@@ -345,10 +468,7 @@ class _HeaderText extends StatelessWidget {
 }
 
 class _HeaderActions extends StatelessWidget {
-  const _HeaderActions({
-    required this.onContinue,
-    required this.onLogout,
-  });
+  const _HeaderActions({required this.onContinue, required this.onLogout});
 
   final VoidCallback onContinue;
   final VoidCallback onLogout;
@@ -381,11 +501,91 @@ class _HeaderActions extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem({
-    required this.label,
-    required this.icon,
-  });
+  const _NavItem({required this.label, required this.icon});
 
   final String label;
   final IconData icon;
+}
+
+class _SubnavEntry {
+  const _SubnavEntry({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+}
+
+class _NavEntry extends StatelessWidget {
+  const _NavEntry({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+    this.submenu,
+  });
+
+  final _NavItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Widget? submenu;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: item.label,
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                color: isSelected
+                    ? AppColors.accent.withValues(alpha: 0.18)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.accent.withValues(alpha: 0.45)
+                      : AppColors.outline.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    item.icon,
+                    color: isSelected
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: isSelected
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ...?(submenu == null ? null : [submenu!]),
+        ],
+      ),
+    );
+  }
 }
