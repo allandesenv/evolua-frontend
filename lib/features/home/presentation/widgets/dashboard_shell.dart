@@ -1,6 +1,7 @@
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
@@ -12,6 +13,7 @@ import 'package:evolua_frontend/features/social/presentation/widgets/social_modu
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -31,6 +33,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ContentModuleSection _trailSection = ContentModuleSection.journey;
   SocialFeedScope _reflectionScope = SocialFeedScope.moment;
   SocialCommunityScope _spaceScope = SocialCommunityScope.explore;
+  ProfileModuleSection _profileSection = ProfileModuleSection.overview;
   bool _handledBillingReturn = false;
 
   static const _destinations = [
@@ -38,8 +41,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
     _NavItem(label: 'Reflexoes', icon: Icons.dynamic_feed_rounded),
     _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
-    _NavItem(label: 'Perfil', icon: Icons.person_rounded),
   ];
+
+  static const _profileIndex = 4;
 
   void _goTo(int index) {
     setState(() => _selectedIndex = index);
@@ -57,7 +61,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       return;
     }
     _handledBillingReturn = true;
-    _selectedIndex = 4;
+    _selectedIndex = _profileIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(subscriptionControllerProvider.notifier).trackCheckout(checkoutId);
       if (mounted) {
@@ -70,15 +74,20 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Widget build(BuildContext context) {
     final isCompact = ResponsiveBreakpoints.isCompact(context);
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
-    final session = ref.watch(authControllerProvider).asData?.value;
 
     final content = _DashboardContent(
       selectedIndex: _selectedIndex,
-      email: session?.email ?? 'voce@evolua.app',
       trailSection: _trailSection,
       reflectionScope: _reflectionScope,
       spaceScope: _spaceScope,
+      profileSection: _profileSection,
       onNavigate: _goTo,
+      onOpenProfileSection: (section) {
+        setState(() {
+          _selectedIndex = _profileIndex;
+          _profileSection = section;
+        });
+      },
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
 
@@ -101,7 +110,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   ),
                   semanticLabel: 'Navegacao principal',
                   child: NavigationBar(
-                    selectedIndex: _selectedIndex,
+                    selectedIndex: _selectedIndex >= _destinations.length
+                        ? 0
+                        : _selectedIndex,
                     height: 72,
                     labelBehavior:
                         NavigationDestinationLabelBehavior.alwaysShow,
@@ -136,7 +147,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const EvoluaLogo(compact: true),
+                              const EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
                               const SizedBox(height: 24),
                               Expanded(
                                 child: SingleChildScrollView(
@@ -272,26 +283,28 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({
     required this.selectedIndex,
-    required this.email,
     required this.trailSection,
     required this.reflectionScope,
     required this.spaceScope,
+    required this.profileSection,
     required this.onNavigate,
+    required this.onOpenProfileSection,
     required this.onLogout,
   });
 
   final int selectedIndex;
-  final String email;
   final ContentModuleSection trailSection;
   final SocialFeedScope reflectionScope;
   final SocialCommunityScope spaceScope;
+  final ProfileModuleSection profileSection;
   final void Function(int index) onNavigate;
+  final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profiles =
-        ref.watch(profileControllerProvider).asData?.value ?? const [];
+    final profile = ref.watch(currentProfileProvider);
+    final session = ref.watch(authControllerProvider).asData?.value;
     final trailsCount =
         ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
     final checkInsCount =
@@ -304,7 +317,7 @@ class _DashboardContent extends ConsumerWidget {
 
     final sections = [
       HomeHubView(
-        profilesCount: profiles.length,
+        profilesCount: profile == null ? 0 : 1,
         trailsCount: trailsCount,
         checkInsCount: checkInsCount,
         postsCount: postsCount,
@@ -312,7 +325,7 @@ class _DashboardContent extends ConsumerWidget {
         onOpenTrails: () => onNavigate(1),
         onOpenFeed: () => onNavigate(2),
         onOpenCommunity: () => onNavigate(3),
-        onOpenProfile: () => onNavigate(4),
+        onOpenProfile: () => onOpenProfileSection(ProfileModuleSection.overview),
       ),
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),
@@ -327,7 +340,7 @@ class _DashboardContent extends ConsumerWidget {
         showScopeChips: true,
       ),
       _CommunityView(scope: spaceScope),
-      const _ProfileArea(),
+      _ProfileArea(section: profileSection),
     ];
 
     return Column(
@@ -342,22 +355,26 @@ class _DashboardContent extends ConsumerWidget {
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _HeaderText(email: email),
-                        const SizedBox(height: 20),
                         _HeaderActions(
                           notificationBell: const NotificationBellButton(),
+                          session: session,
+                          profile: profile,
                           onContinue: () => onNavigate(0),
+                          onOpenProfileSection: onOpenProfileSection,
                           onLogout: onLogout,
                         ),
                       ],
                     )
                   : Row(
                       children: [
-                        Expanded(child: _HeaderText(email: email)),
+                        const Spacer(),
                         const SizedBox(width: 20),
                         _HeaderActions(
                           notificationBell: const NotificationBellButton(),
+                          session: session,
+                          profile: profile,
                           onContinue: () => onNavigate(0),
+                          onOpenProfileSection: onOpenProfileSection,
                           onLogout: onLogout,
                         ),
                       ],
@@ -373,7 +390,7 @@ class _DashboardContent extends ConsumerWidget {
             switchOutCurve: Curves.easeInCubic,
             child: SingleChildScrollView(
               key: ValueKey(selectedIndex),
-              child: sections[selectedIndex],
+              child: sections[selectedIndex.clamp(0, sections.length - 1)],
             ),
           ),
         ),
@@ -451,41 +468,17 @@ class _CommunityView extends StatelessWidget {
 }
 
 class _ProfileArea extends StatelessWidget {
-  const _ProfileArea();
+  const _ProfileArea({required this.section});
 
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        ProfileModuleView(),
-        SizedBox(height: 16),
-        SubscriptionModuleView(),
-      ],
-    );
-  }
-}
-
-class _HeaderText extends StatelessWidget {
-  const _HeaderText({required this.email});
-
-  final String email;
+  final ProfileModuleSection section;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Usuario logado',
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(color: AppColors.accent),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          '$email conectado.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
+        ProfileModuleView(section: section),
+        const SizedBox(height: 16),
+        const SubscriptionModuleView(),
       ],
     );
   }
@@ -494,12 +487,18 @@ class _HeaderText extends StatelessWidget {
 class _HeaderActions extends StatelessWidget {
   const _HeaderActions({
     required this.notificationBell,
+    required this.session,
+    required this.profile,
     required this.onContinue,
+    required this.onOpenProfileSection,
     required this.onLogout,
   });
 
   final Widget notificationBell;
+  final AuthSession? session;
+  final Profile? profile;
   final VoidCallback onContinue;
+  final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback onLogout;
 
   @override
@@ -517,14 +516,236 @@ class _HeaderActions extends StatelessWidget {
             label: const Text('Ir para home'),
           ),
         ),
-        Tooltip(
-          message: 'Encerrar sessao',
-          child: OutlinedButton.icon(
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Sair'),
+        _AccountMenuButton(
+          session: session,
+          profile: profile,
+          onOpenProfileSection: onOpenProfileSection,
+          onLogout: onLogout,
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountMenuButton extends StatelessWidget {
+  const _AccountMenuButton({
+    required this.session,
+    required this.profile,
+    required this.onOpenProfileSection,
+    required this.onLogout,
+  });
+
+  final AuthSession? session;
+  final Profile? profile;
+  final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName =
+        profile?.displayName ??
+        session?.displayName ??
+        session?.email.split('@').first ??
+        'Seu perfil';
+    final avatarUrl = profile?.avatarUrl ?? session?.avatarUrl;
+    final email = session?.email ?? 'voce@evolua.app';
+
+    return PopupMenuButton<_AccountMenuAction>(
+      tooltip: 'Abrir menu da conta',
+      color: AppColors.surfaceStrong,
+      offset: const Offset(0, 14),
+      itemBuilder: (context) => [
+        PopupMenuItem<_AccountMenuAction>(
+          enabled: false,
+          padding: const EdgeInsets.all(0),
+          child: Container(
+            width: 280,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _HeaderAvatar(
+                      imageUrl: avatarUrl,
+                      fallbackText: displayName,
+                      radius: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(email, style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: AppColors.surface.withValues(alpha: 0.86),
+                    border: Border.all(
+                      color: AppColors.outline.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.person_search_rounded),
+                      SizedBox(width: 10),
+                      Expanded(child: Text('Ver perfil')),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _AccountMenuAction.overview,
+          child: _MenuLabel(
+            icon: Icons.person_rounded,
+            label: 'Ver perfil',
+          ),
+        ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.settings,
+          child: _MenuLabel(
+            icon: Icons.settings_rounded,
+            label: 'Configuracoes e privacidade',
+          ),
+        ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.help,
+          child: _MenuLabel(
+            icon: Icons.help_outline_rounded,
+            label: 'Ajuda e suporte',
+          ),
+        ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.accessibility,
+          child: _MenuLabel(
+            icon: Icons.dark_mode_rounded,
+            label: 'Tela e acessibilidade',
+          ),
+        ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.feedback,
+          child: _MenuLabel(
+            icon: Icons.feedback_outlined,
+            label: 'Dar feedback',
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _AccountMenuAction.logout,
+          child: _MenuLabel(
+            icon: Icons.logout_rounded,
+            label: 'Sair',
+          ),
+        ),
+      ],
+      onSelected: (value) {
+        switch (value) {
+          case _AccountMenuAction.overview:
+            onOpenProfileSection(ProfileModuleSection.overview);
+          case _AccountMenuAction.settings:
+            onOpenProfileSection(ProfileModuleSection.settingsPrivacy);
+          case _AccountMenuAction.help:
+            onOpenProfileSection(ProfileModuleSection.helpSupport);
+          case _AccountMenuAction.accessibility:
+            onOpenProfileSection(ProfileModuleSection.displayAccessibility);
+          case _AccountMenuAction.feedback:
+            onOpenProfileSection(ProfileModuleSection.feedback);
+          case _AccountMenuAction.logout:
+            onLogout();
+        }
+      },
+      child: _HeaderAvatar(
+        imageUrl: avatarUrl,
+        fallbackText: displayName,
+        radius: 22,
+      ),
+    );
+  }
+}
+
+enum _AccountMenuAction {
+  overview,
+  settings,
+  help,
+  accessibility,
+  feedback,
+  logout,
+}
+
+class _HeaderAvatar extends StatelessWidget {
+  const _HeaderAvatar({
+    required this.imageUrl,
+    required this.fallbackText,
+    required this.radius,
+  });
+
+  final String? imageUrl;
+  final String fallbackText;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedUrl = imageUrl == null || imageUrl!.isEmpty ? null : imageUrl!;
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.surfaceStrong,
+      backgroundImage: normalizedUrl != null ? NetworkImage(normalizedUrl) : null,
+      child: normalizedUrl == null
+          ? Text(
+              _initials(fallbackText),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            )
+          : null,
+    );
+  }
+
+  String _initials(String value) {
+    final parts = value.trim().split(RegExp(r'\s+')).where((item) => item.isNotEmpty).toList();
+    if (parts.isEmpty) {
+      return 'E';
+    }
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
+  }
+}
+
+class _MenuLabel extends StatelessWidget {
+  const _MenuLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label)),
       ],
     );
   }

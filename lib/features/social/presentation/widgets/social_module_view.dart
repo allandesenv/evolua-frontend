@@ -322,139 +322,21 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
 
     return Column(
       children: [
-        PrimaryPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 560),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.initialTab == SocialModuleTab.feed
-                              ? contextualHint
-                              : 'Explore espacos tematicos, encontre pertencimento sem pressao social e crie um novo espaco quando fizer sentido.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          ref
-                              .read(socialPostControllerProvider.notifier)
-                              .refresh();
-                          ref
-                              .read(communityControllerProvider.notifier)
-                              .refresh();
-                        },
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Atualizar'),
-                      ),
-                      if (widget.initialTab == SocialModuleTab.communities &&
-                          canCreateCommunity)
-                        FilledButton.icon(
-                          onPressed: _openCreateCommunityModal,
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Novo espaco'),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              if (widget.showScopeChips) ...[
-                const SizedBox(height: 16),
-                AnimatedBuilder(
-                  animation: _tabController,
-                  builder: (context, _) {
-                    if (_tabController.index == 0) {
-                      return Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Do momento'),
-                            selected: _feedScope == SocialFeedScope.moment,
-                            onSelected: (_) async {
-                              setState(
-                                () => _feedScope = SocialFeedScope.moment,
-                              );
-                              await _applyFeedFilters();
-                            },
-                          ),
-                          ChoiceChip(
-                            label: const Text('Minhas reflexoes'),
-                            selected: _feedScope == SocialFeedScope.mine,
-                            onSelected: (_) async {
-                              setState(() => _feedScope = SocialFeedScope.mine);
-                              await _applyFeedFilters();
-                            },
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('Explorar'),
-                          selected:
-                              _communityScope == SocialCommunityScope.explore,
-                          onSelected: (_) async {
-                            setState(
-                              () => _communityScope =
-                                  SocialCommunityScope.explore,
-                            );
-                            await _syncScopes(force: true);
-                          },
-                        ),
-                        ChoiceChip(
-                          label: const Text('Meus espacos'),
-                          selected:
-                              _communityScope == SocialCommunityScope.mine,
-                          onSelected: (_) async {
-                            setState(
-                              () => _communityScope = SocialCommunityScope.mine,
-                            );
-                            await _syncScopes(force: true);
-                          },
-                        ),
-                      ],
-                    );
-                  },
-                ),
+        if (widget.showTabs)
+          PrimaryPanel(
+            child: TabBar(
+              controller: _tabController,
+              dividerColor: Colors.transparent,
+              labelColor: AppColors.textPrimary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.accent,
+              tabs: const [
+                Tab(text: 'Reflexoes'),
+                Tab(text: 'Espacos'),
               ],
-              if (widget.showTabs) ...[
-                const SizedBox(height: 18),
-                TabBar(
-                  controller: _tabController,
-                  dividerColor: Colors.transparent,
-                  labelColor: AppColors.textPrimary,
-                  unselectedLabelColor: AppColors.textSecondary,
-                  indicatorColor: AppColors.accent,
-                  tabs: const [
-                    Tab(text: 'Reflexoes'),
-                    Tab(text: 'Espacos'),
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
+        if (widget.showTabs) const SizedBox(height: 16),
         AnimatedBuilder(
           animation: _tabController,
           builder: (context, _) {
@@ -489,6 +371,19 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                       sectionLabel: _feedScope == SocialFeedScope.mine
                           ? 'Minhas reflexoes'
                           : 'Reflexoes do momento',
+                      showScopeChips: widget.showScopeChips,
+                      currentScope: _feedScope.name,
+                      onMomentSelected: () async {
+                        setState(() => _feedScope = SocialFeedScope.moment);
+                        await _applyFeedFilters();
+                      },
+                      onMineSelected: () async {
+                        setState(() => _feedScope = SocialFeedScope.mine);
+                        await _applyFeedFilters();
+                      },
+                      onRefresh: () => ref
+                          .read(socialPostControllerProvider.notifier)
+                          .refresh(),
                       onSearchChanged: (_) => _applyFeedFilters(),
                       onVisibilityFilterChanged: (value) {
                         setState(() => _feedVisibilityFilter = value);
@@ -569,6 +464,21 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                 headline: _communityScope == SocialCommunityScope.mine
                     ? 'Meus espacos'
                     : 'Espacos',
+                showScopeChips: widget.showScopeChips,
+                currentScope: _communityScope.name,
+                onExploreSelected: () async {
+                  setState(
+                    () => _communityScope = SocialCommunityScope.explore,
+                  );
+                  await _syncScopes(force: true);
+                },
+                onMineSelected: () async {
+                  setState(() => _communityScope = SocialCommunityScope.mine);
+                  await _syncScopes(force: true);
+                },
+                onRefresh: () => ref
+                    .read(communityControllerProvider.notifier)
+                    .refresh(),
               ),
               error: (error, stackTrace) => SocialActionableErrorState(
                 title: 'Nao conseguimos abrir os espacos agora.',

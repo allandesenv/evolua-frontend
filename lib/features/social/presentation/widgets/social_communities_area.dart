@@ -26,6 +26,11 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.canCreate,
     required this.onCreate,
     required this.headline,
+    this.showScopeChips = false,
+    this.currentScope,
+    this.onExploreSelected,
+    this.onMineSelected,
+    this.onRefresh,
   });
 
   final PaginatedResponse<Community> result;
@@ -44,6 +49,11 @@ class SocialCommunitiesArea extends StatelessWidget {
   final bool canCreate;
   final VoidCallback onCreate;
   final String headline;
+  final bool showScopeChips;
+  final String? currentScope;
+  final VoidCallback? onExploreSelected;
+  final VoidCallback? onMineSelected;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +81,40 @@ class SocialCommunitiesArea extends StatelessWidget {
                     ),
                 ],
               ),
+              if (showScopeChips || onRefresh != null) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (showScopeChips)
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Explorar'),
+                            selected: currentScope == 'explore',
+                            onSelected: (_) => onExploreSelected?.call(),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Meus espacos'),
+                            selected: currentScope == 'mine',
+                            onSelected: (_) => onMineSelected?.call(),
+                          ),
+                        ],
+                      ),
+                    if (onRefresh != null)
+                      OutlinedButton.icon(
+                        onPressed: onRefresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Atualizar'),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
                 headline == 'Meus espacos'

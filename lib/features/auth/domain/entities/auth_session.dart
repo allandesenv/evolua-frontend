@@ -6,6 +6,8 @@ class AuthSession {
     required this.email,
     required this.roles,
     required this.accessToken,
+    this.displayName,
+    this.avatarUrl,
     this.refreshToken,
     this.expiresAt,
   });
@@ -14,6 +16,8 @@ class AuthSession {
   final String email;
   final List<String> roles;
   final String accessToken;
+  final String? displayName;
+  final String? avatarUrl;
   final String? refreshToken;
   final DateTime? expiresAt;
 
@@ -27,6 +31,8 @@ class AuthSession {
       'email': email,
       'roles': roles,
       'accessToken': accessToken,
+      'displayName': displayName,
+      'avatarUrl': avatarUrl,
       'refreshToken': refreshToken,
       'expiresAt': expiresAt?.toIso8601String(),
     };
@@ -64,6 +70,8 @@ class AuthSession {
       email: email,
       roles: roles,
       accessToken: accessToken,
+      displayName: json['displayName']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString(),
       refreshToken: json['refreshToken']?.toString(),
       expiresAt: expiresAt,
     );

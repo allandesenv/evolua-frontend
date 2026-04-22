@@ -21,6 +21,11 @@ class SocialFeedArea extends StatelessWidget {
     required this.onVisibilityFilterChanged,
     required this.onCommunityFilterChanged,
     required this.onPageChanged,
+    this.showScopeChips = false,
+    this.currentScope,
+    this.onMomentSelected,
+    this.onMineSelected,
+    this.onRefresh,
   });
 
   final PaginatedResponse<SocialPost> result;
@@ -34,6 +39,11 @@ class SocialFeedArea extends StatelessWidget {
   final ValueChanged<String> onVisibilityFilterChanged;
   final ValueChanged<String> onCommunityFilterChanged;
   final ValueChanged<int> onPageChanged;
+  final bool showScopeChips;
+  final String? currentScope;
+  final VoidCallback? onMomentSelected;
+  final VoidCallback? onMineSelected;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +59,40 @@ class SocialFeedArea extends StatelessWidget {
                   context,
                 ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
               ),
+              if (showScopeChips || onRefresh != null) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (showScopeChips)
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Do momento'),
+                            selected: currentScope == 'moment',
+                            onSelected: (_) => onMomentSelected?.call(),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Minhas reflexoes'),
+                            selected: currentScope == 'mine',
+                            onSelected: (_) => onMineSelected?.call(),
+                          ),
+                        ],
+                      ),
+                    if (onRefresh != null)
+                      OutlinedButton.icon(
+                        onPressed: onRefresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Atualizar'),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
                 contextualHint,
