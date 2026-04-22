@@ -4,11 +4,15 @@ class AuthSessionDto {
   const AuthSessionDto({
     required this.email,
     required this.accessToken,
+    this.displayName,
+    this.avatarUrl,
     this.refreshToken,
   });
 
   final String email;
   final String accessToken;
+  final String? displayName;
+  final String? avatarUrl;
   final String? refreshToken;
 
   factory AuthSessionDto.fromJson(
@@ -27,6 +31,8 @@ class AuthSessionDto {
           ? (json['email'] ?? json['username']).toString()
           : fallbackEmail,
       accessToken: accessToken,
+      displayName: json['displayName']?.toString(),
+      avatarUrl: json['avatarUrl']?.toString(),
       refreshToken: (json['refreshToken'] ?? json['refresh_token'])?.toString(),
     );
   }
@@ -36,6 +42,8 @@ class AuthSessionDto {
       {
         'email': email.isEmpty ? null : email,
         'accessToken': accessToken,
+        'displayName': displayName,
+        'avatarUrl': avatarUrl,
         'refreshToken': refreshToken,
       },
     );

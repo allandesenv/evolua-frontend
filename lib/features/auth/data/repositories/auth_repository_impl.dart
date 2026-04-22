@@ -12,12 +12,14 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> register({
     required String email,
     required String password,
+    required String displayName,
   }) async {
     await _dio.post<void>(
       '/v1/public/auth/register',
       data: {
         'email': email,
         'password': password,
+        'displayName': displayName,
       },
     );
   }

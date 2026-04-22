@@ -12,8 +12,8 @@ class AuthHero extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const EvoluaLogo(),
-        const SizedBox(height: 24),
+        const EvoluaLogo(variant: EvoluaLogoVariant.hero),
+        const SizedBox(height: 30),
         Text(
           'Entre e continue sua jornada.',
           style: theme.textTheme.displayMedium,
