@@ -10,28 +10,60 @@ class NotificationRepositoryImpl implements NotificationRepository {
   final Dio _dio;
 
   @override
-  Future<List<NotificationJob>> list() async {
-    final response = await _dio.get<dynamic>('/v1/notifications');
+  Future<List<NotificationJob>> list({bool unreadOnly = false}) async {
+    final response = await _dio.get<dynamic>(
+      '/v1/notifications',
+      queryParameters: {'size': 20, if (unreadOnly) 'unreadOnly': true},
+    );
 
-    return ApiPayloadParser.dataList(response.data)
-        .map(NotificationJobDto.fromJson)
-        .map((item) => item.toEntity())
-        .toList();
+    return ApiPayloadParser.dataList(
+      response.data,
+    ).map(NotificationJobDto.fromJson).map((item) => item.toEntity()).toList();
   }
 
   @override
-  Future<NotificationJob> create({
-    required String channel,
+  Future<int> unreadCount() async {
+    final response = await _dio.get<dynamic>('/v1/notifications/unread-count');
+    final data = ApiPayloadParser.dataMap(response.data);
+    return (data['unreadCount'] as num?)?.toInt() ?? 0;
+  }
+
+  @override
+  Future<NotificationJob> markAsRead(String id) async {
+    final response = await _dio.post<dynamic>('/v1/notifications/$id/read');
+    return NotificationJobDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<int> markAllAsRead() async {
+    final response = await _dio.post<dynamic>('/v1/notifications/read-all');
+    final data = ApiPayloadParser.dataMap(response.data);
+    return (data['updatedCount'] as num?)?.toInt() ?? 0;
+  }
+
+  @override
+  Future<NotificationJob> createAdmin({
+    required String targetUserId,
+    required String type,
+    required String title,
     required String message,
+    String? actionTarget,
   }) async {
     final response = await _dio.post<dynamic>(
-      '/v1/notifications',
+      '/v1/admin/notifications',
       data: {
-        'channel': channel,
+        'targetUserId': targetUserId,
+        'type': type,
+        'title': title,
         'message': message,
+        'actionTarget': actionTarget,
       },
     );
 
-    return NotificationJobDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return NotificationJobDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 }

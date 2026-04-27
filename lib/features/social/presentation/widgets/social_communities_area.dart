@@ -23,7 +23,14 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.onPageChanged,
     required this.onJoin,
     required this.onLeave,
+    required this.canCreate,
     required this.onCreate,
+    required this.headline,
+    this.showScopeChips = false,
+    this.currentScope,
+    this.onExploreSelected,
+    this.onMineSelected,
+    this.onRefresh,
   });
 
   final PaginatedResponse<Community> result;
@@ -39,7 +46,14 @@ class SocialCommunitiesArea extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final Future<void> Function(Community community) onJoin;
   final Future<void> Function(Community community) onLeave;
+  final bool canCreate;
   final VoidCallback onCreate;
+  final String headline;
+  final bool showScopeChips;
+  final String? currentScope;
+  final VoidCallback? onExploreSelected;
+  final VoidCallback? onMineSelected;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -53,22 +67,59 @@ class SocialCommunitiesArea extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Comunidades',
+                      headline,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: onCreate,
-                    icon: const Icon(Icons.add_circle_outline_rounded),
-                    label: const Text('Criar grupo'),
-                  ),
+                  if (canCreate)
+                    OutlinedButton.icon(
+                      onPressed: onCreate,
+                      icon: const Icon(Icons.add_circle_outline_rounded),
+                      label: const Text('Criar espaco'),
+                    ),
                 ],
               ),
+              if (showScopeChips || onRefresh != null) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (showScopeChips)
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Explorar'),
+                            selected: currentScope == 'explore',
+                            onSelected: (_) => onExploreSelected?.call(),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Meus espacos'),
+                            selected: currentScope == 'mine',
+                            onSelected: (_) => onMineSelected?.call(),
+                          ),
+                        ],
+                      ),
+                    if (onRefresh != null)
+                      OutlinedButton.icon(
+                        onPressed: onRefresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Atualizar'),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
-                '${result.totalItems} comunidades para explorar sem pressa.',
+                headline == 'Meus espacos'
+                    ? '${result.totalItems} espacos em que voce ja entrou.'
+                    : '${result.totalItems} espacos para explorar sem pressa.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
@@ -76,7 +127,7 @@ class SocialCommunitiesArea extends StatelessWidget {
                 controller: searchController,
                 onChanged: onSearchChanged,
                 decoration: const InputDecoration(
-                  labelText: 'Buscar por nome, descricao ou categoria',
+                  labelText: 'Buscar por espaco, descricao ou tema',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
               ),
@@ -92,8 +143,14 @@ class SocialCommunitiesArea extends StatelessWidget {
                       decoration: const InputDecoration(labelText: 'Recorte'),
                       items: const [
                         DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(value: 'INGRESSADAS', child: Text('Ingressadas')),
-                        DropdownMenuItem(value: 'DESCOBRIR', child: Text('Descobrir')),
+                        DropdownMenuItem(
+                          value: 'INGRESSADAS',
+                          child: Text('Participando'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'DESCOBRIR',
+                          child: Text('Descobrir'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -106,11 +163,19 @@ class SocialCommunitiesArea extends StatelessWidget {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: visibilityFilter,
-                      decoration: const InputDecoration(labelText: 'Visibilidade'),
+                      decoration: const InputDecoration(
+                        labelText: 'Visibilidade',
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(value: 'PUBLIC', child: Text('Publicas')),
-                        DropdownMenuItem(value: 'PRIVATE', child: Text('Privadas')),
+                        DropdownMenuItem(
+                          value: 'PUBLIC',
+                          child: Text('Publicas'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'PRIVATE',
+                          child: Text('Privadas'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -148,11 +213,20 @@ class SocialCommunitiesArea extends StatelessWidget {
         if (result.items.isEmpty)
           GuidedEmptyState(
             icon: Icons.groups_rounded,
-            title: 'Nenhuma comunidade apareceu com esse recorte.',
-            subtitle:
-                'Amplie a busca, troque os filtros ou crie a primeira comunidade para esse contexto.',
-            actionLabel: 'Criar comunidade',
-            onAction: onCreate,
+            title: 'Nenhum espaco apareceu com esse recorte.',
+            subtitle: canCreate
+                ? 'Amplie a busca, troque os filtros ou crie o primeiro espaco para esse contexto.'
+                : 'Amplie a busca ou troque os filtros para encontrar um espaco com mais aderencia ao seu momento.',
+            actionLabel: canCreate ? 'Criar espaco' : 'Ver todos',
+            onAction: canCreate
+                ? onCreate
+                : () {
+                    searchController.clear();
+                    onSearchChanged('');
+                    onMembershipChanged('TODAS');
+                    onVisibilityChanged('TODAS');
+                    onCategoryChanged('TODAS');
+                  },
           )
         else
           Column(
@@ -169,9 +243,8 @@ class SocialCommunitiesArea extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 community.name,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: AppColors.textPrimary,
-                                    ),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(color: AppColors.textPrimary),
                               ),
                             ),
                             SocialMetaPill(label: community.visibility),
@@ -183,8 +256,14 @@ class SocialCommunitiesArea extends StatelessWidget {
                           runSpacing: 8,
                           children: [
                             SocialMetaPill(label: community.category),
-                            SocialMetaPill(label: '${community.memberCount} membros'),
-                            SocialMetaPill(label: community.joined ? 'Ingressada' : 'Descoberta'),
+                            SocialMetaPill(
+                              label: '${community.memberCount} pessoas',
+                            ),
+                            SocialMetaPill(
+                              label: community.joined
+                                  ? 'Participando'
+                                  : 'Explorar',
+                            ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -199,12 +278,12 @@ class SocialCommunitiesArea extends StatelessWidget {
                               ? OutlinedButton.icon(
                                   onPressed: () => onLeave(community),
                                   icon: const Icon(Icons.logout_rounded),
-                                  label: const Text('Sair da comunidade'),
+                                  label: const Text('Sair do espaco'),
                                 )
                               : FilledButton.icon(
                                   onPressed: () => onJoin(community),
                                   icon: const Icon(Icons.group_add_rounded),
-                                  label: const Text('Entrar na comunidade'),
+                                  label: const Text('Entrar no espaco'),
                                 ),
                         ),
                       ],

@@ -1,6 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
-import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/user/data/repositories/profile_repository_impl.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
@@ -12,58 +13,61 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 });
 
 final profileControllerProvider =
-    AsyncNotifierProvider<ProfileController, List<Profile>>(ProfileController.new);
+    AsyncNotifierProvider<ProfileController, Profile?>(ProfileController.new);
 
 final currentProfileProvider = Provider<Profile?>((ref) {
-  final session = ref.watch(authControllerProvider).asData?.value;
-  final profiles = ref.watch(profileControllerProvider).asData?.value ?? const <Profile>[];
-
-  if (session == null) {
-    return null;
-  }
-
-  for (final profile in profiles) {
-    if (profile.userId == session.userId) {
-      return profile;
-    }
-  }
-
-  return null;
+  return ref.watch(profileControllerProvider).asData?.value;
 });
 
-class ProfileController extends AsyncNotifier<List<Profile>> {
+class ProfileController extends AsyncNotifier<Profile?> {
   @override
-  Future<List<Profile>> build() async {
+  Future<Profile?> build() async {
     final repository = ref.watch(profileRepositoryProvider);
-    return repository.list();
+    return repository.getMe();
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      return ref.read(profileRepositoryProvider).list();
+      return ref.read(profileRepositoryProvider).getMe();
     });
   }
 
-  Future<void> create({
+  Future<Profile> upsertMe({
     required String displayName,
+    required DateTime birthDate,
+    required String gender,
+    String? customGender,
     required String bio,
     required int journeyLevel,
-    required bool premium,
   }) async {
     final repository = ref.read(profileRepositoryProvider);
-    final currentItems = state.asData?.value ?? const <Profile>[];
 
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final created = await repository.create(
+      return repository.upsertMe(
         displayName: displayName,
+        birthDate: birthDate,
+        gender: gender,
+        customGender: customGender,
         bio: bio,
         journeyLevel: journeyLevel,
-        premium: premium,
       );
-
-      return [created, ...currentItems];
     });
+
+    return state.requireValue!;
+  }
+
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final repository = ref.read(profileRepositoryProvider);
+    final avatarUrl = await repository.uploadAvatar(
+      bytes: bytes,
+      fileName: fileName,
+    );
+    await refresh();
+    return avatarUrl;
   }
 }

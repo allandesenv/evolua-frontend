@@ -10,6 +10,11 @@ class TrailDto {
     required this.content,
     required this.category,
     required this.premium,
+    required this.privateTrail,
+    required this.activeJourney,
+    required this.generatedByAi,
+    required this.journeyKey,
+    required this.sourceStyle,
     required this.accessible,
     required this.mediaLinks,
     required this.createdAt,
@@ -22,6 +27,11 @@ class TrailDto {
   final String? content;
   final String category;
   final bool premium;
+  final bool privateTrail;
+  final bool activeJourney;
+  final bool generatedByAi;
+  final String? journeyKey;
+  final String? sourceStyle;
   final bool accessible;
   final List<TrailMediaLink> mediaLinks;
   final DateTime createdAt;
@@ -35,6 +45,11 @@ class TrailDto {
       content: json['content']?.toString(),
       category: json['category'].toString(),
       premium: json['premium'] as bool,
+      privateTrail: json['privateTrail'] as bool? ?? false,
+      activeJourney: json['activeJourney'] as bool? ?? false,
+      generatedByAi: json['generatedByAi'] as bool? ?? false,
+      journeyKey: json['journeyKey']?.toString(),
+      sourceStyle: json['sourceStyle']?.toString(),
       accessible: json['accessible'] as bool? ?? !(json['premium'] as bool? ?? false),
       mediaLinks: (json['mediaLinks'] as List? ?? const [])
           .whereType<Map>()
@@ -53,6 +68,11 @@ class TrailDto {
       content: content,
       category: category,
       premium: premium,
+      privateTrail: privateTrail,
+      activeJourney: activeJourney,
+      generatedByAi: generatedByAi,
+      journeyKey: journeyKey,
+      sourceStyle: sourceStyle,
       accessible: accessible,
       mediaLinks: mediaLinks,
       createdAt: createdAt,

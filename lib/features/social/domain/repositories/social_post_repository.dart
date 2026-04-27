@@ -10,6 +10,7 @@ abstract class SocialPostRepository {
     String sortDir = 'desc',
     String? community,
     String? visibility,
+    bool? mine,
   });
 
   Future<SocialPost> create({

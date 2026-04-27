@@ -26,6 +26,11 @@ class AppConfig {
     defaultValue: 'http://localhost:8084',
   );
 
+  static const aiBaseUrl = String.fromEnvironment(
+    'EVOLUA_AI_BASE_URL',
+    defaultValue: 'http://localhost:8089',
+  );
+
   static const socialBaseUrl = String.fromEnvironment(
     'EVOLUA_SOCIAL_BASE_URL',
     defaultValue: 'http://localhost:8085',

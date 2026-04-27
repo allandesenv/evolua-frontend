@@ -1,6 +1,6 @@
 # Evolua Frontend
 
-Frontend Flutter do projeto Evolua com foco em Android, iOS e Web, seguindo a organizacao `Feature-First + Clean Architecture`, Riverpod para gerenciamento de estado e uma base visual dark pronta para crescer junto com o backend.
+Frontend Flutter Web/Mobile do Evolua com Riverpod, GoRouter, Dio e interface focada em Home, Trilhas, Reflexoes, Espacos, Perfil, notificacoes no sino e jornada guiada por IA.
 
 ## Stack
 
@@ -10,63 +10,40 @@ Frontend Flutter do projeto Evolua com foco em Android, iOS e Web, seguindo a or
 - GoRouter
 - Dio
 - Shared Preferences
-
-## Estrutura inicial
-
-```text
-lib/
-  app/
-  core/
-  features/
-    auth/
-    home/
-  shared/
-  main.dart
-```
-
-Esta primeira iteracao ja entrega:
-
-- design system dark com identidade visual propria
-- tela de autenticacao responsiva
-- integracao real com `auth-service`
-- dashboard responsivo para web e mobile
-- persistencia local simples da sessao
-- modulos funcionais para `user`, `content`, `emotional`, `social`, `chat`, `subscription` e `notification`
+- url_launcher
+- image_picker
 
 ## Como rodar
-
-Se o Flutter nao estiver no `PATH`, voce pode usar o caminho absoluto:
-
-```powershell
-C:\tools\flutter\bin\flutter.bat pub get
-C:\tools\flutter\bin\flutter.bat run -d chrome
-```
-
-Se o `PATH` ja estiver configurado:
 
 ```powershell
 flutter pub get
 flutter run -d chrome
 ```
 
-## Configuracao de backend
+Alternativa mais estavel para web local:
 
-Por padrao, o app usa:
+```powershell
+flutter run -d web-server --web-hostname 0.0.0.0 --web-port 7359
+```
 
-- `http://localhost:8081` para autenticacao
-- `http://localhost:8082` para user
-- `http://localhost:8083` para content
-- `http://localhost:8084` para emotional
-- `http://localhost:8085` para social
-- `http://localhost:8086` para chat
-- `http://localhost:8087` para subscription
-- `http://localhost:8088` para notification
-- `http://localhost:8080` como base geral de API
+## Backends padrao
 
-Voce pode sobrescrever com `dart-define`:
+- `EVOLUA_API_BASE_URL=http://localhost:8080`
+- `EVOLUA_AUTH_BASE_URL=http://localhost:8081`
+- `EVOLUA_USER_BASE_URL=http://localhost:8082`
+- `EVOLUA_CONTENT_BASE_URL=http://localhost:8083`
+- `EVOLUA_EMOTIONAL_BASE_URL=http://localhost:8084`
+- `EVOLUA_SOCIAL_BASE_URL=http://localhost:8085`
+- `EVOLUA_CHAT_BASE_URL=http://localhost:8086`
+- `EVOLUA_SUBSCRIPTION_BASE_URL=http://localhost:8087`
+- `EVOLUA_NOTIFICATION_BASE_URL=http://localhost:8088`
+- `EVOLUA_AI_BASE_URL=http://localhost:8089`
+
+Exemplo com `dart-define`:
 
 ```powershell
 flutter run -d chrome `
+  --dart-define=EVOLUA_API_BASE_URL=http://localhost:8080 `
   --dart-define=EVOLUA_AUTH_BASE_URL=http://localhost:8081 `
   --dart-define=EVOLUA_USER_BASE_URL=http://localhost:8082 `
   --dart-define=EVOLUA_CONTENT_BASE_URL=http://localhost:8083 `
@@ -75,57 +52,60 @@ flutter run -d chrome `
   --dart-define=EVOLUA_CHAT_BASE_URL=http://localhost:8086 `
   --dart-define=EVOLUA_SUBSCRIPTION_BASE_URL=http://localhost:8087 `
   --dart-define=EVOLUA_NOTIFICATION_BASE_URL=http://localhost:8088 `
-  --dart-define=EVOLUA_API_BASE_URL=http://localhost:8080
+  --dart-define=EVOLUA_AI_BASE_URL=http://localhost:8089
 ```
 
-Para Android Emulator, normalmente use `10.0.2.2` no lugar de `localhost`.
+## Fluxos principais
 
-Exemplo:
+- autenticacao por email e Google
+- cadastro local com nome, data de nascimento e genero
+- Home com check-in e jornada
+- Trilhas com `Minha jornada` e catalogo
+- Reflexoes com composer e listagem real
+- Espacos com explorar, meus espacos, entrar, sair e criar quando permitido
+- Perfil com dados pessoais, avatar, assinatura e console admin de notificacoes
+- Sino de notificacoes com inbox in-app
 
-```powershell
-flutter run -d emulator-5554 `
-  --dart-define=EVOLUA_AUTH_BASE_URL=http://10.0.2.2:8081 `
-  --dart-define=EVOLUA_USER_BASE_URL=http://10.0.2.2:8082 `
-  --dart-define=EVOLUA_CONTENT_BASE_URL=http://10.0.2.2:8083 `
-  --dart-define=EVOLUA_EMOTIONAL_BASE_URL=http://10.0.2.2:8084 `
-  --dart-define=EVOLUA_SOCIAL_BASE_URL=http://10.0.2.2:8085 `
-  --dart-define=EVOLUA_CHAT_BASE_URL=http://10.0.2.2:8086 `
-  --dart-define=EVOLUA_SUBSCRIPTION_BASE_URL=http://10.0.2.2:8087 `
-  --dart-define=EVOLUA_NOTIFICATION_BASE_URL=http://10.0.2.2:8088 `
-  --dart-define=EVOLUA_API_BASE_URL=http://10.0.2.2:8080
-```
+## Cadastro e perfil
 
-## Fluxo atual
+Fluxo atual:
 
-1. Abra a tela de autenticacao.
-2. Crie uma conta nova ou entre com um usuario existente.
-3. Ao autenticar com sucesso, o app redireciona para o dashboard.
-4. O admin `clara@evolua.local / 123456` pode criar novas trilhas.
-5. O usuario gratuito `leo@evolua.local / 123456` pode explorar trilhas essenciais e visualizar as premium bloqueadas.
-6. Use os modulos para criar perfil, trilhas, check-ins, posts, mensagens, assinaturas e notificacoes.
-7. A sessao fica salva localmente enquanto o token for valido.
+1. `Criar conta` coleta `Nome`, `Data de nascimento`, `Genero`, `Email` e `Senha`
+2. o `auth-service` cria a conta com `displayName`
+3. o app autentica o usuario
+4. o frontend faz bootstrap automatico do perfil em `PUT /v1/profiles/me`
+5. o cabecalho usa avatar e nome do perfil, com fallback para a sessao
+
+O menu do avatar abre:
+
+- `Ver perfil`
+- `Configuracoes e privacidade`
+- `Ajuda e suporte`
+- `Tela e acessibilidade`
+- `Dar feedback`
+- `Sair`
+
+## Assinaturas
+
+O frontend nao ativa mais premium por formulario manual.
+
+Fluxo atual:
+
+1. listar planos
+2. consultar assinatura atual
+3. iniciar checkout com `POST /v1/billing/checkout`
+4. voltar para `/home` com `billingCheckoutId`
+5. acompanhar status ate confirmacao
 
 ## Qualidade
-
-Comandos recomendados:
 
 ```powershell
 flutter analyze
 flutter test
 ```
 
-Se o Flutter nao estiver no `PATH`:
+## Documentos complementares
 
-```powershell
-C:\tools\flutter\bin\flutter.bat analyze
-C:\tools\flutter\bin\flutter.bat test
-```
-
-## Proximos passos sugeridos
-
-- conectar `user-service` ao perfil e preferencias
-- ligar `content-service` a experiencias multimidia e biblioteca
-- implementar diario emocional mais rico com filtros e historico
-- integrar chat em tempo real via WebSocket/STOMP
-- adicionar cache offline e sincronizacao local
-- preparar internacionalizacao e cache offline
+- [qa-fluxos-principais.md](./docs/qa-fluxos-principais.md)
+- [estado-atual-e-lacunas.md](./docs/estado-atual-e-lacunas.md)
+- [ux-ui-checklist.md](./docs/ux-ui-checklist.md)

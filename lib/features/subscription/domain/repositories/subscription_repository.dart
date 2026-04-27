@@ -1,12 +1,16 @@
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 
 abstract class SubscriptionRepository {
-  Future<List<SubscriptionRecord>> list();
+  Future<List<PlanView>> listPlans();
 
-  Future<SubscriptionRecord> create({
+  Future<CurrentSubscription?> current();
+
+  Future<CheckoutSession> startCheckout({
     required String planCode,
-    required String status,
-    required String billingCycle,
-    required bool premium,
+    required String frontendBaseUrl,
   });
+
+  Future<CheckoutSession> checkoutStatus(String checkoutId);
+
+  Future<CurrentSubscription?> cancel();
 }

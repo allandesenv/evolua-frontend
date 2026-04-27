@@ -1,7 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_redirect.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -18,9 +17,13 @@ class AuthFormCard extends ConsumerStatefulWidget {
 
 class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   final _formKey = GlobalKey<FormState>();
+  final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _customGenderController = TextEditingController();
   bool _isRegisterMode = false;
+  DateTime? _birthDate;
+  String _gender = 'MALE';
 
   @override
   void initState() {
@@ -32,13 +35,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         return;
       }
 
-      final message = error is DioException
-          ? (error.response?.data is Map<String, dynamic>
-              ? (error.response?.data['message']?.toString() ??
-                  error.message ??
-                  'Falha ao autenticar.')
-              : error.message ?? 'Falha ao autenticar.')
-          : error.toString();
+      final message = extractApiErrorMessage(
+        error,
+        fallback: 'Falha ao autenticar.',
+      );
 
       AppSnackBar.show(
         context,
@@ -50,8 +50,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _customGenderController.dispose();
     super.dispose();
   }
 
@@ -63,10 +65,23 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     final controller = ref.read(authControllerProvider.notifier);
 
     if (_isRegisterMode) {
-      await controller.register(
+      final message = await controller.register(
+        displayName: _displayNameController.text.trim(),
+        birthDate: _birthDate!,
+        gender: _gender,
+        customGender: _gender == 'CUSTOM'
+            ? _customGenderController.text.trim()
+            : null,
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      if (message != null && mounted) {
+        AppSnackBar.show(
+          context,
+          message: message,
+          icon: Icons.info_outline_rounded,
+        );
+      }
       return;
     }
 
@@ -93,6 +108,20 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         message: 'Google login esta disponivel apenas no Flutter Web.',
         icon: Icons.info_outline_rounded,
       );
+    }
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1900, 1, 1),
+      lastDate: now,
+      locale: const Locale('pt', 'BR'),
+    );
+    if (selected != null) {
+      setState(() => _birthDate = selected);
     }
   }
 
@@ -158,6 +187,91 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
               key: _formKey,
               child: Column(
               children: [
+                if (_isRegisterMode) ...[
+                  TextFormField(
+                    controller: _displayNameController,
+                    autofillHints: const [AutofillHints.name],
+                    decoration: const InputDecoration(
+                      labelText: 'Nome',
+                      hintText: 'Como voce quer ser chamado',
+                      prefixIcon: Icon(Icons.badge_rounded),
+                    ),
+                    validator: (value) {
+                      if (!_isRegisterMode) {
+                        return null;
+                      }
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Informe seu nome.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: _pickBirthDate,
+                    borderRadius: BorderRadius.circular(18),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Data de nascimento',
+                        prefixIcon: Icon(Icons.cake_rounded),
+                      ),
+                      child: Text(
+                        _birthDate == null
+                            ? 'Selecione sua data'
+                            : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
+                      ),
+                    ),
+                  ),
+                  if (_birthDate == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Informe sua data de nascimento.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: _gender,
+                    decoration: const InputDecoration(
+                      labelText: 'Genero',
+                      prefixIcon: Icon(Icons.wc_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'MALE', child: Text('Masculino')),
+                      DropdownMenuItem(value: 'FEMALE', child: Text('Feminino')),
+                      DropdownMenuItem(value: 'CUSTOM', child: Text('Personalizado')),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _gender = value ?? 'MALE');
+                    },
+                  ),
+                  if (_gender == 'CUSTOM') ...[
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _customGenderController,
+                      decoration: const InputDecoration(
+                        labelText: 'Como voce se identifica',
+                        hintText: 'Escreva do seu jeito',
+                        prefixIcon: Icon(Icons.edit_note_rounded),
+                      ),
+                      validator: (value) {
+                        if (_isRegisterMode &&
+                            _gender == 'CUSTOM' &&
+                            (value == null || value.trim().isEmpty)) {
+                          return 'Informe seu genero personalizado.';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                ],
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -201,7 +315,9 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: isLoading ? null : _submit,
+                    onPressed: isLoading || (_isRegisterMode && _birthDate == null)
+                        ? null
+                        : _submit,
                     child: isLoading
                         ? const SizedBox(
                             width: 20,
@@ -215,82 +331,6 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
             ),
           ),
           ),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceStrong.withValues(alpha: 0.38),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Perfis de desenvolvimento',
-                  style: theme.textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _DevCredentialChip(
-                      label: 'Admin',
-                      value: 'clara@evolua.local / 123456',
-                    ),
-                    _DevCredentialChip(
-                      label: 'Gratuito',
-                      value: 'leo@evolua.local / 123456',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Icon(Icons.bolt_rounded, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Sessao persistente para voce voltar rapido ao app quando quiser.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DevCredentialChip extends StatelessWidget {
-  const _DevCredentialChip({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 4),
-          Text(value, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
