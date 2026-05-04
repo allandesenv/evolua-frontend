@@ -57,25 +57,73 @@ class TrailRepositoryImpl implements TrailRepository {
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/trails',
-      data: {
-        'title': title,
-        'summary': summary,
-        'content': content,
-        'category': category,
-        'premium': premium,
-        'mediaLinks': mediaLinks
-            .map(
-              (link) => {
-                'label': link.label,
-                'url': link.url,
-                'type': link.type,
-              },
-            )
-            .toList(),
-      },
+      data: _trailPayload(
+        title: title,
+        summary: summary,
+        content: content,
+        category: category,
+        premium: premium,
+        mediaLinks: mediaLinks,
+      ),
     );
 
-    return TrailDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return TrailDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<Trail> update({
+    required int id,
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  }) async {
+    final response = await _dio.put<dynamic>(
+      '/v1/trails/$id',
+      data: _trailPayload(
+        title: title,
+        summary: summary,
+        content: content,
+        category: category,
+        premium: premium,
+        mediaLinks: mediaLinks,
+      ),
+    );
+
+    return TrailDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<void> delete(int id) async {
+    await _dio.delete<dynamic>('/v1/trails/$id');
+  }
+
+  Map<String, Object?> _trailPayload({
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  }) {
+    return {
+      'title': title,
+      'summary': summary,
+      'content': content,
+      'category': category,
+      'premium': premium,
+      'mediaLinks': mediaLinks
+          .map(
+            (link) => {'label': link.label, 'url': link.url, 'type': link.type},
+          )
+          .toList(),
+    };
   }
 
   @override
@@ -91,13 +139,19 @@ class TrailRepositoryImpl implements TrailRepository {
   @override
   Future<TrailJourney> journey(int trailId) async {
     final response = await _dio.get<dynamic>('/v1/trails/$trailId/journey');
-    return TrailJourneyDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 
   @override
   Future<TrailJourney> startJourney(int trailId) async {
-    final response = await _dio.post<dynamic>('/v1/trails/$trailId/journey/start');
-    return TrailJourneyDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    final response = await _dio.post<dynamic>(
+      '/v1/trails/$trailId/journey/start',
+    );
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 
   @override
@@ -105,6 +159,8 @@ class TrailRepositoryImpl implements TrailRepository {
     final response = await _dio.post<dynamic>(
       '/v1/trails/$trailId/journey/steps/$stepIndex/complete',
     );
-    return TrailJourneyDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 }

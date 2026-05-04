@@ -26,6 +26,8 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.canCreate,
     required this.onCreate,
     required this.headline,
+    required this.description,
+    this.showMembershipFilter = true,
     this.showScopeChips = false,
     this.currentScope,
     this.onExploreSelected,
@@ -49,6 +51,8 @@ class SocialCommunitiesArea extends StatelessWidget {
   final bool canCreate;
   final VoidCallback onCreate;
   final String headline;
+  final String description;
+  final bool showMembershipFilter;
   final bool showScopeChips;
   final String? currentScope;
   final VoidCallback? onExploreSelected;
@@ -116,6 +120,8 @@ class SocialCommunitiesArea extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 8),
+              Text(description, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 8),
               Text(
                 headline == 'Meus espacos'
                     ? '${result.totalItems} espacos em que voce ja entrou.'
@@ -136,29 +142,33 @@ class SocialCommunitiesArea extends StatelessWidget {
                 spacing: 16,
                 runSpacing: 16,
                 children: [
-                  SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: membershipFilter,
-                      decoration: const InputDecoration(labelText: 'Recorte'),
-                      items: const [
-                        DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(
-                          value: 'INGRESSADAS',
-                          child: Text('Participando'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'DESCOBRIR',
-                          child: Text('Descobrir'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          onMembershipChanged(value);
-                        }
-                      },
+                  if (showMembershipFilter)
+                    SizedBox(
+                      width: 220,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: membershipFilter,
+                        decoration: const InputDecoration(labelText: 'Recorte'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'TODAS',
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'INGRESSADAS',
+                            child: Text('Participando'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'DESCOBRIR',
+                            child: Text('Descobrir'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            onMembershipChanged(value);
+                          }
+                        },
+                      ),
                     ),
-                  ),
                   SizedBox(
                     width: 220,
                     child: DropdownButtonFormField<String>(

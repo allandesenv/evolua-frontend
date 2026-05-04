@@ -3,9 +3,7 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
-import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
-import 'package:evolua_frontend/features/content/domain/entities/journey_chat_message.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
@@ -28,10 +26,12 @@ class ContentModuleView extends ConsumerStatefulWidget {
     super.key,
     this.section = ContentModuleSection.journey,
     this.showSectionChips = true,
+    this.onOpenMentor,
   });
 
   final ContentModuleSection section;
   final bool showSectionChips;
+  final VoidCallback? onOpenMentor;
 
   @override
   ConsumerState<ContentModuleView> createState() => _ContentModuleViewState();
@@ -48,6 +48,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   bool _premium = false;
   bool? _premiumFilter;
   Trail? _selectedCatalogTrail;
+  Trail? _editingTrail;
   late ContentModuleSection _section;
 
   @override
@@ -101,27 +102,44 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
       return;
     }
 
-    await ref
-        .read(trailControllerProvider.notifier)
-        .create(
-          title: _titleController.text.trim(),
-          summary: _summaryController.text.trim(),
-          content: _contentController.text.trim(),
-          category: _categoryController.text.trim(),
-          premium: _premium,
-          mediaLinks: _buildMediaLinks(),
-        );
+    final controller = ref.read(trailControllerProvider.notifier);
+    final editingTrail = _editingTrail;
+    if (editingTrail == null) {
+      await controller.create(
+        title: _titleController.text.trim(),
+        summary: _summaryController.text.trim(),
+        content: _contentController.text.trim(),
+        category: _categoryController.text.trim(),
+        premium: _premium,
+        mediaLinks: _buildMediaLinks(),
+      );
+    } else {
+      await controller.updateTrail(
+        id: editingTrail.id,
+        title: _titleController.text.trim(),
+        summary: _summaryController.text.trim(),
+        content: _contentController.text.trim(),
+        category: _categoryController.text.trim(),
+        premium: _premium,
+        mediaLinks: _buildMediaLinks(),
+      );
+    }
 
     if (!mounted) {
       return;
     }
 
+    _resetAdminEditor();
+  }
+
+  void _resetAdminEditor() {
     _titleController.clear();
     _summaryController.clear();
     _contentController.clear();
     _categoryController.text = 'ansiedade';
     setState(() {
       _premium = false;
+      _editingTrail = null;
       for (final link in _mediaLinks) {
         link.dispose();
       }
@@ -129,6 +147,66 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         ..clear()
         ..add(_EditableMediaLink.live());
     });
+  }
+
+  void _startEditingTrail(Trail trail) {
+    _titleController.text = trail.title;
+    _summaryController.text = trail.summary;
+    _contentController.text = trail.content ?? '';
+    _categoryController.text = trail.category;
+    setState(() {
+      _premium = trail.premium;
+      _editingTrail = trail;
+      for (final link in _mediaLinks) {
+        link.dispose();
+      }
+      _mediaLinks
+        ..clear()
+        ..addAll(
+          trail.mediaLinks.isEmpty
+              ? [_EditableMediaLink.live()]
+              : trail.mediaLinks.map(_EditableMediaLink.fromLink),
+        );
+    });
+  }
+
+  Future<void> _confirmDeleteTrail(Trail trail) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir trilha?'),
+        content: Text(
+          'A trilha "${trail.title}" sera removida, junto com o progresso associado a ela.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    await ref.read(trailControllerProvider.notifier).delete(trail.id);
+    if (!mounted) {
+      return;
+    }
+
+    if (_editingTrail?.id == trail.id) {
+      _resetAdminEditor();
+    }
+    if (_selectedCatalogTrail?.id == trail.id) {
+      setState(() => _selectedCatalogTrail = null);
+    }
   }
 
   Future<void> _applyFilters() {
@@ -185,91 +263,131 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         (session?.isPremium ?? false) || (profile?.premium ?? false);
     final isSaving = trailsState.isLoading && !trailsState.hasValue;
 
-    return Column(
-      children: [
-        if (isAdmin) ...[
-          PrimaryPanel(
-            child: _AdminTrailEditor(
-              formKey: _formKey,
-              titleController: _titleController,
-              summaryController: _summaryController,
-              contentController: _contentController,
-              categoryController: _categoryController,
-              premium: _premium,
-              onPremiumChanged: (value) => setState(() => _premium = value),
-              mediaLinks: _mediaLinks,
-              onAddLink: () => setState(
-                () => _mediaLinks.add(_EditableMediaLink.live()),
-              ),
-              onRemoveLink: (index) => setState(() {
-                _mediaLinks[index].dispose();
-                _mediaLinks.removeAt(index);
-                if (_mediaLinks.isEmpty) {
-                  _mediaLinks.add(_EditableMediaLink.live());
-                }
-              }),
-              onSubmit: isSaving ? null : _submit,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final currentTrail = currentJourney.asData?.value;
+        final showingActiveJourney =
+            currentTrail != null && _section == ContentModuleSection.journey;
+        final showingCatalogJourney =
+            _section == ContentModuleSection.catalog &&
+            _selectedCatalogTrail != null;
+
+        final Widget body = switch ((
+          showingActiveJourney,
+          showingCatalogJourney,
+        )) {
+          (true, _) => currentJourney.when(
+            data: (trail) => trail == null
+                ? const SizedBox.shrink()
+                : _CurrentJourneyPanel(
+                    trail: trail,
+                    onOpenMentor: widget.onOpenMentor,
+                  ),
+            error: (_, _) => const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+          ),
+          (_, true) => _CatalogJourneyPanel(
+            trail: _selectedCatalogTrail!,
+            onBack: () => setState(() => _selectedCatalogTrail = null),
+            onOpenMentor: widget.onOpenMentor,
+          ),
+          _ => SingleChildScrollView(
+            child: Column(
+              children: [
+                currentJourney.when(
+                  data: (trail) => trail == null
+                      ? const SizedBox.shrink()
+                      : _CurrentJourneyBanner(
+                          trail: trail,
+                          onOpenJourney: () => setState(
+                            () => _section = ContentModuleSection.journey,
+                          ),
+                        ),
+                  error: (_, _) => const SizedBox.shrink(),
+                  loading: () => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 16),
+                trailsState.when(
+                  data: (result) => _TrailExplorer(
+                    result: result,
+                    isAdmin: isAdmin,
+                    hasPremiumAccess: hasPremiumAccess,
+                    searchController: _searchController,
+                    premiumFilter: _premiumFilter,
+                    onSearchChanged: (_) => _applyFilters(),
+                    onPremiumFilterChanged: (value) {
+                      setState(() {
+                        _premiumFilter = value;
+                        _selectedCatalogTrail = null;
+                      });
+                      _applyFilters();
+                    },
+                    onOpenTrail: (trail) => setState(() {
+                      _section = ContentModuleSection.catalog;
+                      _selectedCatalogTrail = trail;
+                    }),
+                    onEditTrail: isAdmin ? _startEditingTrail : null,
+                    onDeleteTrail: isAdmin ? _confirmDeleteTrail : null,
+                    onPageChanged: (page) {
+                      setState(() => _selectedCatalogTrail = null);
+                      ref.read(trailControllerProvider.notifier).goToPage(page);
+                    },
+                  ),
+                  error: (error, stackTrace) => _ContentErrorState(
+                    onRetry: () =>
+                        ref.read(trailControllerProvider.notifier).refresh(),
+                  ),
+                  loading: () => const _ContentLoadingState(),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-        ],
-        currentJourney.when(
-          data: (trail) => trail == null ||
-                  (_section == ContentModuleSection.catalog &&
-                      _selectedCatalogTrail != null)
-              ? const SizedBox.shrink()
-              : _section == ContentModuleSection.catalog
-              ? _CurrentJourneyBanner(
-                  trail: trail,
-                  onOpenJourney: () =>
-                      setState(() => _section = ContentModuleSection.journey),
-                )
-              : _CurrentJourneyPanel(trail: trail),
-          error: (_, _) => const SizedBox.shrink(),
-          loading: () => const SizedBox.shrink(),
-        ),
-        if (_section == ContentModuleSection.catalog ||
-            currentJourney.asData?.value == null) ...[
-          const SizedBox(height: 16),
-          if (_section == ContentModuleSection.catalog &&
-              _selectedCatalogTrail != null)
-            _CatalogJourneyPanel(
-              trail: _selectedCatalogTrail!,
-              onBack: () => setState(() => _selectedCatalogTrail = null),
-            )
-          else
-            trailsState.when(
-              data: (result) => _TrailExplorer(
-                result: result,
-                isAdmin: isAdmin,
-                hasPremiumAccess: hasPremiumAccess,
-                searchController: _searchController,
-                premiumFilter: _premiumFilter,
-                onSearchChanged: (_) => _applyFilters(),
-                onPremiumFilterChanged: (value) {
-                  setState(() {
-                    _premiumFilter = value;
-                    _selectedCatalogTrail = null;
-                  });
-                  _applyFilters();
-                },
-                onOpenTrail: (trail) => setState(() {
-                  _section = ContentModuleSection.catalog;
-                  _selectedCatalogTrail = trail;
-                }),
-                onPageChanged: (page) {
-                  setState(() => _selectedCatalogTrail = null);
-                  ref.read(trailControllerProvider.notifier).goToPage(page);
-                },
+        };
+
+        return Column(
+          children: [
+            if (isAdmin) ...[
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight * 0.44,
+                ),
+                child: SingleChildScrollView(
+                  child: PrimaryPanel(
+                    child: _AdminTrailEditor(
+                      formKey: _formKey,
+                      titleController: _titleController,
+                      summaryController: _summaryController,
+                      contentController: _contentController,
+                      categoryController: _categoryController,
+                      premium: _premium,
+                      onPremiumChanged: (value) =>
+                          setState(() => _premium = value),
+                      mediaLinks: _mediaLinks,
+                      editingTrail: _editingTrail,
+                      onAddLink: () => setState(
+                        () => _mediaLinks.add(_EditableMediaLink.live()),
+                      ),
+                      onRemoveLink: (index) => setState(() {
+                        _mediaLinks[index].dispose();
+                        _mediaLinks.removeAt(index);
+                        if (_mediaLinks.isEmpty) {
+                          _mediaLinks.add(_EditableMediaLink.live());
+                        }
+                      }),
+                      onCancelEditing: _editingTrail == null
+                          ? null
+                          : _resetAdminEditor,
+                      onSubmit: isSaving ? null : _submit,
+                    ),
+                  ),
+                ),
               ),
-              error: (error, stackTrace) => _ContentErrorState(
-                onRetry: () =>
-                    ref.read(trailControllerProvider.notifier).refresh(),
-              ),
-              loading: () => const _ContentLoadingState(),
-            ),
-        ],
-      ],
+              const SizedBox(height: 16),
+            ],
+            Expanded(child: body),
+          ],
+        );
+      },
     );
   }
 }
@@ -316,12 +434,14 @@ class _CurrentJourneyBanner extends StatelessWidget {
 }
 
 class _CurrentJourneyPanel extends ConsumerStatefulWidget {
-  const _CurrentJourneyPanel({required this.trail});
+  const _CurrentJourneyPanel({required this.trail, this.onOpenMentor});
 
   final Trail trail;
+  final VoidCallback? onOpenMentor;
 
   @override
-  ConsumerState<_CurrentJourneyPanel> createState() => _CurrentJourneyPanelState();
+  ConsumerState<_CurrentJourneyPanel> createState() =>
+      _CurrentJourneyPanelState();
 }
 
 class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
@@ -365,6 +485,7 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
       data: (journey) => _VisualJourneyPanel(
         journey: journey,
         isActing: _isActing,
+        onOpenMentor: widget.onOpenMentor,
         onPrimaryAction: () => _runJourneyAction(journey),
       ),
       error: (_, _) => PrimaryPanel(
@@ -381,10 +502,12 @@ class _CatalogJourneyPanel extends ConsumerStatefulWidget {
   const _CatalogJourneyPanel({
     required this.trail,
     required this.onBack,
+    this.onOpenMentor,
   });
 
   final Trail trail;
   final VoidCallback onBack;
+  final VoidCallback? onOpenMentor;
 
   @override
   ConsumerState<_CatalogJourneyPanel> createState() =>
@@ -434,6 +557,7 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
         isActing: _isActing,
         isCatalogTrail: true,
         onBackToCatalog: widget.onBack,
+        onOpenMentor: widget.onOpenMentor,
         onPrimaryAction: () => _runJourneyAction(journey),
       ),
       error: (_, _) => PrimaryPanel(
@@ -453,6 +577,7 @@ class _VisualJourneyPanel extends StatelessWidget {
     required this.onPrimaryAction,
     this.isCatalogTrail = false,
     this.onBackToCatalog,
+    this.onOpenMentor,
   });
 
   final TrailJourney journey;
@@ -460,6 +585,7 @@ class _VisualJourneyPanel extends StatelessWidget {
   final VoidCallback onPrimaryAction;
   final bool isCatalogTrail;
   final VoidCallback? onBackToCatalog;
+  final VoidCallback? onOpenMentor;
 
   @override
   Widget build(BuildContext context) {
@@ -471,65 +597,164 @@ class _VisualJourneyPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _JourneyHeader(
-            journey: journey,
-            activeColor: activeColor,
-            isCatalogTrail: isCatalogTrail,
-            onBackToCatalog: onBackToCatalog,
-            onOpenFullJourney: () => _showJourneyDetails(context, journey.trail),
-          ),
-          const SizedBox(height: 18),
-          _JourneyProgressSummary(journey: journey, activeColor: activeColor),
-          const SizedBox(height: 18),
-          if (compact)
-            _JourneyTimeline(
-              journey: journey,
-              activeColor: activeColor,
-              onStepTap: (step) => _showStepSheet(context, journey, step),
-            )
-          else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: _JourneyTimeline(
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _JourneyHeader(
                     journey: journey,
                     activeColor: activeColor,
-                    onStepTap: (step) => _showStepSheet(context, journey, step),
+                    isCatalogTrail: isCatalogTrail,
+                    onBackToCatalog: onBackToCatalog,
+                    onOpenFullJourney: () =>
+                        _showJourneyDetails(context, journey.trail),
                   ),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  flex: 6,
-                  child: _JourneyStepDetailCard(
-                    step: nextStep ?? journey.steps.last,
+                  const SizedBox(height: 18),
+                  _JourneyProgressSummary(
+                    journey: journey,
                     activeColor: activeColor,
-                    isCompleted: journey.isCompleted,
                   ),
-                ),
-              ],
-            ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: isActing || journey.steps.isEmpty ? null : onPrimaryAction,
-              icon: isActing
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                  const SizedBox(height: 18),
+                  if (compact)
+                    _JourneyTimeline(
+                      journey: journey,
+                      activeColor: activeColor,
+                      onStepTap: (step) =>
+                          _showStepSheet(context, journey, step),
                     )
-                  : Icon(journey.isCompleted
-                      ? Icons.replay_rounded
-                      : journey.isStarted
-                          ? Icons.task_alt_rounded
-                          : Icons.play_arrow_rounded),
-              label: Text(_journeyCtaLabel(journey)),
+                  else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: _JourneyTimeline(
+                            journey: journey,
+                            activeColor: activeColor,
+                            onStepTap: (step) =>
+                                _showStepSheet(context, journey, step),
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          flex: 6,
+                          child: _JourneyStepDetailCard(
+                            step: nextStep ?? journey.steps.last,
+                            activeColor: activeColor,
+                            isCompleted: journey.isCompleted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 18),
+                  _JourneyMentorEntryCard(onOpenMentor: onOpenMentor),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 18),
-          _JourneyChatCard(trail: journey.trail),
+          const SizedBox(height: 14),
+          _JourneyStickyCta(
+            journey: journey,
+            isActing: isActing,
+            onPressed: isActing || journey.steps.isEmpty
+                ? null
+                : onPrimaryAction,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyStickyCta extends StatelessWidget {
+  const _JourneyStickyCta({
+    required this.journey,
+    required this.isActing,
+    required this.onPressed,
+  });
+
+  final TrailJourney journey;
+  final bool isActing;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + bottomInset),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: isActing
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  journey.isCompleted
+                      ? Icons.replay_rounded
+                      : journey.isStarted
+                      ? Icons.task_alt_rounded
+                      : Icons.play_arrow_rounded,
+                ),
+          label: Text(_journeyCtaLabel(journey)),
+        ),
+      ),
+    );
+  }
+}
+
+class _JourneyMentorEntryCard extends StatelessWidget {
+  const _JourneyMentorEntryCard({this.onOpenMentor});
+
+  final VoidCallback? onOpenMentor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Precisa adaptar sua jornada hoje?',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Converse com seu Mentor Evolua para ajustar sua proxima etapa.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: onOpenMentor,
+            icon: const Icon(Icons.auto_awesome_rounded),
+            label: const Text('Abrir Mentor Evolua'),
+          ),
         ],
       ),
     );
@@ -565,9 +790,9 @@ class _JourneyHeader extends StatelessWidget {
               ? 'Sua trilha de ${_categoryLabel(trail.category)}'
               : 'Trilha guiada',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: activeColor,
-                fontWeight: FontWeight.w700,
-              ),
+            color: activeColor,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 6),
         Text(trail.title, style: Theme.of(context).textTheme.headlineSmall),
@@ -594,7 +819,10 @@ class _JourneyHeader extends StatelessWidget {
               color: activeColor,
             ),
             if (trail.generatedByAi)
-              const _StatusBadge(label: 'IA ativa', color: AppColors.accentGold),
+              const _StatusBadge(
+                label: 'IA ativa',
+                color: AppColors.accentGold,
+              ),
             _StatusBadge(
               label: '${journey.steps.length} etapas',
               color: AppColors.textSecondary,
@@ -617,7 +845,9 @@ class _JourneyHeader extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onOpenFullJourney,
           icon: const Icon(Icons.auto_stories_rounded),
-          label: Text(isCatalogTrail ? 'Conteudo completo' : 'Jornada completa'),
+          label: Text(
+            isCatalogTrail ? 'Conteudo completo' : 'Jornada completa',
+          ),
         ),
       ],
     );
@@ -625,11 +855,7 @@ class _JourneyHeader extends StatelessWidget {
     if (compact) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          info,
-          const SizedBox(height: 14),
-          actions,
-        ],
+        children: [info, const SizedBox(height: 14), actions],
       );
     }
 
@@ -670,15 +896,15 @@ class _JourneyProgressSummary extends StatelessWidget {
                 child: Text(
                   '${journey.progressPercent}% da jornada',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               Text(
                 '${journey.completedSteps}/${journey.steps.length} etapas',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -741,7 +967,9 @@ class _JourneyTimelineNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nodeColor = step.isCompleted || step.isCurrent ? activeColor : AppColors.outline;
+    final nodeColor = step.isCompleted || step.isCurrent
+        ? activeColor
+        : AppColors.outline;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -759,7 +987,10 @@ class _JourneyTimelineNode extends StatelessWidget {
                   color: step.isCompleted
                       ? activeColor
                       : AppColors.surfaceStrong.withValues(alpha: 0.9),
-                  border: Border.all(color: nodeColor, width: step.isCurrent ? 2 : 1),
+                  border: Border.all(
+                    color: nodeColor,
+                    width: step.isCurrent ? 2 : 1,
+                  ),
                   boxShadow: step.isCurrent
                       ? [
                           BoxShadow(
@@ -774,8 +1005,8 @@ class _JourneyTimelineNode extends StatelessWidget {
                   step.isCompleted
                       ? Icons.check_rounded
                       : step.isCurrent
-                          ? Icons.local_fire_department_rounded
-                          : Icons.circle_outlined,
+                      ? Icons.local_fire_department_rounded
+                      : Icons.circle_outlined,
                   size: 17,
                   color: step.isCompleted ? AppColors.background : nodeColor,
                 ),
@@ -807,9 +1038,13 @@ class _JourneyTimelineNode extends StatelessWidget {
                   Text(
                     step.title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: step.isCurrent ? AppColors.textPrimary : AppColors.textSecondary,
-                          fontWeight: step.isCurrent ? FontWeight.w700 : FontWeight.w500,
-                        ),
+                      color: step.isCurrent
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                      fontWeight: step.isCurrent
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -853,7 +1088,9 @@ class _JourneyStepDetailCard extends StatelessWidget {
         children: [
           Text(
             isCompleted ? 'Jornada concluida' : 'Proximo passo',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: activeColor),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: activeColor),
           ),
           const SizedBox(height: 8),
           Text(step.title, style: Theme.of(context).textTheme.titleLarge),
@@ -868,14 +1105,15 @@ class _JourneyStepDetailCard extends StatelessWidget {
                 launchUrlString(href);
               }
             },
-            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-              p: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
+                .copyWith(
+                  p: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textPrimary,
                   ),
-              listBullet: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: activeColor,
-                  ),
-            ),
+                  listBullet: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: activeColor),
+                ),
           ),
         ],
       ),
@@ -988,193 +1226,6 @@ class _JourneyStepSheetState extends State<_JourneyStepSheet> {
   }
 }
 
-class _JourneyChatCard extends ConsumerStatefulWidget {
-  const _JourneyChatCard({required this.trail});
-
-  final Trail trail;
-
-  @override
-  ConsumerState<_JourneyChatCard> createState() => _JourneyChatCardState();
-}
-
-class _JourneyChatCardState extends ConsumerState<_JourneyChatCard> {
-  final _messageController = TextEditingController();
-  final List<JourneyChatMessage> _messages = const [
-    JourneyChatMessage(
-      role: 'assistant',
-      content:
-          'Estou aqui para conversar sobre sua jornada. Me conte onde voce travou ou qual exercicio quer adaptar para hoje.',
-    ),
-  ].toList();
-  bool _isSending = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    final text = _messageController.text.trim();
-    if (text.isEmpty || _isSending) {
-      return;
-    }
-
-    setState(() {
-      _isSending = true;
-      _error = null;
-      _messages.add(JourneyChatMessage(role: 'user', content: text));
-      _messageController.clear();
-    });
-
-    try {
-      final reply = await ref
-          .read(journeyChatControllerProvider)
-          .send(
-            message: text,
-            conversationHistory: _messages.length > 6
-                ? _messages.sublist(_messages.length - 6)
-                : List.of(_messages),
-            trailId: widget.trail.id,
-          );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _messages.add(
-          JourneyChatMessage(
-            role: 'assistant',
-            content:
-                '${reply.reply}\n\nProximo passo: ${reply.suggestedNextStep}',
-          ),
-        );
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      final message = error is DioException
-          ? (error.response?.data is Map<String, dynamic>
-                ? (error.response?.data['message']?.toString() ??
-                      error.message ??
-                      'Nao conseguimos responder agora.')
-                : error.message ?? 'Nao conseguimos responder agora.')
-          : 'Nao conseguimos responder agora.';
-      setState(() => _error = message);
-    } finally {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.32),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Conversar sobre minha jornada',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'A IA usa a trilha ativa como contexto e responde com passos pequenos, sem substituir apoio profissional.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 14),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 260),
-            child: SingleChildScrollView(
-              child: Column(
-                children: _messages
-                    .map(
-                      (message) => Align(
-                        alignment: message.role == 'user'
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: message.role == 'user'
-                                ? AppColors.accent.withValues(alpha: 0.16)
-                                : AppColors.surface.withValues(alpha: 0.72),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: AppColors.outline.withValues(alpha: 0.22),
-                            ),
-                          ),
-                          child: Text(
-                            message.content,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppColors.textPrimary),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.danger),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  minLines: 1,
-                  maxLines: 3,
-                  enabled: !_isSending,
-                  decoration: const InputDecoration(
-                    labelText: 'Pergunte ou peça uma adaptacao',
-                    hintText:
-                        'Ex: como eu faco esse exercicio com pouco tempo?',
-                    prefixIcon: Icon(Icons.forum_rounded),
-                  ),
-                  onSubmitted: (_) => _send(),
-                ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filled(
-                onPressed: _isSending ? null : _send,
-                icon: _isSending
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send_rounded),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 void _showJourneyDetails(BuildContext context, Trail trail) {
   showDialog<void>(
     context: context,
@@ -1277,8 +1328,10 @@ class _AdminTrailEditor extends StatelessWidget {
     required this.premium,
     required this.onPremiumChanged,
     required this.mediaLinks,
+    required this.editingTrail,
     required this.onAddLink,
     required this.onRemoveLink,
+    required this.onCancelEditing,
     required this.onSubmit,
   });
 
@@ -1290,16 +1343,33 @@ class _AdminTrailEditor extends StatelessWidget {
   final bool premium;
   final ValueChanged<bool> onPremiumChanged;
   final List<_EditableMediaLink> mediaLinks;
+  final Trail? editingTrail;
   final VoidCallback onAddLink;
   final ValueChanged<int> onRemoveLink;
+  final VoidCallback? onCancelEditing;
   final VoidCallback? onSubmit;
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = editingTrail != null;
     return Form(
       key: formKey,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            isEditing ? 'Editar trilha' : 'Criar nova trilha',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+          ),
+          if (isEditing) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Editando: ${editingTrail!.title}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
           const SizedBox(height: 24),
           TextFormField(
             controller: titleController,
@@ -1400,13 +1470,26 @@ class _AdminTrailEditor extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ElevatedButton.icon(
-              onPressed: onSubmit,
-              icon: const Icon(Icons.add_circle_outline_rounded),
-              label: const Text('Criar trilha'),
-            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              ElevatedButton.icon(
+                onPressed: onSubmit,
+                icon: Icon(
+                  isEditing
+                      ? Icons.save_outlined
+                      : Icons.add_circle_outline_rounded,
+                ),
+                label: Text(isEditing ? 'Salvar alteracoes' : 'Criar trilha'),
+              ),
+              if (onCancelEditing != null)
+                OutlinedButton.icon(
+                  onPressed: onCancelEditing,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Cancelar edicao'),
+                ),
+            ],
           ),
         ],
       ),
@@ -1521,6 +1604,8 @@ class _TrailExplorer extends ConsumerWidget {
     required this.onSearchChanged,
     required this.onPremiumFilterChanged,
     required this.onOpenTrail,
+    required this.onEditTrail,
+    required this.onDeleteTrail,
     required this.onPageChanged,
   });
 
@@ -1532,6 +1617,8 @@ class _TrailExplorer extends ConsumerWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<bool?> onPremiumFilterChanged;
   final ValueChanged<Trail> onOpenTrail;
+  final ValueChanged<Trail>? onEditTrail;
+  final ValueChanged<Trail>? onDeleteTrail;
   final ValueChanged<int> onPageChanged;
 
   @override
@@ -1603,135 +1690,147 @@ class _TrailExplorer extends ConsumerWidget {
         else
           Column(
             children: [
-              ...result.items.map(
-                (trail) {
-                  final journeyState = trail.accessible
-                      ? ref.watch(trailJourneyProvider(trail.id))
-                      : null;
+              ...result.items.map((trail) {
+                final journeyState = trail.accessible
+                    ? ref.watch(trailJourneyProvider(trail.id))
+                    : null;
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: PrimaryPanel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  trail.title,
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(color: AppColors.textPrimary),
-                                ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: PrimaryPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                trail.title,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(color: AppColors.textPrimary),
                               ),
-                              Text(
-                                trail.category,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: AppColors.accent),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            trail.summary,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                          const SizedBox(height: 14),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
+                            ),
+                            Text(
+                              trail.category,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.accent),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          trail.summary,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _StatusBadge(
+                              label: trail.premium ? 'Premium' : 'Essencial',
+                              color: trail.premium
+                                  ? AppColors.accentGold
+                                  : AppColors.accent,
+                            ),
+                            if (trail.mediaLinks.isNotEmpty)
                               _StatusBadge(
-                                label: trail.premium ? 'Premium' : 'Essencial',
-                                color: trail.premium
-                                    ? AppColors.accentGold
-                                    : AppColors.accent,
+                                label: '${trail.mediaLinks.length} links',
+                                color: AppColors.accentWarm,
                               ),
-                              if (trail.mediaLinks.isNotEmpty)
-                                _StatusBadge(
-                                  label: '${trail.mediaLinks.length} links',
-                                  color: AppColors.accentWarm,
-                                ),
-                              if (journeyState?.hasValue ?? false)
-                                _StatusBadge(
-                                  label:
-                                      '${journeyState!.requireValue.progressPercent}% concluido',
-                                  color: AppColors.textSecondary,
-                                ),
-                              if (!trail.accessible &&
-                                  !isAdmin &&
-                                  !hasPremiumAccess)
-                                const _StatusBadge(
-                                  label: 'Faca upgrade para acessar',
-                                  color: AppColors.danger,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                if (trail.accessible)
-                                  journeyState!.when(
-                                    data: (journey) => ElevatedButton.icon(
-                                      onPressed: () async {
-                                        if (!journey.isStarted) {
-                                          await ref
-                                              .read(trailJourneyActionProvider)
-                                              .start(trail.id);
-                                        }
-                                        if (context.mounted) {
-                                          onOpenTrail(trail);
-                                        }
-                                      },
-                                      icon: Icon(
-                                        journey.isCompleted
-                                            ? Icons.replay_rounded
-                                            : journey.isStarted
-                                            ? Icons.task_alt_rounded
-                                            : Icons.play_arrow_rounded,
-                                      ),
-                                      label: Text(_catalogTrailCtaLabel(journey)),
+                            if (journeyState?.hasValue ?? false)
+                              _StatusBadge(
+                                label:
+                                    '${journeyState!.requireValue.progressPercent}% concluido',
+                                color: AppColors.textSecondary,
+                              ),
+                            if (!trail.accessible &&
+                                !isAdmin &&
+                                !hasPremiumAccess)
+                              const _StatusBadge(
+                                label: 'Faca upgrade para acessar',
+                                color: AppColors.danger,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              if (trail.accessible)
+                                journeyState!.when(
+                                  data: (journey) => ElevatedButton.icon(
+                                    onPressed: () async {
+                                      if (!journey.isStarted) {
+                                        await ref
+                                            .read(trailJourneyActionProvider)
+                                            .start(trail.id);
+                                      }
+                                      if (context.mounted) {
+                                        onOpenTrail(trail);
+                                      }
+                                    },
+                                    icon: Icon(
+                                      journey.isCompleted
+                                          ? Icons.replay_rounded
+                                          : journey.isStarted
+                                          ? Icons.task_alt_rounded
+                                          : Icons.play_arrow_rounded,
                                     ),
-                                    loading: () => ElevatedButton.icon(
-                                      onPressed: null,
-                                      icon: const SizedBox.square(
-                                        dimension: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                      label: const Text('Carregando progresso'),
-                                    ),
-                                    error: (_, _) => ElevatedButton.icon(
-                                      onPressed: () => onOpenTrail(trail),
-                                      icon: const Icon(Icons.route_rounded),
-                                      label: const Text('Abrir trilha'),
-                                    ),
+                                    label: Text(_catalogTrailCtaLabel(journey)),
                                   ),
+                                  loading: () => ElevatedButton.icon(
+                                    onPressed: null,
+                                    icon: const SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    label: const Text('Carregando progresso'),
+                                  ),
+                                  error: (_, _) => ElevatedButton.icon(
+                                    onPressed: () => onOpenTrail(trail),
+                                    icon: const Icon(Icons.route_rounded),
+                                    label: const Text('Abrir trilha'),
+                                  ),
+                                ),
+                              OutlinedButton.icon(
+                                onPressed: trail.accessible
+                                    ? () => onOpenTrail(trail)
+                                    : () => _showTrailDetails(context, trail),
+                                icon: const Icon(Icons.visibility_rounded),
+                                label: Text(
+                                  trail.accessible
+                                      ? 'Ver caminho'
+                                      : 'Ver detalhes',
+                                ),
+                              ),
+                              if (isAdmin) ...[
                                 OutlinedButton.icon(
-                                  onPressed: trail.accessible
-                                      ? () => onOpenTrail(trail)
-                                      : () => _showTrailDetails(context, trail),
-                                  icon: const Icon(Icons.visibility_rounded),
-                                  label: Text(
-                                    trail.accessible
-                                        ? 'Ver caminho'
-                                        : 'Ver detalhes',
+                                  onPressed: () => onEditTrail?.call(trail),
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Editar'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () => onDeleteTrail?.call(trail),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
                                   ),
+                                  label: const Text('Excluir'),
                                 ),
                               ],
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              }),
               PaginationControls(
                 page: result.page,
                 totalPages: result.totalPages,
@@ -1959,6 +2058,11 @@ class _EditableMediaLink {
     : labelController = TextEditingController(),
       urlController = TextEditingController(),
       type = 'auto';
+
+  _EditableMediaLink.fromLink(TrailMediaLink link)
+    : labelController = TextEditingController(text: link.label),
+      urlController = TextEditingController(text: link.url),
+      type = link.type;
 
   final TextEditingController labelController;
   final TextEditingController urlController;
