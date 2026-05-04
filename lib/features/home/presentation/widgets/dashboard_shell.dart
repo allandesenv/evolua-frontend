@@ -4,6 +4,7 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
+import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
@@ -31,22 +32,31 @@ class DashboardShell extends ConsumerStatefulWidget {
 class _DashboardShellState extends ConsumerState<DashboardShell> {
   int _selectedIndex = 0;
   ContentModuleSection _trailSection = ContentModuleSection.journey;
-  SocialFeedScope _reflectionScope = SocialFeedScope.moment;
-  SocialCommunityScope _spaceScope = SocialCommunityScope.explore;
+  SocialModuleTab _spaceSection = SocialModuleTab.featured;
+  final SocialFeedScope _reflectionScope = SocialFeedScope.moment;
   ProfileModuleSection _profileSection = ProfileModuleSection.overview;
   bool _handledBillingReturn = false;
 
   static const _destinations = [
     _NavItem(label: 'Home', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
-    _NavItem(label: 'Reflexoes', icon: Icons.dynamic_feed_rounded),
     _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
+    _NavItem(label: 'Mentor Evolua', icon: Icons.auto_awesome_rounded),
   ];
 
+  static const _spacesIndex = 2;
+  static const _mentorIndex = 3;
   static const _profileIndex = 4;
 
   void _goTo(int index) {
     setState(() => _selectedIndex = index);
+  }
+
+  void _openSpacesSection(SocialModuleTab section) {
+    setState(() {
+      _selectedIndex = _spacesIndex;
+      _spaceSection = section;
+    });
   }
 
   @override
@@ -63,7 +73,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _handledBillingReturn = true;
     _selectedIndex = _profileIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(subscriptionControllerProvider.notifier).trackCheckout(checkoutId);
+      ref
+          .read(subscriptionControllerProvider.notifier)
+          .trackCheckout(checkoutId);
       if (mounted) {
         context.go('/home');
       }
@@ -78,10 +90,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final content = _DashboardContent(
       selectedIndex: _selectedIndex,
       trailSection: _trailSection,
+      spaceSection: _spaceSection,
       reflectionScope: _reflectionScope,
-      spaceScope: _spaceScope,
       profileSection: _profileSection,
       onNavigate: _goTo,
+      onOpenSpacesSection: _openSpacesSection,
+      onOpenMentor: () => _goTo(_mentorIndex),
       onOpenProfileSection: (section) {
         setState(() {
           _selectedIndex = _profileIndex;
@@ -147,7 +161,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
+                              const EvoluaLogo(
+                                variant: EvoluaLogoVariant.sidebar,
+                              ),
                               const SizedBox(height: 24),
                               Expanded(
                                 child: SingleChildScrollView(
@@ -202,56 +218,39 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                   context,
                                                   entries: [
                                                     _SubnavEntry(
-                                                      label: 'Do momento',
+                                                      label: 'Em destaque',
                                                       selected:
-                                                          _reflectionScope ==
-                                                          SocialFeedScope
-                                                              .moment,
+                                                          _spaceSection ==
+                                                          SocialModuleTab
+                                                              .featured,
                                                       onTap: () => setState(
-                                                        () => _reflectionScope =
-                                                            SocialFeedScope
-                                                                .moment,
+                                                        () => _spaceSection =
+                                                            SocialModuleTab
+                                                                .featured,
                                                       ),
                                                     ),
                                                     _SubnavEntry(
-                                                      label: 'Minhas reflexoes',
+                                                      label: 'Reflexoes',
                                                       selected:
-                                                          _reflectionScope ==
-                                                          SocialFeedScope.mine,
+                                                          _spaceSection ==
+                                                          SocialModuleTab
+                                                              .reflections,
                                                       onTap: () => setState(
-                                                        () => _reflectionScope =
-                                                            SocialFeedScope
-                                                                .mine,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              3 when isSelected =>
-                                                _buildDesktopSubmenu(
-                                                  context,
-                                                  entries: [
-                                                    _SubnavEntry(
-                                                      label: 'Explorar',
-                                                      selected:
-                                                          _spaceScope ==
-                                                          SocialCommunityScope
-                                                              .explore,
-                                                      onTap: () => setState(
-                                                        () => _spaceScope =
-                                                            SocialCommunityScope
-                                                                .explore,
+                                                        () => _spaceSection =
+                                                            SocialModuleTab
+                                                                .reflections,
                                                       ),
                                                     ),
                                                     _SubnavEntry(
                                                       label: 'Meus espacos',
                                                       selected:
-                                                          _spaceScope ==
-                                                          SocialCommunityScope
-                                                              .mine,
+                                                          _spaceSection ==
+                                                          SocialModuleTab
+                                                              .mySpaces,
                                                       onTap: () => setState(
-                                                        () => _spaceScope =
-                                                            SocialCommunityScope
-                                                                .mine,
+                                                        () => _spaceSection =
+                                                            SocialModuleTab
+                                                                .mySpaces,
                                                       ),
                                                     ),
                                                   ],
@@ -284,20 +283,24 @@ class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({
     required this.selectedIndex,
     required this.trailSection,
+    required this.spaceSection,
     required this.reflectionScope,
-    required this.spaceScope,
     required this.profileSection,
     required this.onNavigate,
+    required this.onOpenSpacesSection,
+    required this.onOpenMentor,
     required this.onOpenProfileSection,
     required this.onLogout,
   });
 
   final int selectedIndex;
   final ContentModuleSection trailSection;
+  final SocialModuleTab spaceSection;
   final SocialFeedScope reflectionScope;
-  final SocialCommunityScope spaceScope;
   final ProfileModuleSection profileSection;
   final void Function(int index) onNavigate;
+  final void Function(SocialModuleTab section) onOpenSpacesSection;
+  final VoidCallback onOpenMentor;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback onLogout;
 
@@ -314,6 +317,8 @@ class _DashboardContent extends ConsumerWidget {
         ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
     final communitiesCount =
         ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
+    final compact = ResponsiveBreakpoints.isCompact(context);
+    final pageTitle = _pageTitleFor(selectedIndex);
 
     final sections = [
       HomeHubView(
@@ -323,63 +328,57 @@ class _DashboardContent extends ConsumerWidget {
         postsCount: postsCount,
         communitiesCount: communitiesCount,
         onOpenTrails: () => onNavigate(1),
-        onOpenFeed: () => onNavigate(2),
-        onOpenCommunity: () => onNavigate(3),
-        onOpenProfile: () => onOpenProfileSection(ProfileModuleSection.overview),
+        onOpenFeed: () => onOpenSpacesSection(SocialModuleTab.reflections),
+        onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
+        onOpenProfile: () =>
+            onOpenProfileSection(ProfileModuleSection.overview),
       ),
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),
         section: trailSection,
         showSectionChips: true,
+        onOpenMentor: onOpenMentor,
       ),
       SocialModuleView(
-        key: ValueKey('feed-${reflectionScope.name}'),
-        initialTab: SocialModuleTab.feed,
+        key: ValueKey('spaces-${spaceSection.name}-${reflectionScope.name}'),
+        initialTab: spaceSection,
         feedScope: reflectionScope,
-        showTabs: false,
-        showScopeChips: true,
+        showTabs: true,
+        showScopeChips: false,
+        onTabChanged: onOpenSpacesSection,
       ),
-      _CommunityView(scope: spaceScope),
+      MentorEvoluaModuleView(onOpenTrails: () => onNavigate(1)),
       _ProfileArea(section: profileSection),
     ];
 
     return Column(
       children: [
-        PrimaryPanel(
-          semanticLabel: 'Cabecalho da area autenticada',
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 760;
-
-              return compact
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _HeaderActions(
-                          notificationBell: const NotificationBellButton(),
-                          session: session,
-                          profile: profile,
-                          onContinue: () => onNavigate(0),
-                          onOpenProfileSection: onOpenProfileSection,
-                          onLogout: onLogout,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        const Spacer(),
-                        const SizedBox(width: 20),
-                        _HeaderActions(
-                          notificationBell: const NotificationBellButton(),
-                          session: session,
-                          profile: profile,
-                          onContinue: () => onNavigate(0),
-                          onOpenProfileSection: onOpenProfileSection,
-                          onLogout: onLogout,
-                        ),
-                      ],
-                    );
-            },
+        SizedBox(
+          width: double.infinity,
+          child: PrimaryPanel(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 16 : 18,
+              vertical: 10,
+            ),
+            semanticLabel: 'Cabecalho da area autenticada',
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: compact
+                      ? const _TopBarIdentity()
+                      : _TopBarTitle(title: pageTitle),
+                ),
+                const SizedBox(width: 16),
+                _HeaderActions(
+                  notificationBell: const NotificationBellButton(),
+                  session: session,
+                  profile: profile,
+                  onOpenProfileSection: onOpenProfileSection,
+                  onLogout: onLogout,
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 18),
@@ -388,14 +387,32 @@ class _DashboardContent extends ConsumerWidget {
             duration: const Duration(milliseconds: 220),
             switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
-            child: SingleChildScrollView(
-              key: ValueKey(selectedIndex),
-              child: sections[selectedIndex.clamp(0, sections.length - 1)],
-            ),
+            child: selectedIndex == 1
+                ? KeyedSubtree(
+                    key: ValueKey(selectedIndex),
+                    child:
+                        sections[selectedIndex.clamp(0, sections.length - 1)],
+                  )
+                : SingleChildScrollView(
+                    key: ValueKey(selectedIndex),
+                    child:
+                        sections[selectedIndex.clamp(0, sections.length - 1)],
+                  ),
           ),
         ),
       ],
     );
+  }
+
+  String _pageTitleFor(int index) {
+    return switch (index) {
+      0 => 'Home',
+      1 => 'Trilhas',
+      2 => 'Espacos',
+      3 => 'Mentor Evolua',
+      4 => 'Perfil',
+      _ => 'Evolua',
+    };
   }
 }
 
@@ -447,26 +464,6 @@ Widget? _buildDesktopSubmenu(
   );
 }
 
-class _CommunityView extends StatelessWidget {
-  const _CommunityView({required this.scope});
-
-  final SocialCommunityScope scope;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SocialModuleView(
-          initialTab: SocialModuleTab.communities,
-          showTabs: false,
-          communityScope: scope,
-          showScopeChips: true,
-        ),
-      ],
-    );
-  }
-}
-
 class _ProfileArea extends StatelessWidget {
   const _ProfileArea({required this.section});
 
@@ -484,12 +481,70 @@ class _ProfileArea extends StatelessWidget {
   }
 }
 
+class _TopBarIdentity extends StatelessWidget {
+  const _TopBarIdentity();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: AppColors.outline.withValues(alpha: 0.16),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.asset(
+            'assets/branding/app_logo_trimmed.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            'Evolua',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopBarTitle extends StatelessWidget {
+  const _TopBarTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
 class _HeaderActions extends StatelessWidget {
   const _HeaderActions({
     required this.notificationBell,
     required this.session,
     required this.profile,
-    required this.onContinue,
     required this.onOpenProfileSection,
     required this.onLogout,
   });
@@ -497,25 +552,17 @@ class _HeaderActions extends StatelessWidget {
   final Widget notificationBell;
   final AuthSession? session;
   final Profile? profile;
-  final VoidCallback onContinue;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         notificationBell,
-        Tooltip(
-          message: 'Voltar para a home principal',
-          child: FilledButton.icon(
-            onPressed: onContinue,
-            icon: const Icon(Icons.favorite_outline_rounded),
-            label: const Text('Ir para home'),
-          ),
-        ),
+        const SizedBox(width: 8),
         _AccountMenuButton(
           session: session,
           profile: profile,
@@ -581,7 +628,10 @@ class _AccountMenuButton extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 4),
-                          Text(email, style: Theme.of(context).textTheme.bodySmall),
+                          Text(
+                            email,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ],
                       ),
                     ),
@@ -616,10 +666,7 @@ class _AccountMenuButton extends StatelessWidget {
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: _AccountMenuAction.overview,
-          child: _MenuLabel(
-            icon: Icons.person_rounded,
-            label: 'Ver perfil',
-          ),
+          child: _MenuLabel(icon: Icons.person_rounded, label: 'Ver perfil'),
         ),
         const PopupMenuItem(
           value: _AccountMenuAction.settings,
@@ -652,10 +699,7 @@ class _AccountMenuButton extends StatelessWidget {
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: _AccountMenuAction.logout,
-          child: _MenuLabel(
-            icon: Icons.logout_rounded,
-            label: 'Sair',
-          ),
+          child: _MenuLabel(icon: Icons.logout_rounded, label: 'Sair'),
         ),
       ],
       onSelected: (value) {
@@ -705,31 +749,40 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalizedUrl = imageUrl == null || imageUrl!.isEmpty ? null : imageUrl!;
+    final normalizedUrl = imageUrl == null || imageUrl!.isEmpty
+        ? null
+        : imageUrl!;
     return CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.surfaceStrong,
-      backgroundImage: normalizedUrl != null ? NetworkImage(normalizedUrl) : null,
+      backgroundImage: normalizedUrl != null
+          ? NetworkImage(normalizedUrl)
+          : null,
       child: normalizedUrl == null
           ? Text(
               _initials(fallbackText),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
             )
           : null,
     );
   }
 
   String _initials(String value) {
-    final parts = value.trim().split(RegExp(r'\s+')).where((item) => item.isNotEmpty).toList();
+    final parts = value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((item) => item.isNotEmpty)
+        .toList();
     if (parts.isEmpty) {
       return 'E';
     }
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();
     }
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
   }
 }
 

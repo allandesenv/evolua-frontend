@@ -2,8 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/network/pagination_query.dart';
+import 'package:evolua_frontend/features/content/data/models/trail_journey_dto.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 
@@ -55,25 +57,73 @@ class TrailRepositoryImpl implements TrailRepository {
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/trails',
-      data: {
-        'title': title,
-        'summary': summary,
-        'content': content,
-        'category': category,
-        'premium': premium,
-        'mediaLinks': mediaLinks
-            .map(
-              (link) => {
-                'label': link.label,
-                'url': link.url,
-                'type': link.type,
-              },
-            )
-            .toList(),
-      },
+      data: _trailPayload(
+        title: title,
+        summary: summary,
+        content: content,
+        category: category,
+        premium: premium,
+        mediaLinks: mediaLinks,
+      ),
     );
 
-    return TrailDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return TrailDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<Trail> update({
+    required int id,
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  }) async {
+    final response = await _dio.put<dynamic>(
+      '/v1/trails/$id',
+      data: _trailPayload(
+        title: title,
+        summary: summary,
+        content: content,
+        category: category,
+        premium: premium,
+        mediaLinks: mediaLinks,
+      ),
+    );
+
+    return TrailDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<void> delete(int id) async {
+    await _dio.delete<dynamic>('/v1/trails/$id');
+  }
+
+  Map<String, Object?> _trailPayload({
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  }) {
+    return {
+      'title': title,
+      'summary': summary,
+      'content': content,
+      'category': category,
+      'premium': premium,
+      'mediaLinks': mediaLinks
+          .map(
+            (link) => {'label': link.label, 'url': link.url, 'type': link.type},
+          )
+          .toList(),
+    };
   }
 
   @override
@@ -84,5 +134,33 @@ class TrailRepositoryImpl implements TrailRepository {
       return null;
     }
     return TrailDto.fromJson(data).toEntity();
+  }
+
+  @override
+  Future<TrailJourney> journey(int trailId) async {
+    final response = await _dio.get<dynamic>('/v1/trails/$trailId/journey');
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<TrailJourney> startJourney(int trailId) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/trails/$trailId/journey/start',
+    );
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<TrailJourney> completeStep(int trailId, int stepIndex) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/trails/$trailId/journey/steps/$stepIndex/complete',
+    );
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 }

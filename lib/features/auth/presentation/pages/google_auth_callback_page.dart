@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:flutter/material.dart';
@@ -9,17 +11,22 @@ class GoogleAuthCallbackPage extends ConsumerStatefulWidget {
     super.key,
     this.code,
     this.error,
+    this.completionTimeout = const Duration(seconds: 15),
   });
 
   final String? code;
   final String? error;
+  final Duration completionTimeout;
 
   @override
-  ConsumerState<GoogleAuthCallbackPage> createState() => _GoogleAuthCallbackPageState();
+  ConsumerState<GoogleAuthCallbackPage> createState() =>
+      _GoogleAuthCallbackPageState();
 }
 
-class _GoogleAuthCallbackPageState extends ConsumerState<GoogleAuthCallbackPage> {
+class _GoogleAuthCallbackPageState
+    extends ConsumerState<GoogleAuthCallbackPage> {
   String? _errorMessage;
+  bool _isCompleting = true;
   bool _started = false;
 
   @override
@@ -32,38 +39,69 @@ class _GoogleAuthCallbackPageState extends ConsumerState<GoogleAuthCallbackPage>
     _started = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.error != null && widget.error!.isNotEmpty) {
-        setState(() => _errorMessage = 'Nao foi possivel autenticar com Google.');
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isCompleting = false;
+          _errorMessage = 'Nao foi possivel autenticar com Google.';
+        });
         return;
       }
 
       final code = widget.code;
       if (code == null || code.isEmpty) {
-        setState(() => _errorMessage = 'Callback de autenticacao sem codigo.');
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isCompleting = false;
+          _errorMessage = 'Callback de autenticacao sem codigo.';
+        });
         return;
       }
 
       try {
-        await ref.read(authControllerProvider.notifier).completeGoogleLogin(code: code);
+        await ref
+            .read(authControllerProvider.notifier)
+            .completeGoogleLogin(code: code)
+            .timeout(widget.completionTimeout);
         if (!mounted) {
           return;
         }
         final session = ref.read(authControllerProvider).asData?.value;
         if (session == null) {
-          setState(() => _errorMessage = 'Falha ao concluir o login com Google.');
+          setState(() {
+            _isCompleting = false;
+            _errorMessage = 'Falha ao concluir o login com Google.';
+          });
+          return;
         }
+        context.go('/home');
+      } on TimeoutException {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isCompleting = false;
+          _errorMessage =
+              'O login com Google demorou mais que o esperado. Tente novamente.';
+        });
       } catch (_) {
         if (!mounted) {
           return;
         }
-        setState(() => _errorMessage = 'Falha ao concluir o login com Google.');
+        setState(() {
+          _isCompleting = false;
+          _errorMessage = 'Falha ao concluir o login com Google.';
+        });
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading && !authState.hasValue;
+    ref.watch(authControllerProvider);
 
     return GradientScaffold(
       child: Center(
@@ -78,7 +116,9 @@ class _GoogleAuthCallbackPageState extends ConsumerState<GoogleAuthCallbackPage>
                   const Icon(Icons.account_circle_rounded, size: 42),
                   const SizedBox(height: 16),
                   Text(
-                    _errorMessage == null ? 'Concluindo seu login com Google' : 'Nao foi possivel entrar',
+                    _errorMessage == null
+                        ? 'Concluindo seu login com Google'
+                        : 'Nao foi possivel entrar',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -90,7 +130,7 @@ class _GoogleAuthCallbackPageState extends ConsumerState<GoogleAuthCallbackPage>
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 20),
-                  if (_errorMessage == null && isLoading)
+                  if (_errorMessage == null && _isCompleting)
                     const CircularProgressIndicator()
                   else
                     FilledButton(

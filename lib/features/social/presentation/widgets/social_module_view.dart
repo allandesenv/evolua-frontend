@@ -14,7 +14,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum SocialModuleTab { feed, communities }
+enum SocialModuleTab { featured, reflections, mySpaces }
 
 enum SocialFeedScope { moment, mine }
 
@@ -23,11 +23,12 @@ enum SocialCommunityScope { explore, mine }
 class SocialModuleView extends ConsumerStatefulWidget {
   const SocialModuleView({
     super.key,
-    this.initialTab = SocialModuleTab.feed,
+    this.initialTab = SocialModuleTab.featured,
     this.showTabs = true,
     this.feedScope = SocialFeedScope.moment,
     this.communityScope = SocialCommunityScope.explore,
     this.showScopeChips = true,
+    this.onTabChanged,
   });
 
   final SocialModuleTab initialTab;
@@ -35,6 +36,7 @@ class SocialModuleView extends ConsumerStatefulWidget {
   final SocialFeedScope feedScope;
   final SocialCommunityScope communityScope;
   final bool showScopeChips;
+  final ValueChanged<SocialModuleTab>? onTabChanged;
 
   @override
   ConsumerState<SocialModuleView> createState() => _SocialModuleViewState();
@@ -62,11 +64,9 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     super.initState();
     _feedScope = widget.feedScope;
     _communityScope = widget.communityScope;
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.index = switch (widget.initialTab) {
-      SocialModuleTab.feed => 0,
-      SocialModuleTab.communities => 1,
-    };
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.index = _indexForTab(widget.initialTab);
+    _tabController.addListener(_handleTabChanged);
 
     ref.listenManual(socialPostControllerProvider, (previous, next) {
       if (next.hasError) {
@@ -99,10 +99,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
         oldWidget.initialTab != widget.initialTab) {
       _feedScope = widget.feedScope;
       _communityScope = widget.communityScope;
-      _tabController.index = switch (widget.initialTab) {
-        SocialModuleTab.feed => 0,
-        SocialModuleTab.communities => 1,
-      };
+      _tabController.index = _indexForTab(widget.initialTab);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _syncScopes(force: true);
       });
@@ -111,6 +108,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     _postContentController.dispose();
     _feedSearchController.dispose();
@@ -192,19 +190,47 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
   }
 
   Future<void> _syncScopes({bool force = false}) async {
-    if (_tabController.index == 0) {
+    final currentTab = _tabForIndex(_tabController.index);
+    if (currentTab == SocialModuleTab.reflections) {
       if (force) {
         await _applyFeedFilters();
       }
       return;
     }
 
-    if (_communityScope == SocialCommunityScope.mine) {
+    if (currentTab == SocialModuleTab.mySpaces ||
+        _communityScope == SocialCommunityScope.mine) {
       _communityMembershipFilter = 'INGRESSADAS';
     } else if (force || _communityMembershipFilter == 'INGRESSADAS') {
       _communityMembershipFilter = 'TODAS';
     }
     await _applyCommunityFilters();
+  }
+
+  void _handleTabChanged() {
+    if (_tabController.indexIsChanging) {
+      return;
+    }
+
+    final tab = _tabForIndex(_tabController.index);
+    widget.onTabChanged?.call(tab);
+    _syncScopes(force: true);
+  }
+
+  int _indexForTab(SocialModuleTab tab) {
+    return switch (tab) {
+      SocialModuleTab.featured => 0,
+      SocialModuleTab.reflections => 1,
+      SocialModuleTab.mySpaces => 2,
+    };
+  }
+
+  SocialModuleTab _tabForIndex(int index) {
+    return switch (index) {
+      1 => SocialModuleTab.reflections,
+      2 => SocialModuleTab.mySpaces,
+      _ => SocialModuleTab.featured,
+    };
   }
 
   Future<void> _openCreateCommunityModal() async {
@@ -246,7 +272,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   }
 
                   Navigator.of(this.context).pop();
-                  _tabController.animateTo(1);
+                  _tabController.animateTo(0);
                   AppSnackBar.show(
                     this.context,
                     message: 'Espaco criado com sucesso.',
@@ -324,15 +350,33 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       children: [
         if (widget.showTabs)
           PrimaryPanel(
-            child: TabBar(
-              controller: _tabController,
-              dividerColor: Colors.transparent,
-              labelColor: AppColors.textPrimary,
-              unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.accent,
-              tabs: const [
-                Tab(text: 'Reflexoes'),
-                Tab(text: 'Espacos'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Espacos',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ambientes de troca, reflexao e pertencimento para encontrar contexto antes de compartilhar.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TabBar(
+                  controller: _tabController,
+                  dividerColor: Colors.transparent,
+                  labelColor: AppColors.textPrimary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  indicatorColor: AppColors.accent,
+                  tabs: const [
+                    Tab(text: 'Em destaque'),
+                    Tab(text: 'Reflexoes'),
+                    Tab(text: 'Meus espacos'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -340,7 +384,8 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
         AnimatedBuilder(
           animation: _tabController,
           builder: (context, _) {
-            if (_tabController.index == 0) {
+            final currentTab = _tabForIndex(_tabController.index);
+            if (currentTab == SocialModuleTab.reflections) {
               return Column(
                 children: [
                   SocialPostComposer(
@@ -371,7 +416,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                       sectionLabel: _feedScope == SocialFeedScope.mine
                           ? 'Minhas reflexoes'
                           : 'Reflexoes do momento',
-                      showScopeChips: widget.showScopeChips,
+                      showScopeChips: true,
                       currentScope: _feedScope.name,
                       onMomentSelected: () async {
                         setState(() => _feedScope = SocialFeedScope.moment);
@@ -461,11 +506,21 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                 },
                 canCreate: canCreateCommunity,
                 onCreate: _openCreateCommunityModal,
-                headline: _communityScope == SocialCommunityScope.mine
+                headline:
+                    currentTab == SocialModuleTab.mySpaces ||
+                        _communityScope == SocialCommunityScope.mine
                     ? 'Meus espacos'
-                    : 'Espacos',
+                    : 'Espacos em destaque',
+                description:
+                    currentTab == SocialModuleTab.mySpaces ||
+                        _communityScope == SocialCommunityScope.mine
+                    ? 'Acompanhe os ambientes em que voce ja entrou e retome as reflexoes desse contexto.'
+                    : 'Explore ambientes de troca antes de compartilhar uma reflexao. Cada espaco organiza pessoas, temas e conversas com mais contexto.',
+                showMembershipFilter: currentTab != SocialModuleTab.mySpaces,
                 showScopeChips: widget.showScopeChips,
-                currentScope: _communityScope.name,
+                currentScope: currentTab == SocialModuleTab.mySpaces
+                    ? SocialCommunityScope.mine.name
+                    : _communityScope.name,
                 onExploreSelected: () async {
                   setState(
                     () => _communityScope = SocialCommunityScope.explore,
@@ -476,9 +531,8 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   setState(() => _communityScope = SocialCommunityScope.mine);
                   await _syncScopes(force: true);
                 },
-                onRefresh: () => ref
-                    .read(communityControllerProvider.notifier)
-                    .refresh(),
+                onRefresh: () =>
+                    ref.read(communityControllerProvider.notifier).refresh(),
               ),
               error: (error, stackTrace) => SocialActionableErrorState(
                 title: 'Nao conseguimos abrir os espacos agora.',
