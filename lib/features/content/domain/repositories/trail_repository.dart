@@ -23,6 +23,18 @@ abstract class TrailRepository {
     required List<TrailMediaLink> mediaLinks,
   });
 
+  Future<Trail> update({
+    required int id,
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  });
+
+  Future<void> delete(int id);
+
   Future<Trail?> currentJourney();
 
   Future<TrailJourney> journey(int trailId);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -11,7 +12,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _sessionStorageKey = 'evolua.auth.session';
 
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
+  ref,
+) async {
   return SharedPreferences.getInstance();
 });
 
@@ -61,17 +64,17 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     final repository = ref.read(authRepositoryProvider);
     final preferences = await ref.read(sharedPreferencesProvider.future);
 
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final session = await repository.login(email: email, password: password);
-      await preferences.setString(_sessionStorageKey, jsonEncode(session.toJson()));
+      await preferences.setString(
+        _sessionStorageKey,
+        jsonEncode(session.toJson()),
+      );
       return session;
     });
   }
@@ -94,7 +97,10 @@ class AuthController extends AsyncNotifier<AuthSession?> {
 
     state = const AsyncLoading();
     final session = await repository.login(email: email, password: password);
-    await preferences.setString(_sessionStorageKey, jsonEncode(session.toJson()));
+    await preferences.setString(
+      _sessionStorageKey,
+      jsonEncode(session.toJson()),
+    );
     state = AsyncData(session);
 
     try {
@@ -116,37 +122,41 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
-  Future<void> completeGoogleLogin({
-    required String code,
-  }) async {
+  Future<void> completeGoogleLogin({required String code}) async {
     final repository = ref.read(authRepositoryProvider);
     final preferences = await ref.read(sharedPreferencesProvider.future);
 
     state = const AsyncLoading();
     final nextState = await AsyncValue.guard(() async {
       final session = await repository.exchangeGoogleCode(code: code);
-      await preferences.setString(_sessionStorageKey, jsonEncode(session.toJson()));
+      await preferences.setString(
+        _sessionStorageKey,
+        jsonEncode(session.toJson()),
+      );
       return session;
     });
 
     state = nextState;
     if (nextState.hasValue && nextState.value != null) {
-      final session = nextState.value!;
-      try {
-        await ref
-            .read(profileRepositoryProvider)
-            .upsertMe(
-              displayName: session.displayName ?? session.email.split('@').first,
-              birthDate: DateTime(2000, 1, 1),
-              gender: 'CUSTOM',
-              customGender: 'Nao informado',
-              bio: '',
-              journeyLevel: 1,
-            );
-        ref.invalidate(profileControllerProvider);
-      } catch (_) {
-        ref.invalidate(profileControllerProvider);
-      }
+      unawaited(_syncGoogleProfile(nextState.value!));
+    }
+  }
+
+  Future<void> _syncGoogleProfile(AuthSession session) async {
+    try {
+      await ref
+          .read(profileRepositoryProvider)
+          .upsertMe(
+            displayName: session.displayName ?? session.email.split('@').first,
+            birthDate: DateTime(2000, 1, 1),
+            gender: 'CUSTOM',
+            customGender: 'Nao informado',
+            bio: '',
+            journeyLevel: 1,
+          );
+      ref.invalidate(profileControllerProvider);
+    } catch (_) {
+      ref.invalidate(profileControllerProvider);
     }
   }
 

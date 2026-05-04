@@ -2,14 +2,17 @@ import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
-import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_redirect.dart';
+import 'package:evolua_frontend/features/auth/presentation/utils/auth_form_validators.dart';
+import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_launcher_provider.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AuthFormCard extends ConsumerStatefulWidget {
-  const AuthFormCard({super.key});
+  const AuthFormCard({super.key, this.initialRegisterMode = false});
+
+  final bool initialRegisterMode;
 
   @override
   ConsumerState<AuthFormCard> createState() => _AuthFormCardState();
@@ -21,13 +24,26 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _customGenderController = TextEditingController();
+
+  final _displayNameFocusNode = FocusNode();
+  final _birthDateFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _customGenderFocusNode = FocusNode();
+
   bool _isRegisterMode = false;
+  bool _isPasswordVisible = false;
+  bool _isSubmitting = false;
+  bool _isOAuthStarting = false;
+  bool _submitted = false;
   DateTime? _birthDate;
-  String _gender = 'MALE';
+  String? _birthDateError;
+  String _gender = genderMale;
 
   @override
   void initState() {
     super.initState();
+    _isRegisterMode = widget.initialRegisterMode;
     ref.listenManual(authControllerProvider, (previous, next) {
       final error = next.error;
 
@@ -37,7 +53,8 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
       final message = extractApiErrorMessage(
         error,
-        fallback: 'Falha ao autenticar.',
+        fallback:
+            'Nao foi possivel autenticar. Revise os dados e tente novamente.',
       );
 
       AppSnackBar.show(
@@ -54,61 +71,140 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     _emailController.dispose();
     _passwordController.dispose();
     _customGenderController.dispose();
+    _displayNameFocusNode.dispose();
+    _birthDateFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _customGenderFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_isSubmitting || _isOAuthStarting) {
+      return;
+    }
+
+    setState(() {
+      _submitted = true;
+      _birthDateError = _isRegisterMode ? validateBirthDate(_birthDate) : null;
+    });
+
+    final isValid = _formKey.currentState!.validate();
+    if (!isValid || _birthDateError != null) {
+      _focusFirstInvalidField();
       return;
     }
 
     final controller = ref.read(authControllerProvider.notifier);
+    setState(() => _isSubmitting = true);
 
-    if (_isRegisterMode) {
-      final message = await controller.register(
-        displayName: _displayNameController.text.trim(),
-        birthDate: _birthDate!,
-        gender: _gender,
-        customGender: _gender == 'CUSTOM'
-            ? _customGenderController.text.trim()
-            : null,
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      if (message != null && mounted) {
-        AppSnackBar.show(
-          context,
-          message: message,
-          icon: Icons.info_outline_rounded,
+    try {
+      if (_isRegisterMode) {
+        final message = await controller.register(
+          displayName: normalizeDisplayName(_displayNameController.text),
+          birthDate: _birthDate!,
+          gender: _gender,
+          customGender: _gender == genderCustom
+              ? _customGenderController.text.trim()
+              : null,
+          email: normalizeEmail(_emailController.text),
+          password: _passwordController.text,
         );
+        if (message != null && mounted) {
+          AppSnackBar.show(
+            context,
+            message: message,
+            icon: Icons.info_outline_rounded,
+          );
+        }
+        return;
       }
+
+      await controller.login(
+        email: normalizeEmail(_emailController.text),
+        password: _passwordController.text,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  void _focusFirstInvalidField() {
+    if (_isRegisterMode &&
+        validateDisplayName(_displayNameController.text) != null) {
+      _displayNameFocusNode.requestFocus();
       return;
     }
 
-    await controller.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-    );
+    if (_isRegisterMode && _birthDateError != null) {
+      _birthDateFocusNode.requestFocus();
+      return;
+    }
+
+    if (validateEmail(_emailController.text) != null) {
+      _emailFocusNode.requestFocus();
+      return;
+    }
+
+    if (validatePassword(_passwordController.text) != null) {
+      _passwordFocusNode.requestFocus();
+      return;
+    }
+
+    if (_isRegisterMode &&
+        validateCustomGender(
+              selectedGender: _gender,
+              customGender: _customGenderController.text,
+            ) !=
+            null) {
+      _customGenderFocusNode.requestFocus();
+    }
   }
 
   void _handleGoogleLogin() {
-    final frontendRedirectUri =
-        Uri.parse(Uri.base.origin).resolve('/auth/google/callback').toString();
-    final startUri = Uri.parse('${AppConfig.apiBaseUrl}/v1/public/auth/google/start').replace(
-      queryParameters: {
-        'frontendRedirectUri': frontendRedirectUri,
-      },
-    );
+    if (_isSubmitting || _isOAuthStarting) {
+      return;
+    }
 
+    final baseUri = Uri.base;
+    final frontendOrigin =
+        baseUri.hasScheme &&
+            (baseUri.scheme == 'http' || baseUri.scheme == 'https')
+        ? baseUri.origin
+        : 'http://localhost';
+    final frontendRedirectUri = Uri.parse(
+      frontendOrigin,
+    ).resolve('/auth/google/callback').toString();
+    final startUri = Uri.parse(
+      '${AppConfig.apiBaseUrl}/v1/public/auth/google/start',
+    ).replace(queryParameters: {'frontendRedirectUri': frontendRedirectUri});
+
+    setState(() => _isOAuthStarting = true);
     try {
-      openGoogleOAuthRedirect(startUri.toString());
+      ref.read(googleOAuthLauncherProvider)(startUri.toString());
     } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isOAuthStarting = false);
       AppSnackBar.show(
         context,
-        message: 'Google login esta disponivel apenas no Flutter Web.',
+        message:
+            'Nao foi possivel iniciar o login com Google. Tente novamente.',
         icon: Icons.info_outline_rounded,
       );
     }
+  }
+
+  void _handleForgotPassword() {
+    AppSnackBar.show(
+      context,
+      message:
+          'A recuperacao de senha sera enviada para seu email quando estiver disponivel.',
+      icon: Icons.info_outline_rounded,
+    );
   }
 
   Future<void> _pickBirthDate() async {
@@ -121,14 +217,29 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       locale: const Locale('pt', 'BR'),
     );
     if (selected != null) {
-      setState(() => _birthDate = selected);
+      setState(() {
+        _birthDate = selected;
+        _birthDateError = _submitted ? validateBirthDate(_birthDate) : null;
+      });
     }
+  }
+
+  void _switchMode(bool isRegisterMode) {
+    setState(() {
+      _isRegisterMode = isRegisterMode;
+      _submitted = false;
+      _birthDateError = null;
+      _displayNameController.clear();
+      _customGenderController.clear();
+      _birthDate = null;
+      _gender = genderMale;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading;
+    final isLoading = authState.isLoading || _isSubmitting || _isOAuthStarting;
     final theme = Theme.of(context);
     final compact = ResponsiveBreakpoints.isCompact(context);
 
@@ -155,14 +266,16 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                 ),
               ],
               selected: {_isRegisterMode},
-              onSelectionChanged: (selection) {
-                setState(() => _isRegisterMode = selection.first);
-              },
+              onSelectionChanged: isLoading
+                  ? null
+                  : (selection) => _switchMode(selection.first),
             ),
           ),
           const SizedBox(height: 24),
           Text(
-            _isRegisterMode ? 'Crie sua conta e comece leve' : 'Entre e continue sua jornada',
+            _isRegisterMode
+                ? 'Crie sua conta e comece leve'
+                : 'Entre e continue sua jornada',
             style: theme.textTheme.headlineMedium,
           ),
           const SizedBox(height: 12),
@@ -177,7 +290,12 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: isLoading ? null : _handleGoogleLogin,
-              icon: const Icon(Icons.account_circle_rounded),
+              icon: _isOAuthStarting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.account_circle_rounded),
               label: const Text('Continuar com Google'),
             ),
           ),
@@ -186,150 +304,163 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
             child: Form(
               key: _formKey,
               child: Column(
-              children: [
-                if (_isRegisterMode) ...[
-                  TextFormField(
-                    controller: _displayNameController,
-                    autofillHints: const [AutofillHints.name],
-                    decoration: const InputDecoration(
-                      labelText: 'Nome',
-                      hintText: 'Como voce quer ser chamado',
-                      prefixIcon: Icon(Icons.badge_rounded),
-                    ),
-                    validator: (value) {
-                      if (!_isRegisterMode) {
-                        return null;
-                      }
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Informe seu nome.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: _pickBirthDate,
-                    borderRadius: BorderRadius.circular(18),
-                    child: InputDecorator(
+                children: [
+                  if (_isRegisterMode) ...[
+                    TextFormField(
+                      controller: _displayNameController,
+                      focusNode: _displayNameFocusNode,
+                      autofillHints: const [AutofillHints.name],
+                      textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        labelText: 'Data de nascimento',
-                        prefixIcon: Icon(Icons.cake_rounded),
+                        labelText: 'Nome',
+                        hintText: 'Como voce quer ser chamado',
+                        prefixIcon: Icon(Icons.badge_rounded),
                       ),
-                      child: Text(
-                        _birthDate == null
-                            ? 'Selecione sua data'
-                            : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
-                      ),
+                      validator: validateDisplayName,
                     ),
-                  ),
-                  if (_birthDate == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Informe sua data de nascimento.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
+                    const SizedBox(height: 16),
+                    Focus(
+                      focusNode: _birthDateFocusNode,
+                      child: InkWell(
+                        onTap: isLoading ? null : _pickBirthDate,
+                        borderRadius: BorderRadius.circular(18),
+                        child: InputDecorator(
+                          key: const Key('auth-birth-date-field'),
+                          decoration: InputDecoration(
+                            labelText: 'Data de nascimento',
+                            prefixIcon: const Icon(Icons.cake_rounded),
+                            errorText: _submitted ? _birthDateError : null,
+                          ),
+                          child: Text(
+                            _birthDate == null
+                                ? 'Selecione sua data'
+                                : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
                           ),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: _gender,
-                    decoration: const InputDecoration(
-                      labelText: 'Genero',
-                      prefixIcon: Icon(Icons.wc_rounded),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'MALE', child: Text('Masculino')),
-                      DropdownMenuItem(value: 'FEMALE', child: Text('Feminino')),
-                      DropdownMenuItem(value: 'CUSTOM', child: Text('Personalizado')),
-                    ],
-                    onChanged: (value) {
-                      setState(() => _gender = value ?? 'MALE');
-                    },
-                  ),
-                  if (_gender == 'CUSTOM') ...[
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _customGenderController,
+                    DropdownButtonFormField<String>(
+                      initialValue: _gender,
                       decoration: const InputDecoration(
-                        labelText: 'Como voce se identifica',
-                        hintText: 'Escreva do seu jeito',
-                        prefixIcon: Icon(Icons.edit_note_rounded),
+                        labelText: 'Genero',
+                        prefixIcon: Icon(Icons.wc_rounded),
                       ),
-                      validator: (value) {
-                        if (_isRegisterMode &&
-                            _gender == 'CUSTOM' &&
-                            (value == null || value.trim().isEmpty)) {
-                          return 'Informe seu genero personalizado.';
-                        }
-                        return null;
-                      },
+                      items: const [
+                        DropdownMenuItem(
+                          value: genderMale,
+                          child: Text('Masculino'),
+                        ),
+                        DropdownMenuItem(
+                          value: genderFemale,
+                          child: Text('Feminino'),
+                        ),
+                        DropdownMenuItem(
+                          value: genderPreferNotToSay,
+                          child: Text('Prefiro nao informar'),
+                        ),
+                        DropdownMenuItem(
+                          value: genderCustom,
+                          child: Text('Personalizado'),
+                        ),
+                      ],
+                      validator: validateGender,
+                      onChanged: isLoading
+                          ? null
+                          : (value) {
+                              setState(() => _gender = value ?? genderMale);
+                            },
+                    ),
+                    if (_gender == genderCustom) ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _customGenderController,
+                        focusNode: _customGenderFocusNode,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Como voce se identifica',
+                          hintText: 'Escreva do seu jeito',
+                          prefixIcon: Icon(Icons.edit_note_rounded),
+                        ),
+                        validator: (value) => validateCustomGender(
+                          selectedGender: _gender,
+                          customGender: value,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                  ],
+                  TextFormField(
+                    controller: _emailController,
+                    focusNode: _emailFocusNode,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'voce@evolua.app',
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
+                    ),
+                    validator: validateEmail,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    focusNode: _passwordFocusNode,
+                    obscureText: !_isPasswordVisible,
+                    autofillHints: const [AutofillHints.password],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
+                    decoration: InputDecoration(
+                      labelText: 'Senha',
+                      hintText: 'Minimo de 6 caracteres',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: _isPasswordVisible
+                            ? 'Ocultar senha'
+                            : 'Mostrar senha',
+                        onPressed: () {
+                          setState(
+                            () => _isPasswordVisible = !_isPasswordVisible,
+                          );
+                        },
+                        icon: Icon(
+                          _isPasswordVisible
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                        ),
+                      ),
+                    ),
+                    validator: validatePassword,
+                  ),
+                  if (!_isRegisterMode) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: isLoading ? null : _handleForgotPassword,
+                        child: const Text('Esqueci minha senha'),
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _submit,
+                      key: const Key('auth-submit-button'),
+                      child: _isSubmitting && !_isOAuthStarting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_isRegisterMode ? 'Criar conta' : 'Entrar'),
+                    ),
+                  ),
                 ],
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'voce@evolua.app',
-                    prefixIcon: Icon(Icons.alternate_email_rounded),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Informe seu email.';
-                    }
-
-                    if (!value.contains('@')) {
-                      return 'Use um email valido.';
-                    }
-
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: const InputDecoration(
-                    labelText: 'Senha',
-                    hintText: 'Minimo de 6 caracteres',
-                    prefixIcon: Icon(Icons.lock_outline_rounded),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().length < 6) {
-                      return 'A senha deve ter ao menos 6 caracteres.';
-                    }
-
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isLoading || (_isRegisterMode && _birthDate == null)
-                        ? null
-                        : _submit,
-                    child: isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_isRegisterMode ? 'Criar conta' : 'Entrar'),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
           ),
         ],
       ),

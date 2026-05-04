@@ -25,14 +25,18 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? authPageBuilder,
   GoRouterWidgetBuilder? googleCallbackPageBuilder,
   GoRouterWidgetBuilder? homePageBuilder,
+  String initialLocation = '/auth',
+  bool overridePlatformDefaultLocation = false,
 }) {
   return GoRouter(
-    initialLocation: '/auth',
+    initialLocation: initialLocation,
+    overridePlatformDefaultLocation: overridePlatformDefaultLocation,
     refreshListenable: authRouterNotifier,
     routes: [
       GoRoute(
         path: '/',
-        redirect: (context, state) => authRouterNotifier.isAuthenticated ? '/home' : '/auth',
+        redirect: (context, state) =>
+            authRouterNotifier.isAuthenticated ? '/home' : '/auth',
       ),
       GoRoute(
         path: '/auth',
@@ -43,9 +47,9 @@ GoRouter buildAppRouter({
         builder:
             googleCallbackPageBuilder ??
             (context, state) => GoogleAuthCallbackPage(
-                  code: state.uri.queryParameters['code'],
-                  error: state.uri.queryParameters['error'],
-                ),
+              code: state.uri.queryParameters['code'],
+              error: state.uri.queryParameters['error'],
+            ),
       ),
       GoRoute(
         path: '/home',
@@ -57,9 +61,13 @@ GoRouter buildAppRouter({
         return null;
       }
 
-      final goingToAuth = state.matchedLocation.startsWith('/auth');
+      final goingToAuth = state.matchedLocation == '/auth';
+      final goingToGoogleCallback =
+          state.matchedLocation == '/auth/google/callback';
 
-      if (!authRouterNotifier.isAuthenticated && !goingToAuth) {
+      if (!authRouterNotifier.isAuthenticated &&
+          !goingToAuth &&
+          !goingToGoogleCallback) {
         return '/auth';
       }
 
