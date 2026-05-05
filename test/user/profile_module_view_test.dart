@@ -1,6 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
@@ -9,15 +11,21 @@ import 'package:evolua_frontend/features/subscription/application/subscription_c
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    _remoteSettingsPayload = _defaultRemoteSettings();
+  });
+
   testWidgets('keeps profile hero readable on compact width', (tester) async {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
@@ -33,6 +41,12 @@ void main() {
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
           ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -68,6 +82,281 @@ void main() {
     expect(find.text('Planos e assinaturas'), findsAtLeastNWidgets(1));
     expect(find.textContaining('Voce esta no plano essencial'), findsOneWidget);
   });
+
+  testWidgets('renders settings and privacy controls on compact width', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 980));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(
+                section: ProfileModuleSection.settingsPrivacy,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Configuracoes e privacidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Conta e acesso'), findsOneWidget);
+    expect(find.text('Privacidade emocional'), findsOneWidget);
+    expect(find.text('Dados e seguranca'), findsOneWidget);
+    expect(find.text('Personalizacao da experiencia'), findsOneWidget);
+    expect(find.text('E-mail de acesso'), findsOneWidget);
+    expect(find.text('leo@evolua.local'), findsAtLeastNWidgets(1));
+    expect(find.text('Tornar diario privado'), findsOneWidget);
+    expect(find.text('Baixar meus dados'), findsAtLeastNWidgets(1));
+    expect(find.text('Tom da IA'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Salvar preferencias'));
+    await tester.tap(find.text('Salvar preferencias'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preferencias salvas com seguranca.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('persists settings and reloads saved controls', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpSettingsPrivacy(tester);
+
+    await tester.ensureVisible(find.text('Tornar diario privado'));
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tom da IA'));
+    await tester.tap(find.text('Mais acolhedor').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mais direto').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Salvar preferencias'));
+    await tester.tap(find.text('Salvar preferencias'));
+    await tester.pumpAndSettle();
+
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final saved =
+        jsonDecode(
+              sharedPreferences.getString(
+                settingsPrivacyPreferencesStorageKey,
+              )!,
+            )
+            as Map<String, dynamic>;
+
+    expect(saved['privateJournal'], isFalse);
+    expect(saved['aiTone'], 'direto');
+
+    await _pumpSettingsPrivacy(tester);
+
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
+    expect(find.text('Mais direto'), findsOneWidget);
+  });
+
+  testWidgets('exports local settings data as json', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    final clipboardCalls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardCalls.add(call);
+          }
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    await _pumpSettingsPrivacy(tester);
+
+    await tester.ensureVisible(
+      find.widgetWithText(OutlinedButton, 'Baixar meus dados'),
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Baixar meus dados'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Baixar meus dados'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('"email": "leo@evolua.local"'), findsOneWidget);
+    expect(find.textContaining('"privateJournal": true'), findsOneWidget);
+    expect(
+      find.textContaining('Exportacao gerada pelo backend Evolua'),
+      findsOneWidget,
+    );
+    expect(clipboardCalls, isNotEmpty);
+  });
+
+  testWidgets('deactivates and deletes account through guarded dialogs', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpSettingsPrivacy(tester);
+
+    await tester.ensureVisible(
+      find.widgetWithText(OutlinedButton, 'Desativar conta'),
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Desativar conta'));
+    await tester.pumpAndSettle();
+    expect(find.text('Desativar conta'), findsAtLeastNWidgets(1));
+    await tester.enterText(find.byType(TextField).last, 'leo@evolua.local');
+    await tester.tap(find.widgetWithText(FilledButton, 'Desativar conta').last);
+    await tester.pumpAndSettle();
+
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await _pumpSettingsPrivacy(tester);
+
+    await tester.ensureVisible(find.text('Excluir conta'));
+    await tester.tap(find.text('Excluir conta').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(0), 'leo@evolua.local');
+    await tester.enterText(find.byType(TextField).at(1), '123456');
+    await tester.tap(find.widgetWithText(FilledButton, 'Excluir conta').last);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        subscriptionRepositoryProvider.overrideWithValue(
+          _FakeSubscriptionRepository(),
+        ),
+        authenticatedDioProvider(
+          AppConfig.userBaseUrl,
+        ).overrideWithValue(_fakeUserDio()),
+        authenticatedDioProvider(
+          AppConfig.authBaseUrl,
+        ).overrideWithValue(_fakeAuthDio()),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: ProfileModuleView(
+              section: ProfileModuleSection.settingsPrivacy,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Dio _fakeUserDio() {
+  return Dio()..httpClientAdapter = _FakeUserAdapter();
+}
+
+Dio _fakeAuthDio() {
+  return Dio()..httpClientAdapter = _FakeAuthAdapter();
+}
+
+class _FakeUserAdapter implements HttpClientAdapter {
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    if (options.method == 'GET' &&
+        options.path == '/v1/profiles/me/privacy-settings') {
+      return _jsonResponse({'data': _remoteSettingsPayload});
+    }
+    if (options.method == 'PUT' &&
+        options.path == '/v1/profiles/me/privacy-settings') {
+      _remoteSettingsPayload = Map<String, dynamic>.from(options.data as Map);
+      return _jsonResponse({'data': _remoteSettingsPayload});
+    }
+    if (options.method == 'GET' &&
+        options.path == '/v1/profiles/me/data-export') {
+      return _jsonResponse({
+        'data': {
+          'email': 'leo@evolua.local',
+          'preferences': {'privateJournal': true},
+          'exportedAt': '2026-05-05T00:00:00Z',
+          'message': 'Exportacao gerada pelo backend Evolua.',
+        },
+      });
+    }
+    return _jsonResponse({'data': null}, statusCode: 404);
+  }
+}
+
+Map<String, dynamic> _remoteSettingsPayload = {..._defaultRemoteSettings()};
+
+Map<String, dynamic> _defaultRemoteSettings() => {
+  'privateJournal': true,
+  'hideSocialCheckIns': true,
+  'allowHistoryInsights': true,
+  'useEmotionalDataForAi': true,
+  'dailyReminders': true,
+  'contentPreferences': true,
+  'aiTone': 'acolhedor',
+  'suggestionFrequency': 'equilibrada',
+  'trailStyle': 'guiada',
+};
+
+class _FakeAuthAdapter implements HttpClientAdapter {
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return _jsonResponse({'data': null});
+  }
+}
+
+ResponseBody _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
+  return ResponseBody.fromString(
+    jsonEncode(body),
+    statusCode,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
 }
 
 class _FakeAuthRepository implements AuthRepository {
