@@ -5,6 +5,7 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
+import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/support_controller.dart';
@@ -839,6 +840,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
             onOpenLink: _openSupportLink,
             onRefreshStatus: () => ref.invalidate(supportStatusProvider),
           )
+        else if (_section == ProfileModuleSection.feedback)
+          const _FeedbackSection()
         else if (_section == ProfileModuleSection.displayAccessibility)
           accessibilityState.when(
             data: (preferences) {
@@ -1209,6 +1212,380 @@ class _OverviewSection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FeedbackSection extends ConsumerStatefulWidget {
+  const _FeedbackSection();
+
+  @override
+  ConsumerState<_FeedbackSection> createState() => _FeedbackSectionState();
+}
+
+class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
+  final _workingWellController = TextEditingController();
+  final _couldImproveController = TextEditingController();
+  final _confusingOrHardController = TextEditingController();
+  final _helpedHowController = TextEditingController();
+  final _featureSuggestionController = TextEditingController();
+  final _contentSuggestionController = TextEditingController();
+  final _visualSuggestionController = TextEditingController();
+  final _aiSuggestionController = TextEditingController();
+  final _problemWhatHappenedController = TextEditingController();
+  final _problemWhereController = TextEditingController();
+  final _problemCanRepeatController = TextEditingController();
+  final _ratingCommentController = TextEditingController();
+  final _picker = ImagePicker();
+  String? _rating;
+  String? _screenshotFileName;
+  Uint8List? _screenshotBytes;
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _workingWellController.dispose();
+    _couldImproveController.dispose();
+    _confusingOrHardController.dispose();
+    _helpedHowController.dispose();
+    _featureSuggestionController.dispose();
+    _contentSuggestionController.dispose();
+    _visualSuggestionController.dispose();
+    _aiSuggestionController.dispose();
+    _problemWhatHappenedController.dispose();
+    _problemWhereController.dispose();
+    _problemCanRepeatController.dispose();
+    _ratingCommentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickScreenshot() async {
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 86,
+    );
+    if (image == null) {
+      return;
+    }
+    final bytes = await image.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _screenshotFileName = image.name;
+      _screenshotBytes = bytes;
+    });
+  }
+
+  Future<void> _submit() async {
+    final draft = _draft();
+    if (!draft.hasMeaningfulContent) {
+      _showMessage(
+        'Conte pelo menos uma percepcao ou escolha uma avaliacao.',
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final result = await ref.read(feedbackRepositoryProvider).submit(draft);
+      if (!mounted) {
+        return;
+      }
+      _clear();
+      _showMessage(
+        'Feedback #${result.id} enviado. Obrigado por construir o Evolua com a gente.',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showMessage(_friendlyFeedbackError(error));
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  FeedbackSubmissionDraft _draft() {
+    return FeedbackSubmissionDraft(
+      workingWell: _workingWellController.text,
+      couldImprove: _couldImproveController.text,
+      confusingOrHard: _confusingOrHardController.text,
+      helpedHow: _helpedHowController.text,
+      featureSuggestion: _featureSuggestionController.text,
+      contentSuggestion: _contentSuggestionController.text,
+      visualSuggestion: _visualSuggestionController.text,
+      aiSuggestion: _aiSuggestionController.text,
+      problemWhatHappened: _problemWhatHappenedController.text,
+      problemWhere: _problemWhereController.text,
+      problemCanRepeat: _problemCanRepeatController.text,
+      rating: _rating,
+      ratingComment: _ratingCommentController.text,
+      screenshotBytes: _screenshotBytes,
+      screenshotFileName: _screenshotFileName,
+    );
+  }
+
+  void _clear() {
+    for (final controller in [
+      _workingWellController,
+      _couldImproveController,
+      _confusingOrHardController,
+      _helpedHowController,
+      _featureSuggestionController,
+      _contentSuggestionController,
+      _visualSuggestionController,
+      _aiSuggestionController,
+      _problemWhatHappenedController,
+      _problemWhereController,
+      _problemCanRepeatController,
+      _ratingCommentController,
+    ]) {
+      controller.clear();
+    }
+    setState(() {
+      _rating = null;
+      _screenshotFileName = null;
+      _screenshotBytes = null;
+    });
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _friendlyFeedbackError(Object error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map<String, dynamic>) {
+        final details = data['details'];
+        if (details is List && details.isNotEmpty) {
+          return details.first.toString();
+        }
+        final message = data['message'];
+        if (message != null) {
+          return message.toString();
+        }
+      }
+      if (error.message != null && error.message!.isNotEmpty) {
+        return error.message!;
+      }
+    }
+    return 'Nao foi possivel enviar seu feedback agora.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feedbackFields = [
+      _FeedbackTextField(
+        controller: _workingWellController,
+        label: 'O que esta funcionando bem?',
+      ),
+      _FeedbackTextField(
+        controller: _couldImproveController,
+        label: 'O que poderia melhorar?',
+      ),
+      _FeedbackTextField(
+        controller: _confusingOrHardController,
+        label: 'Algo parece confuso ou dificil?',
+      ),
+      _FeedbackTextField(
+        controller: _helpedHowController,
+        label: 'Como o Evolua tem ajudado voce?',
+      ),
+    ];
+    final suggestionFields = [
+      _FeedbackTextField(
+        controller: _featureSuggestionController,
+        label: 'Sugestao de funcionalidade',
+      ),
+      _FeedbackTextField(
+        controller: _contentSuggestionController,
+        label: 'Sugestao de conteudo',
+      ),
+      _FeedbackTextField(
+        controller: _visualSuggestionController,
+        label: 'Sugestao de melhoria visual',
+      ),
+      _FeedbackTextField(
+        controller: _aiSuggestionController,
+        label: 'Sugestao para IA',
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Dar feedback', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 12),
+              Text(
+                'O Evolua esta em constante evolucao. Sua percepcao ajuda a construir uma experiencia melhor para todos.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Compartilhe sua experiencia',
+          description: 'Conte como tem sido usar o Evolua no seu dia a dia.',
+          microcopy:
+              'Sua percepcao mostra onde o app ja apoia bem e onde ainda pode cuidar melhor.',
+          children: feedbackFields,
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Sugerir melhoria',
+          description: 'Tem uma ideia? Queremos ouvir.',
+          microcopy:
+              'Boas ideias podem nascer do uso real, no detalhe pequeno do cotidiano.',
+          children: suggestionFields,
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Reportar problema',
+          description: 'Encontrou algo que nao esta funcionando como deveria?',
+          microcopy:
+              'Relatos claros ajudam nosso time a corrigir com mais rapidez e cuidado.',
+          children: [
+            _FeedbackTextField(
+              controller: _problemWhatHappenedController,
+              label: 'O que aconteceu?',
+            ),
+            _FeedbackTextField(
+              controller: _problemWhereController,
+              label: 'Onde aconteceu?',
+            ),
+            _FeedbackTextField(
+              controller: _problemCanRepeatController,
+              label: 'Consegue repetir o problema?',
+            ),
+            _ScreenshotPickerRow(
+              fileName: _screenshotFileName,
+              onPick: _pickScreenshot,
+              onRemove: () => setState(() {
+                _screenshotFileName = null;
+                _screenshotBytes = null;
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Avaliacao rapida',
+          description: 'Como tem sido sua experiencia no Evolua?',
+          microcopy:
+              'Cada feedback ajuda o Evolua a evoluir com mais intencao, clareza e cuidado.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: const {
+                'MUITO_BOA': 'Muito boa',
+                'BOA': 'Boa',
+                'NEUTRA': 'Neutra',
+                'RUIM': 'Ruim',
+                'MUITO_RUIM': 'Muito ruim',
+              }.entries.map((entry) {
+                return ChoiceChip(
+                  label: Text(entry.value),
+                  selected: _rating == entry.key,
+                  onSelected: (_) => setState(() => _rating = entry.key),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            _FeedbackTextField(
+              controller: _ratingCommentController,
+              label: 'Quer contar um pouco mais?',
+              minLines: 3,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: _isSubmitting ? null : _submit,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded),
+              label: Text(_isSubmitting ? 'Enviando...' : 'Enviar feedback'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedbackTextField extends StatelessWidget {
+  const _FeedbackTextField({
+    required this.controller,
+    required this.label,
+    this.minLines = 2,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final int minLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        minLines: minLines,
+        maxLines: 5,
+        maxLength: 1200,
+        decoration: InputDecoration(
+          labelText: label,
+          alignLabelWithHint: true,
+          counterText: '',
+        ),
+      ),
+    );
+  }
+}
+
+class _ScreenshotPickerRow extends StatelessWidget {
+  const _ScreenshotPickerRow({
+    required this.fileName,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final String? fileName;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsRowShell(
+      icon: Icons.image_outlined,
+      title: 'Enviar captura de tela',
+      subtitle: fileName == null
+          ? 'Opcional, util quando algo visual nao esta funcionando.'
+          : fileName!,
+      trailing: fileName == null
+          ? TextButton(onPressed: onPick, child: const Text('Anexar'))
+          : IconButton(
+              tooltip: 'Remover captura',
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded),
+            ),
     );
   }
 }

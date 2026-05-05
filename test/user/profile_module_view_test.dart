@@ -26,6 +26,8 @@ void main() {
   setUp(() {
     _remoteSettingsPayload = _defaultRemoteSettings();
     _remoteAccessibilityPayload = _defaultRemoteAccessibility();
+    _feedbackShouldFail = false;
+    _lastFeedbackPayload = null;
   });
 
   testWidgets('keeps profile hero readable on compact width', (tester) async {
@@ -207,6 +209,118 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders feedback form and submits real feedback', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(section: ProfileModuleSection.feedback),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dar feedback'), findsAtLeastNWidgets(1));
+    expect(find.text('Compartilhe sua experiencia'), findsOneWidget);
+    expect(find.text('Sugerir melhoria'), findsOneWidget);
+    expect(find.text('Reportar problema'), findsOneWidget);
+    expect(find.text('Avaliacao rapida'), findsOneWidget);
+    expect(find.text('Enviar feedback'), findsOneWidget);
+
+    await tester.enterText(
+      _feedbackTextField('O que esta funcionando bem?'),
+      'As trilhas estao claras.',
+    );
+    await tester.ensureVisible(find.text('Boa'));
+    await tester.tap(find.text('Boa'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Enviar feedback'));
+    await tester.tap(find.text('Enviar feedback'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Feedback #99 enviado. Obrigado por construir o Evolua com a gente.',
+      ),
+      findsOneWidget,
+    );
+    expect(_lastFeedbackPayload?['workingWell'], 'As trilhas estao claras.');
+    expect(_lastFeedbackPayload?['rating'], 'BOA');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps feedback fields when backend returns error', (
+    tester,
+  ) async {
+    _feedbackShouldFail = true;
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(section: ProfileModuleSection.feedback),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      _feedbackTextField('O que poderia melhorar?'),
+      'O carregamento da home.',
+    );
+    await tester.ensureVisible(find.text('Enviar feedback'));
+    await tester.tap(find.text('Enviar feedback'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Falha simulada no feedback.'), findsOneWidget);
+    expect(find.text('O carregamento da home.'), findsOneWidget);
   });
 
   testWidgets('renders accessibility settings and persists controls', (
@@ -530,6 +644,27 @@ class _FakeUserAdapter implements HttpClientAdapter {
         },
       }, statusCode: 201);
     }
+    if (options.method == 'POST' && options.path == '/v1/feedback') {
+      if (_feedbackShouldFail) {
+        return _jsonResponse({
+          'message': 'Bad Request',
+          'details': ['Falha simulada no feedback.'],
+        }, statusCode: 400);
+      }
+      final formData = options.data as FormData;
+      final payload = formData.fields
+          .firstWhere((field) => field.key == 'payload')
+          .value;
+      _lastFeedbackPayload = jsonDecode(payload) as Map<String, dynamic>;
+      return _jsonResponse({
+        'data': {
+          'id': 99,
+          'status': 'RECEIVED',
+          'createdAt': '2026-05-05T00:00:00Z',
+          'screenshotAttached': formData.files.isNotEmpty,
+        },
+      }, statusCode: 201);
+    }
     return _jsonResponse({'data': null}, statusCode: 404);
   }
 }
@@ -538,6 +673,14 @@ Map<String, dynamic> _remoteSettingsPayload = {..._defaultRemoteSettings()};
 Map<String, dynamic> _remoteAccessibilityPayload = {
   ..._defaultRemoteAccessibility(),
 };
+Map<String, dynamic>? _lastFeedbackPayload;
+bool _feedbackShouldFail = false;
+
+Finder _feedbackTextField(String label) {
+  return find.byWidgetPredicate(
+    (widget) => widget is TextField && widget.decoration?.labelText == label,
+  );
+}
 
 Map<String, dynamic> _defaultRemoteSettings() => {
   'privateJournal': true,
