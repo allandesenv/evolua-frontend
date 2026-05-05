@@ -5,6 +5,9 @@ import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
+import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
@@ -27,6 +30,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -53,6 +59,14 @@ void main() {
     );
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsOneWidget);
+    expect(find.text('Planos e assinaturas'), findsOneWidget);
+    expect(find.textContaining('Voce esta no plano essencial'), findsNothing);
+
+    await tester.tap(find.text('Planos e assinaturas'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Planos e assinaturas'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('Voce esta no plano essencial'), findsOneWidget);
   });
 }
 
@@ -126,6 +140,81 @@ class _FakeProfileRepository implements ProfileRepository {
     required String fileName,
   }) async {
     return '';
+  }
+}
+
+class _FakeSubscriptionRepository implements SubscriptionRepository {
+  @override
+  Future<List<PlanView>> listPlans() async {
+    return const [
+      PlanView(
+        planCode: 'essential-free',
+        title: 'Essencial',
+        subtitle: 'Base gratuita do app.',
+        billingCycle: 'MONTHLY',
+        premium: false,
+        price: 0,
+        currency: 'BRL',
+        benefits: ['Base gratuita'],
+        active: true,
+      ),
+      PlanView(
+        planCode: 'premium-monthly',
+        title: 'Premium',
+        subtitle: 'Mais IA e jornadas premium.',
+        billingCycle: 'MONTHLY',
+        premium: true,
+        price: 29.9,
+        currency: 'BRL',
+        benefits: ['Mais analises por dia'],
+        active: true,
+      ),
+    ];
+  }
+
+  @override
+  Future<CurrentSubscription?> current() async {
+    return const CurrentSubscription(
+      planCode: 'essential-free',
+      status: 'ACTIVE',
+      billingCycle: 'MONTHLY',
+      premium: false,
+      adsEnabled: true,
+      aiQuotaRemainingToday: 1,
+    );
+  }
+
+  @override
+  Future<CurrentSubscription?> cancel() async => current();
+
+  @override
+  Future<CheckoutSession> checkoutStatus(String checkoutId) async {
+    return const CheckoutSession(
+      id: 'checkout-1',
+      planCode: 'premium-monthly',
+      billingCycle: 'MONTHLY',
+      status: 'PENDING',
+      premium: true,
+    );
+  }
+
+  @override
+  Future<AdRewardSession> createRewardSession({required String rewardType}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<CheckoutSession> startCheckout({
+    required String planCode,
+    required String frontendBaseUrl,
+  }) async {
+    return CheckoutSession(
+      id: 'checkout-1',
+      planCode: planCode,
+      billingCycle: 'MONTHLY',
+      status: 'PENDING',
+      premium: true,
+    );
   }
 }
 

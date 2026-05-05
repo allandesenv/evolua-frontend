@@ -52,6 +52,26 @@ void main() {
       expect(find.text('Abrir trilha sugerida'), findsOneWidget);
     });
 
+    testWidgets('shows next-step metadata as auxiliary context', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('8 min'), findsOneWidget);
+      expect(find.text('mantem constancia'), findsOneWidget);
+      expect(find.text('jornada ativa'), findsOneWidget);
+      expect(find.text('Continuar jornada'), findsOneWidget);
+      expect(find.text('Espacos'), findsOneWidget);
+
+      expect(find.widgetWithText(OutlinedButton, 'Espacos'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '8 min'), findsNothing);
+      expect(
+        find.widgetWithText(OutlinedButton, 'mantem constancia'),
+        findsNothing,
+      );
+    });
+
     testWidgets('renders safe-mode analysis text in full analysis', (
       tester,
     ) async {
