@@ -10,6 +10,7 @@ import 'package:evolua_frontend/features/auth/domain/repositories/auth_repositor
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
@@ -24,6 +25,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() {
     _remoteSettingsPayload = _defaultRemoteSettings();
+    _remoteAccessibilityPayload = _defaultRemoteAccessibility();
   });
 
   testWidgets('keeps profile hero readable on compact width', (tester) async {
@@ -138,6 +140,124 @@ void main() {
 
     expect(find.text('Preferencias salvas com seguranca.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders help support and creates real ticket', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 980));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(
+                section: ProfileModuleSection.helpSupport,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ajuda e suporte'), findsAtLeastNWidgets(1));
+    expect(find.text('Central de ajuda'), findsOneWidget);
+    expect(find.text('Suporte humano'), findsOneWidget);
+    expect(find.text('Bem-estar e suporte emocional'), findsOneWidget);
+    expect(find.text('Status da plataforma'), findsOneWidget);
+    expect(find.text('Como funcionam as trilhas?'), findsOneWidget);
+    expect(find.text('Sistema operacional'), findsOneWidget);
+    expect(find.text('IA operacional'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Como funcionam as trilhas?'));
+    await tester.tap(find.text('Como funcionam as trilhas?'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('As trilhas organizam praticas'),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.text('Abrir chamado').first);
+    await tester.tap(find.text('Abrir chamado').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Preciso de ajuda.');
+    await tester.tap(find.widgetWithText(FilledButton, 'Enviar chamado'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Chamado #42 aberto. Nosso time vai acompanhar com cuidado.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders accessibility settings and persists controls', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 1040));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpDisplayAccessibility(tester);
+
+    expect(find.text('Tela e acessibilidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Aparencia'), findsOneWidget);
+    expect(find.text('Leitura e legibilidade'), findsOneWidget);
+    expect(find.text('Navegacao e interacao'), findsOneWidget);
+    expect(find.text('Acessibilidade emocional'), findsOneWidget);
+    expect(find.text('Tema'), findsOneWidget);
+    expect(find.text('Contraste elevado'), findsOneWidget);
+    expect(find.text('Tamanho do texto'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Claro'));
+    await tester.tap(find.text('Claro'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Contraste elevado'));
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tamanho do texto'));
+    await tester.tap(find.text('Normal').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Grande').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Salvar preferencias visuais'));
+    await tester.tap(find.text('Salvar preferencias visuais'));
+    await tester.pumpAndSettle();
+
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final saved =
+        jsonDecode(
+              sharedPreferences.getString(accessibilityPreferencesStorageKey)!,
+            )
+            as Map<String, dynamic>;
+
+    expect(saved['themeMode'], 'light');
+    expect(saved['highContrast'], isTrue);
+    expect(saved['textSize'], 'large');
+    expect(
+      find.text('Preferencias visuais salvas com conforto.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('persists settings and reloads saved controls', (tester) async {
@@ -279,6 +399,37 @@ Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpDisplayAccessibility(WidgetTester tester) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        subscriptionRepositoryProvider.overrideWithValue(
+          _FakeSubscriptionRepository(),
+        ),
+        authenticatedDioProvider(
+          AppConfig.userBaseUrl,
+        ).overrideWithValue(_fakeUserDio()),
+        authenticatedDioProvider(
+          AppConfig.authBaseUrl,
+        ).overrideWithValue(_fakeAuthDio()),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: ProfileModuleView(
+              section: ProfileModuleSection.displayAccessibility,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Dio _fakeUserDio() {
   return Dio()..httpClientAdapter = _FakeUserAdapter();
 }
@@ -307,6 +458,17 @@ class _FakeUserAdapter implements HttpClientAdapter {
       return _jsonResponse({'data': _remoteSettingsPayload});
     }
     if (options.method == 'GET' &&
+        options.path == '/v1/profiles/me/accessibility-settings') {
+      return _jsonResponse({'data': _remoteAccessibilityPayload});
+    }
+    if (options.method == 'PUT' &&
+        options.path == '/v1/profiles/me/accessibility-settings') {
+      _remoteAccessibilityPayload = Map<String, dynamic>.from(
+        options.data as Map,
+      );
+      return _jsonResponse({'data': _remoteAccessibilityPayload});
+    }
+    if (options.method == 'GET' &&
         options.path == '/v1/profiles/me/data-export') {
       return _jsonResponse({
         'data': {
@@ -317,11 +479,65 @@ class _FakeUserAdapter implements HttpClientAdapter {
         },
       });
     }
+    if (options.method == 'GET' && options.path == '/v1/support/config') {
+      return _jsonResponse({
+        'data': {
+          'helpCenterUrl': 'https://help.evolua.local',
+          'supportUrl': 'https://support.evolua.local',
+          'professionalHelpUrl': 'https://care.evolua.local',
+          'emotionalResourcesUrl': 'https://resources.evolua.local',
+          'aiLimitsUrl': 'https://limits.evolua.local',
+        },
+      });
+    }
+    if (options.method == 'GET' && options.path == '/v1/support/status') {
+      return _jsonResponse({
+        'data': [
+          {
+            'key': 'system',
+            'label': 'Sistema operacional',
+            'state': 'OPERATIONAL',
+            'detail': 'Funcionando normalmente.',
+          },
+          {
+            'key': 'ai',
+            'label': 'IA operacional',
+            'state': 'UNKNOWN',
+            'detail': 'Nao foi possivel confirmar agora.',
+          },
+          {
+            'key': 'notifications',
+            'label': 'Notificacoes',
+            'state': 'OPERATIONAL',
+            'detail': 'Funcionando normalmente.',
+          },
+          {
+            'key': 'sync',
+            'label': 'Sincronizacao',
+            'state': 'OPERATIONAL',
+            'detail': 'Funcionando normalmente.',
+          },
+        ],
+      });
+    }
+    if (options.method == 'POST' && options.path == '/v1/support/tickets') {
+      return _jsonResponse({
+        'data': {
+          'id': 42,
+          'category': (options.data as Map)['category'],
+          'status': 'OPEN',
+          'createdAt': '2026-05-05T00:00:00Z',
+        },
+      }, statusCode: 201);
+    }
     return _jsonResponse({'data': null}, statusCode: 404);
   }
 }
 
 Map<String, dynamic> _remoteSettingsPayload = {..._defaultRemoteSettings()};
+Map<String, dynamic> _remoteAccessibilityPayload = {
+  ..._defaultRemoteAccessibility(),
+};
 
 Map<String, dynamic> _defaultRemoteSettings() => {
   'privateJournal': true,
@@ -333,6 +549,25 @@ Map<String, dynamic> _defaultRemoteSettings() => {
   'aiTone': 'acolhedor',
   'suggestionFrequency': 'equilibrada',
   'trailStyle': 'guiada',
+};
+
+Map<String, dynamic> _defaultRemoteAccessibility() => {
+  'themeMode': 'dark',
+  'highContrast': false,
+  'reduceTransparency': false,
+  'animationLevel': 'normal',
+  'textSize': 'normal',
+  'readingSpacing': 'comfortable',
+  'accessibleFont': false,
+  'focusMode': false,
+  'reduceMotion': false,
+  'hapticFeedback': true,
+  'extendedResponseTime': false,
+  'simplifiedNavigation': false,
+  'reduceVisualStimuli': false,
+  'softerLanguage': false,
+  'hideSensitiveContent': false,
+  'comfortMode': false,
 };
 
 class _FakeAuthAdapter implements HttpClientAdapter {

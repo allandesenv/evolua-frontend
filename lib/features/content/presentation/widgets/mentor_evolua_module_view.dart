@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
 import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
@@ -72,7 +73,7 @@ class _MentorHeader extends StatelessWidget {
                 child: Text(
                   'Mentor Evolua',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.textPrimary,
+                    color: context.evoluaColors.textPrimary,
                   ),
                 ),
               ),
@@ -92,16 +93,18 @@ class _MentorHeader extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
-                color: AppColors.surfaceStrong.withValues(alpha: 0.42),
+                color: context.evoluaColors.surfaceStrong.withValues(
+                  alpha: 0.42,
+                ),
                 border: Border.all(
-                  color: AppColors.outline.withValues(alpha: 0.24),
+                  color: context.evoluaColors.outline.withValues(alpha: 0.24),
                 ),
               ),
               child: Text(
                 'Contexto ativo: ${trail!.title}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                ),
               ),
             ),
           ] else ...[
@@ -247,7 +250,8 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
       }
       AppSnackBar.show(
         context,
-        message: 'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
+        message:
+            'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -266,9 +270,9 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
         children: [
           Text(
             'Conversa guiada',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -293,16 +297,22 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
                           decoration: BoxDecoration(
                             color: message.role == 'user'
                                 ? AppColors.accent.withValues(alpha: 0.16)
-                                : AppColors.surface.withValues(alpha: 0.72),
+                                : context.evoluaColors.surface.withValues(
+                                    alpha: 0.72,
+                                  ),
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
-                              color: AppColors.outline.withValues(alpha: 0.22),
+                              color: context.evoluaColors.outline.withValues(
+                                alpha: 0.22,
+                              ),
                             ),
                           ),
                           child: Text(
                             message.content,
                             style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppColors.textPrimary),
+                                ?.copyWith(
+                                  color: context.evoluaColors.textPrimary,
+                                ),
                           ),
                         ),
                       ),

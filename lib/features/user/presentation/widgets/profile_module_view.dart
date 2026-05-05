@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
+import 'package:evolua_frontend/features/user/application/support_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -12,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum ProfileModuleSection {
   overview,
@@ -520,6 +524,123 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     );
   }
 
+  Future<void> _saveAccessibilityPreferences() async {
+    try {
+      await ref
+          .read(accessibilityPreferencesControllerProvider.notifier)
+          .save();
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage('Preferencias visuais salvas com conforto.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _openSupportTicket({
+    required String category,
+    required String subject,
+  }) async {
+    final result = await _showSupportTicketDialog(subject: subject);
+    if (result == null) {
+      return;
+    }
+
+    try {
+      final ticket = await ref
+          .read(supportRepositoryProvider)
+          .createTicket(
+            category: category,
+            subject: result.subject,
+            message: result.message,
+          );
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(
+        'Chamado #${ticket.id} aberto. Nosso time vai acompanhar com cuidado.',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _openSupportLink(Uri? url, String fallbackMessage) async {
+    if (url == null) {
+      _showSettingsMessage(fallbackMessage);
+      return;
+    }
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      _showSettingsMessage(fallbackMessage);
+    }
+  }
+
+  Future<_SupportTicketDialogResult?> _showSupportTicketDialog({
+    required String subject,
+  }) async {
+    final subjectController = TextEditingController(text: subject);
+    final messageController = TextEditingController();
+    return showDialog<_SupportTicketDialogResult>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Abrir chamado'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: subjectController,
+              decoration: const InputDecoration(labelText: 'Assunto'),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: messageController,
+              decoration: const InputDecoration(
+                labelText: 'Como podemos ajudar?',
+                alignLabelWithHint: true,
+              ),
+              minLines: 4,
+              maxLines: 6,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final normalizedSubject = subjectController.text.trim();
+              final message = messageController.text.trim();
+              if (normalizedSubject.isEmpty || message.isEmpty) {
+                _showSettingsMessage(
+                  'Informe o assunto e conte rapidamente como podemos ajudar.',
+                );
+                return;
+              }
+              Navigator.of(context).pop(
+                _SupportTicketDialogResult(
+                  subject: normalizedSubject,
+                  message: message,
+                ),
+              );
+            },
+            child: const Text('Enviar chamado'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _friendlySettingsError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -547,6 +668,11 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final settingsState = ref.watch(
       settingsPrivacyPreferencesControllerProvider,
     );
+    final accessibilityState = ref.watch(
+      accessibilityPreferencesControllerProvider,
+    );
+    final supportConfigState = ref.watch(supportConfigProvider);
+    final supportStatusState = ref.watch(supportStatusProvider);
     final profile = profileState.asData?.value;
     final isSaving = profileState.isLoading && profileState.hasValue;
     final isAdmin = session?.isAdmin ?? false;
@@ -704,6 +830,110 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           )
         else if (_section == ProfileModuleSection.plansSubscriptions)
           const SubscriptionModuleView()
+        else if (_section == ProfileModuleSection.helpSupport)
+          _HelpSupportSection(
+            configState: supportConfigState,
+            statusState: supportStatusState,
+            onCreateTicket: (category, subject) =>
+                _openSupportTicket(category: category, subject: subject),
+            onOpenLink: _openSupportLink,
+            onRefreshStatus: () => ref.invalidate(supportStatusProvider),
+          )
+        else if (_section == ProfileModuleSection.displayAccessibility)
+          accessibilityState.when(
+            data: (preferences) {
+              final accessibilityController = ref.read(
+                accessibilityPreferencesControllerProvider.notifier,
+              );
+              return _DisplayAccessibilitySection(
+                preferences: preferences,
+                onThemeModeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(themeMode: value),
+                    ),
+                onHighContrastChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(highContrast: value),
+                    ),
+                onReduceTransparencyChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(reduceTransparency: value),
+                    ),
+                onAnimationLevelChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(animationLevel: value),
+                    ),
+                onTextSizeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(textSize: value),
+                    ),
+                onReadingSpacingChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(readingSpacing: value),
+                    ),
+                onAccessibleFontChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(accessibleFont: value),
+                    ),
+                onFocusModeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(focusMode: value),
+                    ),
+                onReduceMotionChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(reduceMotion: value),
+                    ),
+                onHapticFeedbackChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(hapticFeedback: value),
+                    ),
+                onExtendedResponseTimeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) =>
+                          current.copyWith(extendedResponseTime: value),
+                    ),
+                onSimplifiedNavigationChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) =>
+                          current.copyWith(simplifiedNavigation: value),
+                    ),
+                onReduceVisualStimuliChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(reduceVisualStimuli: value),
+                    ),
+                onSofterLanguageChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(softerLanguage: value),
+                    ),
+                onHideSensitiveContentChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) =>
+                          current.copyWith(hideSensitiveContent: value),
+                    ),
+                onComfortModeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(comfortMode: value),
+                    ),
+                onSavePreferences: _saveAccessibilityPreferences,
+              );
+            },
+            loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
+            error: (_, _) => PrimaryPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tela e acessibilidade',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Nao foi possivel carregar suas preferencias visuais agora.',
+                  ),
+                ],
+              ),
+            ),
+          )
         else
           _SectionPanel(
             title: _sectionLabel(_section),
@@ -956,9 +1186,9 @@ class _OverviewSection extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Nivel da jornada: ${journeyLevel.round()}',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
             Slider(
               min: 1,
@@ -978,6 +1208,558 @@ class _OverviewSection extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HelpSupportSection extends StatelessWidget {
+  const _HelpSupportSection({
+    required this.configState,
+    required this.statusState,
+    required this.onCreateTicket,
+    required this.onOpenLink,
+    required this.onRefreshStatus,
+  });
+
+  final AsyncValue<SupportConfig> configState;
+  final AsyncValue<List<SupportStatusItem>> statusState;
+  final void Function(String category, String subject) onCreateTicket;
+  final Future<void> Function(Uri? url, String fallbackMessage) onOpenLink;
+  final VoidCallback onRefreshStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final config = configState.asData?.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ajuda e suporte',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Se algo nao estiver claro, funcionando ou fazendo sentido, estamos aqui para ajudar.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Central de ajuda',
+          description:
+              'Encontre respostas rapidas para duvidas comuns sobre o Evolua.',
+          microcopy:
+              'Respostas simples ajudam voce a seguir sem precisar pausar a jornada por muito tempo.',
+          children: [
+            const _HelpFaqTile(
+              title: 'Como funcionam as trilhas?',
+              answer:
+                  'As trilhas organizam praticas, reflexoes e proximos passos em uma sequencia privada para apoiar seu momento atual.',
+            ),
+            const _HelpFaqTile(
+              title: 'O que sao check-ins?',
+              answer:
+                  'Check-ins sao registros rapidos do seu estado emocional. Eles ajudam o Evolua a entender seu ritmo e sugerir um cuidado mais coerente.',
+            ),
+            const _HelpFaqTile(
+              title: 'Como a IA gera sugestoes?',
+              answer:
+                  'A IA usa seu check-in e, quando permitido, seu historico para criar orientacoes de autocuidado. Ela nao substitui apoio profissional.',
+            ),
+            const _HelpFaqTile(
+              title: 'Como editar meu perfil?',
+              answer:
+                  'Abra seu perfil, fique em Visao geral, ajuste os dados desejados e toque em Salvar perfil.',
+            ),
+            const _HelpFaqTile(
+              title: 'Como funciona o plano premium?',
+              answer:
+                  'O Premium amplia limites e recursos da jornada. Voce pode ver detalhes em Planos e assinaturas no menu do perfil.',
+            ),
+            _SettingsActionRow(
+              icon: Icons.open_in_new_rounded,
+              title: 'Abrir central de ajuda',
+              subtitle: 'Acesse materiais externos quando configurados.',
+              onTap: () => onOpenLink(
+                config?.helpCenterUrl,
+                'A central completa ainda nao esta configurada. Use as respostas desta pagina por enquanto.',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Suporte humano',
+          description:
+              'Precisa de ajuda com algo mais especifico? Fale com nosso time.',
+          microcopy:
+              'Nem tudo precisa ser resolvido sozinho. Quando precisar, estamos aqui.',
+          children: [
+            _SettingsActionRow(
+              icon: Icons.support_agent_rounded,
+              title: 'Abrir chamado',
+              subtitle: 'Conte o que aconteceu para nosso time acompanhar.',
+              onTap: () => onCreateTicket('GENERAL', 'Ajuda com o Evolua'),
+            ),
+            _SettingsActionRow(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Falar com suporte',
+              subtitle: 'Abra uma conversa registrada com nosso time.',
+              onTap: () => onCreateTicket('SUPPORT', 'Falar com suporte'),
+            ),
+            _SettingsActionRow(
+              icon: Icons.bug_report_outlined,
+              title: 'Reportar problema tecnico',
+              subtitle:
+                  'Informe erros, travamentos ou comportamentos estranhos.',
+              onTap: () =>
+                  onCreateTicket('TECHNICAL', 'Problema tecnico no app'),
+            ),
+            _SettingsActionRow(
+              icon: Icons.workspace_premium_outlined,
+              title: 'Solicitar ajuda com assinatura',
+              subtitle: 'Receba apoio sobre plano, pagamento ou premium.',
+              onTap: () => onCreateTicket('BILLING', 'Ajuda com assinatura'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Bem-estar e suporte emocional',
+          description:
+              'O Evolua apoia processos de autoconhecimento, mas nao substitui acompanhamento profissional.',
+          microcopy:
+              'O Evolua pode apoiar sua jornada, mas cuidado emocional profundo tambem merece apoio humano qualificado.',
+          children: [
+            _SettingsActionRow(
+              icon: Icons.health_and_safety_outlined,
+              title: 'Quando buscar ajuda profissional',
+              subtitle:
+                  'Veja orientacoes configuradas para momentos que pedem apoio humano.',
+              onTap: () => onOpenLink(
+                config?.professionalHelpUrl,
+                'Esse recurso de apoio profissional ainda nao esta configurado.',
+              ),
+            ),
+            _SettingsActionRow(
+              icon: Icons.volunteer_activism_outlined,
+              title: 'Recursos de apoio emocional',
+              subtitle: 'Acesse uma fonte segura configurada pelo Evolua.',
+              onTap: () => onOpenLink(
+                config?.emotionalResourcesUrl,
+                'Os recursos de apoio emocional ainda nao estao configurados.',
+              ),
+            ),
+            _SettingsActionRow(
+              icon: Icons.psychology_alt_outlined,
+              title: 'Limites da IA no cuidado emocional',
+              subtitle:
+                  'Entenda onde a IA ajuda e onde o apoio humano importa.',
+              onTap: () => onOpenLink(
+                config?.aiLimitsUrl,
+                'A pagina sobre limites da IA ainda nao esta configurada.',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Status da plataforma',
+          description: 'Acompanhe a estabilidade e funcionamento do Evolua.',
+          microcopy:
+              'Quando algo oscilar, mostramos de forma clara para voce nao precisar adivinhar.',
+          children: [
+            statusState.when(
+              data: (items) =>
+                  Column(children: items.map(_SupportStatusRow.new).toList()),
+              loading: () => const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(),
+              ),
+              error: (_, _) => const _SettingsInfoRow(
+                icon: Icons.info_outline_rounded,
+                title: 'Status indisponivel',
+                subtitle: 'Nao foi possivel confirmar a plataforma agora.',
+              ),
+            ),
+            _SettingsActionRow(
+              icon: Icons.refresh_rounded,
+              title: 'Atualizar status',
+              subtitle: 'Verifique novamente os servicos do Evolua.',
+              onTap: onRefreshStatus,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                onPressed: () => onCreateTicket('SUPPORT', 'Falar com suporte'),
+                icon: const Icon(Icons.support_agent_rounded),
+                label: const Text('Falar com suporte'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => onOpenLink(
+                  config?.helpCenterUrl,
+                  'A central completa ainda nao esta configurada. Use as respostas desta pagina por enquanto.',
+                ),
+                icon: const Icon(Icons.help_outline_rounded),
+                label: const Text('Abrir central de ajuda'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HelpFaqTile extends StatelessWidget {
+  const _HelpFaqTile({required this.title, required this.answer});
+
+  final String title;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(16),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          leading: const Icon(Icons.help_outline_rounded),
+          title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(answer, style: Theme.of(context).textTheme.bodySmall),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportStatusRow extends StatelessWidget {
+  const _SupportStatusRow(this.item);
+
+  final SupportStatusItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final operational = item.state == 'OPERATIONAL';
+    return _SettingsRowShell(
+      icon: operational
+          ? Icons.check_circle_outline_rounded
+          : Icons.help_outline_rounded,
+      iconColor: operational
+          ? AppColors.accent
+          : context.evoluaColors.textSecondary,
+      title: item.label,
+      subtitle: item.detail,
+      trailing: Text(
+        operational ? 'OK' : 'A confirmar',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: operational
+              ? AppColors.accent
+              : context.evoluaColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _DisplayAccessibilitySection extends StatelessWidget {
+  const _DisplayAccessibilitySection({
+    required this.preferences,
+    required this.onThemeModeChanged,
+    required this.onHighContrastChanged,
+    required this.onReduceTransparencyChanged,
+    required this.onAnimationLevelChanged,
+    required this.onTextSizeChanged,
+    required this.onReadingSpacingChanged,
+    required this.onAccessibleFontChanged,
+    required this.onFocusModeChanged,
+    required this.onReduceMotionChanged,
+    required this.onHapticFeedbackChanged,
+    required this.onExtendedResponseTimeChanged,
+    required this.onSimplifiedNavigationChanged,
+    required this.onReduceVisualStimuliChanged,
+    required this.onSofterLanguageChanged,
+    required this.onHideSensitiveContentChanged,
+    required this.onComfortModeChanged,
+    required this.onSavePreferences,
+  });
+
+  final AccessibilityPreferences preferences;
+  final ValueChanged<String> onThemeModeChanged;
+  final ValueChanged<bool> onHighContrastChanged;
+  final ValueChanged<bool> onReduceTransparencyChanged;
+  final ValueChanged<String> onAnimationLevelChanged;
+  final ValueChanged<String> onTextSizeChanged;
+  final ValueChanged<String> onReadingSpacingChanged;
+  final ValueChanged<bool> onAccessibleFontChanged;
+  final ValueChanged<bool> onFocusModeChanged;
+  final ValueChanged<bool> onReduceMotionChanged;
+  final ValueChanged<bool> onHapticFeedbackChanged;
+  final ValueChanged<bool> onExtendedResponseTimeChanged;
+  final ValueChanged<bool> onSimplifiedNavigationChanged;
+  final ValueChanged<bool> onReduceVisualStimuliChanged;
+  final ValueChanged<bool> onSofterLanguageChanged;
+  final ValueChanged<bool> onHideSensitiveContentChanged;
+  final ValueChanged<bool> onComfortModeChanged;
+  final VoidCallback onSavePreferences;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tela e acessibilidade',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Ajuste a interface para uma experiencia mais confortavel, acessivel e alinhada ao seu ritmo.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Aparencia',
+          description:
+              'Adapte a interface ao seu ambiente e preferencia visual.',
+          microcopy: 'Conforto visual tambem faz parte do cuidado.',
+          children: [
+            _AccessibilitySegmentedRow(
+              title: 'Tema',
+              subtitle: 'Escolha entre escuro, claro ou automatico.',
+              value: preferences.themeMode,
+              options: const {
+                'dark': 'Escuro',
+                'light': 'Claro',
+                'system': 'Auto',
+              },
+              onChanged: onThemeModeChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Contraste elevado',
+              subtitle: 'Aumenta a diferenca entre texto, fundo e bordas.',
+              value: preferences.highContrast,
+              onChanged: onHighContrastChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Reducao de transparencia',
+              subtitle:
+                  'Prefere superficies mais solidas e menos translucidas.',
+              value: preferences.reduceTransparency,
+              onChanged: onReduceTransparencyChanged,
+            ),
+            _SettingsDropdownRow(
+              title: 'Ajuste de animacoes',
+              subtitle: 'Controle a intensidade das transicoes.',
+              value: preferences.animationLevel,
+              items: const {
+                'normal': 'Normal',
+                'reduced': 'Reduzida',
+                'none': 'Sem animacoes',
+              },
+              onChanged: onAnimationLevelChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Leitura e legibilidade',
+          description: 'Melhore a leitura e reduza o esforco visual.',
+          microcopy:
+              'Uma interface mais confortavel torna a experiencia mais leve e presente.',
+          children: [
+            _SettingsDropdownRow(
+              title: 'Tamanho do texto',
+              subtitle: 'Ajuste a escala dos textos no app.',
+              value: preferences.textSize,
+              items: const {
+                'small': 'Pequeno',
+                'normal': 'Normal',
+                'large': 'Grande',
+                'extraLarge': 'Extra grande',
+              },
+              onChanged: onTextSizeChanged,
+            ),
+            _SettingsDropdownRow(
+              title: 'Espacamento de leitura',
+              subtitle: 'Defina o respiro entre as linhas.',
+              value: preferences.readingSpacing,
+              items: const {
+                'compact': 'Compacto',
+                'comfortable': 'Confortavel',
+                'wide': 'Amplo',
+              },
+              onChanged: onReadingSpacingChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Fonte acessivel',
+              subtitle: 'Usa a fonte do sistema para leitura mais familiar.',
+              value: preferences.accessibleFont,
+              onChanged: onAccessibleFontChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Modo foco',
+              subtitle: 'Guarda a preferencia para telas com menos distracao.',
+              value: preferences.focusMode,
+              onChanged: onFocusModeChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Navegacao e interacao',
+          description: 'Ajuste como voce interage com o app.',
+          microcopy:
+              'Pequenos ajustes tornam a experiencia mais fluida e menos cansativa.',
+          children: [
+            _SettingsSwitchRow(
+              title: 'Reduzir movimento',
+              subtitle: 'Diminui transicoes e efeitos animados no app.',
+              value: preferences.reduceMotion,
+              onChanged: onReduceMotionChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Feedback tatil',
+              subtitle: 'Permite respostas tateis em acoes importantes.',
+              value: preferences.hapticFeedback,
+              onChanged: onHapticFeedbackChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Tempo de resposta estendido',
+              subtitle: 'Guarda mais tempo para interacoes futuras.',
+              value: preferences.extendedResponseTime,
+              onChanged: onExtendedResponseTimeChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Navegacao simplificada',
+              subtitle: 'Prioriza caminhos mais diretos quando disponivel.',
+              value: preferences.simplifiedNavigation,
+              onChanged: onSimplifiedNavigationChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Acessibilidade emocional',
+          description:
+              'Ajuste estimulos e linguagem para uma experiencia mais segura emocionalmente.',
+          microcopy:
+              'Seu estado emocional importa. A interface tambem pode respeitar isso.',
+          children: [
+            _SettingsSwitchRow(
+              title: 'Reduzir estimulos visuais',
+              subtitle: 'Registra preferencia por telas menos carregadas.',
+              value: preferences.reduceVisualStimuli,
+              onChanged: onReduceVisualStimuliChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Linguagem mais suave',
+              subtitle: 'Prefere mensagens menos intensas e mais acolhedoras.',
+              value: preferences.softerLanguage,
+              onChanged: onSofterLanguageChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Ocultar conteudos sensiveis',
+              subtitle: 'Guarda preferencia para filtros de cuidado emocional.',
+              value: preferences.hideSensitiveContent,
+              onChanged: onHideSensitiveContentChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Modo acolhimento',
+              subtitle:
+                  'Sinaliza que voce prefere uma experiencia mais gentil.',
+              value: preferences.comfortMode,
+              onChanged: onComfortModeChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: onSavePreferences,
+              icon: const Icon(Icons.save_rounded),
+              label: const Text('Salvar preferencias visuais'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccessibilitySegmentedRow extends StatelessWidget {
+  const _AccessibilitySegmentedRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final String value;
+  final Map<String, String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<String>(
+              segments: options.entries
+                  .map(
+                    (entry) => ButtonSegment<String>(
+                      value: entry.key,
+                      label: Text(entry.value),
+                    ),
+                  )
+                  .toList(),
+              selected: {value},
+              onSelectionChanged: (selection) => onChanged(selection.first),
+              showSelectedIcon: false,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1280,9 +2062,9 @@ class _SettingsGroup extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             microcopy,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 18),
           ...children,
@@ -1434,7 +2216,7 @@ class _SettingsRowShell extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.32),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -1454,7 +2236,9 @@ class _SettingsRowShell extends StatelessWidget {
                         title,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
-                              color: titleColor ?? AppColors.textPrimary,
+                              color:
+                                  titleColor ??
+                                  context.evoluaColors.textPrimary,
                             ),
                       ),
                       const SizedBox(height: 4),
@@ -1546,6 +2330,16 @@ class _DeleteAccountDialogResult {
   final String currentPassword;
 }
 
+class _SupportTicketDialogResult {
+  const _SupportTicketDialogResult({
+    required this.subject,
+    required this.message,
+  });
+
+  final String subject;
+  final String message;
+}
+
 class _SectionPanel extends StatelessWidget {
   const _SectionPanel({required this.title, required this.subtitle});
 
@@ -1585,16 +2379,16 @@ class _AvatarCircle extends StatelessWidget {
         : imageUrl!;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.surfaceStrong,
+      backgroundColor: context.evoluaColors.surfaceStrong,
       backgroundImage: normalizedUrl != null
           ? NetworkImage(normalizedUrl)
           : null,
       child: normalizedUrl == null
           ? Text(
               _initials(fallbackText),
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             )
           : null,
     );

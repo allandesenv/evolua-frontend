@@ -1,5 +1,7 @@
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -135,12 +137,40 @@ void main() {
       expect(find.text('Proximo passo'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('uses light surfaces and readable text in light theme', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _testApp(theme: AppTheme.light(accessibleFont: true)),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.text('O que isso significa?'));
+      final colors = context.evoluaColors;
+      final panel = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer).first,
+      );
+      final decoration = panel.decoration! as BoxDecoration;
+
+      expect(Theme.of(context).brightness, Brightness.light);
+      expect(decoration.color, colors.surface.withValues(alpha: 0.94));
+      expect(
+        decoration.color,
+        isNot(AppColors.surface.withValues(alpha: 0.94)),
+      );
+      expect(
+        Theme.of(context).textTheme.headlineSmall?.color,
+        isNot(AppColors.textPrimary),
+      );
+    });
   });
 }
 
 Widget _testApp({
   CheckInRepository? checkInRepository,
   TrailRepository? trailRepository,
+  ThemeData? theme,
 }) {
   return ProviderScope(
     overrides: [
@@ -152,7 +182,7 @@ Widget _testApp({
       ),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       home: Scaffold(
         body: SingleChildScrollView(
           child: HomeHubView(

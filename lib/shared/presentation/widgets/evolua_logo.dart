@@ -1,4 +1,4 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -42,7 +42,9 @@ class EvoluaLogo extends StatelessWidget {
                 ),
             ],
             border: Border.all(
-              color: AppColors.outline.withValues(alpha: isHero ? 0.14 : 0.08),
+              color: context.evoluaColors.outline.withValues(
+                alpha: isHero ? 0.14 : 0.08,
+              ),
             ),
           ),
           child: ClipRRect(
@@ -51,7 +53,7 @@ class EvoluaLogo extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    AppColors.surfaceStrong.withValues(alpha: 0.16),
+                    context.evoluaColors.surfaceStrong.withValues(alpha: 0.16),
                     Colors.white.withValues(alpha: isHero ? 0.05 : 0.03),
                   ],
                   begin: Alignment.topLeft,
@@ -83,7 +85,7 @@ class EvoluaLogo extends StatelessWidget {
                 style: GoogleFonts.spaceGrotesk(
                   fontSize: titleSize,
                   fontWeight: titleWeight,
-                  color: AppColors.textPrimary,
+                  color: context.evoluaColors.textPrimary,
                   height: 1,
                 ),
               ),
@@ -96,7 +98,7 @@ class EvoluaLogo extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontSize: subtitleSize,
                     letterSpacing: isHero ? 0.2 : 0.1,
-                    color: AppColors.textSecondary,
+                    color: context.evoluaColors.textSecondary,
                   ),
                 ),
               ],

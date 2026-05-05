@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -27,8 +28,9 @@ class GuidedEmptyState extends StatelessWidget {
     return PrimaryPanel(
       semanticLabel: title,
       child: Column(
-        crossAxisAlignment:
-            centered || compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        crossAxisAlignment: centered || compact
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
           Container(
             width: 52,
@@ -44,8 +46,8 @@ class GuidedEmptyState extends StatelessWidget {
             title,
             textAlign: centered || compact ? TextAlign.center : TextAlign.start,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
+              color: context.evoluaColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(

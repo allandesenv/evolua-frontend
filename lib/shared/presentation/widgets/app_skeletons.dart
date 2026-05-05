@@ -1,12 +1,9 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
 class HeroSkeleton extends StatelessWidget {
-  const HeroSkeleton({
-    super.key,
-    this.showActions = true,
-  });
+  const HeroSkeleton({super.key, this.showActions = true});
 
   final bool showActions;
 
@@ -43,11 +40,7 @@ class HeroSkeleton extends StatelessWidget {
 }
 
 class FormSkeleton extends StatelessWidget {
-  const FormSkeleton({
-    super.key,
-    this.fields = 3,
-    this.showButton = true,
-  });
+  const FormSkeleton({super.key, this.fields = 3, this.showButton = true});
 
   final int fields;
   final bool showButton;
@@ -67,7 +60,11 @@ class FormSkeleton extends StatelessWidget {
             fields,
             (index) => Padding(
               padding: EdgeInsets.only(bottom: index == fields - 1 ? 0 : 16),
-              child: const _SkeletonBox(width: double.infinity, height: 58, radius: 22),
+              child: const _SkeletonBox(
+                width: double.infinity,
+                height: 58,
+                radius: 22,
+              ),
             ),
           ),
           if (showButton) ...[
@@ -81,10 +78,7 @@ class FormSkeleton extends StatelessWidget {
 }
 
 class FeedSkeleton extends StatelessWidget {
-  const FeedSkeleton({
-    super.key,
-    this.cards = 3,
-  });
+  const FeedSkeleton({super.key, this.cards = 3});
 
   final int cards;
 
@@ -124,10 +118,7 @@ class FeedSkeleton extends StatelessWidget {
 }
 
 class TimelineSkeleton extends StatelessWidget {
-  const TimelineSkeleton({
-    super.key,
-    this.groups = 2,
-  });
+  const TimelineSkeleton({super.key, this.groups = 2});
 
   final int groups;
 
@@ -177,17 +168,14 @@ class _SkeletonBox extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        color: AppColors.surfaceStrong.withValues(alpha: 0.36),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.36),
       ),
     );
   }
 }
 
 class _SkeletonPill extends StatelessWidget {
-  const _SkeletonPill({
-    required this.width,
-    this.height = 36,
-  });
+  const _SkeletonPill({required this.width, this.height = 36});
 
   final double width;
   final double height;

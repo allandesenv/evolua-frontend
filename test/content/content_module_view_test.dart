@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -64,6 +66,35 @@ void main() {
       expect(find.text('Respiracao breve'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('uses light surfaces and readable text in light theme', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(
+        _testApp(theme: AppTheme.light(accessibleFont: true)),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.text('Minha jornada'));
+      final colors = context.evoluaColors;
+      final panel = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer).first,
+      );
+      final decoration = panel.decoration! as BoxDecoration;
+
+      expect(Theme.of(context).brightness, Brightness.light);
+      expect(decoration.color, colors.surface.withValues(alpha: 0.94));
+      expect(
+        decoration.color,
+        isNot(AppColors.surface.withValues(alpha: 0.94)),
+      );
+      expect(
+        Theme.of(context).textTheme.bodyMedium?.color,
+        isNot(AppColors.textSecondary),
+      );
+    });
   });
 }
 
@@ -72,7 +103,7 @@ Future<void> _setCompactSurface(WidgetTester tester) async {
   addTearDown(() => tester.binding.setSurfaceSize(null));
 }
 
-Widget _testApp() {
+Widget _testApp({ThemeData? theme}) {
   SharedPreferences.setMockInitialValues({});
 
   return ProviderScope(
@@ -81,7 +112,7 @@ Widget _testApp() {
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       home: const Scaffold(
         body: SizedBox.expand(child: ContentModuleView(showSectionChips: true)),
       ),

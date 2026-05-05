@@ -1,13 +1,9 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
 class PanelSkeleton extends StatelessWidget {
-  const PanelSkeleton({
-    super.key,
-    this.rows = 3,
-    this.tileHeight = 96,
-  });
+  const PanelSkeleton({super.key, this.rows = 3, this.tileHeight = 96});
 
   final int rows;
   final double tileHeight;
@@ -23,7 +19,7 @@ class PanelSkeleton extends StatelessWidget {
             height: tileHeight,
             margin: EdgeInsets.only(bottom: index == rows - 1 ? 0 : 14),
             decoration: BoxDecoration(
-              color: AppColors.surfaceStrong.withValues(alpha: 0.34),
+              color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.34),
               borderRadius: BorderRadius.circular(22),
             ),
           ),
