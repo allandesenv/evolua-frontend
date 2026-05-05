@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -8,10 +9,20 @@ class CheckInAiInsightCard extends StatelessWidget {
     super.key,
     required this.insight,
     this.onOpenTrails,
+    this.onOpenAIChat,
+    this.onOpenHistoryAnalysis,
+    this.onWatchRewardedAd,
+    this.onOpenPremium,
+    this.isRewardLoading = false,
   });
 
   final CheckInAiInsight insight;
   final VoidCallback? onOpenTrails;
+  final VoidCallback? onOpenAIChat;
+  final VoidCallback? onOpenHistoryAnalysis;
+  final VoidCallback? onWatchRewardedAd;
+  final VoidCallback? onOpenPremium;
+  final bool isRewardLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +32,11 @@ class CheckInAiInsightCard extends StatelessWidget {
       _ => AppColors.accent,
     };
     final hasLimitedContext = insight.insight.toLowerCase().contains('sem muitos detalhes');
-    final trailLabel = insight.suggestedTrailTitle == null ? 'Abrir trilhas' : 'Abrir trilha sugerida';
+    final stateLabel = insight.emotionalStateLabel;
+    final mainInsight = insight.shortInsight ?? insight.insight;
+    final nextStep = insight.nextStep ?? insight.suggestedAction;
+    final trailTitle = insight.suggestedTrailDetail?.title ?? insight.suggestedTrailTitle;
+    final trailLabel = trailTitle == null ? 'Abrir trilhas' : 'Abrir trilha sugerida';
 
     return PrimaryPanel(
       semanticLabel: 'Leitura inteligente do check-in',
@@ -63,6 +78,18 @@ class CheckInAiInsightCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.labelMedium,
                   ),
                 ),
+              if (stateLabel != null && stateLabel.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    stateLabel,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
               if (hasLimitedContext)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -78,7 +105,7 @@ class CheckInAiInsightCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(insight.insight, style: Theme.of(context).textTheme.bodyLarge),
+          Text(mainInsight, style: Theme.of(context).textTheme.bodyLarge),
           if (hasLimitedContext) ...[
             const SizedBox(height: 10),
             Text(
@@ -86,9 +113,20 @@ class CheckInAiInsightCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
+          if (insight.quotaLimited) ...[
+            const SizedBox(height: 14),
+            AiQuotaLimitCard(
+              message: insight.limitMessage,
+              rewardedAdAvailable: insight.rewardedAdAvailable,
+              upgradeRecommended: insight.upgradeRecommended,
+              isRewardLoading: isRewardLoading,
+              onWatchRewardedAd: onWatchRewardedAd,
+              onOpenPremium: onOpenPremium,
+            ),
+          ],
           const SizedBox(height: 12),
           Text(
-            insight.suggestedAction,
+            nextStep,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: AppColors.textPrimary,
                 ),
@@ -96,9 +134,9 @@ class CheckInAiInsightCard extends StatelessWidget {
           if (insight.suggestedTrailReason.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              insight.suggestedTrailTitle == null
+              trailTitle == null
                   ? insight.suggestedTrailReason
-                  : '${insight.suggestedTrailTitle}: ${insight.suggestedTrailReason}',
+                  : '$trailTitle: ${insight.suggestedTrailReason}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -143,12 +181,34 @@ class CheckInAiInsightCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
-          if (onOpenTrails != null && insight.suggestedTrailId != null) ...[
+          if (onOpenTrails != null &&
+              (insight.suggestedTrailId != null || insight.suggestedTrailDetail != null)) ...[
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: onOpenTrails,
               icon: const Icon(Icons.auto_awesome_rounded),
               label: Text(trailLabel),
+            ),
+          ],
+          if (onOpenAIChat != null || onOpenHistoryAnalysis != null) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (onOpenAIChat != null)
+                  TextButton.icon(
+                    onPressed: onOpenAIChat,
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: const Text('Conversar com IA'),
+                  ),
+                if (onOpenHistoryAnalysis != null)
+                  TextButton.icon(
+                    onPressed: onOpenHistoryAnalysis,
+                    icon: const Icon(Icons.timeline_rounded),
+                    label: const Text('Ver analise do historico'),
+                  ),
+              ],
             ),
           ],
         ],

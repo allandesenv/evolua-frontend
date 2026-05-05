@@ -68,6 +68,30 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
     return _currentFromJson(ApiPayloadParser.dataMap(response.data));
   }
 
+  @override
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+  }) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/ads/reward-session',
+      data: {'rewardType': rewardType},
+    );
+    final json = ApiPayloadParser.dataMap(response.data);
+    return AdRewardSession(
+      id: json['id']?.toString() ?? '',
+      provider: json['provider']?.toString() ?? 'ADMOB',
+      rewardType: json['rewardType']?.toString() ?? rewardType,
+      status: json['status']?.toString() ?? 'CREATED',
+      customData: json['customData']?.toString() ?? json['id']?.toString() ?? '',
+      expiresAt:
+          DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(minutes: 15)),
+      grantedAt: json['grantedAt'] == null
+          ? null
+          : DateTime.tryParse(json['grantedAt'].toString()),
+    );
+  }
+
   CurrentSubscription? _currentFromJson(Map<String, dynamic> json) {
     if (json.isEmpty) {
       return null;
@@ -77,6 +101,8 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       status: json['status']?.toString() ?? 'NONE',
       billingCycle: json['billingCycle']?.toString() ?? 'MONTHLY',
       premium: json['premium'] as bool? ?? false,
+      adsEnabled: json['adsEnabled'] as bool? ?? true,
+      aiQuotaRemainingToday: (json['aiQuotaRemainingToday'] as num?)?.toInt() ?? 0,
       provider: json['provider']?.toString(),
       currentPeriodEndsAt: json['currentPeriodEndsAt'] == null
           ? null

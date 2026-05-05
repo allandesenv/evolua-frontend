@@ -5,13 +5,16 @@ class GradientScaffold extends StatelessWidget {
   const GradientScaffold({
     super.key,
     required this.child,
+    this.resizeToAvoidBottomInset,
   });
 
   final Widget child;
+  final bool? resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -51,10 +54,7 @@ class GradientScaffold extends StatelessWidget {
 }
 
 class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({
-    required this.color,
-    required this.size,
-  });
+  const _GlowOrb({required this.color, required this.size});
 
   final Color color;
   final double size;
@@ -68,11 +68,7 @@ class _GlowOrb extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(
-              color: color,
-              blurRadius: 140,
-              spreadRadius: 24,
-            ),
+            BoxShadow(color: color, blurRadius: 140, spreadRadius: 24),
           ],
         ),
       ),

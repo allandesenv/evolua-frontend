@@ -13,4 +13,6 @@ abstract class SubscriptionRepository {
   Future<CheckoutSession> checkoutStatus(String checkoutId);
 
   Future<CurrentSubscription?> cancel();
+
+  Future<AdRewardSession> createRewardSession({required String rewardType});
 }

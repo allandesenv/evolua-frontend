@@ -19,7 +19,11 @@ void main() {
           journeyChatRepositoryProvider.overrideWithValue(repository),
         ],
         child: const MaterialApp(
-          home: Scaffold(body: MentorEvoluaChatCard(trail: null)),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MentorEvoluaChatCard(trail: null),
+            ),
+          ),
         ),
       ),
     );
@@ -41,9 +45,66 @@ void main() {
       isEmpty,
     );
   });
+
+  testWidgets('Mentor shows rewarded ad and premium actions when quota ends', (
+    tester,
+  ) async {
+    final repository = _FakeJourneyChatRepository(
+      reply: const JourneyChatReply(
+        reply: 'Posso te oferecer um passo seguro sem usar IA externa agora.',
+        riskLevel: 'low',
+        suggestedNextStep: 'Respire por 2 minutos.',
+        fallbackUsed: true,
+        quotaLimited: true,
+        rewardedAdAvailable: true,
+        upgradeRecommended: true,
+        limitMessage: 'Voce chegou ao limite de IA do plano gratuito hoje.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          journeyChatRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MentorEvoluaChatCard(
+                trail: null,
+                onOpenPremium: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'Quero conversar agora');
+    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Limite de IA atingido'), findsOneWidget);
+    expect(
+      find.text('Voce chegou ao limite de IA do plano gratuito hoje.'),
+      findsOneWidget,
+    );
+    expect(find.text('Assistir anuncio para +1 analise'), findsOneWidget);
+    expect(find.text('Assinar Premium'), findsOneWidget);
+  });
 }
 
 class _FakeJourneyChatRepository implements JourneyChatRepository {
+  _FakeJourneyChatRepository({
+    this.reply = const JourneyChatReply(
+      reply: 'Vamos fazer uma pratica curta.',
+      riskLevel: 'low',
+      suggestedNextStep: 'Respire por 3 minutos.',
+      fallbackUsed: true,
+    ),
+  });
+
+  final JourneyChatReply reply;
   String? lastMessage;
   List<JourneyChatMessage> lastConversationHistory = const [];
 
@@ -55,11 +116,6 @@ class _FakeJourneyChatRepository implements JourneyChatRepository {
   }) async {
     lastMessage = message;
     lastConversationHistory = List.of(conversationHistory);
-    return const JourneyChatReply(
-      reply: 'Vamos fazer uma pratica curta.',
-      riskLevel: 'low',
-      suggestedNextStep: 'Respire por 3 minutos.',
-      fallbackUsed: true,
-    );
+    return reply;
   }
 }
