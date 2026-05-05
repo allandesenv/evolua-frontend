@@ -1,4 +1,4 @@
-import 'package:evolua_frontend/core/network/paginated_response.dart';
+﻿import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
@@ -13,7 +13,6 @@ import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'dart:async';
 
 void main() {
   group('HomeHubView briefing', () {
@@ -121,73 +120,6 @@ void main() {
       expect(find.text(safeInsightText), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('shows quota actions when intelligent analysis is limited', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _testApp(
-          checkInRepository: _FakeCheckInRepository(
-            items: [
-              CheckIn(
-                id: 11,
-                userId: 'user-123',
-                mood: 'calmo',
-                reflection: 'check-in simples',
-                energyLevel: 7,
-                recommendedPractice: 'Respire por dois minutos.',
-                aiInsight: _insight(
-                  quotaLimited: true,
-                  rewardedAdAvailable: true,
-                  upgradeRecommended: true,
-                  limitMessage: 'Voce usou sua analise de IA gratuita hoje.',
-                ),
-                createdAt: DateTime.now(),
-              ),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Limite de IA atingido'), findsOneWidget);
-      expect(
-        find.text('Voce usou sua analise de IA gratuita hoje.'),
-        findsOneWidget,
-      );
-      expect(find.text('Assistir anuncio para +1 analise'), findsOneWidget);
-      expect(find.text('Assinar Premium'), findsOneWidget);
-    });
-
-    testWidgets('shows conditional AI chat and history CTAs from check-in insight', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _testApp(
-          checkInRepository: _FakeCheckInRepository(
-            items: [
-              CheckIn(
-                id: 12,
-                userId: 'user-123',
-                mood: 'ansioso',
-                reflection: 'muita coisa',
-                energyLevel: 9,
-                recommendedPractice: 'Escolha uma prioridade.',
-                aiInsight: _insight(
-                  shouldSuggestAIChat: true,
-                  shouldSuggestHistoryAnalysis: true,
-                ),
-                createdAt: DateTime.now(),
-              ),
-            ],
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Conversar com IA'), findsOneWidget);
-      expect(find.text('Ver analise do historico'), findsOneWidget);
-    });
-
     testWidgets('opens rhythm details with personal metrics', (tester) async {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
@@ -214,58 +146,6 @@ void main() {
       expect(find.text('Comece pelo seu estado agora'), findsOneWidget);
       expect(find.text('Proximo passo'), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('shows local loading while quick check-in is being saved', (
-      tester,
-    ) async {
-      final createCompleter = Completer<CheckIn>();
-      await tester.pumpWidget(
-        _testApp(
-          checkInRepository: _FakeCheckInRepository(
-            createHandler: ({
-              required mood,
-              reflection,
-              required energyLevel,
-              emotion,
-              intensity,
-              energy,
-              context,
-              note,
-            }) {
-              return createCompleter.future;
-            },
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.ensureVisible(find.text('Fazer check-in'));
-      await tester.tap(find.text('Fazer check-in'));
-      await tester.pump();
-
-      expect(find.text('Salvando...'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsWidgets);
-      final loadingButton = tester.widget<ElevatedButton>(
-        find.byKey(const Key('home-checkin-submit-button')),
-      );
-      expect(loadingButton.onPressed, isNull);
-
-      createCompleter.complete(
-        CheckIn(
-          id: 99,
-          userId: 'user-123',
-          mood: 'calmo',
-          reflection: '',
-          energyLevel: 7,
-          recommendedPractice: 'Respire por dois minutos.',
-          aiInsight: _insight(),
-          createdAt: DateTime.now(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Fazer check-in'), findsOneWidget);
     });
   });
 }
@@ -297,7 +177,6 @@ Widget _testApp({
             onOpenFeed: () {},
             onOpenCommunity: () {},
             onOpenProfile: () {},
-            onOpenMentor: () {},
           ),
         ),
       ),
@@ -305,24 +184,10 @@ Widget _testApp({
   );
 }
 
-typedef _CreateCheckInHandler =
-    Future<CheckIn> Function({
-      required String mood,
-      String? reflection,
-      required int energyLevel,
-      String? emotion,
-      int? intensity,
-      String? energy,
-      String? context,
-      String? note,
-    });
-
 class _FakeCheckInRepository implements CheckInRepository {
-  _FakeCheckInRepository({List<CheckIn>? items, this.createHandler})
-    : items = items ?? _checkIns();
+  _FakeCheckInRepository({List<CheckIn>? items}) : items = items ?? _checkIns();
 
   final List<CheckIn> items;
-  final _CreateCheckInHandler? createHandler;
 
   @override
   Future<PaginatedResponse<CheckIn>> list({
@@ -355,25 +220,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     required String mood,
     String? reflection,
     required int energyLevel,
-    String? emotion,
-    int? intensity,
-    String? energy,
-    String? context,
-    String? note,
   }) async {
-    final handler = createHandler;
-    if (handler != null) {
-      return handler(
-        mood: mood,
-        reflection: reflection,
-        energyLevel: energyLevel,
-        emotion: emotion,
-        intensity: intensity,
-        energy: energy,
-        context: context,
-        note: note,
-      );
-    }
     return CheckIn(
       id: 99,
       userId: 'user-123',
@@ -509,12 +356,6 @@ CheckInAiInsight _insight({
   String insight =
       'Seu momento aponta para ansiedade leve e pede uma acao simples para recuperar clareza sem abrir muitas frentes agora.',
   bool fallbackUsed = false,
-  bool quotaLimited = false,
-  bool rewardedAdAvailable = false,
-  bool upgradeRecommended = false,
-  String? limitMessage,
-  bool shouldSuggestAIChat = false,
-  bool shouldSuggestHistoryAnalysis = false,
 }) {
   return CheckInAiInsight(
     insight: insight,
@@ -529,17 +370,6 @@ CheckInAiInsight _insight({
     journeyPlan: null,
     generatedTrailDraft: null,
     fallbackUsed: fallbackUsed,
-    quotaLimited: quotaLimited,
-    rewardedAdAvailable: rewardedAdAvailable,
-    upgradeRecommended: upgradeRecommended,
-    limitMessage: limitMessage,
-    emotionalStateLabel: 'mente acelerada',
-    shortInsight: insight,
-    nextStep: 'Escolha uma unica prioridade para os proximos 10 minutos.',
-    severityLevel: 'medium',
-    tags: const ['ansiedade', 'organizacao'],
-    shouldSuggestAIChat: shouldSuggestAIChat,
-    shouldSuggestHistoryAnalysis: shouldSuggestHistoryAnalysis,
   );
 }
 

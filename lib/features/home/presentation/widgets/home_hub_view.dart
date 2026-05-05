@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
-import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
@@ -26,7 +25,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenFeed,
     required this.onOpenCommunity,
     required this.onOpenProfile,
-    required this.onOpenMentor,
+    this.onOpenPremium,
   });
 
   final int profilesCount;
@@ -38,7 +37,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenProfile;
-  final VoidCallback onOpenMentor;
+  final VoidCallback? onOpenPremium;
 
   @override
   ConsumerState<HomeHubView> createState() => _HomeHubViewState();
@@ -50,11 +49,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   final _reflectionController = TextEditingController();
   String _selectedMood = 'Calmo';
   double _energyLevel = 7;
-  double _intensityLevel = 5;
-  String _selectedEnergy = 'média';
-  String _selectedContext = 'trabalho';
-  bool _isRewardLoading = false;
   bool _isSubmittingCheckIn = false;
+  bool _isRewardLoading = false;
 
   @override
   void initState() {
@@ -102,13 +98,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
                 ? null
                 : _reflectionController.text.trim(),
             energyLevel: _energyLevel.round(),
-            emotion: _selectedMood.toLowerCase(),
-            intensity: _intensityLevel.round(),
-            energy: _selectedEnergy,
-            context: _selectedContext,
-            note: _reflectionController.text.trim().isEmpty
-                ? null
-                : _reflectionController.text.trim(),
           );
 
       if (!mounted) {
@@ -116,23 +105,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
 
       _reflectionController.clear();
-
-      final latestInsight = ref
-          .read(checkInControllerProvider)
-          .asData
-          ?.value
-          .latestCreatedCheckIn
-          ?.aiInsight;
-      if (latestInsight?.quotaLimited == true) {
-        AppSnackBar.show(
-          context,
-          message:
-              latestInsight?.limitMessage ??
-              'Check-in salvo. Seu limite de IA de hoje foi atingido.',
-          icon: Icons.lock_clock_rounded,
-        );
-        return;
-      }
 
       AppSnackBar.show(
         context,
@@ -144,6 +116,41 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         setState(() => _isSubmittingCheckIn = false);
       }
     }
+  }
+
+  void _openMoodPicker(List<CheckIn> recentItems, CheckInAiInsight? insight) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) => _MoodPickerSheet(
+        recentItems: recentItems,
+        suggestedInsight: insight,
+        selectedMood: _selectedMood,
+        onSelected: (mood) {
+          setState(() => _selectedMood = mood);
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+  }
+
+  void _openInsightSheet(CheckInAiInsight insight) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) => _BriefingBottomSheet(
+        title: 'Analise completa',
+        child: CheckInAiInsightCard(
+          insight: insight,
+          onOpenTrails: widget.onOpenTrails,
+          isRewardLoading: _isRewardLoading,
+          onWatchRewardedAd: _watchRewardedAd,
+          onOpenPremium: widget.onOpenPremium,
+        ),
+      ),
+    );
   }
 
   Future<void> _watchRewardedAd() async {
@@ -178,8 +185,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message:
-            'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
+        message: 'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -187,59 +193,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         setState(() => _isRewardLoading = false);
       }
     }
-  }
-
-  void _openMoodPicker(List<CheckIn> recentItems, CheckInAiInsight? insight) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => _MoodPickerSheet(
-        recentItems: recentItems,
-        suggestedInsight: insight,
-        selectedMood: _selectedMood,
-        onSelected: (mood) {
-          setState(() => _selectedMood = mood);
-          Navigator.of(context).pop();
-        },
-      ),
-    );
-  }
-
-  void _openInsightSheet(CheckInAiInsight insight) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => _BriefingBottomSheet(
-        title: 'Analise completa',
-        child: CheckInAiInsightCard(
-          insight: insight,
-          onOpenTrails: widget.onOpenTrails,
-          onOpenAIChat: insight.shouldSuggestAIChat ? widget.onOpenMentor : null,
-          onOpenHistoryAnalysis: insight.shouldSuggestHistoryAnalysis
-              ? () {
-                  Navigator.of(context).pop();
-                  final checkInState = ref.read(checkInControllerProvider);
-                  final items =
-                      checkInState.asData?.value.result.items ??
-                      const <CheckIn>[];
-                  _openRhythmDetails(
-                    _RhythmSummary.fromItems(
-                      items,
-                      fallbackEnergy: _energyLevel.round(),
-                      activeJourneyTitle: null,
-                    ),
-                    items,
-                  );
-                }
-              : null,
-          onWatchRewardedAd: _watchRewardedAd,
-          onOpenPremium: widget.onOpenProfile,
-          isRewardLoading: _isRewardLoading,
-        ),
-      ),
-    );
   }
 
   void _openRhythmDetails(_RhythmSummary summary, List<CheckIn> recentItems) {
@@ -309,9 +262,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       children: [
         _CheckInBriefingCard(
           selectedMood: _selectedMood,
-          intensityLevel: _intensityLevel,
-          selectedEnergy: _selectedEnergy,
-          selectedContext: _selectedContext,
+          energyLevel: _energyLevel,
           reflectionController: _reflectionController,
           quickMoodOptions: _quickMoodOptions,
           isLoading:
@@ -319,17 +270,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
               (checkInState.isLoading && !checkInState.hasValue),
           onMoodSelected: (mood) => setState(() => _selectedMood = mood),
           onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
-          onIntensityChanged: (value) =>
-              setState(() => _intensityLevel = value),
-          onEnergyLabelChanged: (value) => setState(() {
-            _selectedEnergy = value;
-            _energyLevel = switch (value) {
-              'baixa' => 2,
-              'alta' => 9,
-              _ => 6,
-            };
-          }),
-          onContextChanged: (value) => setState(() => _selectedContext = value),
+          onEnergyChanged: (value) => setState(() => _energyLevel = value),
           onSubmit: _submitQuickCheckIn,
         ),
         const SizedBox(height: 22),
@@ -338,16 +279,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenFullAnalysis: latestInsight == null
               ? null
               : () => _openInsightSheet(latestInsight),
-          onOpenAIChat: latestInsight?.shouldSuggestAIChat == true
-              ? widget.onOpenMentor
-              : null,
-          onOpenHistoryAnalysis:
-              latestInsight?.shouldSuggestHistoryAnalysis == true
-              ? () => _openRhythmDetails(rhythmSummary, recentItems)
-              : null,
-          onWatchRewardedAd: _watchRewardedAd,
-          onOpenPremium: widget.onOpenProfile,
-          isRewardLoading: _isRewardLoading,
         ),
         const SizedBox(height: 24),
         _NextStepHeroCard(
@@ -379,32 +310,24 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
 class _CheckInBriefingCard extends StatelessWidget {
   const _CheckInBriefingCard({
     required this.selectedMood,
-    required this.intensityLevel,
-    required this.selectedEnergy,
-    required this.selectedContext,
+    required this.energyLevel,
     required this.reflectionController,
     required this.quickMoodOptions,
     required this.isLoading,
     required this.onMoodSelected,
     required this.onOpenMoodPicker,
-    required this.onIntensityChanged,
-    required this.onEnergyLabelChanged,
-    required this.onContextChanged,
+    required this.onEnergyChanged,
     required this.onSubmit,
   });
 
   final String selectedMood;
-  final double intensityLevel;
-  final String selectedEnergy;
-  final String selectedContext;
+  final double energyLevel;
   final TextEditingController reflectionController;
   final List<String> quickMoodOptions;
   final bool isLoading;
   final ValueChanged<String> onMoodSelected;
   final VoidCallback onOpenMoodPicker;
-  final ValueChanged<double> onIntensityChanged;
-  final ValueChanged<String> onEnergyLabelChanged;
-  final ValueChanged<String> onContextChanged;
+  final ValueChanged<double> onEnergyChanged;
   final VoidCallback onSubmit;
 
   @override
@@ -451,7 +374,7 @@ class _CheckInBriefingCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Intensidade do momento: ${intensityLevel.round()}/10',
+            'Energia percebida: ${energyLevel.round()}/10',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
@@ -460,56 +383,8 @@ class _CheckInBriefingCard extends StatelessWidget {
             min: 1,
             max: 10,
             divisions: 9,
-            value: intensityLevel,
-            onChanged: onIntensityChanged,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Energia percebida',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 10),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'baixa', label: Text('Baixa')),
-              ButtonSegment(value: 'média', label: Text('Média')),
-              ButtonSegment(value: 'alta', label: Text('Alta')),
-            ],
-            selected: {selectedEnergy},
-            onSelectionChanged: (values) =>
-                onEnergyLabelChanged(values.first),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Contexto principal',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              'trabalho',
-              'família',
-              'relacionamento',
-              'saúde',
-              'estudos',
-              'financeiro',
-              'social',
-              'outro',
-            ]
-                .map(
-                  (item) => ChoiceChip(
-                    label: Text(item),
-                    selected: selectedContext == item,
-                    onSelected: (_) => onContextChanged(item),
-                  ),
-                )
-                .toList(),
+            value: energyLevel,
+            onChanged: onEnergyChanged,
           ),
           const SizedBox(height: 8),
           TextFormField(
@@ -525,7 +400,6 @@ class _CheckInBriefingCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            key: const Key('home-checkin-submit-button'),
             onPressed: isLoading ? null : onSubmit,
             icon: isLoading
                 ? const SizedBox.square(
@@ -533,7 +407,7 @@ class _CheckInBriefingCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.favorite_rounded),
-            label: Text(isLoading ? 'Salvando...' : 'Fazer check-in'),
+            label: const Text('Fazer check-in'),
           ),
         ],
       ),
@@ -545,20 +419,10 @@ class _InsightBriefingCard extends StatelessWidget {
   const _InsightBriefingCard({
     required this.insight,
     required this.onOpenFullAnalysis,
-    required this.onOpenAIChat,
-    required this.onOpenHistoryAnalysis,
-    required this.onWatchRewardedAd,
-    required this.onOpenPremium,
-    required this.isRewardLoading,
   });
 
   final CheckInAiInsight? insight;
   final VoidCallback? onOpenFullAnalysis;
-  final VoidCallback? onOpenAIChat;
-  final VoidCallback? onOpenHistoryAnalysis;
-  final VoidCallback onWatchRewardedAd;
-  final VoidCallback onOpenPremium;
-  final bool isRewardLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -601,40 +465,11 @@ class _InsightBriefingCard extends StatelessWidget {
                   ),
               ],
             ),
-            if (insight!.quotaLimited) ...[
-              const SizedBox(height: 14),
-              AiQuotaLimitCard(
-                message: insight!.limitMessage,
-                rewardedAdAvailable: insight!.rewardedAdAvailable,
-                upgradeRecommended: insight!.upgradeRecommended,
-                isRewardLoading: isRewardLoading,
-                onWatchRewardedAd: onWatchRewardedAd,
-                onOpenPremium: onOpenPremium,
-              ),
-            ],
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                TextButton.icon(
-                  onPressed: onOpenFullAnalysis,
-                  icon: const Icon(Icons.open_in_full_rounded),
-                  label: const Text('Ver analise completa'),
-                ),
-                if (onOpenAIChat != null)
-                  OutlinedButton.icon(
-                    onPressed: onOpenAIChat,
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    label: const Text('Conversar com IA'),
-                  ),
-                if (onOpenHistoryAnalysis != null)
-                  OutlinedButton.icon(
-                    onPressed: onOpenHistoryAnalysis,
-                    icon: const Icon(Icons.timeline_rounded),
-                    label: const Text('Ver analise do historico'),
-                  ),
-              ],
+            TextButton.icon(
+              onPressed: onOpenFullAnalysis,
+              icon: const Icon(Icons.open_in_full_rounded),
+              label: const Text('Ver analise completa'),
             ),
           ],
         ],
@@ -644,10 +479,10 @@ class _InsightBriefingCard extends StatelessWidget {
 
   String _summaryFromInsight(CheckInAiInsight? insight) {
     if (insight == null) {
-      return 'Depois do proximo check-in, o Evolua resume o momento e transforma a leitura em uma acao simples.';
+      return 'Depois do proximo check-in, a IA resume o momento e transforma a leitura em uma acao simples.';
     }
 
-    final text = (insight.shortInsight ?? insight.insight).trim();
+    final text = insight.insight.trim();
     if (text.length <= 180) {
       return text;
     }
