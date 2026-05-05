@@ -327,28 +327,10 @@ class _NextStepHeroCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(description, style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _SoftChip(
-                icon: Icons.schedule_rounded,
-                label: meta.duration,
-                color: AppColors.accent,
-              ),
-              _SoftChip(
-                icon: Icons.lightbulb_outline_rounded,
-                label: meta.benefit,
-                color: AppColors.accentWarm,
-              ),
-              _SoftChip(
-                icon: Icons.auto_awesome_rounded,
-                label: meta.reason,
-                color: AppColors.accentGold,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
+          _PaceMetadataLine(duration: meta.duration, benefit: meta.benefit),
+          const SizedBox(height: 10),
+          _PaceStatusBadge(label: meta.reason),
+          const SizedBox(height: 30),
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -364,6 +346,109 @@ class _NextStepHeroCard extends StatelessWidget {
                 label: const Text('Espacos'),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaceMetadataLine extends StatelessWidget {
+  const _PaceMetadataLine({required this.duration, required this.benefit});
+
+  final String duration;
+  final String benefit;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: AppColors.textSecondary.withValues(alpha: 0.78),
+      fontWeight: FontWeight.w500,
+    );
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _PaceMetadataItem(
+          icon: Icons.schedule_rounded,
+          label: duration,
+          style: style,
+        ),
+        Text(
+          '-',
+          style: style?.copyWith(
+            color: AppColors.textSecondary.withValues(alpha: 0.48),
+          ),
+        ),
+        _PaceMetadataItem(
+          icon: Icons.lightbulb_outline_rounded,
+          label: benefit,
+          style: style,
+        ),
+      ],
+    );
+  }
+}
+
+class _PaceMetadataItem extends StatelessWidget {
+  const _PaceMetadataItem({
+    required this.icon,
+    required this.label,
+    required this.style,
+  });
+
+  final IconData icon;
+  final String label;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color: AppColors.textSecondary.withValues(alpha: 0.68),
+        ),
+        const SizedBox(width: 5),
+        Text(label, style: style),
+      ],
+    );
+  }
+}
+
+class _PaceStatusBadge extends StatelessWidget {
+  const _PaceStatusBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: AppColors.surfaceStrong.withValues(alpha: 0.18),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.auto_awesome_rounded,
+            size: 13,
+            color: AppColors.textSecondary.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary.withValues(alpha: 0.82),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

@@ -12,7 +12,6 @@ import 'package:evolua_frontend/features/social/application/community_controller
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
-import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
@@ -334,7 +333,7 @@ class _DashboardContent extends ConsumerWidget {
             onOpenProfileSection(ProfileModuleSection.overview),
         onOpenCheckIn: () => context.push('/check-in'),
         onOpenPremium: () =>
-            onOpenProfileSection(ProfileModuleSection.overview),
+            onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),
@@ -353,7 +352,7 @@ class _DashboardContent extends ConsumerWidget {
       MentorEvoluaModuleView(
         onOpenTrails: () => onNavigate(1),
         onOpenPremium: () =>
-            onOpenProfileSection(ProfileModuleSection.overview),
+            onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
       _ProfileArea(section: profileSection),
     ];
@@ -479,13 +478,7 @@ class _ProfileArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ProfileModuleView(section: section),
-        const SizedBox(height: 16),
-        const SubscriptionModuleView(),
-      ],
-    );
+    return ProfileModuleView(section: section);
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
+import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
@@ -16,6 +17,7 @@ enum ProfileModuleSection {
   helpSupport,
   displayAccessibility,
   feedback,
+  plansSubscriptions,
 }
 
 class ProfileModuleView extends ConsumerStatefulWidget {
@@ -224,6 +226,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
             onPickBirthDate: _pickBirthDate,
             onSubmit: _saveProfile,
           )
+        else if (_section == ProfileModuleSection.plansSubscriptions)
+          const SubscriptionModuleView()
         else
           _SectionPanel(
             title: _sectionLabel(_section),
@@ -236,6 +240,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 'Centralize preferencias de leitura, foco visual e conforto de uso nesta tela.',
               ProfileModuleSection.feedback =>
                 'Registre sugestoes e percepcoes sobre a experiencia do app sem sair do seu espaco.',
+              ProfileModuleSection.plansSubscriptions =>
+                'Gerencie seu plano atual e as opcoes de assinatura.',
               ProfileModuleSection.overview =>
                 'Visao geral do seu perfil e dos dados principais da sua conta.',
             },
@@ -579,5 +585,6 @@ String _sectionLabel(ProfileModuleSection section) {
     ProfileModuleSection.helpSupport => 'Ajuda e suporte',
     ProfileModuleSection.displayAccessibility => 'Tela e acessibilidade',
     ProfileModuleSection.feedback => 'Dar feedback',
+    ProfileModuleSection.plansSubscriptions => 'Planos e assinaturas',
   };
 }
