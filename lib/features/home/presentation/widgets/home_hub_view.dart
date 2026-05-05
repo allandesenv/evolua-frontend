@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
@@ -25,6 +24,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenFeed,
     required this.onOpenCommunity,
     required this.onOpenProfile,
+    required this.onOpenCheckIn,
     this.onOpenPremium,
   });
 
@@ -37,6 +37,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenProfile;
+  final VoidCallback onOpenCheckIn;
   final VoidCallback? onOpenPremium;
 
   @override
@@ -44,96 +45,7 @@ class HomeHubView extends ConsumerStatefulWidget {
 }
 
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
-  static const _quickMoodOptions = ['Calmo', 'Ansioso', 'Cansado', 'Distraido'];
-
-  final _reflectionController = TextEditingController();
-  String _selectedMood = 'Calmo';
-  double _energyLevel = 7;
-  bool _isSubmittingCheckIn = false;
   bool _isRewardLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    ref.listenManual(checkInControllerProvider, (previous, next) {
-      if (!next.hasError || !mounted) {
-        return;
-      }
-
-      final error = next.error;
-      final message = error is DioException
-          ? (error.response?.data is Map<String, dynamic>
-                ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                      error.message ??
-                      'Nao foi possivel salvar o check-in.')
-                : error.message ?? 'Nao foi possivel salvar o check-in.')
-          : 'Nao foi possivel salvar o check-in.';
-
-      AppSnackBar.show(
-        context,
-        message: message,
-        icon: Icons.favorite_border_rounded,
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _reflectionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submitQuickCheckIn() async {
-    if (_isSubmittingCheckIn) {
-      return;
-    }
-
-    setState(() => _isSubmittingCheckIn = true);
-    try {
-      await ref
-          .read(checkInControllerProvider.notifier)
-          .create(
-            mood: _selectedMood.toLowerCase(),
-            reflection: _reflectionController.text.trim().isEmpty
-                ? null
-                : _reflectionController.text.trim(),
-            energyLevel: _energyLevel.round(),
-          );
-
-      if (!mounted) {
-        return;
-      }
-
-      _reflectionController.clear();
-
-      AppSnackBar.show(
-        context,
-        message: 'Check-in registrado. Continue no seu ritmo.',
-        icon: Icons.check_circle_outline_rounded,
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmittingCheckIn = false);
-      }
-    }
-  }
-
-  void _openMoodPicker(List<CheckIn> recentItems, CheckInAiInsight? insight) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => _MoodPickerSheet(
-        recentItems: recentItems,
-        suggestedInsight: insight,
-        selectedMood: _selectedMood,
-        onSelected: (mood) {
-          setState(() => _selectedMood = mood);
-          Navigator.of(context).pop();
-        },
-      ),
-    );
-  }
 
   void _openInsightSheet(CheckInAiInsight insight) {
     showModalBottomSheet<void>(
@@ -185,7 +97,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: 'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
+        message:
+            'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -222,7 +135,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
             .firstOrNull;
     final rhythmSummary = _RhythmSummary.fromItems(
       recentItems,
-      fallbackEnergy: _energyLevel.round(),
+      fallbackEnergy: 7,
       activeJourneyTitle: currentJourney?.title,
     );
 
@@ -238,7 +151,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final paceAction = switch (widget.trailsCount) {
       _ when currentJourney != null => widget.onOpenTrails,
       0 => widget.onOpenTrails,
-      _ when widget.checkInsCount == 0 => _submitQuickCheckIn,
+      _ when widget.checkInsCount == 0 => widget.onOpenCheckIn,
       _ when widget.postsCount == 0 => widget.onOpenFeed,
       _ => widget.onOpenTrails,
     };
@@ -260,20 +173,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _CheckInBriefingCard(
-          selectedMood: _selectedMood,
-          energyLevel: _energyLevel,
-          reflectionController: _reflectionController,
-          quickMoodOptions: _quickMoodOptions,
-          isLoading:
-              _isSubmittingCheckIn ||
-              (checkInState.isLoading && !checkInState.hasValue),
-          onMoodSelected: (mood) => setState(() => _selectedMood = mood),
-          onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
-          onEnergyChanged: (value) => setState(() => _energyLevel = value),
-          onSubmit: _submitQuickCheckIn,
-        ),
-        const SizedBox(height: 22),
         _InsightBriefingCard(
           insight: latestInsight,
           onOpenFullAnalysis: latestInsight == null
@@ -303,114 +202,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenProfile: widget.onOpenProfile,
         ),
       ],
-    );
-  }
-}
-
-class _CheckInBriefingCard extends StatelessWidget {
-  const _CheckInBriefingCard({
-    required this.selectedMood,
-    required this.energyLevel,
-    required this.reflectionController,
-    required this.quickMoodOptions,
-    required this.isLoading,
-    required this.onMoodSelected,
-    required this.onOpenMoodPicker,
-    required this.onEnergyChanged,
-    required this.onSubmit,
-  });
-
-  final String selectedMood;
-  final double energyLevel;
-  final TextEditingController reflectionController;
-  final List<String> quickMoodOptions;
-  final bool isLoading;
-  final ValueChanged<String> onMoodSelected;
-  final VoidCallback onOpenMoodPicker;
-  final ValueChanged<double> onEnergyChanged;
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return PrimaryPanel(
-      semanticLabel: 'Check-in do dia',
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(
-            eyebrow: 'Como estou?',
-            title: 'Comece pelo seu estado agora',
-            subtitle:
-                'Um check-in curto ja da contexto para o seu briefing do dia.',
-            accentColor: AppColors.accent,
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              ...quickMoodOptions.map(
-                (mood) => ChoiceChip(
-                  label: Text(mood),
-                  selected: selectedMood == mood,
-                  onSelected: (_) => onMoodSelected(mood),
-                ),
-              ),
-              ActionChip(
-                tooltip: 'Ver mais estados',
-                avatar: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Mais estados'),
-                onPressed: onOpenMoodPicker,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Estado selecionado: $selectedMood',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Energia percebida: ${energyLevel.round()}/10',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
-          ),
-          Slider(
-            min: 1,
-            max: 10,
-            divisions: 9,
-            value: energyLevel,
-            onChanged: onEnergyChanged,
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: reflectionController,
-            minLines: 2,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Se quiser, conte o motivo',
-              hintText: 'Uma frase simples ajuda a leitura ficar mais precisa.',
-              alignLabelWithHint: true,
-              prefixIcon: Icon(Icons.edit_note_rounded),
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: isLoading ? null : onSubmit,
-            icon: isLoading
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.favorite_rounded),
-            label: const Text('Fazer check-in'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -650,189 +441,6 @@ class _RhythmBriefingCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _MoodPickerSheet extends StatefulWidget {
-  const _MoodPickerSheet({
-    required this.recentItems,
-    required this.suggestedInsight,
-    required this.selectedMood,
-    required this.onSelected,
-  });
-
-  final List<CheckIn> recentItems;
-  final CheckInAiInsight? suggestedInsight;
-  final String selectedMood;
-  final ValueChanged<String> onSelected;
-
-  @override
-  State<_MoodPickerSheet> createState() => _MoodPickerSheetState();
-}
-
-class _MoodPickerSheetState extends State<_MoodPickerSheet> {
-  final _searchController = TextEditingController();
-  String _query = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final recentMoods = widget.recentItems
-        .map((item) => _capitalize(item.mood))
-        .where((mood) => mood.isNotEmpty)
-        .toSet()
-        .take(4)
-        .toList();
-    final suggestedMoods = _suggestedMoods(widget.suggestedInsight);
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 18,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.82,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _BottomSheetHandle(),
-                Text(
-                  'Escolha um estado',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    labelText: 'Buscar estado',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (value) => setState(() => _query = value),
-                ),
-                if (recentMoods.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  _MoodGroup(
-                    title: 'Recentes',
-                    moods: _filterMoods(recentMoods),
-                    selectedMood: widget.selectedMood,
-                    onSelected: widget.onSelected,
-                  ),
-                ],
-                if (suggestedMoods.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  _MoodGroup(
-                    title: 'Sugeridos pela IA',
-                    moods: _filterMoods(suggestedMoods),
-                    selectedMood: widget.selectedMood,
-                    onSelected: widget.onSelected,
-                  ),
-                ],
-                ..._moodGroups.entries.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(top: 18),
-                    child: _MoodGroup(
-                      title: entry.key,
-                      moods: _filterMoods(entry.value),
-                      selectedMood: widget.selectedMood,
-                      onSelected: widget.onSelected,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<String> _filterMoods(List<String> moods) {
-    final normalizedQuery = _query.trim().toLowerCase();
-    if (normalizedQuery.isEmpty) {
-      return moods;
-    }
-
-    return moods
-        .where((mood) => mood.toLowerCase().contains(normalizedQuery))
-        .toList();
-  }
-
-  List<String> _suggestedMoods(CheckInAiInsight? insight) {
-    final source = [
-      insight?.insight ?? '',
-      insight?.suggestedAction ?? '',
-      insight?.suggestedTrailReason ?? '',
-    ].join(' ').toLowerCase();
-
-    final matches = <String>[];
-    for (final moods in _moodGroups.values) {
-      for (final mood in moods) {
-        if (source.contains(mood.toLowerCase())) {
-          matches.add(mood);
-        }
-      }
-    }
-
-    return matches.toSet().take(4).toList();
-  }
-}
-
-class _MoodGroup extends StatelessWidget {
-  const _MoodGroup({
-    required this.title,
-    required this.moods,
-    required this.selectedMood,
-    required this.onSelected,
-  });
-
-  final String title;
-  final List<String> moods;
-  final String selectedMood;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    if (moods.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: moods
-              .map(
-                (mood) => ChoiceChip(
-                  label: Text(mood),
-                  selected: selectedMood == mood,
-                  onSelected: (_) => onSelected(mood),
-                ),
-              )
-              .toList(),
-        ),
-      ],
     );
   }
 }
@@ -1236,35 +844,6 @@ class _RhythmSummary {
     );
   }
 }
-
-const _moodGroups = {
-  'Emocionais': [
-    'Calmo',
-    'Ansioso',
-    'Triste',
-    'Animado',
-    'Irritado',
-    'Esperancoso',
-    'Sobrecarregado',
-  ],
-  'Mentais': [
-    'Distraido',
-    'Focado',
-    'Confuso',
-    'Criativo',
-    'Acelerado',
-    'Travado',
-  ],
-  'Fisicos': ['Cansado', 'Energizado', 'Tenso', 'Leve', 'Sonolento', 'Agitado'],
-  'Comportamentais': [
-    'Evitando',
-    'Produtivo',
-    'Isolado',
-    'Conectado',
-    'Procrastinando',
-    'Constante',
-  ],
-};
 
 String _dominantMood(List<CheckIn> items) {
   final counts = <String, int>{};

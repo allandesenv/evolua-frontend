@@ -1,4 +1,4 @@
-﻿import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
@@ -22,50 +22,18 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Como estou?'), findsOneWidget);
       expect(find.text('O que isso significa?'), findsOneWidget);
       expect(find.text('O que faco agora?'), findsOneWidget);
       expect(find.text('Como anda meu ritmo?'), findsOneWidget);
 
-      final checkInTop = tester.getTopLeft(find.text('Como estou?')).dy;
       final insightTop = tester
           .getTopLeft(find.text('O que isso significa?'))
           .dy;
       final nextStepTop = tester.getTopLeft(find.text('O que faco agora?')).dy;
       final rhythmTop = tester.getTopLeft(find.text('Como anda meu ritmo?')).dy;
 
-      expect(checkInTop, lessThan(insightTop));
       expect(insightTop, lessThan(nextStepTop));
       expect(nextStepTop, lessThan(rhythmTop));
-    });
-
-    testWidgets('shows four quick moods and expands additional mood groups', (
-      tester,
-    ) async {
-      await tester.pumpWidget(_testApp());
-      await tester.pumpAndSettle();
-
-      expect(find.text('Calmo'), findsOneWidget);
-      expect(find.text('Ansioso'), findsOneWidget);
-      expect(find.text('Cansado'), findsOneWidget);
-      expect(find.text('Distraido'), findsOneWidget);
-      expect(find.text('Mais estados'), findsOneWidget);
-      expect(find.text('Focado'), findsNothing);
-
-      await tester.tap(find.text('Mais estados'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Buscar estado'), findsOneWidget);
-      expect(find.text('Emocionais'), findsOneWidget);
-      expect(find.text('Mentais'), findsOneWidget);
-      expect(find.text('Fisicos'), findsOneWidget);
-      expect(find.text('Comportamentais'), findsOneWidget);
-
-      await tester.ensureVisible(find.text('Focado'));
-      await tester.tap(find.text('Focado'), warnIfMissed: false);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Estado selecionado: Focado'), findsOneWidget);
     });
 
     testWidgets('opens full intelligent analysis from summarized card', (
@@ -143,7 +111,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Comece pelo seu estado agora'), findsOneWidget);
+      expect(find.text('Leitura inteligente'), findsOneWidget);
       expect(find.text('Proximo passo'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -177,6 +145,7 @@ Widget _testApp({
             onOpenFeed: () {},
             onOpenCommunity: () {},
             onOpenProfile: () {},
+            onOpenCheckIn: () {},
           ),
         ),
       ),

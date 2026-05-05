@@ -141,6 +141,69 @@ void main() {
       );
     });
 
+    testWidgets('manual check-in navigation preserves previous page', (
+      tester,
+    ) async {
+      final session = _testSession();
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(session.toJson()),
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FakeAuthRepository(googleSession: session),
+          ),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final authRouterNotifier = _bindAuthRouterNotifier(container);
+      addTearDown(authRouterNotifier.dispose);
+      final router = buildAppRouter(
+        authRouterNotifier: authRouterNotifier,
+        authPageBuilder: (context, state) =>
+            const _PlaceholderPage('auth-page'),
+        homePageBuilder: (context, state) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => context.push('/check-in'),
+              child: const Text('Fazer check-in'),
+            ),
+          ),
+        ),
+        checkInPageBuilder: (context, state) =>
+            const _PlaceholderPage('check-in-page'),
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('check-in-page'), findsOneWidget);
+      expect(
+        router.routerDelegate.currentConfiguration.last.matchedLocation,
+        '/check-in',
+      );
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fazer check-in'), findsOneWidget);
+      expect(
+        router.routerDelegate.currentConfiguration.last.matchedLocation,
+        '/home',
+      );
+    });
+
     testWidgets('google callback exchanges code and redirects to /home', (
       tester,
     ) async {
