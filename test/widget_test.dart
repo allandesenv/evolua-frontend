@@ -4,15 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('renders Evolua auth shell', (tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: EvoluaApp(),
-      ),
-    );
+    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
 
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Evolua'), findsWidgets);
-    expect(find.textContaining('Entre e continue sua jornada'), findsWidgets);
+    expect(find.text('Continue sua jornada'), findsWidgets);
+    expect(find.textContaining('Entre e continue sua jornada'), findsNothing);
   });
 }

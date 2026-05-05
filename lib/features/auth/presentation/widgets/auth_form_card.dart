@@ -1,6 +1,6 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
-import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
+import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/auth_form_validators.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_launcher_provider.dart';
@@ -240,230 +240,235 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading || _isSubmitting || _isOAuthStarting;
-    final theme = Theme.of(context);
-    final compact = ResponsiveBreakpoints.isCompact(context);
 
-    return PrimaryPanel(
-      padding: const EdgeInsets.all(28),
-      semanticLabel: 'Formulario de autenticacao',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: compact ? double.infinity : null,
-            child: SegmentedButton<bool>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment<bool>(
-                  value: false,
-                  icon: Icon(Icons.login_rounded),
-                  label: Text('Entrar'),
-                ),
-                ButtonSegment<bool>(
-                  value: true,
-                  icon: Icon(Icons.person_add_alt_1_rounded),
-                  label: Text('Criar conta'),
-                ),
-              ],
-              selected: {_isRegisterMode},
-              onSelectionChanged: isLoading
-                  ? null
-                  : (selection) => _switchMode(selection.first),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            _isRegisterMode
-                ? 'Crie sua conta e comece leve'
-                : 'Entre e continue sua jornada',
-            style: theme.textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _isRegisterMode
-                ? 'Cadastro direto, sem ruido, para voce chegar logo ao primeiro check-in.'
-                : 'Continue de onde parou com um login simples e sem excesso de passos.',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: isLoading ? null : _handleGoogleLogin,
-              icon: _isOAuthStarting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.account_circle_rounded),
-              label: const Text('Continuar com Google'),
-            ),
-          ),
-          const SizedBox(height: 24),
-          AutofillGroup(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  if (_isRegisterMode) ...[
-                    TextFormField(
-                      controller: _displayNameController,
-                      focusNode: _displayNameFocusNode,
-                      autofillHints: const [AutofillHints.name],
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome',
-                        hintText: 'Como voce quer ser chamado',
-                        prefixIcon: Icon(Icons.badge_rounded),
-                      ),
-                      validator: validateDisplayName,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 600;
+
+        return PrimaryPanel(
+          padding: EdgeInsets.all(compact ? 18 : 24),
+          semanticLabel: 'Formulario de autenticacao',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: compact ? double.infinity : null,
+                child: SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment<bool>(
+                      value: false,
+                      icon: Icon(Icons.login_rounded),
+                      label: Text('Entrar'),
                     ),
-                    const SizedBox(height: 16),
-                    Focus(
-                      focusNode: _birthDateFocusNode,
-                      child: InkWell(
-                        onTap: isLoading ? null : _pickBirthDate,
-                        borderRadius: BorderRadius.circular(18),
-                        child: InputDecorator(
-                          key: const Key('auth-birth-date-field'),
-                          decoration: InputDecoration(
-                            labelText: 'Data de nascimento',
-                            prefixIcon: const Icon(Icons.cake_rounded),
-                            errorText: _submitted ? _birthDateError : null,
+                    ButtonSegment<bool>(
+                      value: true,
+                      icon: Icon(Icons.person_add_alt_1_rounded),
+                      label: Text('Criar conta'),
+                    ),
+                  ],
+                  selected: {_isRegisterMode},
+                  onSelectionChanged: isLoading
+                      ? null
+                      : (selection) => _switchMode(selection.first),
+                ),
+              ),
+              SizedBox(height: compact ? 16 : 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : _handleGoogleLogin,
+                  icon: _isOAuthStarting
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.account_circle_rounded),
+                  label: const Text('Continuar com Google'),
+                ),
+              ),
+              SizedBox(height: compact ? 16 : 18),
+              AutofillGroup(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      if (_isRegisterMode) ...[
+                        TextFormField(
+                          controller: _displayNameController,
+                          focusNode: _displayNameFocusNode,
+                          autofillHints: const [AutofillHints.name],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Nome',
+                            hintText: 'Como voce quer ser chamado',
+                            prefixIcon: Icon(Icons.badge_rounded),
                           ),
-                          child: Text(
-                            _birthDate == null
-                                ? 'Selecione sua data'
-                                : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
+                          validator: validateDisplayName,
+                        ),
+                        SizedBox(height: compact ? 12 : 14),
+                        Focus(
+                          focusNode: _birthDateFocusNode,
+                          child: InkWell(
+                            onTap: isLoading ? null : _pickBirthDate,
+                            borderRadius: BorderRadius.circular(18),
+                            child: InputDecorator(
+                              key: const Key('auth-birth-date-field'),
+                              decoration: InputDecoration(
+                                labelText: 'Data de nascimento',
+                                prefixIcon: const Icon(Icons.cake_rounded),
+                                errorText: _submitted ? _birthDateError : null,
+                              ),
+                              child: Text(
+                                _birthDate == null
+                                    ? 'Selecione sua data'
+                                    : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _gender,
-                      decoration: const InputDecoration(
-                        labelText: 'Genero',
-                        prefixIcon: Icon(Icons.wc_rounded),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: genderMale,
-                          child: Text('Masculino'),
+                        SizedBox(height: compact ? 12 : 14),
+                        DropdownButtonFormField<String>(
+                          initialValue: _gender,
+                          decoration: const InputDecoration(
+                            labelText: 'Genero',
+                            prefixIcon: Icon(Icons.wc_rounded),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: genderMale,
+                              child: Text('Masculino'),
+                            ),
+                            DropdownMenuItem(
+                              value: genderFemale,
+                              child: Text('Feminino'),
+                            ),
+                            DropdownMenuItem(
+                              value: genderPreferNotToSay,
+                              child: Text('Prefiro nao informar'),
+                            ),
+                            DropdownMenuItem(
+                              value: genderCustom,
+                              child: Text('Personalizado'),
+                            ),
+                          ],
+                          validator: validateGender,
+                          onChanged: isLoading
+                              ? null
+                              : (value) {
+                                  setState(() => _gender = value ?? genderMale);
+                                },
                         ),
-                        DropdownMenuItem(
-                          value: genderFemale,
-                          child: Text('Feminino'),
-                        ),
-                        DropdownMenuItem(
-                          value: genderPreferNotToSay,
-                          child: Text('Prefiro nao informar'),
-                        ),
-                        DropdownMenuItem(
-                          value: genderCustom,
-                          child: Text('Personalizado'),
-                        ),
+                        if (_gender == genderCustom) ...[
+                          SizedBox(height: compact ? 12 : 14),
+                          TextFormField(
+                            controller: _customGenderController,
+                            focusNode: _customGenderFocusNode,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Como voce se identifica',
+                              hintText: 'Escreva do seu jeito',
+                              prefixIcon: Icon(Icons.edit_note_rounded),
+                            ),
+                            validator: (value) => validateCustomGender(
+                              selectedGender: _gender,
+                              customGender: value,
+                            ),
+                          ),
+                        ],
+                        SizedBox(height: compact ? 12 : 14),
                       ],
-                      validator: validateGender,
-                      onChanged: isLoading
-                          ? null
-                          : (value) {
-                              setState(() => _gender = value ?? genderMale);
-                            },
-                    ),
-                    if (_gender == genderCustom) ...[
-                      const SizedBox(height: 16),
                       TextFormField(
-                        controller: _customGenderController,
-                        focusNode: _customGenderFocusNode,
+                        controller: _emailController,
+                        focusNode: _emailFocusNode,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
-                          labelText: 'Como voce se identifica',
-                          hintText: 'Escreva do seu jeito',
-                          prefixIcon: Icon(Icons.edit_note_rounded),
+                          labelText: 'Email',
+                          hintText: 'voce@evolua.app',
+                          prefixIcon: Icon(Icons.alternate_email_rounded),
                         ),
-                        validator: (value) => validateCustomGender(
-                          selectedGender: _gender,
-                          customGender: value,
+                        validator: validateEmail,
+                      ),
+                      SizedBox(height: compact ? 12 : 14),
+                      TextFormField(
+                        controller: _passwordController,
+                        focusNode: _passwordFocusNode,
+                        obscureText: !_isPasswordVisible,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: InputDecoration(
+                          labelText: 'Senha',
+                          hintText: 'Minimo de 6 caracteres',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            tooltip: _isPasswordVisible
+                                ? 'Ocultar senha'
+                                : 'Mostrar senha',
+                            onPressed: () {
+                              setState(
+                                () => _isPasswordVisible = !_isPasswordVisible,
+                              );
+                            },
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                            ),
+                          ),
+                        ),
+                        validator: validatePassword,
+                      ),
+                      if (!_isRegisterMode) ...[
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 2,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            onPressed: isLoading ? null : _handleForgotPassword,
+                            child: const Text('Esqueci minha senha'),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: compact ? 16 : 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : _submit,
+                          key: const Key('auth-submit-button'),
+                          child: _isSubmitting && !_isOAuthStarting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  _isRegisterMode ? 'Criar conta' : 'Entrar',
+                                ),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 16),
-                  ],
-                  TextFormField(
-                    controller: _emailController,
-                    focusNode: _emailFocusNode,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'voce@evolua.app',
-                      prefixIcon: Icon(Icons.alternate_email_rounded),
-                    ),
-                    validator: validateEmail,
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    focusNode: _passwordFocusNode,
-                    obscureText: !_isPasswordVisible,
-                    autofillHints: const [AutofillHints.password],
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'Senha',
-                      hintText: 'Minimo de 6 caracteres',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        tooltip: _isPasswordVisible
-                            ? 'Ocultar senha'
-                            : 'Mostrar senha',
-                        onPressed: () {
-                          setState(
-                            () => _isPasswordVisible = !_isPasswordVisible,
-                          );
-                        },
-                        icon: Icon(
-                          _isPasswordVisible
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                        ),
-                      ),
-                    ),
-                    validator: validatePassword,
-                  ),
-                  if (!_isRegisterMode) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: isLoading ? null : _handleForgotPassword,
-                        child: const Text('Esqueci minha senha'),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isLoading ? null : _submit,
-                      key: const Key('auth-submit-button'),
-                      child: _isSubmitting && !_isOAuthStarting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(_isRegisterMode ? 'Criar conta' : 'Entrar'),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

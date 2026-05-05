@@ -10,6 +10,12 @@ class CheckIn {
     required this.recommendedPractice,
     required this.aiInsight,
     required this.createdAt,
+    this.emotion,
+    this.intensity,
+    this.energy,
+    this.context,
+    this.decisionTags,
+    this.severityLevel,
   });
 
   final int id;
@@ -20,4 +26,10 @@ class CheckIn {
   final String recommendedPractice;
   final CheckInAiInsight? aiInsight;
   final DateTime createdAt;
+  final String? emotion;
+  final int? intensity;
+  final String? energy;
+  final String? context;
+  final String? decisionTags;
+  final String? severityLevel;
 }

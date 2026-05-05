@@ -157,6 +157,14 @@ void main() {
         await tester.tap(find.text('Esqueci minha senha'));
         await tester.pumpAndSettle();
         expect(find.textContaining('recuperacao de senha'), findsOneWidget);
+
+        final forgotButton = tester.widget<TextButton>(
+          find.widgetWithText(TextButton, 'Esqueci minha senha'),
+        );
+        expect(
+          forgotButton.style?.tapTargetSize,
+          MaterialTapTargetSize.shrinkWrap,
+        );
       },
     );
 
@@ -290,6 +298,33 @@ void main() {
         expect(find.text('Informe como voce se identifica.'), findsOneWidget);
       },
     );
+
+    testWidgets('renders compact mobile auth page without duplicate title', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.binding.setSurfaceSize(const Size(390, 780));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _authPageTestApp(repository: _FakeAuthRepository()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Evolua'), findsOneWidget);
+      expect(find.text('Continue sua jornada'), findsOneWidget);
+      expect(find.text('Entre e continue sua jornada'), findsNothing);
+      expect(find.text('Check-in rapido'), findsNothing);
+      expect(find.text('Trilhas curtas'), findsNothing);
+      expect(find.text('Reflexoes do momento'), findsNothing);
+      expect(
+        find.widgetWithText(OutlinedButton, 'Continuar com Google'),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Senha'), findsOneWidget);
+      expect(find.byKey(const Key('auth-submit-button')), findsOneWidget);
+    });
   });
 }
 
@@ -347,6 +382,16 @@ Widget _testApp({
         ),
       ),
     ),
+  );
+}
+
+Widget _authPageTestApp({required _FakeAuthRepository repository}) {
+  return ProviderScope(
+    overrides: [
+      authRepositoryProvider.overrideWithValue(repository),
+      profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+    ],
+    child: const MaterialApp(home: AuthPage()),
   );
 }
 

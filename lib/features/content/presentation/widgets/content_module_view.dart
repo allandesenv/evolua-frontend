@@ -221,6 +221,15 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         );
   }
 
+  void _selectSection(ContentModuleSection section) {
+    setState(() {
+      _section = section;
+      if (section == ContentModuleSection.catalog) {
+        _selectedCatalogTrail = null;
+      }
+    });
+  }
+
   List<TrailMediaLink> _buildMediaLinks() {
     return _mediaLinks
         .where((item) => item.urlController.text.trim().isNotEmpty)
@@ -281,6 +290,8 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                 ? const SizedBox.shrink()
                 : _CurrentJourneyPanel(
                     trail: trail,
+                    onOpenCatalog: () =>
+                        _selectSection(ContentModuleSection.catalog),
                     onOpenMentor: widget.onOpenMentor,
                   ),
             error: (_, _) => const SizedBox.shrink(),
@@ -346,6 +357,14 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
 
         return Column(
           children: [
+            if (widget.showSectionChips) ...[
+              _ContentSectionSwitcher(
+                selected: _section,
+                hasActiveJourney: currentTrail != null,
+                onSelected: _selectSection,
+              ),
+              const SizedBox(height: 16),
+            ],
             if (isAdmin) ...[
               ConstrainedBox(
                 constraints: BoxConstraints(
@@ -392,6 +411,101 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   }
 }
 
+class _ContentSectionSwitcher extends StatelessWidget {
+  const _ContentSectionSwitcher({
+    required this.selected,
+    required this.hasActiveJourney,
+    required this.onSelected,
+  });
+
+  final ContentModuleSection selected;
+  final bool hasActiveJourney;
+  final ValueChanged<ContentModuleSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      padding: const EdgeInsets.all(8),
+      semanticLabel: 'Alternar area de trilhas',
+      child: Row(
+        children: [
+          Expanded(
+            child: _ContentSectionButton(
+              icon: Icons.route_rounded,
+              label: hasActiveJourney ? 'Minha jornada' : 'Jornada',
+              selected: selected == ContentModuleSection.journey,
+              onTap: () => onSelected(ContentModuleSection.journey),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _ContentSectionButton(
+              icon: Icons.grid_view_rounded,
+              label: 'Catalogo',
+              selected: selected == ContentModuleSection.catalog,
+              onTap: () => onSelected(ContentModuleSection.catalog),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContentSectionButton extends StatelessWidget {
+  const _ContentSectionButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.background : AppColors.textSecondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? AppColors.accent
+                : AppColors.outline.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CurrentJourneyBanner extends StatelessWidget {
   const _CurrentJourneyBanner({
     required this.trail,
@@ -434,9 +548,14 @@ class _CurrentJourneyBanner extends StatelessWidget {
 }
 
 class _CurrentJourneyPanel extends ConsumerStatefulWidget {
-  const _CurrentJourneyPanel({required this.trail, this.onOpenMentor});
+  const _CurrentJourneyPanel({
+    required this.trail,
+    required this.onOpenCatalog,
+    this.onOpenMentor,
+  });
 
   final Trail trail;
+  final VoidCallback onOpenCatalog;
   final VoidCallback? onOpenMentor;
 
   @override
@@ -485,6 +604,7 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
       data: (journey) => _VisualJourneyPanel(
         journey: journey,
         isActing: _isActing,
+        onOpenCatalog: widget.onOpenCatalog,
         onOpenMentor: widget.onOpenMentor,
         onPrimaryAction: () => _runJourneyAction(journey),
       ),
@@ -577,6 +697,7 @@ class _VisualJourneyPanel extends StatelessWidget {
     required this.onPrimaryAction,
     this.isCatalogTrail = false,
     this.onBackToCatalog,
+    this.onOpenCatalog,
     this.onOpenMentor,
   });
 
@@ -585,6 +706,7 @@ class _VisualJourneyPanel extends StatelessWidget {
   final VoidCallback onPrimaryAction;
   final bool isCatalogTrail;
   final VoidCallback? onBackToCatalog;
+  final VoidCallback? onOpenCatalog;
   final VoidCallback? onOpenMentor;
 
   @override
@@ -608,6 +730,7 @@ class _VisualJourneyPanel extends StatelessWidget {
                     activeColor: activeColor,
                     isCatalogTrail: isCatalogTrail,
                     onBackToCatalog: onBackToCatalog,
+                    onOpenCatalog: onOpenCatalog,
                     onOpenFullJourney: () =>
                         _showJourneyDetails(context, journey.trail),
                   ),
@@ -768,6 +891,7 @@ class _JourneyHeader extends StatelessWidget {
     required this.onOpenFullJourney,
     this.isCatalogTrail = false,
     this.onBackToCatalog,
+    this.onOpenCatalog,
   });
 
   final TrailJourney journey;
@@ -775,11 +899,11 @@ class _JourneyHeader extends StatelessWidget {
   final VoidCallback onOpenFullJourney;
   final bool isCatalogTrail;
   final VoidCallback? onBackToCatalog;
+  final VoidCallback? onOpenCatalog;
 
   @override
   Widget build(BuildContext context) {
     final trail = journey.trail;
-    final compact = ResponsiveBreakpoints.isCompact(context);
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -831,41 +955,53 @@ class _JourneyHeader extends StatelessWidget {
         ),
       ],
     );
-    final actions = Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: compact ? WrapAlignment.start : WrapAlignment.end,
-      children: [
-        if (isCatalogTrail && onBackToCatalog != null)
-          OutlinedButton.icon(
-            onPressed: onBackToCatalog,
-            icon: const Icon(Icons.arrow_back_rounded),
-            label: const Text('Voltar ao catalogo'),
-          ),
-        OutlinedButton.icon(
-          onPressed: onOpenFullJourney,
-          icon: const Icon(Icons.auto_stories_rounded),
-          label: Text(
-            isCatalogTrail ? 'Conteudo completo' : 'Jornada completa',
-          ),
-        ),
-      ],
-    );
 
-    if (compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [info, const SizedBox(height: 14), actions],
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 620;
+        final actions = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: compact ? WrapAlignment.start : WrapAlignment.end,
+          children: [
+            if (isCatalogTrail && onBackToCatalog != null)
+              OutlinedButton.icon(
+                onPressed: onBackToCatalog,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Voltar ao catalogo'),
+              ),
+            if (!isCatalogTrail && onOpenCatalog != null)
+              OutlinedButton.icon(
+                onPressed: onOpenCatalog,
+                icon: const Icon(Icons.grid_view_rounded),
+                label: const Text('Ver catalogo'),
+              ),
+            OutlinedButton.icon(
+              onPressed: onOpenFullJourney,
+              icon: const Icon(Icons.auto_stories_rounded),
+              label: Text(
+                isCatalogTrail ? 'Conteudo completo' : 'Jornada completa',
+              ),
+            ),
+          ],
+        );
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: info),
-        const SizedBox(width: 12),
-        actions,
-      ],
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [info, const SizedBox(height: 14), actions],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: info),
+            const SizedBox(width: 12),
+            actions,
+          ],
+        );
+      },
     );
   }
 }

@@ -1,18 +1,28 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
 import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_message.dart';
+import 'package:evolua_frontend/features/content/domain/entities/journey_chat_reply.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/panel_skeleton.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MentorEvoluaModuleView extends ConsumerWidget {
-  const MentorEvoluaModuleView({super.key, required this.onOpenTrails});
+  const MentorEvoluaModuleView({
+    super.key,
+    required this.onOpenTrails,
+    this.onOpenPremium,
+  });
 
   final VoidCallback onOpenTrails;
+  final VoidCallback? onOpenPremium;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,14 +33,14 @@ class MentorEvoluaModuleView extends ConsumerWidget {
         children: [
           _MentorHeader(trail: trail, onOpenTrails: onOpenTrails),
           const SizedBox(height: 16),
-          MentorEvoluaChatCard(trail: trail),
+          MentorEvoluaChatCard(trail: trail, onOpenPremium: onOpenPremium),
         ],
       ),
       error: (_, _) => Column(
         children: [
           _MentorHeader(trail: null, onOpenTrails: onOpenTrails),
           const SizedBox(height: 16),
-          const MentorEvoluaChatCard(trail: null),
+          MentorEvoluaChatCard(trail: null, onOpenPremium: onOpenPremium),
         ],
       ),
       loading: () => const PanelSkeleton(rows: 4, tileHeight: 92),
@@ -109,9 +119,14 @@ class _MentorHeader extends StatelessWidget {
 }
 
 class MentorEvoluaChatCard extends ConsumerStatefulWidget {
-  const MentorEvoluaChatCard({super.key, required this.trail});
+  const MentorEvoluaChatCard({
+    super.key,
+    required this.trail,
+    this.onOpenPremium,
+  });
 
   final Trail? trail;
+  final VoidCallback? onOpenPremium;
 
   @override
   ConsumerState<MentorEvoluaChatCard> createState() =>
@@ -129,7 +144,9 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
     ),
   ];
   bool _isSending = false;
+  bool _isRewardLoading = false;
   String? _error;
+  JourneyChatReply? _quotaLimitedReply;
 
   @override
   void dispose() {
@@ -169,6 +186,7 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
 
       final suggestedStep = reply.suggestedNextStep.trim();
       setState(() {
+        _quotaLimitedReply = reply.quotaLimited ? reply : null;
         _messages.add(
           JourneyChatMessage(
             role: 'assistant',
@@ -193,6 +211,48 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
+      }
+    }
+  }
+
+  Future<void> _watchRewardedAd() async {
+    if (_isRewardLoading) {
+      return;
+    }
+
+    setState(() => _isRewardLoading = true);
+    try {
+      final rewarded = await ref
+          .read(rewardedAdServiceProvider)
+          .showRewardedAd(rewardType: 'AI_ACTION');
+      if (!mounted) {
+        return;
+      }
+      await ref.read(subscriptionControllerProvider.notifier).refresh();
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: rewarded
+            ? 'Credito extra de IA liberado. Envie uma nova mensagem ao Mentor.'
+            : 'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.',
+        icon: rewarded
+            ? Icons.ondemand_video_rounded
+            : Icons.workspace_premium_rounded,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
+        icon: Icons.wifi_off_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isRewardLoading = false);
       }
     }
   }
@@ -258,6 +318,17 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.danger),
+            ),
+          ],
+          if (_quotaLimitedReply != null) ...[
+            const SizedBox(height: 8),
+            AiQuotaLimitCard(
+              message: _quotaLimitedReply!.limitMessage,
+              rewardedAdAvailable: _quotaLimitedReply!.rewardedAdAvailable,
+              upgradeRecommended: _quotaLimitedReply!.upgradeRecommended,
+              isRewardLoading: _isRewardLoading,
+              onWatchRewardedAd: _watchRewardedAd,
+              onOpenPremium: widget.onOpenPremium,
             ),
           ],
           const SizedBox(height: 12),

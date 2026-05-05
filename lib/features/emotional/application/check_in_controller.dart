@@ -124,6 +124,11 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     required String mood,
     String? reflection,
     required int energyLevel,
+    String? emotion,
+    int? intensity,
+    String? energy,
+    String? context,
+    String? note,
   }) async {
     final repository = ref.read(checkInRepositoryProvider);
     state = const AsyncLoading();
@@ -132,6 +137,11 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         mood: mood,
         reflection: reflection,
         energyLevel: energyLevel,
+        emotion: emotion,
+        intensity: intensity,
+        energy: energy,
+        context: context,
+        note: note,
       );
 
       ref.invalidate(currentJourneyTrailProvider);
