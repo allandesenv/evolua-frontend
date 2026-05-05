@@ -1,8 +1,6 @@
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_generated_trail.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_journey_plan.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_suggested_space.dart';
-import 'package:evolua_frontend/features/emotional/domain/entities/check_in_suggested_action.dart';
-import 'package:evolua_frontend/features/emotional/domain/entities/check_in_suggested_trail.dart';
 
 class CheckInAiInsight {
   const CheckInAiInsight({
@@ -21,15 +19,6 @@ class CheckInAiInsight {
     this.rewardedAdAvailable = false,
     this.upgradeRecommended = false,
     this.limitMessage,
-    this.emotionalStateLabel,
-    this.shortInsight,
-    this.nextStep,
-    this.severityLevel,
-    this.tags = const [],
-    this.shouldSuggestAIChat = false,
-    this.shouldSuggestHistoryAnalysis = false,
-    this.suggestedTrailDetail,
-    this.suggestedActionDetail,
   });
 
   final String insight;
@@ -47,13 +36,4 @@ class CheckInAiInsight {
   final bool rewardedAdAvailable;
   final bool upgradeRecommended;
   final String? limitMessage;
-  final String? emotionalStateLabel;
-  final String? shortInsight;
-  final String? nextStep;
-  final String? severityLevel;
-  final List<String> tags;
-  final bool shouldSuggestAIChat;
-  final bool shouldSuggestHistoryAnalysis;
-  final CheckInSuggestedTrail? suggestedTrailDetail;
-  final CheckInSuggestedAction? suggestedActionDetail;
 }

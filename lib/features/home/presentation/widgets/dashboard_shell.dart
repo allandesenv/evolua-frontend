@@ -332,7 +332,8 @@ class _DashboardContent extends ConsumerWidget {
         onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
         onOpenProfile: () =>
             onOpenProfileSection(ProfileModuleSection.overview),
-        onOpenMentor: onOpenMentor,
+        onOpenPremium: () =>
+            onOpenProfileSection(ProfileModuleSection.overview),
       ),
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),

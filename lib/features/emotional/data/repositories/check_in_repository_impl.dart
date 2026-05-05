@@ -52,11 +52,6 @@ class CheckInRepositoryImpl implements CheckInRepository {
     required String mood,
     String? reflection,
     required int energyLevel,
-    String? emotion,
-    int? intensity,
-    String? energy,
-    String? context,
-    String? note,
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/check-ins',
@@ -64,15 +59,12 @@ class CheckInRepositoryImpl implements CheckInRepository {
         'mood': mood,
         'reflection': reflection,
         'energyLevel': energyLevel,
-        'emotion': emotion ?? mood,
-        'intensity': intensity,
-        'energy': energy,
-        'context': context,
-        'note': note ?? reflection,
       },
     );
 
-    return CheckInDto.fromJson(ApiPayloadParser.dataMap(response.data)).toEntity();
+    return CheckInDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 
   String? _formatDate(DateTime? value) {

@@ -13,7 +13,9 @@ final checkInRepositoryProvider = Provider<CheckInRepository>((ref) {
 });
 
 final checkInControllerProvider =
-    AsyncNotifierProvider<CheckInController, CheckInHistoryState>(CheckInController.new);
+    AsyncNotifierProvider<CheckInController, CheckInHistoryState>(
+      CheckInController.new,
+    );
 
 class CheckInHistoryState {
   const CheckInHistoryState({
@@ -56,7 +58,9 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(await _fetch(page: state.asData?.value.result.page ?? 0)),
+      () async => _stateFromResult(
+        await _fetch(page: state.asData?.value.result.page ?? 0),
+      ),
     );
   }
 
@@ -124,11 +128,6 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     required String mood,
     String? reflection,
     required int energyLevel,
-    String? emotion,
-    int? intensity,
-    String? energy,
-    String? context,
-    String? note,
   }) async {
     final repository = ref.read(checkInRepositoryProvider);
     state = const AsyncLoading();
@@ -137,22 +136,22 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         mood: mood,
         reflection: reflection,
         energyLevel: energyLevel,
-        emotion: emotion,
-        intensity: intensity,
-        energy: energy,
-        context: context,
-        note: note,
       );
 
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(trailControllerProvider);
 
-      return _stateFromResult(await _fetch(page: 0), latestCreatedCheckIn: created);
+      return _stateFromResult(
+        await _fetch(page: 0),
+        latestCreatedCheckIn: created,
+      );
     });
   }
 
   Future<PaginatedResponse<CheckIn>> _fetch({required int page}) {
-    return ref.read(checkInRepositoryProvider).list(
+    return ref
+        .read(checkInRepositoryProvider)
+        .list(
           page: page,
           size: _pageSize,
           search: _search,
@@ -170,7 +169,8 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     return CheckInHistoryState(
       result: result,
       selectedGrouping: _selectedGrouping,
-      latestCreatedCheckIn: latestCreatedCheckIn ?? state.asData?.value.latestCreatedCheckIn,
+      latestCreatedCheckIn:
+          latestCreatedCheckIn ?? state.asData?.value.latestCreatedCheckIn,
       search: _search,
       mood: _mood,
       energyRange: _energyRange,

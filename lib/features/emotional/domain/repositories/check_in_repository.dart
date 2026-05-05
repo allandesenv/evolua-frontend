@@ -18,10 +18,5 @@ abstract class CheckInRepository {
     required String mood,
     String? reflection,
     required int energyLevel,
-    String? emotion,
-    int? intensity,
-    String? energy,
-    String? context,
-    String? note,
   });
 }
