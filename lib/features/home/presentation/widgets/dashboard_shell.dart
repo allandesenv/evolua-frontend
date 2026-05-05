@@ -332,6 +332,7 @@ class _DashboardContent extends ConsumerWidget {
         onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
         onOpenProfile: () =>
             onOpenProfileSection(ProfileModuleSection.overview),
+        onOpenCheckIn: () => context.push('/check-in'),
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.overview),
       ),
@@ -380,6 +381,7 @@ class _DashboardContent extends ConsumerWidget {
                   notificationBell: const NotificationBellButton(),
                   session: session,
                   profile: profile,
+                  onOpenCheckIn: () => context.push('/check-in'),
                   onOpenProfileSection: onOpenProfileSection,
                   onLogout: onLogout,
                 ),
@@ -551,6 +553,7 @@ class _HeaderActions extends StatelessWidget {
     required this.notificationBell,
     required this.session,
     required this.profile,
+    required this.onOpenCheckIn,
     required this.onOpenProfileSection,
     required this.onLogout,
   });
@@ -558,6 +561,7 @@ class _HeaderActions extends StatelessWidget {
   final Widget notificationBell;
   final AuthSession? session;
   final Profile? profile;
+  final VoidCallback onOpenCheckIn;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback onLogout;
 
@@ -569,6 +573,8 @@ class _HeaderActions extends StatelessWidget {
       children: [
         notificationBell,
         const SizedBox(width: 8),
+        _CheckInHeaderButton(onPressed: onOpenCheckIn),
+        const SizedBox(width: 8),
         _AccountMenuButton(
           session: session,
           profile: profile,
@@ -576,6 +582,44 @@ class _HeaderActions extends StatelessWidget {
           onLogout: onLogout,
         ),
       ],
+    );
+  }
+}
+
+class _CheckInHeaderButton extends StatelessWidget {
+  const _CheckInHeaderButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Fazer check-in',
+      onPressed: onPressed,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.favorite_rounded),
+          Positioned(
+            right: -3,
+            bottom: -3,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accent,
+                border: Border.all(color: AppColors.surface, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 10,
+                color: AppColors.background,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
