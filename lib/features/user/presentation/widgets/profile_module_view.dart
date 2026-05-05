@@ -87,7 +87,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     if (_didSeedForm && profile == null) {
       return;
     }
-    if (_didSeedForm && profile != null && _displayNameController.text.isNotEmpty) {
+    if (_didSeedForm &&
+        profile != null &&
+        _displayNameController.text.isNotEmpty) {
       return;
     }
 
@@ -175,18 +177,32 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 onChangeAvatar: _pickAvatar,
               ),
               const SizedBox(height: 18),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: ProfileModuleSection.values
-                    .map(
-                      (section) => ChoiceChip(
-                        label: Text(_sectionLabel(section)),
-                        selected: _section == section,
-                        onSelected: (_) => setState(() => _section = section),
-                      ),
-                    )
-                    .toList(),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: ProfileModuleSection.values
+                        .map(
+                          (section) => ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth,
+                            ),
+                            child: ChoiceChip(
+                              label: Text(
+                                _sectionLabel(section),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              selected: _section == section,
+                              onSelected: (_) =>
+                                  setState(() => _section = section),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
               ),
             ],
           ),
@@ -203,7 +219,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
             journeyLevel: _journeyLevel,
             isSaving: isSaving,
             onGenderChanged: (value) => setState(() => _gender = value),
-            onJourneyLevelChanged: (value) => setState(() => _journeyLevel = value),
+            onJourneyLevelChanged: (value) =>
+                setState(() => _journeyLevel = value),
             onPickBirthDate: _pickBirthDate,
             onSubmit: _saveProfile,
           )
@@ -253,44 +270,88 @@ class _ProfileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _AvatarCircle(
-          imageUrl: avatarUrl,
-          radius: 34,
-          fallbackText: displayName,
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                displayName,
-                style: Theme.of(context).textTheme.headlineMedium,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 620;
+        final nameStyle = isCompact
+            ? Theme.of(context).textTheme.titleLarge
+            : Theme.of(context).textTheme.headlineMedium;
+        final identity = Row(
+          children: [
+            _AvatarCircle(
+              imageUrl: avatarUrl,
+              radius: 34,
+              fallbackText: displayName,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: nameStyle,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    email,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(email, style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        Wrap(
+            ),
+          ],
+        );
+        final actions = Wrap(
           spacing: 10,
           runSpacing: 10,
           children: [
-            OutlinedButton.icon(
-              onPressed: onChangeAvatar,
-              icon: const Icon(Icons.photo_camera_back_rounded),
-              label: const Text('Trocar foto'),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+              child: OutlinedButton.icon(
+                onPressed: onChangeAvatar,
+                icon: const Icon(Icons.photo_camera_back_rounded),
+                label: const Text(
+                  'Trocar foto',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
-            OutlinedButton.icon(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Atualizar'),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+              child: OutlinedButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text(
+                  'Atualizar',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
           ],
-        ),
-      ],
+        );
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [identity, const SizedBox(height: 16), actions],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: identity),
+            const SizedBox(width: 16),
+            actions,
+          ],
+        );
+      },
     );
   }
 }
@@ -413,9 +474,9 @@ class _OverviewSection extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Nivel da jornada: ${journeyLevel.round()}',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
             ),
             Slider(
               min: 1,
@@ -474,31 +535,40 @@ class _AvatarCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalizedUrl = imageUrl == null || imageUrl!.isEmpty ? null : imageUrl!;
+    final normalizedUrl = imageUrl == null || imageUrl!.isEmpty
+        ? null
+        : imageUrl!;
     return CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.surfaceStrong,
-      backgroundImage: normalizedUrl != null ? NetworkImage(normalizedUrl) : null,
+      backgroundImage: normalizedUrl != null
+          ? NetworkImage(normalizedUrl)
+          : null,
       child: normalizedUrl == null
           ? Text(
               _initials(fallbackText),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
             )
           : null,
     );
   }
 
   String _initials(String value) {
-    final parts = value.trim().split(RegExp(r'\s+')).where((item) => item.isNotEmpty).toList();
+    final parts = value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((item) => item.isNotEmpty)
+        .toList();
     if (parts.isEmpty) {
       return 'E';
     }
     if (parts.length == 1) {
       return parts.first.substring(0, 1).toUpperCase();
     }
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
   }
 }
 

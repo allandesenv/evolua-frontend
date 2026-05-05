@@ -9,54 +9,65 @@ class AuthHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const EvoluaLogo(variant: EvoluaLogoVariant.hero),
-        const SizedBox(height: 30),
-        Text(
-          'Entre e continue sua jornada.',
-          style: theme.textTheme.displayMedium,
-        ),
-        const SizedBox(height: 14),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Text(
-            'Check-in rapido, proxima acao clara e reflexoes leves para voce voltar todos os dias sem cansar.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            EvoluaLogo(
+              variant: isMobile
+                  ? EvoluaLogoVariant.compact
+                  : EvoluaLogoVariant.hero,
             ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: const [
-            _SignalChip(
-              icon: Icons.favorite_border_rounded,
-              label: 'Check-in rapido',
+            SizedBox(height: isMobile ? 14 : 24),
+            Text(
+              'Continue sua jornada',
+              style: isMobile
+                  ? theme.textTheme.headlineMedium
+                  : theme.textTheme.displayMedium,
             ),
-            _SignalChip(
-              icon: Icons.auto_stories_rounded,
-              label: 'Trilhas curtas',
+            SizedBox(height: isMobile ? 8 : 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Text(
+                'Acesse seu espaco de autoconhecimento em poucos segundos.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ),
-            _SignalChip(
-              icon: Icons.dynamic_feed_rounded,
-              label: 'Reflexoes do momento',
-            ),
+            if (!isMobile) ...[
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: const [
+                  _SignalChip(
+                    icon: Icons.favorite_border_rounded,
+                    label: 'Check-in rapido',
+                  ),
+                  _SignalChip(
+                    icon: Icons.auto_stories_rounded,
+                    label: 'Trilhas curtas',
+                  ),
+                  _SignalChip(
+                    icon: Icons.dynamic_feed_rounded,
+                    label: 'Reflexoes do momento',
+                  ),
+                ],
+              ),
+            ],
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
 class _SignalChip extends StatelessWidget {
-  const _SignalChip({
-    required this.icon,
-    required this.label,
-  });
+  const _SignalChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -80,9 +91,9 @@ class _SignalChip extends StatelessWidget {
               label,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
             ),
           ),
         ],

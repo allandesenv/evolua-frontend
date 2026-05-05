@@ -332,11 +332,12 @@ class _DashboardContent extends ConsumerWidget {
         onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
         onOpenProfile: () =>
             onOpenProfileSection(ProfileModuleSection.overview),
+        onOpenMentor: onOpenMentor,
       ),
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),
         section: trailSection,
-        showSectionChips: true,
+        showSectionChips: compact,
         onOpenMentor: onOpenMentor,
       ),
       SocialModuleView(
@@ -347,7 +348,11 @@ class _DashboardContent extends ConsumerWidget {
         showScopeChips: false,
         onTabChanged: onOpenSpacesSection,
       ),
-      MentorEvoluaModuleView(onOpenTrails: () => onNavigate(1)),
+      MentorEvoluaModuleView(
+        onOpenTrails: () => onNavigate(1),
+        onOpenPremium: () =>
+            onOpenProfileSection(ProfileModuleSection.overview),
+      ),
       _ProfileArea(section: profileSection),
     ];
 

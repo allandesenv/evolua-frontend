@@ -2,25 +2,23 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-enum EvoluaLogoVariant { hero, sidebar }
+enum EvoluaLogoVariant { hero, sidebar, compact }
 
 class EvoluaLogo extends StatelessWidget {
-  const EvoluaLogo({
-    super.key,
-    this.variant = EvoluaLogoVariant.hero,
-  });
+  const EvoluaLogo({super.key, this.variant = EvoluaLogoVariant.hero});
 
   final EvoluaLogoVariant variant;
 
   @override
   Widget build(BuildContext context) {
     final isHero = variant == EvoluaLogoVariant.hero;
-    final logoSize = isHero ? 72.0 : 56.0;
-    final logoRadius = isHero ? 24.0 : 18.0;
-    final titleSize = isHero ? 30.0 : 23.0;
+    final isCompact = variant == EvoluaLogoVariant.compact;
+    final logoSize = isHero ? 72.0 : (isCompact ? 44.0 : 56.0);
+    final logoRadius = isHero ? 24.0 : (isCompact ? 14.0 : 18.0);
+    final titleSize = isHero ? 30.0 : (isCompact ? 22.0 : 23.0);
     final subtitleSize = isHero ? 16.0 : 13.0;
     final titleWeight = isHero ? FontWeight.w800 : FontWeight.w700;
-    final spacing = isHero ? 18.0 : 14.0;
+    final spacing = isHero ? 18.0 : (isCompact ? 12.0 : 14.0);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -89,17 +87,19 @@ class EvoluaLogo extends StatelessWidget {
                   height: 1,
                 ),
               ),
-              SizedBox(height: isHero ? 6 : 4),
-              Text(
-                'Autoconhecimento em movimento',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontSize: subtitleSize,
-                      letterSpacing: isHero ? 0.2 : 0.1,
-                      color: AppColors.textSecondary,
-                    ),
-              ),
+              if (!isCompact) ...[
+                SizedBox(height: isHero ? 6 : 4),
+                Text(
+                  'Autoconhecimento em movimento',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: subtitleSize,
+                    letterSpacing: isHero ? 0.2 : 0.1,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

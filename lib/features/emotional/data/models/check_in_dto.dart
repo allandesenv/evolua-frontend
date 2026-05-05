@@ -4,6 +4,8 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_g
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_journey_plan.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_suggested_space.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_suggested_action.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_suggested_trail.dart';
 
 class CheckInDto {
   const CheckInDto({
@@ -15,6 +17,12 @@ class CheckInDto {
     required this.recommendedPractice,
     required this.aiInsight,
     required this.createdAt,
+    this.emotion,
+    this.intensity,
+    this.energy,
+    this.context,
+    this.decisionTags,
+    this.severityLevel,
   });
 
   final int id;
@@ -25,6 +33,12 @@ class CheckInDto {
   final String recommendedPractice;
   final CheckInAiInsight? aiInsight;
   final DateTime createdAt;
+  final String? emotion;
+  final int? intensity;
+  final String? energy;
+  final String? context;
+  final String? decisionTags;
+  final String? severityLevel;
 
   factory CheckInDto.fromJson(Map<String, dynamic> json) {
     return CheckInDto(
@@ -36,6 +50,12 @@ class CheckInDto {
       recommendedPractice: json['recommendedPractice'].toString(),
       aiInsight: _parseInsight(json['aiInsight']),
       createdAt: DateTime.parse(json['createdAt'].toString()),
+      emotion: json['emotion']?.toString(),
+      intensity: (json['intensity'] as num?)?.toInt(),
+      energy: json['energy']?.toString(),
+      context: json['context']?.toString(),
+      decisionTags: json['decisionTags']?.toString(),
+      severityLevel: json['severityLevel']?.toString(),
     );
   }
 
@@ -49,6 +69,12 @@ class CheckInDto {
       recommendedPractice: recommendedPractice,
       aiInsight: aiInsight,
       createdAt: createdAt,
+      emotion: emotion,
+      intensity: intensity,
+      energy: energy,
+      context: context,
+      decisionTags: decisionTags,
+      severityLevel: severityLevel,
     );
   }
 
@@ -68,6 +94,47 @@ class CheckInDto {
       journeyPlan: _parseJourneyPlan(value['journeyPlan']),
       generatedTrailDraft: _parseGeneratedTrail(value['generatedTrailDraft']),
       fallbackUsed: value['fallbackUsed'] as bool? ?? false,
+      quotaLimited: value['quotaLimited'] as bool? ?? false,
+      quotaRemainingToday: (value['quotaRemainingToday'] as num?)?.toInt() ?? 0,
+      rewardedAdAvailable: value['rewardedAdAvailable'] as bool? ?? false,
+      upgradeRecommended: value['upgradeRecommended'] as bool? ?? false,
+      limitMessage: value['limitMessage']?.toString(),
+      emotionalStateLabel: value['emotionalStateLabel']?.toString(),
+      shortInsight: value['shortInsight']?.toString(),
+      nextStep: value['nextStep']?.toString(),
+      severityLevel: value['severityLevel']?.toString(),
+      tags: (value['tags'] as List? ?? const [])
+          .map((item) => item.toString())
+          .toList(),
+      shouldSuggestAIChat: value['shouldSuggestAIChat'] as bool? ?? false,
+      shouldSuggestHistoryAnalysis:
+          value['shouldSuggestHistoryAnalysis'] as bool? ?? false,
+      suggestedTrailDetail: _parseSuggestedTrail(value['suggestedTrailDetail']),
+      suggestedActionDetail:
+          _parseSuggestedAction(value['suggestedActionDetail']),
+    );
+  }
+
+  static CheckInSuggestedTrail? _parseSuggestedTrail(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+
+    return CheckInSuggestedTrail(
+      id: value['id']?.toString() ?? '',
+      title: value['title']?.toString() ?? '',
+    );
+  }
+
+  static CheckInSuggestedAction? _parseSuggestedAction(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+
+    return CheckInSuggestedAction(
+      type: value['type']?.toString() ?? '',
+      title: value['title']?.toString() ?? '',
+      durationMinutes: (value['durationMinutes'] as num?)?.toInt(),
     );
   }
 

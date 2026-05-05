@@ -28,6 +28,8 @@ class CurrentSubscription {
     required this.status,
     required this.billingCycle,
     required this.premium,
+    required this.adsEnabled,
+    required this.aiQuotaRemainingToday,
     this.provider,
     this.currentPeriodEndsAt,
     this.canceledAt,
@@ -37,9 +39,31 @@ class CurrentSubscription {
   final String status;
   final String billingCycle;
   final bool premium;
+  final bool adsEnabled;
+  final int aiQuotaRemainingToday;
   final String? provider;
   final DateTime? currentPeriodEndsAt;
   final DateTime? canceledAt;
+}
+
+class AdRewardSession {
+  const AdRewardSession({
+    required this.id,
+    required this.provider,
+    required this.rewardType,
+    required this.status,
+    required this.customData,
+    required this.expiresAt,
+    this.grantedAt,
+  });
+
+  final String id;
+  final String provider;
+  final String rewardType;
+  final String status;
+  final String customData;
+  final DateTime expiresAt;
+  final DateTime? grantedAt;
 }
 
 class CheckoutSession {
