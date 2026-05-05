@@ -1,8 +1,28 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+fun dartDefine(name: String, defaultValue: String): String {
+    val encodedDefines = project.findProperty("dart-defines")?.toString()
+    if (encodedDefines.isNullOrBlank()) {
+        return defaultValue
+    }
+    return encodedDefines
+        .split(',')
+        .mapNotNull {
+            runCatching {
+                String(Base64.getDecoder().decode(it))
+            }.getOrNull()
+        }
+        .firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter('=')
+        ?.takeIf { it.isNotBlank() }
+        ?: defaultValue
 }
 
 android {
@@ -28,6 +48,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["adMobApplicationId"] =
+            dartDefine("EVOLUA_ADMOB_ANDROID_APP_ID", "ca-app-pub-3940256099942544~3347511713")
     }
 
     buildTypes {
