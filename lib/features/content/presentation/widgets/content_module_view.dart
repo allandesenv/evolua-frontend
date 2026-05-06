@@ -9,7 +9,10 @@ import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
@@ -28,11 +31,13 @@ class ContentModuleView extends ConsumerStatefulWidget {
     this.section = ContentModuleSection.journey,
     this.showSectionChips = true,
     this.onOpenMentor,
+    this.onOpenPremium,
   });
 
   final ContentModuleSection section;
   final bool showSectionChips;
   final VoidCallback? onOpenMentor;
+  final VoidCallback? onOpenPremium;
 
   @override
   ConsumerState<ContentModuleView> createState() => _ContentModuleViewState();
@@ -268,9 +273,18 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     final currentJourney = ref.watch(currentJourneyTrailProvider);
     final session = ref.watch(authControllerProvider).asData?.value;
     final profile = ref.watch(currentProfileProvider);
+    final currentSubscription = ref
+        .watch(subscriptionControllerProvider)
+        .asData
+        ?.value
+        .current;
     final isAdmin = session?.isAdmin ?? false;
     final hasPremiumAccess =
-        (session?.isPremium ?? false) || (profile?.premium ?? false);
+        (session?.isPremium ?? false) ||
+        (profile?.premium ?? false) ||
+        (currentSubscription?.premium ?? false);
+    final mentorPremiumPassActive =
+        currentSubscription?.mentorPremiumPassActive ?? false;
     final isSaving = trailsState.isLoading && !trailsState.hasValue;
 
     return LayoutBuilder(
@@ -324,6 +338,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                     result: result,
                     isAdmin: isAdmin,
                     hasPremiumAccess: hasPremiumAccess,
+                    mentorPremiumPassActive: mentorPremiumPassActive,
                     searchController: _searchController,
                     premiumFilter: _premiumFilter,
                     onSearchChanged: (_) => _applyFilters(),
@@ -340,6 +355,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                     }),
                     onEditTrail: isAdmin ? _startEditingTrail : null,
                     onDeleteTrail: isAdmin ? _confirmDeleteTrail : null,
+                    onOpenPremium: widget.onOpenPremium,
                     onPageChanged: (page) {
                       setState(() => _selectedCatalogTrail = null);
                       ref.read(trailControllerProvider.notifier).goToPage(page);
@@ -1290,6 +1306,17 @@ String _catalogTrailCtaLabel(TrailJourney journey) {
   return 'Iniciar trilha';
 }
 
+bool _isMentorPremiumTrail(Trail trail) {
+  final category = trail.category.trim().toLowerCase();
+  final sourceStyle = trail.sourceStyle?.trim().toLowerCase() ?? '';
+  return trail.premium &&
+      (category == 'mentoria' || sourceStyle == 'mentor_exclusive');
+}
+
+bool _isLockedMentorPremiumTrail(Trail trail) {
+  return _isMentorPremiumTrail(trail) && !trail.accessible;
+}
+
 Color _journeyAccentColor(Trail trail) {
   final category = trail.category.toLowerCase();
   if (category.contains('ansiedade') || category.contains('sono')) {
@@ -1758,6 +1785,7 @@ class _TrailExplorer extends ConsumerWidget {
     required this.result,
     required this.isAdmin,
     required this.hasPremiumAccess,
+    required this.mentorPremiumPassActive,
     required this.searchController,
     required this.premiumFilter,
     required this.onSearchChanged,
@@ -1765,12 +1793,14 @@ class _TrailExplorer extends ConsumerWidget {
     required this.onOpenTrail,
     required this.onEditTrail,
     required this.onDeleteTrail,
+    required this.onOpenPremium,
     required this.onPageChanged,
   });
 
   final PaginatedResponse<Trail> result;
   final bool isAdmin;
   final bool hasPremiumAccess;
+  final bool mentorPremiumPassActive;
   final TextEditingController searchController;
   final bool? premiumFilter;
   final ValueChanged<String> onSearchChanged;
@@ -1778,6 +1808,7 @@ class _TrailExplorer extends ConsumerWidget {
   final ValueChanged<Trail> onOpenTrail;
   final ValueChanged<Trail>? onEditTrail;
   final ValueChanged<Trail>? onDeleteTrail;
+  final VoidCallback? onOpenPremium;
   final ValueChanged<int> onPageChanged;
 
   @override
@@ -1850,7 +1881,14 @@ class _TrailExplorer extends ConsumerWidget {
           Column(
             children: [
               ...result.items.map((trail) {
-                final journeyState = trail.accessible
+                final effectiveAccessible =
+                    trail.accessible ||
+                    (mentorPremiumPassActive && _isMentorPremiumTrail(trail));
+                final lockedMentorTrail =
+                    _isLockedMentorPremiumTrail(trail) &&
+                    !mentorPremiumPassActive &&
+                    !hasPremiumAccess;
+                final journeyState = effectiveAccessible
                     ? ref.watch(trailJourneyProvider(trail.id))
                     : null;
 
@@ -1905,13 +1943,21 @@ class _TrailExplorer extends ConsumerWidget {
                                     '${journeyState!.requireValue.progressPercent}% concluido',
                                 color: context.evoluaColors.textSecondary,
                               ),
-                            if (!trail.accessible &&
+                            if (!effectiveAccessible &&
                                 !isAdmin &&
-                                !hasPremiumAccess)
-                              const _StatusBadge(
-                                label: 'Faca upgrade para acessar',
+                                !hasPremiumAccess) ...[
+                              _StatusBadge(
+                                label: lockedMentorTrail
+                                    ? 'Mentoria premium'
+                                    : 'Faca upgrade para acessar',
                                 color: AppColors.danger,
                               ),
+                              if (lockedMentorTrail)
+                                const _StatusBadge(
+                                  label: 'Anuncio libera hoje',
+                                  color: AppColors.accentGold,
+                                ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 14),
@@ -1921,7 +1967,7 @@ class _TrailExplorer extends ConsumerWidget {
                             spacing: 10,
                             runSpacing: 10,
                             children: [
-                              if (trail.accessible)
+                              if (effectiveAccessible)
                                 journeyState!.when(
                                   data: (journey) => ElevatedButton.icon(
                                     onPressed: () async {
@@ -1960,12 +2006,16 @@ class _TrailExplorer extends ConsumerWidget {
                                   ),
                                 ),
                               OutlinedButton.icon(
-                                onPressed: trail.accessible
+                                onPressed: effectiveAccessible
                                     ? () => onOpenTrail(trail)
-                                    : () => _showTrailDetails(context, trail),
+                                    : () => _showTrailDetails(
+                                        context,
+                                        trail,
+                                        lockedMentorTrail: lockedMentorTrail,
+                                      ),
                                 icon: const Icon(Icons.visibility_rounded),
                                 label: Text(
-                                  trail.accessible
+                                  effectiveAccessible
                                       ? 'Ver caminho'
                                       : 'Ver detalhes',
                                 ),
@@ -2003,173 +2053,341 @@ class _TrailExplorer extends ConsumerWidget {
     );
   }
 
-  void _showTrailDetails(BuildContext context, Trail trail) {
+  void _showTrailDetails(
+    BuildContext context,
+    Trail trail, {
+    required bool lockedMentorTrail,
+  }) {
     showDialog<void>(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: context.evoluaColors.backgroundSecondary,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760, maxHeight: 780),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        trail.title,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(color: context.evoluaColors.textPrimary),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          var isRewardLoading = false;
+          String? rewardStatusMessage;
+
+          return StatefulBuilder(
+            builder: (context, setDialogState) => Dialog(
+              backgroundColor: context.evoluaColors.backgroundSecondary,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 760,
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.82,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  trail.summary,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 18),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: trail.accessible
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              MarkdownBody(
-                                data: trail.content ?? '',
-                                selectable: true,
-                                onTapLink: (text, href, title) {
-                                  if (href != null) {
-                                    launchUrlString(href);
-                                  }
-                                },
-                                styleSheet:
-                                    MarkdownStyleSheet.fromTheme(
-                                      Theme.of(context),
-                                    ).copyWith(
-                                      p: Theme.of(context).textTheme.bodyLarge
-                                          ?.copyWith(
-                                            color: context
-                                                .evoluaColors
-                                                .textPrimary,
-                                          ),
-                                      h1: Theme.of(context)
-                                          .textTheme
-                                          .headlineSmall
-                                          ?.copyWith(
-                                            color: context
-                                                .evoluaColors
-                                                .textPrimary,
-                                          ),
-                                      h2: Theme.of(context).textTheme.titleLarge
-                                          ?.copyWith(
-                                            color: context
-                                                .evoluaColors
-                                                .textPrimary,
-                                          ),
-                                      listBullet: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(color: AppColors.accent),
-                                    ),
-                              ),
-                              if (trail.mediaLinks.isNotEmpty) ...[
-                                const SizedBox(height: 20),
-                                Text(
-                                  'Conteudos de apoio',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(
-                                        color: context.evoluaColors.textPrimary,
-                                      ),
-                                ),
-                                const SizedBox(height: 12),
-                                ...trail.mediaLinks.map(
-                                  (link) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: InkWell(
-                                      onTap: () => launchUrlString(link.url),
-                                      borderRadius: BorderRadius.circular(18),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: context
-                                              .evoluaColors
-                                              .surfaceStrong
-                                              .withValues(alpha: 0.4),
-                                          borderRadius: BorderRadius.circular(
-                                            18,
-                                          ),
-                                          border: Border.all(
-                                            color: context.evoluaColors.outline
-                                                .withValues(alpha: 0.4),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              link.isYoutube
-                                                  ? Icons.ondemand_video_rounded
-                                                  : Icons.link_rounded,
-                                              color: link.isYoutube
-                                                  ? AppColors.danger
-                                                  : AppColors.accentWarm,
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    link.label,
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .titleSmall
-                                                        ?.copyWith(
-                                                          color: AppColors
-                                                              .textPrimary,
-                                                        ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    link.url,
-                                                    style: Theme.of(
-                                                      context,
-                                                    ).textTheme.bodySmall,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              trail.title,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: context.evoluaColors.textPrimary,
                                   ),
-                                ),
-                              ],
-                            ],
-                          )
-                        : GuidedEmptyState(
-                            icon: Icons.workspace_premium_rounded,
-                            title: 'Conteudo completo liberado no premium',
-                            subtitle:
-                                'Voce pode visualizar o resumo da trilha agora e desbloquear o conteudo completo com upgrade.',
-                            actionLabel: 'Entendi',
-                            onAction: () => Navigator.of(context).pop(),
+                            ),
                           ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        trail.summary,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 18),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: trail.accessible
+                              ? _UnlockedTrailDetails(trail: trail)
+                              : lockedMentorTrail
+                              ? _LockedMentorTrailState(
+                                  isRewardLoading: isRewardLoading,
+                                  onWatchAd: () async {
+                                    if (isRewardLoading) {
+                                      return;
+                                    }
+                                    setDialogState(() {
+                                      isRewardLoading = true;
+                                      rewardStatusMessage = null;
+                                    });
+                                    try {
+                                      final result = await ref
+                                          .read(
+                                            mentorPremiumPassRewardServiceProvider,
+                                          )
+                                          .watchAdAndConfirm(
+                                            trailId: trail.id,
+                                            onAwaitingConfirmation: () {
+                                              if (!context.mounted) {
+                                                return;
+                                              }
+                                              setDialogState(() {
+                                                rewardStatusMessage =
+                                                    'Estamos confirmando seu passe de mentoria...';
+                                              });
+                                            },
+                                          );
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      if (result.confirmed) {
+                                        AppSnackBar.show(
+                                          context,
+                                          message:
+                                              'Passe de mentoria liberado por hoje.',
+                                          icon: Icons.workspace_premium_rounded,
+                                        );
+                                        Navigator.of(context).pop();
+                                      } else {
+                                        final message =
+                                            result.status ==
+                                                MentorPremiumPassRewardStatus
+                                                    .unavailable
+                                            ? 'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.'
+                                            : 'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.';
+                                        setDialogState(() {
+                                          rewardStatusMessage = message;
+                                        });
+                                        AppSnackBar.show(
+                                          context,
+                                          message: message,
+                                          icon: Icons.workspace_premium_rounded,
+                                        );
+                                      }
+                                    } finally {
+                                      if (context.mounted) {
+                                        setDialogState(
+                                          () => isRewardLoading = false,
+                                        );
+                                      }
+                                    }
+                                  },
+                                  statusMessage: rewardStatusMessage,
+                                  onOpenPremium: onOpenPremium == null
+                                      ? null
+                                      : () {
+                                          Navigator.of(context).pop();
+                                          onOpenPremium?.call();
+                                        },
+                                )
+                              : GuidedEmptyState(
+                                  icon: Icons.workspace_premium_rounded,
+                                  title:
+                                      'Conteudo completo liberado no premium',
+                                  subtitle:
+                                      'Voce pode visualizar o resumo da trilha agora e desbloquear o conteudo completo com upgrade.',
+                                  actionLabel: 'Entendi',
+                                  onAction: () => Navigator.of(context).pop(),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _UnlockedTrailDetails extends StatelessWidget {
+  const _UnlockedTrailDetails({required this.trail});
+
+  final Trail trail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        MarkdownBody(
+          data: trail.content ?? '',
+          selectable: true,
+          onTapLink: (text, href, title) {
+            if (href != null) {
+              launchUrlString(href);
+            }
+          },
+          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+            p: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+            h1: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+            h2: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+            listBullet: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: AppColors.accent),
           ),
         ),
+        if (trail.mediaLinks.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Text(
+            'Conteudos de apoio',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...trail.mediaLinks.map(
+            (link) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                onTap: () => launchUrlString(link.url),
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: context.evoluaColors.surfaceStrong.withValues(
+                      alpha: 0.4,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: context.evoluaColors.outline.withValues(
+                        alpha: 0.4,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        link.isYoutube
+                            ? Icons.ondemand_video_rounded
+                            : Icons.link_rounded,
+                        color: link.isYoutube
+                            ? AppColors.danger
+                            : AppColors.accentWarm,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              link.label,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: context.evoluaColors.textPrimary,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              link.url,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _LockedMentorTrailState extends StatelessWidget {
+  const _LockedMentorTrailState({
+    required this.isRewardLoading,
+    required this.onWatchAd,
+    required this.statusMessage,
+    required this.onOpenPremium,
+  });
+
+  final bool isRewardLoading;
+  final VoidCallback onWatchAd;
+  final String? statusMessage;
+  final VoidCallback? onOpenPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.center,
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Icon(
+                Icons.workspace_premium_rounded,
+                color: AppColors.accent,
+                size: 34,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Libere esta mentoria por hoje',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Assista a um anuncio premiado para acessar trilhas de mentoria ate o fim do dia, ou assine Premium para acesso completo.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: isRewardLoading ? null : onWatchAd,
+            icon: isRewardLoading
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.ondemand_video_rounded),
+            label: Text(
+              isRewardLoading
+                  ? 'Carregando anuncio'
+                  : 'Assistir anuncio para liberar mentoria por hoje',
+            ),
+          ),
+          if (onOpenPremium != null) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: onOpenPremium,
+              icon: const Icon(Icons.workspace_premium_rounded),
+              label: const Text('Assinar Premium'),
+            ),
+          ],
+          if (statusMessage != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              statusMessage!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

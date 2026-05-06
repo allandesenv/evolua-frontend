@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
+import 'package:evolua_frontend/features/home/application/proactive_greeting.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -21,6 +22,8 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.checkInsCount,
     required this.postsCount,
     required this.communitiesCount,
+    required this.displayName,
+    required this.mentorPremiumPassActive,
     required this.onOpenTrails,
     required this.onOpenFeed,
     required this.onOpenCommunity,
@@ -28,6 +31,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenEvolutionMirror,
     required this.onOpenCheckIn,
     this.onOpenPremium,
+    this.mentorPremiumPassEndsAt,
   });
 
   final int profilesCount;
@@ -35,6 +39,8 @@ class HomeHubView extends ConsumerStatefulWidget {
   final int checkInsCount;
   final int postsCount;
   final int communitiesCount;
+  final String? displayName;
+  final bool mentorPremiumPassActive;
   final VoidCallback onOpenTrails;
   final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
@@ -42,6 +48,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenEvolutionMirror;
   final VoidCallback onOpenCheckIn;
   final VoidCallback? onOpenPremium;
+  final DateTime? mentorPremiumPassEndsAt;
 
   @override
   ConsumerState<HomeHubView> createState() => _HomeHubViewState();
@@ -137,8 +144,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final currentJourney = ref.watch(currentJourneyTrailProvider).asData?.value;
     final result = checkInState.asData?.value.result;
     final recentItems = result?.items ?? const <CheckIn>[];
+    final latestCreatedCheckIn =
+        checkInState.asData?.value.latestCreatedCheckIn;
     final latestInsight =
-        checkInState.asData?.value.latestCreatedCheckIn?.aiInsight ??
+        latestCreatedCheckIn?.aiInsight ??
         recentItems
             .where((item) => item.aiInsight != null)
             .map((item) => item.aiInsight!)
@@ -179,10 +188,25 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       suggestedAction: latestInsight?.suggestedAction,
       currentJourneySummary: currentJourney?.summary,
     );
+    final proactiveGreeting = buildProactiveGreeting(
+      displayName: widget.displayName,
+      checkIns: recentItems,
+      latestCreatedCheckIn: latestCreatedCheckIn,
+      activeJourney: currentJourney,
+      mentorPremiumPassActive: widget.mentorPremiumPassActive,
+      mentorPremiumPassEndsAt: widget.mentorPremiumPassEndsAt,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _ProactiveGreetingCard(
+          greeting: proactiveGreeting,
+          onCheckIn: widget.onOpenCheckIn,
+          onContinueJourney: widget.onOpenTrails,
+          onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
+        ),
+        const SizedBox(height: 18),
         _InsightBriefingCard(
           insight: latestInsight,
           onOpenFullAnalysis: latestInsight == null
@@ -212,6 +236,88 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenProfile: widget.onOpenProfile,
         ),
       ],
+    );
+  }
+}
+
+class _ProactiveGreetingCard extends StatelessWidget {
+  const _ProactiveGreetingCard({
+    required this.greeting,
+    required this.onCheckIn,
+    required this.onContinueJourney,
+    required this.onOpenEvolutionMirror,
+  });
+
+  final ProactiveGreeting greeting;
+  final VoidCallback onCheckIn;
+  final VoidCallback onContinueJourney;
+  final VoidCallback onOpenEvolutionMirror;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = switch (greeting.action) {
+      ProactiveGreetingAction.checkIn => onCheckIn,
+      ProactiveGreetingAction.continueJourney => onContinueJourney,
+      ProactiveGreetingAction.evolutionMirror => onOpenEvolutionMirror,
+    };
+    final icon = switch (greeting.action) {
+      ProactiveGreetingAction.checkIn => Icons.favorite_rounded,
+      ProactiveGreetingAction.continueJourney => Icons.play_arrow_rounded,
+      ProactiveGreetingAction.evolutionMirror => Icons.auto_graph_rounded,
+    };
+
+    return PrimaryPanel(
+      semanticLabel: 'Mensagem proativa personalizada',
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: AppColors.accent.withValues(alpha: 0.14),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.24),
+              ),
+            ),
+            child: const Icon(
+              Icons.waving_hand_rounded,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  greeting.greeting,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  greeting.message,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: action,
+                    icon: Icon(icon),
+                    label: Text(greeting.actionLabel),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
