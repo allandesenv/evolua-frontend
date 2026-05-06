@@ -3,7 +3,13 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/content/application/trail_controller.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
@@ -26,6 +32,7 @@ enum ProfileModuleSection {
   displayAccessibility,
   feedback,
   plansSubscriptions,
+  evolutionMirror,
 }
 
 class ProfileModuleView extends ConsumerStatefulWidget {
@@ -675,6 +682,12 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     );
     final supportConfigState = ref.watch(supportConfigProvider);
     final supportStatusState = ref.watch(supportStatusProvider);
+    final checkInState = ref.watch(checkInControllerProvider);
+    final currentJourneyState = ref.watch(currentJourneyTrailProvider);
+    final activeJourney = currentJourneyState.asData?.value;
+    final journeyState = activeJourney == null
+        ? null
+        : ref.watch(trailJourneyProvider(activeJourney.id));
     final profile = profileState.asData?.value;
     final isSaving = profileState.isLoading && profileState.hasValue;
     final isAdmin = session?.isAdmin ?? false;
@@ -696,241 +709,256 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-        if (_section == ProfileModuleSection.overview)
-          _OverviewSection(
-            formKey: _formKey,
-            displayNameController: _displayNameController,
-            bioController: _bioController,
-            customGenderController: _customGenderController,
-            gender: _gender,
-            birthDate: _birthDate,
-            journeyLevel: _journeyLevel,
-            isSaving: isSaving,
-            onGenderChanged: (value) => setState(() => _gender = value),
-            onJourneyLevelChanged: (value) =>
-                setState(() => _journeyLevel = value),
-            onPickBirthDate: _pickBirthDate,
-            onSubmit: _saveProfile,
-          )
-        else if (_section == ProfileModuleSection.settingsPrivacy)
-          settingsState.when(
-            data: (preferences) {
-              final settingsController = ref.read(
-                settingsPrivacyPreferencesControllerProvider.notifier,
-              );
-              return _SettingsPrivacySection(
-                email: session?.email ?? 'voce@evolua.app',
-                privateJournal: preferences.privateJournal,
-                hideSocialCheckIns: preferences.hideSocialCheckIns,
-                allowHistoryInsights: preferences.allowHistoryInsights,
-                useEmotionalDataForAi: preferences.useEmotionalDataForAi,
-                dailyReminders: preferences.dailyReminders,
-                contentPreferences: preferences.contentPreferences,
-                aiTone: preferences.aiTone,
-                suggestionFrequency: preferences.suggestionFrequency,
-                trailStyle: preferences.trailStyle,
-                onPrivateJournalChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(privateJournal: value),
+          if (_section == ProfileModuleSection.overview)
+            _OverviewSection(
+              formKey: _formKey,
+              displayNameController: _displayNameController,
+              bioController: _bioController,
+              customGenderController: _customGenderController,
+              gender: _gender,
+              birthDate: _birthDate,
+              journeyLevel: _journeyLevel,
+              isSaving: isSaving,
+              onGenderChanged: (value) => setState(() => _gender = value),
+              onJourneyLevelChanged: (value) =>
+                  setState(() => _journeyLevel = value),
+              onPickBirthDate: _pickBirthDate,
+              onSubmit: _saveProfile,
+            )
+          else if (_section == ProfileModuleSection.settingsPrivacy)
+            settingsState.when(
+              data: (preferences) {
+                final settingsController = ref.read(
+                  settingsPrivacyPreferencesControllerProvider.notifier,
+                );
+                return _SettingsPrivacySection(
+                  email: session?.email ?? 'voce@evolua.app',
+                  privateJournal: preferences.privateJournal,
+                  hideSocialCheckIns: preferences.hideSocialCheckIns,
+                  allowHistoryInsights: preferences.allowHistoryInsights,
+                  useEmotionalDataForAi: preferences.useEmotionalDataForAi,
+                  dailyReminders: preferences.dailyReminders,
+                  contentPreferences: preferences.contentPreferences,
+                  aiTone: preferences.aiTone,
+                  suggestionFrequency: preferences.suggestionFrequency,
+                  trailStyle: preferences.trailStyle,
+                  onPrivateJournalChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) => current.copyWith(privateJournal: value),
+                      ),
+                  onHideSocialCheckInsChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) =>
+                            current.copyWith(hideSocialCheckIns: value),
+                      ),
+                  onAllowHistoryInsightsChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) =>
+                            current.copyWith(allowHistoryInsights: value),
+                      ),
+                  onUseEmotionalDataForAiChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) =>
+                            current.copyWith(useEmotionalDataForAi: value),
+                      ),
+                  onDailyRemindersChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) => current.copyWith(dailyReminders: value),
+                      ),
+                  onContentPreferencesChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) =>
+                            current.copyWith(contentPreferences: value),
+                      ),
+                  onAiToneChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) => current.copyWith(aiTone: value),
+                      ),
+                  onSuggestionFrequencyChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) =>
+                            current.copyWith(suggestionFrequency: value),
+                      ),
+                  onTrailStyleChanged: (value) =>
+                      settingsController.updatePreferences(
+                        (current) => current.copyWith(trailStyle: value),
+                      ),
+                  onSavePreferences: _saveSettingsPreferences,
+                  onExportData: _exportSettingsData,
+                  onChangePassword: _changePassword,
+                  onRevokeSessions: _revokeSessions,
+                  onDeactivateAccount: () =>
+                      _deactivateAccount(session?.email ?? 'voce@evolua.app'),
+                  onDeleteAccount: () =>
+                      _deleteAccount(session?.email ?? 'voce@evolua.app'),
+                  onInformationalAction: () => _showSettingsMessage(
+                    'Esta informacao sera aberta em uma area dedicada em breve.',
+                  ),
+                );
+              },
+              loading: () =>
+                  const PrimaryPanel(child: LinearProgressIndicator()),
+              error: (_, _) => PrimaryPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Configuracoes e privacidade',
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
-                onHideSocialCheckInsChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(hideSocialCheckIns: value),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Nao foi possivel carregar suas preferencias agora.',
                     ),
-                onAllowHistoryInsightsChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) =>
-                          current.copyWith(allowHistoryInsights: value),
-                    ),
-                onUseEmotionalDataForAiChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) =>
-                          current.copyWith(useEmotionalDataForAi: value),
-                    ),
-                onDailyRemindersChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(dailyReminders: value),
-                    ),
-                onContentPreferencesChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(contentPreferences: value),
-                    ),
-                onAiToneChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(aiTone: value),
-                    ),
-                onSuggestionFrequencyChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(suggestionFrequency: value),
-                    ),
-                onTrailStyleChanged: (value) =>
-                    settingsController.updatePreferences(
-                      (current) => current.copyWith(trailStyle: value),
-                    ),
-                onSavePreferences: _saveSettingsPreferences,
-                onExportData: _exportSettingsData,
-                onChangePassword: _changePassword,
-                onRevokeSessions: _revokeSessions,
-                onDeactivateAccount: () =>
-                    _deactivateAccount(session?.email ?? 'voce@evolua.app'),
-                onDeleteAccount: () =>
-                    _deleteAccount(session?.email ?? 'voce@evolua.app'),
-                onInformationalAction: () => _showSettingsMessage(
-                  'Esta informacao sera aberta em uma area dedicada em breve.',
+                  ],
                 ),
-              );
-            },
-            loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
-            error: (_, _) => PrimaryPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Configuracoes e privacidade',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Nao foi possivel carregar suas preferencias agora.',
-                  ),
-                ],
               ),
-            ),
-          )
-        else if (_section == ProfileModuleSection.plansSubscriptions)
-          const SubscriptionModuleView()
-        else if (_section == ProfileModuleSection.helpSupport)
-          _HelpSupportSection(
-            configState: supportConfigState,
-            statusState: supportStatusState,
-            onCreateTicket: (category, subject) =>
-                _openSupportTicket(category: category, subject: subject),
-            onOpenLink: _openSupportLink,
-            onRefreshStatus: () => ref.invalidate(supportStatusProvider),
-          )
-        else if (_section == ProfileModuleSection.feedback)
-          const _FeedbackSection()
-        else if (_section == ProfileModuleSection.displayAccessibility)
-          accessibilityState.when(
-            data: (preferences) {
-              final accessibilityController = ref.read(
-                accessibilityPreferencesControllerProvider.notifier,
-              );
-              return _DisplayAccessibilitySection(
-                preferences: preferences,
-                onThemeModeChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(themeMode: value),
+            )
+          else if (_section == ProfileModuleSection.plansSubscriptions)
+            const SubscriptionModuleView()
+          else if (_section == ProfileModuleSection.helpSupport)
+            _HelpSupportSection(
+              configState: supportConfigState,
+              statusState: supportStatusState,
+              onCreateTicket: (category, subject) =>
+                  _openSupportTicket(category: category, subject: subject),
+              onOpenLink: _openSupportLink,
+              onRefreshStatus: () => ref.invalidate(supportStatusProvider),
+            )
+          else if (_section == ProfileModuleSection.feedback)
+            const _FeedbackSection()
+          else if (_section == ProfileModuleSection.evolutionMirror)
+            _EvolutionMirrorSection(
+              checkInState: checkInState,
+              currentJourneyState: currentJourneyState,
+              journeyState: journeyState,
+            )
+          else if (_section == ProfileModuleSection.displayAccessibility)
+            accessibilityState.when(
+              data: (preferences) {
+                final accessibilityController = ref.read(
+                  accessibilityPreferencesControllerProvider.notifier,
+                );
+                return _DisplayAccessibilitySection(
+                  preferences: preferences,
+                  onThemeModeChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(themeMode: value),
+                      ),
+                  onHighContrastChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(highContrast: value),
+                      ),
+                  onReduceTransparencyChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) =>
+                            current.copyWith(reduceTransparency: value),
+                      ),
+                  onAnimationLevelChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(animationLevel: value),
+                      ),
+                  onTextSizeChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(textSize: value),
+                      ),
+                  onReadingSpacingChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(readingSpacing: value),
+                      ),
+                  onAccessibleFontChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(accessibleFont: value),
+                      ),
+                  onFocusModeChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(focusMode: value),
+                      ),
+                  onReduceMotionChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(reduceMotion: value),
+                      ),
+                  onHapticFeedbackChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(hapticFeedback: value),
+                      ),
+                  onExtendedResponseTimeChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) =>
+                            current.copyWith(extendedResponseTime: value),
+                      ),
+                  onSimplifiedNavigationChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) =>
+                            current.copyWith(simplifiedNavigation: value),
+                      ),
+                  onReduceVisualStimuliChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) =>
+                            current.copyWith(reduceVisualStimuli: value),
+                      ),
+                  onSofterLanguageChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(softerLanguage: value),
+                      ),
+                  onHideSensitiveContentChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) =>
+                            current.copyWith(hideSensitiveContent: value),
+                      ),
+                  onComfortModeChanged: (value) =>
+                      accessibilityController.updatePreferences(
+                        (current) => current.copyWith(comfortMode: value),
+                      ),
+                  onSavePreferences: _saveAccessibilityPreferences,
+                );
+              },
+              loading: () =>
+                  const PrimaryPanel(child: LinearProgressIndicator()),
+              error: (_, _) => PrimaryPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tela e acessibilidade',
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
-                onHighContrastChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(highContrast: value),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Nao foi possivel carregar suas preferencias visuais agora.',
                     ),
-                onReduceTransparencyChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(reduceTransparency: value),
-                    ),
-                onAnimationLevelChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(animationLevel: value),
-                    ),
-                onTextSizeChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(textSize: value),
-                    ),
-                onReadingSpacingChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(readingSpacing: value),
-                    ),
-                onAccessibleFontChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(accessibleFont: value),
-                    ),
-                onFocusModeChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(focusMode: value),
-                    ),
-                onReduceMotionChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(reduceMotion: value),
-                    ),
-                onHapticFeedbackChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(hapticFeedback: value),
-                    ),
-                onExtendedResponseTimeChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) =>
-                          current.copyWith(extendedResponseTime: value),
-                    ),
-                onSimplifiedNavigationChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) =>
-                          current.copyWith(simplifiedNavigation: value),
-                    ),
-                onReduceVisualStimuliChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(reduceVisualStimuli: value),
-                    ),
-                onSofterLanguageChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(softerLanguage: value),
-                    ),
-                onHideSensitiveContentChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) =>
-                          current.copyWith(hideSensitiveContent: value),
-                    ),
-                onComfortModeChanged: (value) =>
-                    accessibilityController.updatePreferences(
-                      (current) => current.copyWith(comfortMode: value),
-                    ),
-                onSavePreferences: _saveAccessibilityPreferences,
-              );
-            },
-            loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
-            error: (_, _) => PrimaryPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tela e acessibilidade',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Nao foi possivel carregar suas preferencias visuais agora.',
-                  ),
-                ],
+                  ],
+                ),
               ),
+            )
+          else
+            _SectionPanel(
+              title: _sectionLabel(_section),
+              subtitle: switch (_section) {
+                ProfileModuleSection.settingsPrivacy =>
+                  'Ajuste informacoes pessoais, dados da conta e o que fica visivel para voce nesta jornada.',
+                ProfileModuleSection.helpSupport =>
+                  'Use esta area como ponto de apoio para duvidas, orientacoes e proximos passos de suporte.',
+                ProfileModuleSection.displayAccessibility =>
+                  'Centralize preferencias de leitura, foco visual e conforto de uso nesta tela.',
+                ProfileModuleSection.feedback =>
+                  'Registre sugestoes e percepcoes sobre a experiencia do app sem sair do seu espaco.',
+                ProfileModuleSection.plansSubscriptions =>
+                  'Gerencie seu plano atual e as opcoes de assinatura.',
+                ProfileModuleSection.evolutionMirror =>
+                  'Acompanhe progresso, padroes e conquistas da sua jornada.',
+                ProfileModuleSection.overview =>
+                  'Visao geral do seu perfil e dos dados principais da sua conta.',
+              },
             ),
-          )
-        else
-          _SectionPanel(
-            title: _sectionLabel(_section),
-            subtitle: switch (_section) {
-              ProfileModuleSection.settingsPrivacy =>
-                'Ajuste informacoes pessoais, dados da conta e o que fica visivel para voce nesta jornada.',
-              ProfileModuleSection.helpSupport =>
-                'Use esta area como ponto de apoio para duvidas, orientacoes e proximos passos de suporte.',
-              ProfileModuleSection.displayAccessibility =>
-                'Centralize preferencias de leitura, foco visual e conforto de uso nesta tela.',
-              ProfileModuleSection.feedback =>
-                'Registre sugestoes e percepcoes sobre a experiencia do app sem sair do seu espaco.',
-              ProfileModuleSection.plansSubscriptions =>
-                'Gerencie seu plano atual e as opcoes de assinatura.',
-              ProfileModuleSection.overview =>
-                'Visao geral do seu perfil e dos dados principais da sua conta.',
-            },
-          ),
-        if (profileState.isLoading && !profileState.hasValue) ...[
-          const SizedBox(height: 16),
-          const FeedSkeleton(cards: 2),
-        ],
-        if (isAdmin) ...[
-          const SizedBox(height: 16),
-          const NotificationAdminConsole(),
-        ],
+          if (profileState.isLoading && !profileState.hasValue) ...[
+            const SizedBox(height: 16),
+            const FeedSkeleton(cards: 2),
+          ],
+          if (isAdmin) ...[
+            const SizedBox(height: 16),
+            const NotificationAdminConsole(),
+          ],
         ],
       ),
     );
@@ -985,10 +1013,7 @@ class _ProfilePreferencesLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PrimaryPanel(
-          semanticLabel: 'Resumo do perfil',
-          child: hero,
-        ),
+        PrimaryPanel(semanticLabel: 'Resumo do perfil', child: hero),
         const SizedBox(height: 16),
         content,
       ],
@@ -1012,10 +1037,7 @@ class _ProfileSectionNavigation extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Preferencias',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        Text('Preferencias', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
           'Escolha uma area para ajustar sua experiencia no Evolua.',
@@ -1107,8 +1129,9 @@ class _ProfileSectionNavItem extends StatelessWidget {
                           meta.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: titleColor),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleMedium?.copyWith(color: titleColor),
                         ),
                         const SizedBox(height: 3),
                         Text(
@@ -1140,10 +1163,7 @@ class _ProfileSectionNavItem extends StatelessWidget {
 }
 
 class _ProfileSectionGroup {
-  const _ProfileSectionGroup({
-    required this.title,
-    required this.sections,
-  });
+  const _ProfileSectionGroup({required this.title, required this.sections});
 
   final String title;
   final List<ProfileModuleSection> sections;
@@ -1168,6 +1188,7 @@ const _profileSectionGroups = [
     title: 'Conta',
     sections: [
       ProfileModuleSection.overview,
+      ProfileModuleSection.evolutionMirror,
       ProfileModuleSection.plansSubscriptions,
     ],
   ),
@@ -1180,10 +1201,7 @@ const _profileSectionGroups = [
   ),
   _ProfileSectionGroup(
     title: 'Apoio',
-    sections: [
-      ProfileModuleSection.helpSupport,
-      ProfileModuleSection.feedback,
-    ],
+    sections: [ProfileModuleSection.helpSupport, ProfileModuleSection.feedback],
   ),
 ];
 
@@ -1200,6 +1218,12 @@ _ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
       icon: Icons.workspace_premium_rounded,
       title: 'Planos e assinaturas',
       description: 'Plano atual, beneficios e upgrade.',
+    ),
+    ProfileModuleSection.evolutionMirror => const _ProfileSectionMeta(
+      section: ProfileModuleSection.evolutionMirror,
+      icon: Icons.auto_graph_rounded,
+      title: 'Espelho da Evolucao',
+      description: 'Progresso, padroes, IA e conquistas.',
     ),
     ProfileModuleSection.settingsPrivacy => const _ProfileSectionMeta(
       section: ProfileModuleSection.settingsPrivacy,
@@ -1476,6 +1500,596 @@ class _OverviewSection extends StatelessWidget {
   }
 }
 
+class _EvolutionMirrorSection extends StatelessWidget {
+  const _EvolutionMirrorSection({
+    required this.checkInState,
+    required this.currentJourneyState,
+    required this.journeyState,
+  });
+
+  final AsyncValue<CheckInHistoryState> checkInState;
+  final AsyncValue<Trail?> currentJourneyState;
+  final AsyncValue<TrailJourney>? journeyState;
+
+  @override
+  Widget build(BuildContext context) {
+    final history = checkInState.asData?.value;
+    final checkIns = history?.result.items ?? const <CheckIn>[];
+    final totalCheckIns = history?.result.totalItems ?? checkIns.length;
+    final latestInsight =
+        history?.latestCreatedCheckIn?.aiInsight ??
+        checkIns
+            .where((item) => item.aiInsight != null)
+            .map((item) => item.aiInsight!)
+            .firstOrNull;
+    final activeTrail = currentJourneyState.asData?.value;
+    final journey = journeyState?.asData?.value;
+    final stats = _EvolutionMirrorStats.from(
+      checkIns: checkIns,
+      totalCheckIns: totalCheckIns,
+      activeTrail: activeTrail,
+      journey: journey,
+      latestInsight: latestInsight,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          semanticLabel: 'Espelho da Evolucao',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Espelho da Evolucao',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Um retrato vivo do seu progresso, dos seus padroes e das conquistas que estao se formando na sua jornada.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Visao de progresso',
+          description:
+              'Veja como seus registros, sua constancia e sua jornada ativa estao se conectando.',
+          child: _EvolutionMetricGrid(
+            metrics: [
+              _EvolutionMetric(
+                icon: Icons.favorite_rounded,
+                label: 'Check-ins',
+                value: '$totalCheckIns',
+              ),
+              _EvolutionMetric(
+                icon: Icons.local_fire_department_rounded,
+                label: 'Consistencia',
+                value: '${stats.streak} dias',
+              ),
+              _EvolutionMetric(
+                icon: Icons.route_rounded,
+                label: 'Jornada',
+                value: journey == null
+                    ? 'em preparo'
+                    : '${journey.progressPercent}%',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Padroes emocionais',
+          description:
+              'Leituras simples para perceber energia, repeticoes e sinais recentes sem transformar isso em cobranca.',
+          child: Column(
+            children: [
+              _EvolutionSignalRow(
+                icon: Icons.mood_rounded,
+                label: 'Estado dominante',
+                value: stats.dominantMood,
+              ),
+              _EvolutionSignalRow(
+                icon: Icons.bolt_rounded,
+                label: 'Energia media',
+                value: stats.averageEnergyLabel,
+              ),
+              _EvolutionSignalRow(
+                icon: Icons.schedule_rounded,
+                label: 'Melhor horario',
+                value: stats.bestTimeWindow,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Evolucao nas trilhas',
+          description:
+              'Acompanhe a trilha que esta guiando seus proximos passos.',
+          child: _TrailEvolutionPanel(
+            currentJourneyState: currentJourneyState,
+            journeyState: journeyState,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Insights da IA',
+          description:
+              'O ultimo insight vira um espelho pratico, com cuidado e contexto.',
+          child: _AiInsightMirrorPanel(insight: latestInsight),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Conquistas',
+          description:
+              'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: stats.achievements
+                .map((item) => _AchievementBadge(label: item))
+                .toList(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Consistencia',
+          description:
+              'Uma leitura de continuidade para ajudar voce a voltar sem peso quando o ritmo oscilar.',
+          child: _ConsistencyPanel(stats: stats),
+        ),
+      ],
+    );
+  }
+}
+
+class _EvolutionSectionGroup extends StatelessWidget {
+  const _EvolutionSectionGroup({
+    required this.title,
+    required this.description,
+    required this.child,
+  });
+
+  final String title;
+  final String description;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      semanticLabel: title,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(description, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _EvolutionMetric {
+  const _EvolutionMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+}
+
+class _EvolutionMetricGrid extends StatelessWidget {
+  const _EvolutionMetricGrid({required this.metrics});
+
+  final List<_EvolutionMetric> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: metrics
+          .map(
+            (metric) => SizedBox(
+              width: 160,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: context.evoluaColors.surfaceStrong.withValues(
+                    alpha: 0.28,
+                  ),
+                  border: Border.all(
+                    color: context.evoluaColors.outline.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(metric.icon, color: AppColors.accent),
+                    const SizedBox(height: 10),
+                    Text(
+                      metric.value,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: context.evoluaColors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      metric.label,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _EvolutionSignalRow extends StatelessWidget {
+  const _EvolutionSignalRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrailEvolutionPanel extends StatelessWidget {
+  const _TrailEvolutionPanel({
+    required this.currentJourneyState,
+    required this.journeyState,
+  });
+
+  final AsyncValue<Trail?> currentJourneyState;
+  final AsyncValue<TrailJourney>? journeyState;
+
+  @override
+  Widget build(BuildContext context) {
+    final trail = currentJourneyState.asData?.value;
+    if (currentJourneyState.isLoading && trail == null) {
+      return const LinearProgressIndicator();
+    }
+    if (trail == null) {
+      return Text(
+        'Quando uma trilha estiver ativa, ela aparece aqui como mapa de progresso.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+
+    final journey = journeyState?.asData?.value;
+    final progress = (journey?.progressPercent ?? 0).clamp(0, 100);
+    final nextStep = journey?.nextStep?.title ?? 'Retomar no seu ritmo';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          trail.title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: context.evoluaColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(trail.summary, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 14),
+        LinearProgressIndicator(value: progress / 100),
+        const SizedBox(height: 10),
+        Text(
+          journey == null
+              ? 'Carregando progresso da trilha...'
+              : '$progress% concluido - ${journey.completedSteps}/${journey.steps.length} etapas',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Proximo passo: $nextStep',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+}
+
+class _AiInsightMirrorPanel extends StatelessWidget {
+  const _AiInsightMirrorPanel({required this.insight});
+
+  final CheckInAiInsight? insight;
+
+  @override
+  Widget build(BuildContext context) {
+    if (insight == null) {
+      return Text(
+        'Depois dos proximos check-ins, os insights da IA aparecem aqui com acoes e padroes mais claros.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(insight!.insight, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 12),
+        _EvolutionSignalRow(
+          icon: Icons.task_alt_rounded,
+          label: 'Acao sugerida',
+          value: insight!.suggestedAction,
+        ),
+        _EvolutionSignalRow(
+          icon: Icons.shield_rounded,
+          label: 'Risco / cuidado',
+          value: insight!.fallbackUsed ? 'modo seguro' : insight!.riskLevel,
+        ),
+        if (insight!.suggestedTrailTitle != null)
+          _EvolutionSignalRow(
+            icon: Icons.route_rounded,
+            label: 'Trilha sugerida',
+            value: insight!.suggestedTrailTitle!,
+          ),
+      ],
+    );
+  }
+}
+
+class _AchievementBadge extends StatelessWidget {
+  const _AchievementBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 250),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: AppColors.accent.withValues(alpha: 0.14),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.emoji_events_rounded,
+            size: 16,
+            color: AppColors.accent,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConsistencyPanel extends StatelessWidget {
+  const _ConsistencyPanel({required this.stats});
+
+  final _EvolutionMirrorStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeDays = stats.weeklyCheckIns.clamp(0, 7);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(
+            7,
+            (index) => Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: index < activeDays
+                    ? AppColors.accent
+                    : context.evoluaColors.surfaceStrong.withValues(
+                        alpha: 0.36,
+                      ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          stats.consistencyMessage,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+}
+
+class _EvolutionMirrorStats {
+  const _EvolutionMirrorStats({
+    required this.weeklyCheckIns,
+    required this.streak,
+    required this.dominantMood,
+    required this.averageEnergyLabel,
+    required this.bestTimeWindow,
+    required this.consistencyMessage,
+    required this.achievements,
+  });
+
+  final int weeklyCheckIns;
+  final int streak;
+  final String dominantMood;
+  final String averageEnergyLabel;
+  final String bestTimeWindow;
+  final String consistencyMessage;
+  final List<String> achievements;
+
+  factory _EvolutionMirrorStats.from({
+    required List<CheckIn> checkIns,
+    required int totalCheckIns,
+    required Trail? activeTrail,
+    required TrailJourney? journey,
+    required CheckInAiInsight? latestInsight,
+  }) {
+    final weeklyCheckIns = _mirrorWeeklyCheckIns(checkIns);
+    final streak = _mirrorStreak(checkIns);
+    final averageEnergy = checkIns.isEmpty
+        ? null
+        : checkIns.fold<int>(0, (sum, item) => sum + item.energyLevel) /
+              checkIns.length;
+    final achievements = <String>[
+      if (totalCheckIns > 0) 'Primeiro check-in',
+      if (streak >= 2) 'Constancia emocional',
+      if (activeTrail != null) 'Jornada ativa',
+      if ((journey?.completedSteps ?? 0) > 0) 'Etapas concluidas',
+      if (latestInsight != null) 'Insight da IA',
+      if ((journey?.progressPercent ?? 0) >= 100) 'Ciclo completo',
+    ];
+
+    return _EvolutionMirrorStats(
+      weeklyCheckIns: weeklyCheckIns,
+      streak: streak,
+      dominantMood: checkIns.isEmpty
+          ? 'sem padrao ainda'
+          : _mirrorCapitalize(_mirrorDominantMood(checkIns)),
+      averageEnergyLabel: averageEnergy == null
+          ? 'sem dados'
+          : '${averageEnergy.toStringAsFixed(1)}/10',
+      bestTimeWindow: _mirrorBestTimeWindow(checkIns),
+      consistencyMessage: weeklyCheckIns == 0
+          ? 'Seu espelho ainda esta se formando. Um check-in curto ja cria o primeiro ponto de referencia.'
+          : 'Voce registrou $weeklyCheckIns momento(s) nesta semana. A constancia aqui e voltar com honestidade, nao fazer tudo perfeito.',
+      achievements: achievements.isEmpty
+          ? const ['Primeiro passo disponivel']
+          : achievements,
+    );
+  }
+}
+
+String _mirrorDominantMood(List<CheckIn> items) {
+  final counts = <String, int>{};
+  for (final item in items) {
+    counts[item.mood] = (counts[item.mood] ?? 0) + 1;
+  }
+  return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+}
+
+int _mirrorWeeklyCheckIns(List<CheckIn> items) {
+  final now = DateTime.now();
+  final start = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(const Duration(days: 6));
+  return items.where((item) => !item.createdAt.isBefore(start)).length;
+}
+
+int _mirrorStreak(List<CheckIn> items) {
+  if (items.isEmpty) {
+    return 0;
+  }
+  final days = items
+      .map(
+        (item) => DateTime(
+          item.createdAt.year,
+          item.createdAt.month,
+          item.createdAt.day,
+        ),
+      )
+      .toSet();
+  final today = DateTime.now();
+  final base = DateTime(today.year, today.month, today.day);
+  var streak = 0;
+  for (var offset = 0; offset < 60; offset++) {
+    if (!days.contains(base.subtract(Duration(days: offset)))) {
+      break;
+    }
+    streak++;
+  }
+  return streak;
+}
+
+String _mirrorBestTimeWindow(List<CheckIn> items) {
+  if (items.isEmpty) {
+    return 'sem dados';
+  }
+  final averageHour =
+      items.fold<int>(0, (sum, item) => sum + item.createdAt.hour) /
+      items.length;
+  if (averageHour < 12) {
+    return 'manha';
+  }
+  if (averageHour < 18) {
+    return 'tarde';
+  }
+  return 'noite';
+}
+
+String _mirrorCapitalize(String value) {
+  if (value.isEmpty) {
+    return value;
+  }
+  return value[0].toUpperCase() + value.substring(1);
+}
+
 class _FeedbackSection extends ConsumerStatefulWidget {
   const _FeedbackSection();
 
@@ -1540,9 +2154,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
   Future<void> _submit() async {
     final draft = _draft();
     if (!draft.hasMeaningfulContent) {
-      _showMessage(
-        'Conte pelo menos uma percepcao ou escolha uma avaliacao.',
-      );
+      _showMessage('Conte pelo menos uma percepcao ou escolha uma avaliacao.');
       return;
     }
 
@@ -1613,7 +2225,9 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _friendlyFeedbackError(Object error) {
@@ -1682,7 +2296,10 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Dar feedback', style: Theme.of(context).textTheme.headlineMedium),
+              Text(
+                'Dar feedback',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
               const SizedBox(height: 12),
               Text(
                 'O Evolua esta em constante evolucao. Sua percepcao ajuda a construir uma experiencia melhor para todos.',
@@ -1746,19 +2363,20 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: const {
-                'MUITO_BOA': 'Muito boa',
-                'BOA': 'Boa',
-                'NEUTRA': 'Neutra',
-                'RUIM': 'Ruim',
-                'MUITO_RUIM': 'Muito ruim',
-              }.entries.map((entry) {
-                return ChoiceChip(
-                  label: Text(entry.value),
-                  selected: _rating == entry.key,
-                  onSelected: (_) => setState(() => _rating = entry.key),
-                );
-              }).toList(),
+              children:
+                  const {
+                    'MUITO_BOA': 'Muito boa',
+                    'BOA': 'Boa',
+                    'NEUTRA': 'Neutra',
+                    'RUIM': 'Ruim',
+                    'MUITO_RUIM': 'Muito ruim',
+                  }.entries.map((entry) {
+                    return ChoiceChip(
+                      label: Text(entry.value),
+                      selected: _rating == entry.key,
+                      onSelected: (_) => setState(() => _rating = entry.key),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: 12),
             _FeedbackTextField(
@@ -3056,5 +3674,6 @@ String _sectionLabel(ProfileModuleSection section) {
     ProfileModuleSection.displayAccessibility => 'Tela e acessibilidade',
     ProfileModuleSection.feedback => 'Dar feedback',
     ProfileModuleSection.plansSubscriptions => 'Planos e assinaturas',
+    ProfileModuleSection.evolutionMirror => 'Espelho da Evolucao',
   };
 }

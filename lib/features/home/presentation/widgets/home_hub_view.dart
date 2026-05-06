@@ -25,6 +25,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenFeed,
     required this.onOpenCommunity,
     required this.onOpenProfile,
+    required this.onOpenEvolutionMirror,
     required this.onOpenCheckIn,
     this.onOpenPremium,
   });
@@ -38,6 +39,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenProfile;
+  final VoidCallback onOpenEvolutionMirror;
   final VoidCallback onOpenCheckIn;
   final VoidCallback? onOpenPremium;
 
@@ -116,7 +118,14 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       backgroundColor: context.evoluaColors.surface,
       builder: (context) => _BriefingBottomSheet(
         title: 'Seu ritmo hoje',
-        child: _RhythmDetailsSheet(summary: summary, recentItems: recentItems),
+        child: _RhythmDetailsSheet(
+          summary: summary,
+          recentItems: recentItems,
+          onOpenEvolutionMirror: () {
+            Navigator.of(context).pop();
+            widget.onOpenEvolutionMirror();
+          },
+        ),
       ),
     );
   }
@@ -534,49 +543,156 @@ class _RhythmBriefingCard extends StatelessWidget {
 }
 
 class _RhythmDetailsSheet extends StatelessWidget {
-  const _RhythmDetailsSheet({required this.summary, required this.recentItems});
+  const _RhythmDetailsSheet({
+    required this.summary,
+    required this.recentItems,
+    required this.onOpenEvolutionMirror,
+  });
 
   final _RhythmSummary summary;
   final List<CheckIn> recentItems;
+  final VoidCallback onOpenEvolutionMirror;
 
   @override
   Widget build(BuildContext context) {
+    final consistencyDays = summary.weeklyCheckIns.clamp(0, 7);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _RhythmDetailRow(
-          label: 'Energia media',
-          value: '${summary.averageEnergy.toStringAsFixed(1)}/10',
-        ),
-        _RhythmDetailRow(label: 'Melhor horario', value: summary.bestTime),
-        _RhythmDetailRow(
-          label: 'Estado dominante',
-          value: summary.dominantMood,
-        ),
-        _RhythmDetailRow(
-          label: 'Check-ins esta semana',
-          value: '${summary.weeklyCheckIns}',
-        ),
-        _RhythmDetailRow(label: 'Streak', value: '${summary.streak} dias'),
-        _RhythmDetailRow(
-          label: 'Oscilacao recente',
-          value: summary.energyTrend,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: AppColors.accent.withValues(alpha: 0.12),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.22)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: AppColors.accent.withValues(alpha: 0.18),
+                    ),
+                    child: const Icon(
+                      Icons.insights_rounded,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      summary.personalInsight,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: context.evoluaColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                summary.energyTrend,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 18),
+        _RhythmMetricGrid(
+          metrics: [
+            _RhythmMetric(
+              icon: Icons.bolt_rounded,
+              label: 'Energia media',
+              value: '${summary.averageEnergy.toStringAsFixed(1)}/10',
+            ),
+            _RhythmMetric(
+              icon: Icons.schedule_rounded,
+              label: 'Melhor horario',
+              value: summary.bestTime,
+            ),
+            _RhythmMetric(
+              icon: Icons.mood_rounded,
+              label: 'Estado dominante',
+              value: summary.dominantMood,
+            ),
+            _RhythmMetric(
+              icon: Icons.event_available_rounded,
+              label: 'Check-ins na semana',
+              value: '${summary.weeklyCheckIns}',
+            ),
+            _RhythmMetric(
+              icon: Icons.local_fire_department_rounded,
+              label: 'Streak',
+              value: '${summary.streak} dias',
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'Consistencia da semana',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: context.evoluaColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(
+            7,
+            (index) => _ConsistencyDot(active: index < consistencyDays),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          summary.weeklyCheckIns == 0
+              ? 'Seu ritmo ainda esta se formando. Um check-in curto ja ajuda a criar contexto.'
+              : 'Voce registrou ${summary.weeklyCheckIns} momento(s) nesta semana.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 22),
         Text(
           'Ultimos check-ins',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: context.evoluaColors.textPrimary,
+            fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         if (recentItems.isEmpty)
-          Text(
-            'Seus proximos check-ins aparecem aqui.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
+            ),
+            child: Text(
+              'Seus proximos check-ins aparecem aqui.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           )
         else
           ...recentItems.take(4).map((item) => _RecentCheckInTile(item: item)),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: onOpenEvolutionMirror,
+            icon: const Icon(Icons.auto_graph_rounded),
+            label: const Text('Abrir Espelho da Evolucao'),
+          ),
+        ),
       ],
     );
   }
@@ -736,34 +852,101 @@ class _InsightPill extends StatelessWidget {
   }
 }
 
-class _RhythmDetailRow extends StatelessWidget {
-  const _RhythmDetailRow({required this.label, required this.value});
+class _RhythmMetric {
+  const _RhythmMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
+}
+
+class _RhythmMetricGrid extends StatelessWidget {
+  const _RhythmMetricGrid({required this.metrics});
+
+  final List<_RhythmMetric> metrics;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          ),
-          const SizedBox(width: 16),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: metrics
+          .map(
+            (metric) => SizedBox(
+              width: 150,
+              child: Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: context.evoluaColors.surfaceStrong.withValues(
+                    alpha: 0.32,
+                  ),
+                  border: Border.all(
+                    color: context.evoluaColors.outline.withValues(alpha: 0.16),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(metric.icon, size: 18, color: AppColors.accent),
+                    const SizedBox(height: 9),
+                    Text(
+                      metric.value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: context.evoluaColors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      metric.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          )
+          .toList(),
+    );
+  }
+}
+
+class _ConsistencyDot extends StatelessWidget {
+  const _ConsistencyDot({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: MediaQuery.of(context).disableAnimations
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active
+            ? AppColors.accent
+            : context.evoluaColors.surfaceStrong.withValues(alpha: 0.36),
+        border: Border.all(
+          color: active
+              ? AppColors.accent.withValues(alpha: 0.42)
+              : context.evoluaColors.outline.withValues(alpha: 0.14),
+        ),
       ),
+      child: active
+          ? const Icon(Icons.check_rounded, size: 16, color: AppColors.surface)
+          : null,
     );
   }
 }
@@ -787,20 +970,51 @@ class _RecentCheckInTile extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
+          border: Border.all(
+            color: context.evoluaColors.outline.withValues(alpha: 0.12),
+          ),
         ),
         child: Row(
           children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppColors.accent.withValues(alpha: 0.14),
+              ),
+              child: const Icon(
+                Icons.favorite_rounded,
+                size: 17,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                _capitalize(item.mood),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: context.evoluaColors.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _capitalize(item.mood),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.evoluaColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$day/$month as $hour:$minute',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
             Text(
-              '$day/$month $hour:$minute - ${item.energyLevel}/10',
-              style: Theme.of(context).textTheme.bodySmall,
+              '${item.energyLevel}/10',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),

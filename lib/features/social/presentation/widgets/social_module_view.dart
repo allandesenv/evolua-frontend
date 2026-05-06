@@ -404,8 +404,10 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   ),
                   const SizedBox(height: 16),
                   postsState.when(
-                    data: (result) => SocialFeedArea(
-                      result: result,
+                    data: (feedState) => SocialFeedArea(
+                      result: feedState.result,
+                      isFromCache: feedState.isFromCache,
+                      offlineMessage: feedState.offlineMessage,
                       searchController: _feedSearchController,
                       visibilityFilter: _feedVisibilityFilter,
                       communityFilter: _feedCommunityFilter,
