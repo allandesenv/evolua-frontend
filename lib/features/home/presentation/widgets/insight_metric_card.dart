@@ -1,4 +1,4 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
@@ -24,16 +24,13 @@ class InsightMetricCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(label, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 14),
             Text(
               value,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Container(
@@ -44,9 +41,9 @@ class InsightMetricCard extends StatelessWidget {
               ),
               child: Text(
                 change,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: tone,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: tone),
               ),
             ),
           ],

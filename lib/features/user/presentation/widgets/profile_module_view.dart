@@ -1,10 +1,15 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
+import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
+import 'package:evolua_frontend/features/user/application/support_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -12,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum ProfileModuleSection {
   overview,
@@ -520,6 +526,123 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     );
   }
 
+  Future<void> _saveAccessibilityPreferences() async {
+    try {
+      await ref
+          .read(accessibilityPreferencesControllerProvider.notifier)
+          .save();
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage('Preferencias visuais salvas com conforto.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _openSupportTicket({
+    required String category,
+    required String subject,
+  }) async {
+    final result = await _showSupportTicketDialog(subject: subject);
+    if (result == null) {
+      return;
+    }
+
+    try {
+      final ticket = await ref
+          .read(supportRepositoryProvider)
+          .createTicket(
+            category: category,
+            subject: result.subject,
+            message: result.message,
+          );
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(
+        'Chamado #${ticket.id} aberto. Nosso time vai acompanhar com cuidado.',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _openSupportLink(Uri? url, String fallbackMessage) async {
+    if (url == null) {
+      _showSettingsMessage(fallbackMessage);
+      return;
+    }
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      _showSettingsMessage(fallbackMessage);
+    }
+  }
+
+  Future<_SupportTicketDialogResult?> _showSupportTicketDialog({
+    required String subject,
+  }) async {
+    final subjectController = TextEditingController(text: subject);
+    final messageController = TextEditingController();
+    return showDialog<_SupportTicketDialogResult>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Abrir chamado'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: subjectController,
+              decoration: const InputDecoration(labelText: 'Assunto'),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: messageController,
+              decoration: const InputDecoration(
+                labelText: 'Como podemos ajudar?',
+                alignLabelWithHint: true,
+              ),
+              minLines: 4,
+              maxLines: 6,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final normalizedSubject = subjectController.text.trim();
+              final message = messageController.text.trim();
+              if (normalizedSubject.isEmpty || message.isEmpty) {
+                _showSettingsMessage(
+                  'Informe o assunto e conte rapidamente como podemos ajudar.',
+                );
+                return;
+              }
+              Navigator.of(context).pop(
+                _SupportTicketDialogResult(
+                  subject: normalizedSubject,
+                  message: message,
+                ),
+              );
+            },
+            child: const Text('Enviar chamado'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _friendlySettingsError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -547,6 +670,11 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final settingsState = ref.watch(
       settingsPrivacyPreferencesControllerProvider,
     );
+    final accessibilityState = ref.watch(
+      accessibilityPreferencesControllerProvider,
+    );
+    final supportConfigState = ref.watch(supportConfigProvider);
+    final supportStatusState = ref.watch(supportStatusProvider);
     final profile = profileState.asData?.value;
     final isSaving = profileState.isLoading && profileState.hasValue;
     final isAdmin = session?.isAdmin ?? false;
@@ -555,52 +683,19 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
 
     _seedForm(profile, fallbackName);
 
-    return Column(
-      children: [
-        PrimaryPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ProfileHero(
-                displayName: profile?.displayName ?? fallbackName,
-                email: session?.email ?? 'voce@evolua.app',
-                avatarUrl: profile?.avatarUrl ?? session?.avatarUrl,
-                onRefresh: () =>
-                    ref.read(profileControllerProvider.notifier).refresh(),
-                onChangeAvatar: _pickAvatar,
-              ),
-              const SizedBox(height: 18),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: ProfileModuleSection.values
-                        .map(
-                          (section) => ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth,
-                            ),
-                            child: ChoiceChip(
-                              label: Text(
-                                _sectionLabel(section),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              selected: _section == section,
-                              onSelected: (_) =>
-                                  setState(() => _section = section),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
+    return _ProfilePreferencesLayout(
+      hero: _ProfileHero(
+        displayName: profile?.displayName ?? fallbackName,
+        email: session?.email ?? 'voce@evolua.app',
+        avatarUrl: profile?.avatarUrl ?? session?.avatarUrl,
+        onRefresh: () => ref.read(profileControllerProvider.notifier).refresh(),
+        onChangeAvatar: _pickAvatar,
+      ),
+      selectedSection: _section,
+      onSectionSelected: (section) => setState(() => _section = section),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         if (_section == ProfileModuleSection.overview)
           _OverviewSection(
             formKey: _formKey,
@@ -704,6 +799,112 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           )
         else if (_section == ProfileModuleSection.plansSubscriptions)
           const SubscriptionModuleView()
+        else if (_section == ProfileModuleSection.helpSupport)
+          _HelpSupportSection(
+            configState: supportConfigState,
+            statusState: supportStatusState,
+            onCreateTicket: (category, subject) =>
+                _openSupportTicket(category: category, subject: subject),
+            onOpenLink: _openSupportLink,
+            onRefreshStatus: () => ref.invalidate(supportStatusProvider),
+          )
+        else if (_section == ProfileModuleSection.feedback)
+          const _FeedbackSection()
+        else if (_section == ProfileModuleSection.displayAccessibility)
+          accessibilityState.when(
+            data: (preferences) {
+              final accessibilityController = ref.read(
+                accessibilityPreferencesControllerProvider.notifier,
+              );
+              return _DisplayAccessibilitySection(
+                preferences: preferences,
+                onThemeModeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(themeMode: value),
+                    ),
+                onHighContrastChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(highContrast: value),
+                    ),
+                onReduceTransparencyChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(reduceTransparency: value),
+                    ),
+                onAnimationLevelChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(animationLevel: value),
+                    ),
+                onTextSizeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(textSize: value),
+                    ),
+                onReadingSpacingChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(readingSpacing: value),
+                    ),
+                onAccessibleFontChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(accessibleFont: value),
+                    ),
+                onFocusModeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(focusMode: value),
+                    ),
+                onReduceMotionChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(reduceMotion: value),
+                    ),
+                onHapticFeedbackChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(hapticFeedback: value),
+                    ),
+                onExtendedResponseTimeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) =>
+                          current.copyWith(extendedResponseTime: value),
+                    ),
+                onSimplifiedNavigationChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) =>
+                          current.copyWith(simplifiedNavigation: value),
+                    ),
+                onReduceVisualStimuliChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(reduceVisualStimuli: value),
+                    ),
+                onSofterLanguageChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(softerLanguage: value),
+                    ),
+                onHideSensitiveContentChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) =>
+                          current.copyWith(hideSensitiveContent: value),
+                    ),
+                onComfortModeChanged: (value) =>
+                    accessibilityController.updatePreferences(
+                      (current) => current.copyWith(comfortMode: value),
+                    ),
+                onSavePreferences: _saveAccessibilityPreferences,
+              );
+            },
+            loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
+            error: (_, _) => PrimaryPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tela e acessibilidade',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Nao foi possivel carregar suas preferencias visuais agora.',
+                  ),
+                ],
+              ),
+            ),
+          )
         else
           _SectionPanel(
             title: _sectionLabel(_section),
@@ -730,9 +931,301 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           const SizedBox(height: 16),
           const NotificationAdminConsole(),
         ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfilePreferencesLayout extends StatelessWidget {
+  const _ProfilePreferencesLayout({
+    required this.hero,
+    required this.selectedSection,
+    required this.onSectionSelected,
+    required this.content,
+  });
+
+  final Widget hero;
+  final ProfileModuleSection selectedSection;
+  final ValueChanged<ProfileModuleSection> onSectionSelected;
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) {
+    final expanded = ResponsiveBreakpoints.isExpanded(context);
+
+    if (expanded) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 288,
+            child: PrimaryPanel(
+              semanticLabel: 'Preferencias do perfil',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  hero,
+                  const SizedBox(height: 22),
+                  _ProfileSectionNavigation(
+                    selectedSection: selectedSection,
+                    onSectionSelected: onSectionSelected,
+                    compact: false,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(child: content),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          semanticLabel: 'Resumo do perfil',
+          child: hero,
+        ),
+        const SizedBox(height: 16),
+        content,
       ],
     );
   }
+}
+
+class _ProfileSectionNavigation extends StatelessWidget {
+  const _ProfileSectionNavigation({
+    required this.selectedSection,
+    required this.onSectionSelected,
+    required this.compact,
+  });
+
+  final ProfileModuleSection selectedSection;
+  final ValueChanged<ProfileModuleSection> onSectionSelected;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Preferencias',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Escolha uma area para ajustar sua experiencia no Evolua.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 16),
+        for (final group in _profileSectionGroups) ...[
+          Padding(
+            padding: EdgeInsets.only(
+              top: group == _profileSectionGroups.first ? 0 : 14,
+              bottom: 8,
+            ),
+            child: Text(
+              group.title,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+          ),
+          for (final section in group.sections)
+            _ProfileSectionNavItem(
+              meta: _profileSectionMeta(section),
+              selected: selectedSection == section,
+              compact: compact,
+              onTap: () => onSectionSelected(section),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProfileSectionNavItem extends StatelessWidget {
+  const _ProfileSectionNavItem({
+    required this.meta,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final _ProfileSectionMeta meta;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.evoluaColors;
+    final backgroundColor = selected
+        ? AppColors.accent.withValues(alpha: 0.16)
+        : colors.surfaceStrong.withValues(alpha: 0.24);
+    final borderColor = selected
+        ? AppColors.accent.withValues(alpha: 0.48)
+        : colors.outline.withValues(alpha: 0.14);
+    final iconColor = selected ? AppColors.accent : colors.textSecondary;
+    final titleColor = selected ? colors.textPrimary : colors.textPrimary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: meta.title,
+        child: Material(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 12 : 14,
+                vertical: compact ? 11 : 12,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(meta.icon, color: iconColor, size: compact ? 22 : 21),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meta.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: titleColor),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          meta.description,
+                          maxLines: compact ? 2 : 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (selected) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.accent,
+                      size: 18,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSectionGroup {
+  const _ProfileSectionGroup({
+    required this.title,
+    required this.sections,
+  });
+
+  final String title;
+  final List<ProfileModuleSection> sections;
+}
+
+class _ProfileSectionMeta {
+  const _ProfileSectionMeta({
+    required this.section,
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final ProfileModuleSection section;
+  final IconData icon;
+  final String title;
+  final String description;
+}
+
+const _profileSectionGroups = [
+  _ProfileSectionGroup(
+    title: 'Conta',
+    sections: [
+      ProfileModuleSection.overview,
+      ProfileModuleSection.plansSubscriptions,
+    ],
+  ),
+  _ProfileSectionGroup(
+    title: 'Preferencias',
+    sections: [
+      ProfileModuleSection.settingsPrivacy,
+      ProfileModuleSection.displayAccessibility,
+    ],
+  ),
+  _ProfileSectionGroup(
+    title: 'Apoio',
+    sections: [
+      ProfileModuleSection.helpSupport,
+      ProfileModuleSection.feedback,
+    ],
+  ),
+];
+
+_ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
+  return switch (section) {
+    ProfileModuleSection.overview => const _ProfileSectionMeta(
+      section: ProfileModuleSection.overview,
+      icon: Icons.person_rounded,
+      title: 'Visao geral',
+      description: 'Dados principais e identidade da conta.',
+    ),
+    ProfileModuleSection.plansSubscriptions => const _ProfileSectionMeta(
+      section: ProfileModuleSection.plansSubscriptions,
+      icon: Icons.workspace_premium_rounded,
+      title: 'Planos e assinaturas',
+      description: 'Plano atual, beneficios e upgrade.',
+    ),
+    ProfileModuleSection.settingsPrivacy => const _ProfileSectionMeta(
+      section: ProfileModuleSection.settingsPrivacy,
+      icon: Icons.shield_rounded,
+      title: 'Configuracoes e privacidade',
+      description: 'Conta, dados, seguranca e preferencias.',
+    ),
+    ProfileModuleSection.displayAccessibility => const _ProfileSectionMeta(
+      section: ProfileModuleSection.displayAccessibility,
+      icon: Icons.contrast_rounded,
+      title: 'Tela e acessibilidade',
+      description: 'Conforto visual, leitura e interacao.',
+    ),
+    ProfileModuleSection.helpSupport => const _ProfileSectionMeta(
+      section: ProfileModuleSection.helpSupport,
+      icon: Icons.help_outline_rounded,
+      title: 'Ajuda e suporte',
+      description: 'Central de ajuda, chamados e status.',
+    ),
+    ProfileModuleSection.feedback => const _ProfileSectionMeta(
+      section: ProfileModuleSection.feedback,
+      icon: Icons.feedback_outlined,
+      title: 'Dar feedback',
+      description: 'Compartilhe percepcoes e sugestoes.',
+    ),
+  };
 }
 
 class _ProfileHero extends StatelessWidget {
@@ -956,9 +1449,9 @@ class _OverviewSection extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Nivel da jornada: ${journeyLevel.round()}',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
             Slider(
               min: 1,
@@ -978,6 +1471,932 @@ class _OverviewSection extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FeedbackSection extends ConsumerStatefulWidget {
+  const _FeedbackSection();
+
+  @override
+  ConsumerState<_FeedbackSection> createState() => _FeedbackSectionState();
+}
+
+class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
+  final _workingWellController = TextEditingController();
+  final _couldImproveController = TextEditingController();
+  final _confusingOrHardController = TextEditingController();
+  final _helpedHowController = TextEditingController();
+  final _featureSuggestionController = TextEditingController();
+  final _contentSuggestionController = TextEditingController();
+  final _visualSuggestionController = TextEditingController();
+  final _aiSuggestionController = TextEditingController();
+  final _problemWhatHappenedController = TextEditingController();
+  final _problemWhereController = TextEditingController();
+  final _problemCanRepeatController = TextEditingController();
+  final _ratingCommentController = TextEditingController();
+  final _picker = ImagePicker();
+  String? _rating;
+  String? _screenshotFileName;
+  Uint8List? _screenshotBytes;
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _workingWellController.dispose();
+    _couldImproveController.dispose();
+    _confusingOrHardController.dispose();
+    _helpedHowController.dispose();
+    _featureSuggestionController.dispose();
+    _contentSuggestionController.dispose();
+    _visualSuggestionController.dispose();
+    _aiSuggestionController.dispose();
+    _problemWhatHappenedController.dispose();
+    _problemWhereController.dispose();
+    _problemCanRepeatController.dispose();
+    _ratingCommentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickScreenshot() async {
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 86,
+    );
+    if (image == null) {
+      return;
+    }
+    final bytes = await image.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _screenshotFileName = image.name;
+      _screenshotBytes = bytes;
+    });
+  }
+
+  Future<void> _submit() async {
+    final draft = _draft();
+    if (!draft.hasMeaningfulContent) {
+      _showMessage(
+        'Conte pelo menos uma percepcao ou escolha uma avaliacao.',
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final result = await ref.read(feedbackRepositoryProvider).submit(draft);
+      if (!mounted) {
+        return;
+      }
+      _clear();
+      _showMessage(
+        'Feedback #${result.id} enviado. Obrigado por construir o Evolua com a gente.',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showMessage(_friendlyFeedbackError(error));
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  FeedbackSubmissionDraft _draft() {
+    return FeedbackSubmissionDraft(
+      workingWell: _workingWellController.text,
+      couldImprove: _couldImproveController.text,
+      confusingOrHard: _confusingOrHardController.text,
+      helpedHow: _helpedHowController.text,
+      featureSuggestion: _featureSuggestionController.text,
+      contentSuggestion: _contentSuggestionController.text,
+      visualSuggestion: _visualSuggestionController.text,
+      aiSuggestion: _aiSuggestionController.text,
+      problemWhatHappened: _problemWhatHappenedController.text,
+      problemWhere: _problemWhereController.text,
+      problemCanRepeat: _problemCanRepeatController.text,
+      rating: _rating,
+      ratingComment: _ratingCommentController.text,
+      screenshotBytes: _screenshotBytes,
+      screenshotFileName: _screenshotFileName,
+    );
+  }
+
+  void _clear() {
+    for (final controller in [
+      _workingWellController,
+      _couldImproveController,
+      _confusingOrHardController,
+      _helpedHowController,
+      _featureSuggestionController,
+      _contentSuggestionController,
+      _visualSuggestionController,
+      _aiSuggestionController,
+      _problemWhatHappenedController,
+      _problemWhereController,
+      _problemCanRepeatController,
+      _ratingCommentController,
+    ]) {
+      controller.clear();
+    }
+    setState(() {
+      _rating = null;
+      _screenshotFileName = null;
+      _screenshotBytes = null;
+    });
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _friendlyFeedbackError(Object error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map<String, dynamic>) {
+        final details = data['details'];
+        if (details is List && details.isNotEmpty) {
+          return details.first.toString();
+        }
+        final message = data['message'];
+        if (message != null) {
+          return message.toString();
+        }
+      }
+      if (error.message != null && error.message!.isNotEmpty) {
+        return error.message!;
+      }
+    }
+    return 'Nao foi possivel enviar seu feedback agora.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feedbackFields = [
+      _FeedbackTextField(
+        controller: _workingWellController,
+        label: 'O que esta funcionando bem?',
+      ),
+      _FeedbackTextField(
+        controller: _couldImproveController,
+        label: 'O que poderia melhorar?',
+      ),
+      _FeedbackTextField(
+        controller: _confusingOrHardController,
+        label: 'Algo parece confuso ou dificil?',
+      ),
+      _FeedbackTextField(
+        controller: _helpedHowController,
+        label: 'Como o Evolua tem ajudado voce?',
+      ),
+    ];
+    final suggestionFields = [
+      _FeedbackTextField(
+        controller: _featureSuggestionController,
+        label: 'Sugestao de funcionalidade',
+      ),
+      _FeedbackTextField(
+        controller: _contentSuggestionController,
+        label: 'Sugestao de conteudo',
+      ),
+      _FeedbackTextField(
+        controller: _visualSuggestionController,
+        label: 'Sugestao de melhoria visual',
+      ),
+      _FeedbackTextField(
+        controller: _aiSuggestionController,
+        label: 'Sugestao para IA',
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Dar feedback', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 12),
+              Text(
+                'O Evolua esta em constante evolucao. Sua percepcao ajuda a construir uma experiencia melhor para todos.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Compartilhe sua experiencia',
+          description: 'Conte como tem sido usar o Evolua no seu dia a dia.',
+          microcopy:
+              'Sua percepcao mostra onde o app ja apoia bem e onde ainda pode cuidar melhor.',
+          children: feedbackFields,
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Sugerir melhoria',
+          description: 'Tem uma ideia? Queremos ouvir.',
+          microcopy:
+              'Boas ideias podem nascer do uso real, no detalhe pequeno do cotidiano.',
+          children: suggestionFields,
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Reportar problema',
+          description: 'Encontrou algo que nao esta funcionando como deveria?',
+          microcopy:
+              'Relatos claros ajudam nosso time a corrigir com mais rapidez e cuidado.',
+          children: [
+            _FeedbackTextField(
+              controller: _problemWhatHappenedController,
+              label: 'O que aconteceu?',
+            ),
+            _FeedbackTextField(
+              controller: _problemWhereController,
+              label: 'Onde aconteceu?',
+            ),
+            _FeedbackTextField(
+              controller: _problemCanRepeatController,
+              label: 'Consegue repetir o problema?',
+            ),
+            _ScreenshotPickerRow(
+              fileName: _screenshotFileName,
+              onPick: _pickScreenshot,
+              onRemove: () => setState(() {
+                _screenshotFileName = null;
+                _screenshotBytes = null;
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Avaliacao rapida',
+          description: 'Como tem sido sua experiencia no Evolua?',
+          microcopy:
+              'Cada feedback ajuda o Evolua a evoluir com mais intencao, clareza e cuidado.',
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: const {
+                'MUITO_BOA': 'Muito boa',
+                'BOA': 'Boa',
+                'NEUTRA': 'Neutra',
+                'RUIM': 'Ruim',
+                'MUITO_RUIM': 'Muito ruim',
+              }.entries.map((entry) {
+                return ChoiceChip(
+                  label: Text(entry.value),
+                  selected: _rating == entry.key,
+                  onSelected: (_) => setState(() => _rating = entry.key),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+            _FeedbackTextField(
+              controller: _ratingCommentController,
+              label: 'Quer contar um pouco mais?',
+              minLines: 3,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: _isSubmitting ? null : _submit,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_rounded),
+              label: Text(_isSubmitting ? 'Enviando...' : 'Enviar feedback'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedbackTextField extends StatelessWidget {
+  const _FeedbackTextField({
+    required this.controller,
+    required this.label,
+    this.minLines = 2,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final int minLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: controller,
+        minLines: minLines,
+        maxLines: 5,
+        maxLength: 1200,
+        decoration: InputDecoration(
+          labelText: label,
+          alignLabelWithHint: true,
+          counterText: '',
+        ),
+      ),
+    );
+  }
+}
+
+class _ScreenshotPickerRow extends StatelessWidget {
+  const _ScreenshotPickerRow({
+    required this.fileName,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final String? fileName;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsRowShell(
+      icon: Icons.image_outlined,
+      title: 'Enviar captura de tela',
+      subtitle: fileName == null
+          ? 'Opcional, util quando algo visual nao esta funcionando.'
+          : fileName!,
+      trailing: fileName == null
+          ? TextButton(onPressed: onPick, child: const Text('Anexar'))
+          : IconButton(
+              tooltip: 'Remover captura',
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded),
+            ),
+    );
+  }
+}
+
+class _HelpSupportSection extends StatelessWidget {
+  const _HelpSupportSection({
+    required this.configState,
+    required this.statusState,
+    required this.onCreateTicket,
+    required this.onOpenLink,
+    required this.onRefreshStatus,
+  });
+
+  final AsyncValue<SupportConfig> configState;
+  final AsyncValue<List<SupportStatusItem>> statusState;
+  final void Function(String category, String subject) onCreateTicket;
+  final Future<void> Function(Uri? url, String fallbackMessage) onOpenLink;
+  final VoidCallback onRefreshStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final config = configState.asData?.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ajuda e suporte',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Se algo nao estiver claro, funcionando ou fazendo sentido, estamos aqui para ajudar.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Central de ajuda',
+          description:
+              'Encontre respostas rapidas para duvidas comuns sobre o Evolua.',
+          microcopy:
+              'Respostas simples ajudam voce a seguir sem precisar pausar a jornada por muito tempo.',
+          children: [
+            const _HelpFaqTile(
+              title: 'Como funcionam as trilhas?',
+              answer:
+                  'As trilhas organizam praticas, reflexoes e proximos passos em uma sequencia privada para apoiar seu momento atual.',
+            ),
+            const _HelpFaqTile(
+              title: 'O que sao check-ins?',
+              answer:
+                  'Check-ins sao registros rapidos do seu estado emocional. Eles ajudam o Evolua a entender seu ritmo e sugerir um cuidado mais coerente.',
+            ),
+            const _HelpFaqTile(
+              title: 'Como a IA gera sugestoes?',
+              answer:
+                  'A IA usa seu check-in e, quando permitido, seu historico para criar orientacoes de autocuidado. Ela nao substitui apoio profissional.',
+            ),
+            const _HelpFaqTile(
+              title: 'Como editar meu perfil?',
+              answer:
+                  'Abra seu perfil, fique em Visao geral, ajuste os dados desejados e toque em Salvar perfil.',
+            ),
+            const _HelpFaqTile(
+              title: 'Como funciona o plano premium?',
+              answer:
+                  'O Premium amplia limites e recursos da jornada. Voce pode ver detalhes em Planos e assinaturas no menu do perfil.',
+            ),
+            _SettingsActionRow(
+              icon: Icons.open_in_new_rounded,
+              title: 'Abrir central de ajuda',
+              subtitle: 'Acesse materiais externos quando configurados.',
+              onTap: () => onOpenLink(
+                config?.helpCenterUrl,
+                'A central completa ainda nao esta configurada. Use as respostas desta pagina por enquanto.',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Suporte humano',
+          description:
+              'Precisa de ajuda com algo mais especifico? Fale com nosso time.',
+          microcopy:
+              'Nem tudo precisa ser resolvido sozinho. Quando precisar, estamos aqui.',
+          children: [
+            _SettingsActionRow(
+              icon: Icons.support_agent_rounded,
+              title: 'Abrir chamado',
+              subtitle: 'Conte o que aconteceu para nosso time acompanhar.',
+              onTap: () => onCreateTicket('GENERAL', 'Ajuda com o Evolua'),
+            ),
+            _SettingsActionRow(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Falar com suporte',
+              subtitle: 'Abra uma conversa registrada com nosso time.',
+              onTap: () => onCreateTicket('SUPPORT', 'Falar com suporte'),
+            ),
+            _SettingsActionRow(
+              icon: Icons.bug_report_outlined,
+              title: 'Reportar problema tecnico',
+              subtitle:
+                  'Informe erros, travamentos ou comportamentos estranhos.',
+              onTap: () =>
+                  onCreateTicket('TECHNICAL', 'Problema tecnico no app'),
+            ),
+            _SettingsActionRow(
+              icon: Icons.workspace_premium_outlined,
+              title: 'Solicitar ajuda com assinatura',
+              subtitle: 'Receba apoio sobre plano, pagamento ou premium.',
+              onTap: () => onCreateTicket('BILLING', 'Ajuda com assinatura'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Bem-estar e suporte emocional',
+          description:
+              'O Evolua apoia processos de autoconhecimento, mas nao substitui acompanhamento profissional.',
+          microcopy:
+              'O Evolua pode apoiar sua jornada, mas cuidado emocional profundo tambem merece apoio humano qualificado.',
+          children: [
+            _SettingsActionRow(
+              icon: Icons.health_and_safety_outlined,
+              title: 'Quando buscar ajuda profissional',
+              subtitle:
+                  'Veja orientacoes configuradas para momentos que pedem apoio humano.',
+              onTap: () => onOpenLink(
+                config?.professionalHelpUrl,
+                'Esse recurso de apoio profissional ainda nao esta configurado.',
+              ),
+            ),
+            _SettingsActionRow(
+              icon: Icons.volunteer_activism_outlined,
+              title: 'Recursos de apoio emocional',
+              subtitle: 'Acesse uma fonte segura configurada pelo Evolua.',
+              onTap: () => onOpenLink(
+                config?.emotionalResourcesUrl,
+                'Os recursos de apoio emocional ainda nao estao configurados.',
+              ),
+            ),
+            _SettingsActionRow(
+              icon: Icons.psychology_alt_outlined,
+              title: 'Limites da IA no cuidado emocional',
+              subtitle:
+                  'Entenda onde a IA ajuda e onde o apoio humano importa.',
+              onTap: () => onOpenLink(
+                config?.aiLimitsUrl,
+                'A pagina sobre limites da IA ainda nao esta configurada.',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Status da plataforma',
+          description: 'Acompanhe a estabilidade e funcionamento do Evolua.',
+          microcopy:
+              'Quando algo oscilar, mostramos de forma clara para voce nao precisar adivinhar.',
+          children: [
+            statusState.when(
+              data: (items) =>
+                  Column(children: items.map(_SupportStatusRow.new).toList()),
+              loading: () => const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(),
+              ),
+              error: (_, _) => const _SettingsInfoRow(
+                icon: Icons.info_outline_rounded,
+                title: 'Status indisponivel',
+                subtitle: 'Nao foi possivel confirmar a plataforma agora.',
+              ),
+            ),
+            _SettingsActionRow(
+              icon: Icons.refresh_rounded,
+              title: 'Atualizar status',
+              subtitle: 'Verifique novamente os servicos do Evolua.',
+              onTap: onRefreshStatus,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                onPressed: () => onCreateTicket('SUPPORT', 'Falar com suporte'),
+                icon: const Icon(Icons.support_agent_rounded),
+                label: const Text('Falar com suporte'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => onOpenLink(
+                  config?.helpCenterUrl,
+                  'A central completa ainda nao esta configurada. Use as respostas desta pagina por enquanto.',
+                ),
+                icon: const Icon(Icons.help_outline_rounded),
+                label: const Text('Abrir central de ajuda'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HelpFaqTile extends StatelessWidget {
+  const _HelpFaqTile({required this.title, required this.answer});
+
+  final String title;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(16),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          leading: const Icon(Icons.help_outline_rounded),
+          title: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(answer, style: Theme.of(context).textTheme.bodySmall),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportStatusRow extends StatelessWidget {
+  const _SupportStatusRow(this.item);
+
+  final SupportStatusItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final operational = item.state == 'OPERATIONAL';
+    return _SettingsRowShell(
+      icon: operational
+          ? Icons.check_circle_outline_rounded
+          : Icons.help_outline_rounded,
+      iconColor: operational
+          ? AppColors.accent
+          : context.evoluaColors.textSecondary,
+      title: item.label,
+      subtitle: item.detail,
+      trailing: Text(
+        operational ? 'OK' : 'A confirmar',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: operational
+              ? AppColors.accent
+              : context.evoluaColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _DisplayAccessibilitySection extends StatelessWidget {
+  const _DisplayAccessibilitySection({
+    required this.preferences,
+    required this.onThemeModeChanged,
+    required this.onHighContrastChanged,
+    required this.onReduceTransparencyChanged,
+    required this.onAnimationLevelChanged,
+    required this.onTextSizeChanged,
+    required this.onReadingSpacingChanged,
+    required this.onAccessibleFontChanged,
+    required this.onFocusModeChanged,
+    required this.onReduceMotionChanged,
+    required this.onHapticFeedbackChanged,
+    required this.onExtendedResponseTimeChanged,
+    required this.onSimplifiedNavigationChanged,
+    required this.onReduceVisualStimuliChanged,
+    required this.onSofterLanguageChanged,
+    required this.onHideSensitiveContentChanged,
+    required this.onComfortModeChanged,
+    required this.onSavePreferences,
+  });
+
+  final AccessibilityPreferences preferences;
+  final ValueChanged<String> onThemeModeChanged;
+  final ValueChanged<bool> onHighContrastChanged;
+  final ValueChanged<bool> onReduceTransparencyChanged;
+  final ValueChanged<String> onAnimationLevelChanged;
+  final ValueChanged<String> onTextSizeChanged;
+  final ValueChanged<String> onReadingSpacingChanged;
+  final ValueChanged<bool> onAccessibleFontChanged;
+  final ValueChanged<bool> onFocusModeChanged;
+  final ValueChanged<bool> onReduceMotionChanged;
+  final ValueChanged<bool> onHapticFeedbackChanged;
+  final ValueChanged<bool> onExtendedResponseTimeChanged;
+  final ValueChanged<bool> onSimplifiedNavigationChanged;
+  final ValueChanged<bool> onReduceVisualStimuliChanged;
+  final ValueChanged<bool> onSofterLanguageChanged;
+  final ValueChanged<bool> onHideSensitiveContentChanged;
+  final ValueChanged<bool> onComfortModeChanged;
+  final VoidCallback onSavePreferences;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tela e acessibilidade',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Ajuste a interface para uma experiencia mais confortavel, acessivel e alinhada ao seu ritmo.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Aparencia',
+          description:
+              'Adapte a interface ao seu ambiente e preferencia visual.',
+          microcopy: 'Conforto visual tambem faz parte do cuidado.',
+          children: [
+            _AccessibilitySegmentedRow(
+              title: 'Tema',
+              subtitle: 'Escolha entre escuro, claro ou automatico.',
+              value: preferences.themeMode,
+              options: const {
+                'dark': 'Escuro',
+                'light': 'Claro',
+                'system': 'Auto',
+              },
+              onChanged: onThemeModeChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Contraste elevado',
+              subtitle: 'Aumenta a diferenca entre texto, fundo e bordas.',
+              value: preferences.highContrast,
+              onChanged: onHighContrastChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Reducao de transparencia',
+              subtitle:
+                  'Prefere superficies mais solidas e menos translucidas.',
+              value: preferences.reduceTransparency,
+              onChanged: onReduceTransparencyChanged,
+            ),
+            _SettingsDropdownRow(
+              title: 'Ajuste de animacoes',
+              subtitle: 'Controle a intensidade das transicoes.',
+              value: preferences.animationLevel,
+              items: const {
+                'normal': 'Normal',
+                'reduced': 'Reduzida',
+                'none': 'Sem animacoes',
+              },
+              onChanged: onAnimationLevelChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Leitura e legibilidade',
+          description: 'Melhore a leitura e reduza o esforco visual.',
+          microcopy:
+              'Uma interface mais confortavel torna a experiencia mais leve e presente.',
+          children: [
+            _SettingsDropdownRow(
+              title: 'Tamanho do texto',
+              subtitle: 'Ajuste a escala dos textos no app.',
+              value: preferences.textSize,
+              items: const {
+                'small': 'Pequeno',
+                'normal': 'Normal',
+                'large': 'Grande',
+                'extraLarge': 'Extra grande',
+              },
+              onChanged: onTextSizeChanged,
+            ),
+            _SettingsDropdownRow(
+              title: 'Espacamento de leitura',
+              subtitle: 'Defina o respiro entre as linhas.',
+              value: preferences.readingSpacing,
+              items: const {
+                'compact': 'Compacto',
+                'comfortable': 'Confortavel',
+                'wide': 'Amplo',
+              },
+              onChanged: onReadingSpacingChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Fonte acessivel',
+              subtitle: 'Usa a fonte do sistema para leitura mais familiar.',
+              value: preferences.accessibleFont,
+              onChanged: onAccessibleFontChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Modo foco',
+              subtitle: 'Guarda a preferencia para telas com menos distracao.',
+              value: preferences.focusMode,
+              onChanged: onFocusModeChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Navegacao e interacao',
+          description: 'Ajuste como voce interage com o app.',
+          microcopy:
+              'Pequenos ajustes tornam a experiencia mais fluida e menos cansativa.',
+          children: [
+            _SettingsSwitchRow(
+              title: 'Reduzir movimento',
+              subtitle: 'Diminui transicoes e efeitos animados no app.',
+              value: preferences.reduceMotion,
+              onChanged: onReduceMotionChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Feedback tatil',
+              subtitle: 'Permite respostas tateis em acoes importantes.',
+              value: preferences.hapticFeedback,
+              onChanged: onHapticFeedbackChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Tempo de resposta estendido',
+              subtitle: 'Guarda mais tempo para interacoes futuras.',
+              value: preferences.extendedResponseTime,
+              onChanged: onExtendedResponseTimeChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Navegacao simplificada',
+              subtitle: 'Prioriza caminhos mais diretos quando disponivel.',
+              value: preferences.simplifiedNavigation,
+              onChanged: onSimplifiedNavigationChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SettingsGroup(
+          title: 'Acessibilidade emocional',
+          description:
+              'Ajuste estimulos e linguagem para uma experiencia mais segura emocionalmente.',
+          microcopy:
+              'Seu estado emocional importa. A interface tambem pode respeitar isso.',
+          children: [
+            _SettingsSwitchRow(
+              title: 'Reduzir estimulos visuais',
+              subtitle: 'Registra preferencia por telas menos carregadas.',
+              value: preferences.reduceVisualStimuli,
+              onChanged: onReduceVisualStimuliChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Linguagem mais suave',
+              subtitle: 'Prefere mensagens menos intensas e mais acolhedoras.',
+              value: preferences.softerLanguage,
+              onChanged: onSofterLanguageChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Ocultar conteudos sensiveis',
+              subtitle: 'Guarda preferencia para filtros de cuidado emocional.',
+              value: preferences.hideSensitiveContent,
+              onChanged: onHideSensitiveContentChanged,
+            ),
+            _SettingsSwitchRow(
+              title: 'Modo acolhimento',
+              subtitle:
+                  'Sinaliza que voce prefere uma experiencia mais gentil.',
+              value: preferences.comfortMode,
+              onChanged: onComfortModeChanged,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: onSavePreferences,
+              icon: const Icon(Icons.save_rounded),
+              label: const Text('Salvar preferencias visuais'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccessibilitySegmentedRow extends StatelessWidget {
+  const _AccessibilitySegmentedRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final String value;
+  final Map<String, String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<String>(
+              segments: options.entries
+                  .map(
+                    (entry) => ButtonSegment<String>(
+                      value: entry.key,
+                      label: Text(entry.value),
+                    ),
+                  )
+                  .toList(),
+              selected: {value},
+              onSelectionChanged: (selection) => onChanged(selection.first),
+              showSelectedIcon: false,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1280,9 +2699,9 @@ class _SettingsGroup extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             microcopy,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 18),
           ...children,
@@ -1434,7 +2853,7 @@ class _SettingsRowShell extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.32),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -1454,7 +2873,9 @@ class _SettingsRowShell extends StatelessWidget {
                         title,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
-                              color: titleColor ?? AppColors.textPrimary,
+                              color:
+                                  titleColor ??
+                                  context.evoluaColors.textPrimary,
                             ),
                       ),
                       const SizedBox(height: 4),
@@ -1546,6 +2967,16 @@ class _DeleteAccountDialogResult {
   final String currentPassword;
 }
 
+class _SupportTicketDialogResult {
+  const _SupportTicketDialogResult({
+    required this.subject,
+    required this.message,
+  });
+
+  final String subject;
+  final String message;
+}
+
 class _SectionPanel extends StatelessWidget {
   const _SectionPanel({required this.title, required this.subtitle});
 
@@ -1585,16 +3016,16 @@ class _AvatarCircle extends StatelessWidget {
         : imageUrl!;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.surfaceStrong,
+      backgroundColor: context.evoluaColors.surfaceStrong,
       backgroundImage: normalizedUrl != null
           ? NetworkImage(normalizedUrl)
           : null,
       child: normalizedUrl == null
           ? Text(
               _initials(fallbackText),
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             )
           : null,
     );

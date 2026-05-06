@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
@@ -51,7 +52,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.evoluaColors.surface,
       builder: (context) => _BriefingBottomSheet(
         title: 'Analise completa',
         child: CheckInAiInsightCard(
@@ -112,7 +113,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: context.evoluaColors.surface,
       builder: (context) => _BriefingBottomSheet(
         title: 'Seu ritmo hoje',
         child: _RhythmDetailsSheet(summary: summary, recentItems: recentItems),
@@ -249,10 +250,10 @@ class _InsightBriefingCard extends StatelessWidget {
                   color: riskColor,
                 ),
                 if (insight!.fallbackUsed)
-                  const _SoftChip(
+                  _SoftChip(
                     icon: Icons.shield_outlined,
                     label: 'Modo seguro',
-                    color: AppColors.textSecondary,
+                    color: context.evoluaColors.textSecondary,
                   ),
               ],
             ),
@@ -320,7 +321,7 @@ class _NextStepHeroCard extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppColors.textPrimary,
+              color: context.evoluaColors.textPrimary,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -362,7 +363,7 @@ class _PaceMetadataLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: AppColors.textSecondary.withValues(alpha: 0.78),
+      color: context.evoluaColors.textSecondary.withValues(alpha: 0.78),
       fontWeight: FontWeight.w500,
     );
 
@@ -379,7 +380,7 @@ class _PaceMetadataLine extends StatelessWidget {
         Text(
           '-',
           style: style?.copyWith(
-            color: AppColors.textSecondary.withValues(alpha: 0.48),
+            color: context.evoluaColors.textSecondary.withValues(alpha: 0.48),
           ),
         ),
         _PaceMetadataItem(
@@ -411,7 +412,7 @@ class _PaceMetadataItem extends StatelessWidget {
         Icon(
           icon,
           size: 14,
-          color: AppColors.textSecondary.withValues(alpha: 0.68),
+          color: context.evoluaColors.textSecondary.withValues(alpha: 0.68),
         ),
         const SizedBox(width: 5),
         Text(label, style: style),
@@ -431,8 +432,10 @@ class _PaceStatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: AppColors.surfaceStrong.withValues(alpha: 0.18),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.14)),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.18),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.14),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -440,13 +443,13 @@ class _PaceStatusBadge extends StatelessWidget {
           Icon(
             Icons.auto_awesome_rounded,
             size: 13,
-            color: AppColors.textSecondary.withValues(alpha: 0.7),
+            color: context.evoluaColors.textSecondary.withValues(alpha: 0.7),
           ),
           const SizedBox(width: 5),
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary.withValues(alpha: 0.82),
+              color: context.evoluaColors.textSecondary.withValues(alpha: 0.82),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -562,9 +565,9 @@ class _RhythmDetailsSheet extends StatelessWidget {
         const SizedBox(height: 18),
         Text(
           'Ultimos check-ins',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: context.evoluaColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 10),
         if (recentItems.isEmpty)
@@ -646,7 +649,7 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: AppColors.textPrimary,
+            color: context.evoluaColors.textPrimary,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -685,9 +688,9 @@ class _SoftChip extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -714,8 +717,10 @@ class _InsightPill extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: AppColors.surfaceStrong.withValues(alpha: 0.36),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.36),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.28),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,9 +757,9 @@ class _RhythmDetailRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -781,16 +786,16 @@ class _RecentCheckInTile extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: AppColors.surfaceStrong.withValues(alpha: 0.32),
+          color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
         ),
         child: Row(
           children: [
             Expanded(
               child: Text(
                 _capitalize(item.mood),
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                ),
               ),
             ),
             Text(
@@ -814,7 +819,7 @@ class _BottomSheetHandle extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 18),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          color: AppColors.outline.withValues(alpha: 0.8),
+          color: context.evoluaColors.outline.withValues(alpha: 0.8),
         ),
       ),
     );

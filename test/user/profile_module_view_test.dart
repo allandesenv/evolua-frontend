@@ -3,13 +3,33 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
+import 'package:evolua_frontend/features/content/application/trail_controller.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
+import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
+import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
+import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
+import 'package:evolua_frontend/features/notification/domain/repositories/notification_repository.dart';
+import 'package:evolua_frontend/features/social/application/community_controller.dart';
+import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
+import 'package:evolua_frontend/features/social/domain/entities/community.dart';
+import 'package:evolua_frontend/features/social/domain/entities/social_post.dart';
+import 'package:evolua_frontend/features/social/domain/repositories/community_repository.dart';
+import 'package:evolua_frontend/features/social/domain/repositories/social_post_repository.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
@@ -24,6 +44,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() {
     _remoteSettingsPayload = _defaultRemoteSettings();
+    _remoteAccessibilityPayload = _defaultRemoteAccessibility();
+    _feedbackShouldFail = false;
+    _lastFeedbackPayload = null;
   });
 
   testWidgets('keeps profile hero readable on compact width', (tester) async {
@@ -73,14 +96,249 @@ void main() {
     );
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsOneWidget);
-    expect(find.text('Planos e assinaturas'), findsOneWidget);
+    expect(find.text('Planos e assinaturas'), findsNothing);
     expect(find.textContaining('Voce esta no plano essencial'), findsNothing);
+  });
 
+  testWidgets('profile preferences navigation is hidden on mobile', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(section: ProfileModuleSection.overview),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChoiceChip), findsNothing);
+    expect(find.text('Conta'), findsNothing);
+    expect(find.text('Preferencias'), findsNothing);
+    expect(find.text('Apoio'), findsNothing);
+    expect(find.text('Configuracoes e privacidade'), findsNothing);
+    expect(find.text('Ajuda e suporte'), findsNothing);
+    expect(find.text('Tela e acessibilidade'), findsNothing);
+    expect(find.text('Dar feedback'), findsNothing);
+    expect(find.text('Planos e assinaturas'), findsNothing);
+    expect(find.text('Leo Respiro'), findsOneWidget);
+  });
+
+  testWidgets('profile mobile renders externally selected section directly', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 980));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(
+                section: ProfileModuleSection.settingsPrivacy,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preferencias'), findsNothing);
+    expect(find.text('Configuracoes e privacidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Conta e acesso'), findsOneWidget);
+  });
+
+  testWidgets('avatar menu exposes profile preference sections on mobile', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ver perfil'), findsAtLeastNWidgets(1));
+    expect(find.text('Planos e assinaturas'), findsOneWidget);
+    expect(find.text('Configuracoes e privacidade'), findsOneWidget);
+    expect(find.text('Ajuda e suporte'), findsOneWidget);
+    expect(find.text('Tela e acessibilidade'), findsOneWidget);
+    expect(find.text('Dar feedback'), findsOneWidget);
+  });
+
+  testWidgets('avatar menu opens plans and overview sections', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Planos e assinaturas'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Planos e assinaturas'), findsAtLeastNWidgets(1));
     expect(find.textContaining('Voce esta no plano essencial'), findsOneWidget);
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver perfil').last);
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
+    expect(find.textContaining('Voce esta no plano essencial'), findsNothing);
+  });
+
+  testWidgets('profile preferences render sidebar on expanded desktop', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const MediaQuery(
+            data: MediaQueryData(size: Size(1280, 900)),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: ProfileModuleView(
+                  section: ProfileModuleSection.settingsPrivacy,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChoiceChip), findsNothing);
+    expect(
+      find.byWidgetPredicate((widget) => widget is SizedBox && widget.width == 288),
+      findsOneWidget,
+    );
+    expect(find.text('Leo Respiro'), findsOneWidget);
+    expect(find.text('Configuracoes e privacidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Conta e acesso'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('profile preferences follow externally selected section', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    final selectedSection = ValueNotifier(ProfileModuleSection.feedback);
+    addTearDown(selectedSection.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ValueListenableBuilder<ProfileModuleSection>(
+                valueListenable: selectedSection,
+                builder: (context, section, _) {
+                  return ProfileModuleView(section: section);
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Compartilhe sua experiencia'), findsOneWidget);
+
+    selectedSection.value = ProfileModuleSection.plansSubscriptions;
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Voce esta no plano essencial'), findsOneWidget);
+    expect(find.text('Compartilhe sua experiencia'), findsNothing);
   });
 
   testWidgets('renders settings and privacy controls on compact width', (
@@ -138,6 +396,236 @@ void main() {
 
     expect(find.text('Preferencias salvas com seguranca.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders help support and creates real ticket', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 980));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(
+                section: ProfileModuleSection.helpSupport,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ajuda e suporte'), findsAtLeastNWidgets(1));
+    expect(find.text('Central de ajuda'), findsOneWidget);
+    expect(find.text('Suporte humano'), findsOneWidget);
+    expect(find.text('Bem-estar e suporte emocional'), findsOneWidget);
+    expect(find.text('Status da plataforma'), findsOneWidget);
+    expect(find.text('Como funcionam as trilhas?'), findsOneWidget);
+    expect(find.text('Sistema operacional'), findsOneWidget);
+    expect(find.text('IA operacional'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Como funcionam as trilhas?'));
+    await tester.tap(find.text('Como funcionam as trilhas?'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('As trilhas organizam praticas'),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.text('Abrir chamado').first);
+    await tester.tap(find.text('Abrir chamado').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Preciso de ajuda.');
+    await tester.tap(find.widgetWithText(FilledButton, 'Enviar chamado'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Chamado #42 aberto. Nosso time vai acompanhar com cuidado.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders feedback form and submits real feedback', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(section: ProfileModuleSection.feedback),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dar feedback'), findsAtLeastNWidgets(1));
+    expect(find.text('Compartilhe sua experiencia'), findsOneWidget);
+    expect(find.text('Sugerir melhoria'), findsOneWidget);
+    expect(find.text('Reportar problema'), findsOneWidget);
+    expect(find.text('Avaliacao rapida'), findsOneWidget);
+    expect(find.text('Enviar feedback'), findsOneWidget);
+
+    await tester.enterText(
+      _feedbackTextField('O que esta funcionando bem?'),
+      'As trilhas estao claras.',
+    );
+    await tester.ensureVisible(find.text('Boa'));
+    await tester.tap(find.text('Boa'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Enviar feedback'));
+    await tester.tap(find.text('Enviar feedback'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Feedback #99 enviado. Obrigado por construir o Evolua com a gente.',
+      ),
+      findsOneWidget,
+    );
+    expect(_lastFeedbackPayload?['workingWell'], 'As trilhas estao claras.');
+    expect(_lastFeedbackPayload?['rating'], 'BOA');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps feedback fields when backend returns error', (
+    tester,
+  ) async {
+    _feedbackShouldFail = true;
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+          authenticatedDioProvider(
+            AppConfig.authBaseUrl,
+          ).overrideWithValue(_fakeAuthDio()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(section: ProfileModuleSection.feedback),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      _feedbackTextField('O que poderia melhorar?'),
+      'O carregamento da home.',
+    );
+    await tester.ensureVisible(find.text('Enviar feedback'));
+    await tester.tap(find.text('Enviar feedback'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Falha simulada no feedback.'), findsOneWidget);
+    expect(find.text('O carregamento da home.'), findsOneWidget);
+  });
+
+  testWidgets('renders accessibility settings and persists controls', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 1040));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpDisplayAccessibility(tester);
+
+    expect(find.text('Tela e acessibilidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Aparencia'), findsOneWidget);
+    expect(find.text('Leitura e legibilidade'), findsOneWidget);
+    expect(find.text('Navegacao e interacao'), findsOneWidget);
+    expect(find.text('Acessibilidade emocional'), findsOneWidget);
+    expect(find.text('Tema'), findsOneWidget);
+    expect(find.text('Contraste elevado'), findsOneWidget);
+    expect(find.text('Tamanho do texto'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Claro'));
+    await tester.tap(find.text('Claro'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Contraste elevado'));
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tamanho do texto'));
+    await tester.tap(find.text('Normal').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Grande').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Salvar preferencias visuais'));
+    await tester.tap(find.text('Salvar preferencias visuais'));
+    await tester.pumpAndSettle();
+
+    final sharedPreferences = await SharedPreferences.getInstance();
+    final saved =
+        jsonDecode(
+              sharedPreferences.getString(accessibilityPreferencesStorageKey)!,
+            )
+            as Map<String, dynamic>;
+
+    expect(saved['themeMode'], 'light');
+    expect(saved['highContrast'], isTrue);
+    expect(saved['textSize'], 'large');
+    expect(
+      find.text('Preferencias visuais salvas com conforto.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('persists settings and reloads saved controls', (tester) async {
@@ -279,6 +767,75 @@ Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpDisplayAccessibility(WidgetTester tester) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        subscriptionRepositoryProvider.overrideWithValue(
+          _FakeSubscriptionRepository(),
+        ),
+        authenticatedDioProvider(
+          AppConfig.userBaseUrl,
+        ).overrideWithValue(_fakeUserDio()),
+        authenticatedDioProvider(
+          AppConfig.authBaseUrl,
+        ).overrideWithValue(_fakeAuthDio()),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: ProfileModuleView(
+              section: ProfileModuleSection.displayAccessibility,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Widget _dashboardShell() {
+  return ProviderScope(
+    overrides: [
+      authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+      profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+      subscriptionRepositoryProvider.overrideWithValue(
+        _FakeSubscriptionRepository(),
+      ),
+      trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
+      checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
+      socialPostRepositoryProvider.overrideWithValue(
+        _FakeSocialPostRepository(),
+      ),
+      communityRepositoryProvider.overrideWithValue(_FakeCommunityRepository()),
+      notificationRepositoryProvider.overrideWithValue(
+        _FakeNotificationRepository(),
+      ),
+      authenticatedDioProvider(
+        AppConfig.userBaseUrl,
+      ).overrideWithValue(_fakeUserDio()),
+      authenticatedDioProvider(
+        AppConfig.authBaseUrl,
+      ).overrideWithValue(_fakeAuthDio()),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.dark(),
+      home: const MediaQuery(
+        data: MediaQueryData(size: Size(390, 900)),
+        child: Scaffold(body: DashboardShell()),
+      ),
+    ),
+  );
+}
+
+Future<void> _openAvatarMenu(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('Abrir menu da conta'));
+}
+
 Dio _fakeUserDio() {
   return Dio()..httpClientAdapter = _FakeUserAdapter();
 }
@@ -307,6 +864,17 @@ class _FakeUserAdapter implements HttpClientAdapter {
       return _jsonResponse({'data': _remoteSettingsPayload});
     }
     if (options.method == 'GET' &&
+        options.path == '/v1/profiles/me/accessibility-settings') {
+      return _jsonResponse({'data': _remoteAccessibilityPayload});
+    }
+    if (options.method == 'PUT' &&
+        options.path == '/v1/profiles/me/accessibility-settings') {
+      _remoteAccessibilityPayload = Map<String, dynamic>.from(
+        options.data as Map,
+      );
+      return _jsonResponse({'data': _remoteAccessibilityPayload});
+    }
+    if (options.method == 'GET' &&
         options.path == '/v1/profiles/me/data-export') {
       return _jsonResponse({
         'data': {
@@ -317,11 +885,94 @@ class _FakeUserAdapter implements HttpClientAdapter {
         },
       });
     }
+    if (options.method == 'GET' && options.path == '/v1/support/config') {
+      return _jsonResponse({
+        'data': {
+          'helpCenterUrl': 'https://help.evolua.local',
+          'supportUrl': 'https://support.evolua.local',
+          'professionalHelpUrl': 'https://care.evolua.local',
+          'emotionalResourcesUrl': 'https://resources.evolua.local',
+          'aiLimitsUrl': 'https://limits.evolua.local',
+        },
+      });
+    }
+    if (options.method == 'GET' && options.path == '/v1/support/status') {
+      return _jsonResponse({
+        'data': [
+          {
+            'key': 'system',
+            'label': 'Sistema operacional',
+            'state': 'OPERATIONAL',
+            'detail': 'Funcionando normalmente.',
+          },
+          {
+            'key': 'ai',
+            'label': 'IA operacional',
+            'state': 'UNKNOWN',
+            'detail': 'Nao foi possivel confirmar agora.',
+          },
+          {
+            'key': 'notifications',
+            'label': 'Notificacoes',
+            'state': 'OPERATIONAL',
+            'detail': 'Funcionando normalmente.',
+          },
+          {
+            'key': 'sync',
+            'label': 'Sincronizacao',
+            'state': 'OPERATIONAL',
+            'detail': 'Funcionando normalmente.',
+          },
+        ],
+      });
+    }
+    if (options.method == 'POST' && options.path == '/v1/support/tickets') {
+      return _jsonResponse({
+        'data': {
+          'id': 42,
+          'category': (options.data as Map)['category'],
+          'status': 'OPEN',
+          'createdAt': '2026-05-05T00:00:00Z',
+        },
+      }, statusCode: 201);
+    }
+    if (options.method == 'POST' && options.path == '/v1/feedback') {
+      if (_feedbackShouldFail) {
+        return _jsonResponse({
+          'message': 'Bad Request',
+          'details': ['Falha simulada no feedback.'],
+        }, statusCode: 400);
+      }
+      final formData = options.data as FormData;
+      final payload = formData.fields
+          .firstWhere((field) => field.key == 'payload')
+          .value;
+      _lastFeedbackPayload = jsonDecode(payload) as Map<String, dynamic>;
+      return _jsonResponse({
+        'data': {
+          'id': 99,
+          'status': 'RECEIVED',
+          'createdAt': '2026-05-05T00:00:00Z',
+          'screenshotAttached': formData.files.isNotEmpty,
+        },
+      }, statusCode: 201);
+    }
     return _jsonResponse({'data': null}, statusCode: 404);
   }
 }
 
 Map<String, dynamic> _remoteSettingsPayload = {..._defaultRemoteSettings()};
+Map<String, dynamic> _remoteAccessibilityPayload = {
+  ..._defaultRemoteAccessibility(),
+};
+Map<String, dynamic>? _lastFeedbackPayload;
+bool _feedbackShouldFail = false;
+
+Finder _feedbackTextField(String label) {
+  return find.byWidgetPredicate(
+    (widget) => widget is TextField && widget.decoration?.labelText == label,
+  );
+}
 
 Map<String, dynamic> _defaultRemoteSettings() => {
   'privateJournal': true,
@@ -333,6 +984,25 @@ Map<String, dynamic> _defaultRemoteSettings() => {
   'aiTone': 'acolhedor',
   'suggestionFrequency': 'equilibrada',
   'trailStyle': 'guiada',
+};
+
+Map<String, dynamic> _defaultRemoteAccessibility() => {
+  'themeMode': 'dark',
+  'highContrast': false,
+  'reduceTransparency': false,
+  'animationLevel': 'normal',
+  'textSize': 'normal',
+  'readingSpacing': 'comfortable',
+  'accessibleFont': false,
+  'focusMode': false,
+  'reduceMotion': false,
+  'hapticFeedback': true,
+  'extendedResponseTime': false,
+  'simplifiedNavigation': false,
+  'reduceVisualStimuli': false,
+  'softerLanguage': false,
+  'hideSensitiveContent': false,
+  'comfortMode': false,
 };
 
 class _FakeAuthAdapter implements HttpClientAdapter {
@@ -505,6 +1175,193 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       premium: true,
     );
   }
+}
+
+class _FakeTrailRepository implements TrailRepository {
+  @override
+  Future<PaginatedResponse<Trail>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? category,
+    bool? premium,
+  }) async {
+    return PaginatedResponse<Trail>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<Trail?> currentJourney() async => null;
+
+  @override
+  Future<Trail> create({
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> delete(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailJourney> journey(int trailId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailJourney> startJourney(int trailId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailJourney> completeStep(int trailId, int stepIndex) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Trail> update({
+    required int id,
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+  }) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeCheckInRepository implements CheckInRepository {
+  @override
+  Future<PaginatedResponse<CheckIn>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    return PaginatedResponse<CheckIn>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<CheckIn> create({
+    required String mood,
+    String? reflection,
+    required int energyLevel,
+  }) async {
+    return CheckIn(
+      id: 1,
+      userId: 'user-123',
+      mood: mood,
+      reflection: reflection ?? '',
+      energyLevel: energyLevel,
+      recommendedPractice: 'Respire por alguns minutos.',
+      aiInsight: null,
+      createdAt: DateTime(2026, 1, 1),
+    );
+  }
+}
+
+class _FakeSocialPostRepository implements SocialPostRepository {
+  @override
+  Future<PaginatedResponse<SocialPost>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? community,
+    String? visibility,
+    bool? mine,
+  }) async {
+    return PaginatedResponse<SocialPost>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<SocialPost> create({
+    required String content,
+    required String community,
+    required String visibility,
+  }) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeCommunityRepository implements CommunityRepository {
+  @override
+  Future<PaginatedResponse<Community>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? visibility,
+    String? category,
+    bool? joined,
+  }) async {
+    return PaginatedResponse<Community>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<Community> create({
+    required String name,
+    required String slug,
+    required String description,
+    required String visibility,
+    required String category,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Community> join(String id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Community> leave(String id) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeNotificationRepository implements NotificationRepository {
+  @override
+  Future<List<NotificationJob>> list({bool unreadOnly = false}) async => const [];
+
+  @override
+  Future<int> unreadCount() async => 0;
+
+  @override
+  Future<NotificationJob> createAdmin({
+    required String targetUserId,
+    required String type,
+    required String title,
+    required String message,
+    String? actionTarget,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<NotificationJob> markAsRead(String id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<int> markAllAsRead() async => 0;
 }
 
 AuthSession _testSession({String email = 'leo@evolua.local'}) {

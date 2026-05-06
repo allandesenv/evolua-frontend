@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -446,20 +447,24 @@ Widget? _buildDesktopSubmenu(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
                     color: entry.selected
-                        ? AppColors.surfaceStrong.withValues(alpha: 0.62)
+                        ? context.evoluaColors.surfaceStrong.withValues(
+                            alpha: 0.62,
+                          )
                         : Colors.transparent,
                     border: Border.all(
                       color: entry.selected
                           ? AppColors.accent.withValues(alpha: 0.3)
-                          : AppColors.outline.withValues(alpha: 0.18),
+                          : context.evoluaColors.outline.withValues(
+                              alpha: 0.18,
+                            ),
                     ),
                   ),
                   child: Text(
                     entry.label,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: entry.selected
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
+                          ? context.evoluaColors.textPrimary
+                          : context.evoluaColors.textSecondary,
                     ),
                   ),
                 ),
@@ -496,7 +501,7 @@ class _TopBarIdentity extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(11),
             border: Border.all(
-              color: AppColors.outline.withValues(alpha: 0.16),
+              color: context.evoluaColors.outline.withValues(alpha: 0.16),
             ),
           ),
           clipBehavior: Clip.antiAlias,
@@ -512,7 +517,7 @@ class _TopBarIdentity extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textPrimary,
+              color: context.evoluaColors.textPrimary,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -534,7 +539,7 @@ class _TopBarTitle extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        color: AppColors.textPrimary,
+        color: context.evoluaColors.textPrimary,
         fontWeight: FontWeight.w800,
       ),
     );
@@ -602,12 +607,15 @@ class _CheckInHeaderButton extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.accent,
-                border: Border.all(color: AppColors.surface, width: 1.5),
+                border: Border.all(
+                  color: context.evoluaColors.surface,
+                  width: 1.5,
+                ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.check_rounded,
                 size: 10,
-                color: AppColors.background,
+                color: context.evoluaColors.background,
               ),
             ),
           ),
@@ -642,7 +650,7 @@ class _AccountMenuButton extends StatelessWidget {
 
     return PopupMenuButton<_AccountMenuAction>(
       tooltip: 'Abrir menu da conta',
-      color: AppColors.surfaceStrong,
+      color: context.evoluaColors.surfaceStrong,
       offset: const Offset(0, 14),
       itemBuilder: (context) => [
         PopupMenuItem<_AccountMenuAction>(
@@ -680,28 +688,6 @@ class _AccountMenuButton extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: AppColors.surface.withValues(alpha: 0.86),
-                    border: Border.all(
-                      color: AppColors.outline.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.person_search_rounded),
-                      SizedBox(width: 10),
-                      Expanded(child: Text('Ver perfil')),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -710,6 +696,13 @@ class _AccountMenuButton extends StatelessWidget {
         const PopupMenuItem(
           value: _AccountMenuAction.overview,
           child: _MenuLabel(icon: Icons.person_rounded, label: 'Ver perfil'),
+        ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.plans,
+          child: _MenuLabel(
+            icon: Icons.workspace_premium_rounded,
+            label: 'Planos e assinaturas',
+          ),
         ),
         const PopupMenuItem(
           value: _AccountMenuAction.settings,
@@ -749,6 +742,8 @@ class _AccountMenuButton extends StatelessWidget {
         switch (value) {
           case _AccountMenuAction.overview:
             onOpenProfileSection(ProfileModuleSection.overview);
+          case _AccountMenuAction.plans:
+            onOpenProfileSection(ProfileModuleSection.plansSubscriptions);
           case _AccountMenuAction.settings:
             onOpenProfileSection(ProfileModuleSection.settingsPrivacy);
           case _AccountMenuAction.help:
@@ -772,6 +767,7 @@ class _AccountMenuButton extends StatelessWidget {
 
 enum _AccountMenuAction {
   overview,
+  plans,
   settings,
   help,
   accessibility,
@@ -797,16 +793,16 @@ class _HeaderAvatar extends StatelessWidget {
         : imageUrl!;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.surfaceStrong,
+      backgroundColor: context.evoluaColors.surfaceStrong,
       backgroundImage: normalizedUrl != null
           ? NetworkImage(normalizedUrl)
           : null,
       child: normalizedUrl == null
           ? Text(
               _initials(fallbackText),
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             )
           : null,
     );
@@ -901,7 +897,7 @@ class _NavEntry extends StatelessWidget {
                 border: Border.all(
                   color: isSelected
                       ? AppColors.accent.withValues(alpha: 0.45)
-                      : AppColors.outline.withValues(alpha: 0.22),
+                      : context.evoluaColors.outline.withValues(alpha: 0.22),
                 ),
               ),
               child: Row(
@@ -910,7 +906,7 @@ class _NavEntry extends StatelessWidget {
                     item.icon,
                     color: isSelected
                         ? AppColors.accent
-                        : AppColors.textSecondary,
+                        : context.evoluaColors.textSecondary,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -918,8 +914,8 @@ class _NavEntry extends StatelessWidget {
                       item.label,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: isSelected
-                            ? AppColors.textPrimary
-                            : AppColors.textSecondary,
+                            ? context.evoluaColors.textPrimary
+                            : context.evoluaColors.textSecondary,
                         fontWeight: isSelected
                             ? FontWeight.w700
                             : FontWeight.w500,

@@ -1,4 +1,4 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:flutter/material.dart';
 
 class GradientScaffold extends StatelessWidget {
@@ -13,15 +13,17 @@ class GradientScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.evoluaColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppColors.background,
-              AppColors.backgroundSecondary,
-              Color(0xFF0F1828),
+              colors.background,
+              colors.backgroundSecondary,
+              isDark ? const Color(0xFF0F1828) : colors.surfaceStrong,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomCenter,
@@ -33,7 +35,7 @@ class GradientScaffold extends StatelessWidget {
               top: -140,
               left: -60,
               child: _GlowOrb(
-                color: AppColors.accent.withValues(alpha: 0.12),
+                color: colors.accent.withValues(alpha: isDark ? 0.12 : 0.1),
                 size: 300,
               ),
             ),
@@ -41,7 +43,7 @@ class GradientScaffold extends StatelessWidget {
               bottom: -120,
               right: -40,
               child: _GlowOrb(
-                color: AppColors.accentWarm.withValues(alpha: 0.1),
+                color: colors.accentWarm.withValues(alpha: isDark ? 0.1 : 0.08),
                 size: 260,
               ),
             ),
