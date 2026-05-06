@@ -11,6 +11,8 @@ class SocialFeedArea extends StatelessWidget {
   const SocialFeedArea({
     super.key,
     required this.result,
+    required this.isFromCache,
+    this.offlineMessage,
     required this.searchController,
     required this.visibilityFilter,
     required this.communityFilter,
@@ -29,6 +31,8 @@ class SocialFeedArea extends StatelessWidget {
   });
 
   final PaginatedResponse<SocialPost> result;
+  final bool isFromCache;
+  final String? offlineMessage;
   final TextEditingController searchController;
   final String visibilityFilter;
   final String communityFilter;
@@ -98,6 +102,13 @@ class SocialFeedArea extends StatelessWidget {
                 contextualHint,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (isFromCache && offlineMessage != null) ...[
+                const SizedBox(height: 12),
+                _OfflineFeedNotice(
+                  message: offlineMessage!,
+                  onRefresh: onRefresh,
+                ),
+              ],
               const SizedBox(height: 10),
               Text(
                 sectionLabel == 'Minhas reflexoes'
@@ -173,7 +184,17 @@ class SocialFeedArea extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        if (result.items.isEmpty)
+        if (result.items.isEmpty && isFromCache)
+          GuidedEmptyState(
+            icon: Icons.cloud_off_rounded,
+            title: 'Suas reflexoes salvas nao apareceram aqui.',
+            subtitle:
+                offlineMessage ??
+                'Quando a conexao voltar, atualize para carregar o feed.',
+            actionLabel: 'Atualizar',
+            onAction: onRefresh ?? () {},
+          )
+        else if (result.items.isEmpty)
           GuidedEmptyState(
             icon: Icons.dynamic_feed_rounded,
             title: 'Nenhuma reflexao apareceu com esse recorte.',
@@ -245,6 +266,44 @@ class SocialFeedArea extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+}
+
+class _OfflineFeedNotice extends StatelessWidget {
+  const _OfflineFeedNotice({required this.message, this.onRefresh});
+
+  final String message;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: AppColors.accentGold.withValues(alpha: 0.12),
+        border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.cloud_done_outlined,
+            color: AppColors.accentGold,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message, style: Theme.of(context).textTheme.bodySmall),
+          ),
+          if (onRefresh != null) ...[
+            const SizedBox(width: 8),
+            TextButton(onPressed: onRefresh, child: const Text('Atualizar')),
+          ],
+        ],
+      ),
     );
   }
 }

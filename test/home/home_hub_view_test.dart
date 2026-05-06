@@ -5,7 +5,9 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
@@ -63,7 +65,7 @@ void main() {
       expect(find.text('8 min'), findsOneWidget);
       expect(find.text('mantem constancia'), findsOneWidget);
       expect(find.text('jornada ativa'), findsOneWidget);
-      expect(find.text('Continuar jornada'), findsOneWidget);
+      expect(find.text('Continuar jornada'), findsAtLeastNWidgets(1));
       expect(find.text('Espacos'), findsOneWidget);
 
       expect(find.widgetWithText(OutlinedButton, 'Espacos'), findsOneWidget);
@@ -72,6 +74,19 @@ void main() {
         find.widgetWithText(OutlinedButton, 'mantem constancia'),
         findsNothing,
       );
+    });
+
+    testWidgets('does not render journey progress inside next-step card', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua jornada em movimento'), findsNothing);
+      expect(find.text('50%'), findsNothing);
+      expect(find.text('50% da jornada'), findsNothing);
+      expect(find.text('1/2 etapas'), findsNothing);
+      expect(find.text('Proxima etapa: Escolher'), findsNothing);
     });
 
     testWidgets('renders safe-mode analysis text in full analysis', (
@@ -110,8 +125,13 @@ void main() {
       expect(find.text(safeInsightText), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('opens rhythm details with personal metrics', (tester) async {
-      await tester.pumpWidget(_testApp());
+    testWidgets('opens polished rhythm details and evolution mirror CTA', (
+      tester,
+    ) async {
+      var openedMirror = false;
+      await tester.pumpWidget(
+        _testApp(onOpenEvolutionMirror: () => openedMirror = true),
+      );
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Ver detalhes do seu ritmo'));
@@ -121,9 +141,18 @@ void main() {
       expect(find.text('Seu ritmo hoje'), findsOneWidget);
       expect(find.text('Energia media'), findsOneWidget);
       expect(find.text('Estado dominante'), findsOneWidget);
-      expect(find.text('Check-ins esta semana'), findsOneWidget);
+      expect(find.text('Check-ins na semana'), findsOneWidget);
       expect(find.text('Streak'), findsOneWidget);
+      expect(find.text('Consistencia da semana'), findsOneWidget);
       expect(find.text('Ultimos check-ins'), findsOneWidget);
+      expect(find.text('Abrir Espelho da Evolucao'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Abrir Espelho da Evolucao'));
+      await tester.tap(find.text('Abrir Espelho da Evolucao'));
+      await tester.pumpAndSettle();
+
+      expect(openedMirror, isTrue);
+      expect(find.text('Seu ritmo hoje'), findsNothing);
     });
 
     testWidgets('keeps the briefing usable on mobile width', (tester) async {
@@ -171,6 +200,7 @@ Widget _testApp({
   CheckInRepository? checkInRepository,
   TrailRepository? trailRepository,
   ThemeData? theme,
+  VoidCallback? onOpenEvolutionMirror,
 }) {
   return ProviderScope(
     overrides: [
@@ -195,6 +225,7 @@ Widget _testApp({
             onOpenFeed: () {},
             onOpenCommunity: () {},
             onOpenProfile: () {},
+            onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
             onOpenCheckIn: () {},
           ),
         ),
@@ -307,8 +338,44 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
-  Future<TrailJourney> journey(int trailId) {
-    throw UnimplementedError();
+  Future<TrailJourney> journey(int trailId) async {
+    final trail = _currentJourney;
+    if (trail == null) {
+      throw StateError('Sem jornada ativa.');
+    }
+    final steps = [
+      const TrailJourneyStep(
+        index: 0,
+        title: 'Respirar',
+        summary: 'Dois minutos de presenca.',
+        content: 'Respire por quatro ciclos.',
+        status: 'completed',
+        estimatedMinutes: 2,
+        mediaLinks: [],
+      ),
+      const TrailJourneyStep(
+        index: 1,
+        title: 'Escolher',
+        summary: 'Uma proxima acao simples.',
+        content: 'Escolha uma acao pequena.',
+        status: 'current',
+        estimatedMinutes: 4,
+        mediaLinks: [],
+      ),
+    ];
+    return TrailJourney(
+      trail: trail,
+      steps: steps,
+      progress: TrailProgress(
+        currentStepIndex: 1,
+        completedStepIndexes: const [0],
+        startedAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 2),
+        completedAt: null,
+      ),
+      progressPercent: 50,
+      nextStep: steps.last,
+    );
   }
 
   @override

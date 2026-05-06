@@ -11,10 +11,13 @@ import 'package:evolua_frontend/features/auth/domain/repositories/auth_repositor
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
@@ -208,6 +211,7 @@ void main() {
 
     expect(find.text('Ver perfil'), findsAtLeastNWidgets(1));
     expect(find.text('Planos e assinaturas'), findsOneWidget);
+    expect(find.text('Espelho da Evolucao'), findsOneWidget);
     expect(find.text('Configuracoes e privacidade'), findsOneWidget);
     expect(find.text('Ajuda e suporte'), findsOneWidget);
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
@@ -238,6 +242,25 @@ void main() {
 
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
     expect(find.textContaining('Voce esta no plano essencial'), findsNothing);
+  });
+
+  testWidgets('avatar menu opens evolution mirror section', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Espelho da Evolucao'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
+    expect(find.text('Visao de progresso'), findsOneWidget);
   });
 
   testWidgets('profile preferences render sidebar on expanded desktop', (
@@ -283,7 +306,9 @@ void main() {
 
     expect(find.byType(ChoiceChip), findsNothing);
     expect(
-      find.byWidgetPredicate((widget) => widget is SizedBox && widget.width == 288),
+      find.byWidgetPredicate(
+        (widget) => widget is SizedBox && widget.width == 288,
+      ),
       findsOneWidget,
     );
     expect(find.text('Leo Respiro'), findsOneWidget);
@@ -396,6 +421,52 @@ void main() {
 
     expect(find.text('Preferencias salvas com seguranca.'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders evolution mirror with empty data safely', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(tester);
+
+    expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
+    expect(find.text('Visao de progresso'), findsOneWidget);
+    expect(find.text('Padroes emocionais'), findsOneWidget);
+    expect(find.text('Evolucao nas trilhas'), findsOneWidget);
+    expect(find.text('Insights da IA'), findsOneWidget);
+    expect(find.text('Conquistas'), findsOneWidget);
+    expect(find.text('Consistencia'), findsAtLeastNWidgets(1));
+    expect(find.text('sem padrao ainda'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders evolution mirror with journey and insight data', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    final trail = _testTrail();
+
+    await _pumpEvolutionMirror(
+      tester,
+      trailRepository: _FakeTrailRepository(
+        currentJourney: trail,
+        journey: _testJourney(trail),
+      ),
+      checkInRepository: _FakeCheckInRepository(items: _evolutionCheckIns()),
+    );
+
+    expect(find.text('Clareza pratica'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('50% concluido'), findsOneWidget);
+    expect(find.text('Proximo passo: Escolher'), findsOneWidget);
+    expect(find.text('Insight da IA'), findsAtLeastNWidgets(1));
+    expect(find.text('Jornada ativa'), findsOneWidget);
+    expect(find.text('Etapas concluidas'), findsOneWidget);
+    expect(find.text('Ansioso'), findsOneWidget);
   });
 
   testWidgets('renders help support and creates real ticket', (tester) async {
@@ -798,6 +869,50 @@ Future<void> _pumpDisplayAccessibility(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpEvolutionMirror(
+  WidgetTester tester, {
+  TrailRepository? trailRepository,
+  CheckInRepository? checkInRepository,
+}) async {
+  await tester.binding.setSurfaceSize(const Size(390, 1100));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        subscriptionRepositoryProvider.overrideWithValue(
+          _FakeSubscriptionRepository(),
+        ),
+        trailRepositoryProvider.overrideWithValue(
+          trailRepository ?? _FakeTrailRepository(),
+        ),
+        checkInRepositoryProvider.overrideWithValue(
+          checkInRepository ?? _FakeCheckInRepository(),
+        ),
+        authenticatedDioProvider(
+          AppConfig.userBaseUrl,
+        ).overrideWithValue(_fakeUserDio()),
+        authenticatedDioProvider(
+          AppConfig.authBaseUrl,
+        ).overrideWithValue(_fakeAuthDio()),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: ProfileModuleView(
+              section: ProfileModuleSection.evolutionMirror,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Widget _dashboardShell() {
   return ProviderScope(
     overrides: [
@@ -1005,6 +1120,99 @@ Map<String, dynamic> _defaultRemoteAccessibility() => {
   'comfortMode': false,
 };
 
+Trail _testTrail() {
+  return Trail(
+    id: 7,
+    userId: 'user-123',
+    title: 'Clareza pratica',
+    summary: 'Uma trilha ativa para organizar o momento.',
+    content: 'Conteudo da trilha.',
+    category: 'foco',
+    premium: false,
+    privateTrail: true,
+    activeJourney: true,
+    generatedByAi: true,
+    journeyKey: 'clareza-pratica',
+    sourceStyle: 'briefing',
+    accessible: true,
+    mediaLinks: const [],
+    createdAt: DateTime(2026, 1, 1),
+  );
+}
+
+TrailJourney _testJourney(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Respirar',
+      summary: 'Dois minutos de presenca.',
+      content: 'Respire por quatro ciclos.',
+      status: 'completed',
+      estimatedMinutes: 2,
+      mediaLinks: [],
+    ),
+    const TrailJourneyStep(
+      index: 1,
+      title: 'Escolher',
+      summary: 'Uma proxima acao simples.',
+      content: 'Escolha uma acao pequena.',
+      status: 'current',
+      estimatedMinutes: 4,
+      mediaLinks: [],
+    ),
+  ];
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 1,
+      completedStepIndexes: const [0],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 2),
+      completedAt: null,
+    ),
+    progressPercent: 50,
+    nextStep: steps.last,
+  );
+}
+
+List<CheckIn> _evolutionCheckIns() {
+  final now = DateTime.now();
+  return [
+    CheckIn(
+      id: 1,
+      userId: 'user-123',
+      mood: 'ansioso',
+      reflection: 'Dia intenso.',
+      energyLevel: 6,
+      recommendedPractice: 'Respire por dois minutos.',
+      aiInsight: const CheckInAiInsight(
+        insight: 'Seu check-in mostra uma busca por clareza.',
+        suggestedAction: 'Escolha uma proxima acao simples.',
+        riskLevel: 'low',
+        suggestedTrailId: 7,
+        suggestedTrailTitle: 'Clareza pratica',
+        suggestedTrailReason: 'Combina com o momento atual.',
+        suggestedSpace: null,
+        journeyPlan: null,
+        generatedTrailDraft: null,
+        fallbackUsed: false,
+      ),
+      createdAt: now,
+    ),
+    CheckIn(
+      id: 2,
+      userId: 'user-123',
+      mood: 'calmo',
+      reflection: 'Melhorou um pouco.',
+      energyLevel: 8,
+      recommendedPractice: 'Caminhada curta.',
+      aiInsight: null,
+      createdAt: now.subtract(const Duration(days: 1)),
+    ),
+  ];
+}
+
 class _FakeAuthAdapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
@@ -1178,6 +1386,13 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 }
 
 class _FakeTrailRepository implements TrailRepository {
+  const _FakeTrailRepository({Trail? currentJourney, TrailJourney? journey})
+    : _currentJourney = currentJourney,
+      _journey = journey;
+
+  final Trail? _currentJourney;
+  final TrailJourney? _journey;
+
   @override
   Future<PaginatedResponse<Trail>> list({
     required int page,
@@ -1188,11 +1403,23 @@ class _FakeTrailRepository implements TrailRepository {
     String? category,
     bool? premium,
   }) async {
-    return PaginatedResponse<Trail>.empty(page: page, size: size);
+    final items = _currentJourney == null ? const <Trail>[] : [_currentJourney];
+    return PaginatedResponse<Trail>(
+      items: items,
+      page: page,
+      size: size,
+      totalItems: items.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      filters: const {},
+    );
   }
 
   @override
-  Future<Trail?> currentJourney() async => null;
+  Future<Trail?> currentJourney() async => _currentJourney;
 
   @override
   Future<Trail> create({
@@ -1212,8 +1439,12 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
-  Future<TrailJourney> journey(int trailId) {
-    throw UnimplementedError();
+  Future<TrailJourney> journey(int trailId) async {
+    final journey = _journey;
+    if (journey == null) {
+      throw StateError('Sem jornada ativa.');
+    }
+    return journey;
   }
 
   @override
@@ -1241,6 +1472,10 @@ class _FakeTrailRepository implements TrailRepository {
 }
 
 class _FakeCheckInRepository implements CheckInRepository {
+  const _FakeCheckInRepository({this.items = const <CheckIn>[]});
+
+  final List<CheckIn> items;
+
   @override
   Future<PaginatedResponse<CheckIn>> list({
     required int page,
@@ -1253,7 +1488,18 @@ class _FakeCheckInRepository implements CheckInRepository {
     DateTime? from,
     DateTime? to,
   }) async {
-    return PaginatedResponse<CheckIn>.empty(page: page, size: size);
+    return PaginatedResponse<CheckIn>(
+      items: items,
+      page: page,
+      size: size,
+      totalItems: items.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      filters: const {},
+    );
   }
 
   @override
@@ -1339,7 +1585,8 @@ class _FakeCommunityRepository implements CommunityRepository {
 
 class _FakeNotificationRepository implements NotificationRepository {
   @override
-  Future<List<NotificationJob>> list({bool unreadOnly = false}) async => const [];
+  Future<List<NotificationJob>> list({bool unreadOnly = false}) async =>
+      const [];
 
   @override
   Future<int> unreadCount() async => 0;

@@ -13,6 +13,7 @@ import 'package:evolua_frontend/features/social/application/community_controller
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
@@ -319,6 +320,10 @@ class _DashboardContent extends ConsumerWidget {
         ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
     final compact = ResponsiveBreakpoints.isCompact(context);
     final pageTitle = _pageTitleFor(selectedIndex);
+    final preferences =
+        ref.watch(accessibilityPreferencesControllerProvider).value ??
+        AccessibilityPreferences.defaults();
+    final reduceMotion = preferences.shouldReduceMotion;
 
     final sections = [
       HomeHubView(
@@ -332,6 +337,8 @@ class _DashboardContent extends ConsumerWidget {
         onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
         onOpenProfile: () =>
             onOpenProfileSection(ProfileModuleSection.overview),
+        onOpenEvolutionMirror: () =>
+            onOpenProfileSection(ProfileModuleSection.evolutionMirror),
         onOpenCheckIn: () => context.push('/check-in'),
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
@@ -392,17 +399,45 @@ class _DashboardContent extends ConsumerWidget {
         const SizedBox(height: 18),
         Expanded(
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
+            reverseDuration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
             switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              if (reduceMotion) {
+                return child;
+              }
+              final curved = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              return FadeTransition(
+                opacity: curved,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.018, 0.015),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.992, end: 1).animate(curved),
+                    child: child,
+                  ),
+                ),
+              );
+            },
             child: selectedIndex == 1
                 ? KeyedSubtree(
-                    key: ValueKey(selectedIndex),
+                    key: ValueKey(_sectionKey()),
                     child:
                         sections[selectedIndex.clamp(0, sections.length - 1)],
                   )
                 : SingleChildScrollView(
-                    key: ValueKey(selectedIndex),
+                    key: ValueKey(_sectionKey()),
                     child:
                         sections[selectedIndex.clamp(0, sections.length - 1)],
                   ),
@@ -420,6 +455,15 @@ class _DashboardContent extends ConsumerWidget {
       3 => 'Mentor Evolua',
       4 => 'Perfil',
       _ => 'Evolua',
+    };
+  }
+
+  String _sectionKey() {
+    return switch (selectedIndex) {
+      1 => 'trails-${trailSection.name}',
+      2 => 'spaces-${spaceSection.name}-${reflectionScope.name}',
+      4 => 'profile-${profileSection.name}',
+      _ => 'main-$selectedIndex',
     };
   }
 }
@@ -705,6 +749,13 @@ class _AccountMenuButton extends StatelessWidget {
           ),
         ),
         const PopupMenuItem(
+          value: _AccountMenuAction.evolutionMirror,
+          child: _MenuLabel(
+            icon: Icons.auto_graph_rounded,
+            label: 'Espelho da Evolucao',
+          ),
+        ),
+        const PopupMenuItem(
           value: _AccountMenuAction.settings,
           child: _MenuLabel(
             icon: Icons.settings_rounded,
@@ -744,6 +795,8 @@ class _AccountMenuButton extends StatelessWidget {
             onOpenProfileSection(ProfileModuleSection.overview);
           case _AccountMenuAction.plans:
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions);
+          case _AccountMenuAction.evolutionMirror:
+            onOpenProfileSection(ProfileModuleSection.evolutionMirror);
           case _AccountMenuAction.settings:
             onOpenProfileSection(ProfileModuleSection.settingsPrivacy);
           case _AccountMenuAction.help:
@@ -768,6 +821,7 @@ class _AccountMenuButton extends StatelessWidget {
 enum _AccountMenuAction {
   overview,
   plans,
+  evolutionMirror,
   settings,
   help,
   accessibility,
