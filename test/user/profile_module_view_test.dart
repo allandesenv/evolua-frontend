@@ -1348,6 +1348,8 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       premium: false,
       adsEnabled: true,
       aiQuotaRemainingToday: 1,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: true,
     );
   }
 

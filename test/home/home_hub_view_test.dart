@@ -26,6 +26,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
+      expect(find.textContaining('Leo'), findsOneWidget);
       expect(find.text('O que isso significa?'), findsOneWidget);
       expect(find.text('O que faco agora?'), findsOneWidget);
       expect(find.text('Como anda meu ritmo?'), findsOneWidget);
@@ -39,6 +40,43 @@ void main() {
       expect(insightTop, lessThan(nextStepTop));
       expect(nextStepTop, lessThan(rhythmTop));
     });
+
+    testWidgets(
+      'shows proactive check-in greeting when user has no check-in today',
+      (tester) async {
+        var openedCheckIn = false;
+        final yesterday = DateTime.now().subtract(const Duration(days: 1));
+
+        await tester.pumpWidget(
+          _testApp(
+            onOpenCheckIn: () => openedCheckIn = true,
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                CheckIn(
+                  id: 20,
+                  userId: 'user-123',
+                  mood: 'calmo',
+                  reflection: 'ontem foi melhor',
+                  energyLevel: 7,
+                  recommendedPractice: 'Pausa curta',
+                  aiInsight: null,
+                  createdAt: yesterday,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('Leo'), findsOneWidget);
+        expect(find.text('Fazer check-in'), findsOneWidget);
+
+        await tester.tap(find.text('Fazer check-in'));
+        await tester.pumpAndSettle();
+
+        expect(openedCheckIn, isTrue);
+      },
+    );
 
     testWidgets('opens full intelligent analysis from summarized card', (
       tester,
@@ -201,6 +239,7 @@ Widget _testApp({
   TrailRepository? trailRepository,
   ThemeData? theme,
   VoidCallback? onOpenEvolutionMirror,
+  VoidCallback? onOpenCheckIn,
 }) {
   return ProviderScope(
     overrides: [
@@ -221,12 +260,14 @@ Widget _testApp({
             checkInsCount: 4,
             postsCount: 2,
             communitiesCount: 1,
+            displayName: 'Leo Respiro',
+            mentorPremiumPassActive: false,
             onOpenTrails: () {},
             onOpenFeed: () {},
             onOpenCommunity: () {},
             onOpenProfile: () {},
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
-            onOpenCheckIn: () {},
+            onOpenCheckIn: onOpenCheckIn ?? () {},
           ),
         ),
       ),

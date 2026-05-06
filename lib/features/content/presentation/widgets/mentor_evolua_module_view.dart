@@ -8,6 +8,7 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_message.dart';
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_reply.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/panel_skeleton.dart';
@@ -34,12 +35,16 @@ class MentorEvoluaModuleView extends ConsumerWidget {
         children: [
           _MentorHeader(trail: trail, onOpenTrails: onOpenTrails),
           const SizedBox(height: 16),
+          _MentorPremiumPassPanel(onOpenPremium: onOpenPremium),
+          const SizedBox(height: 16),
           MentorEvoluaChatCard(trail: trail, onOpenPremium: onOpenPremium),
         ],
       ),
       error: (_, _) => Column(
         children: [
           _MentorHeader(trail: null, onOpenTrails: onOpenTrails),
+          const SizedBox(height: 16),
+          _MentorPremiumPassPanel(onOpenPremium: onOpenPremium),
           const SizedBox(height: 16),
           MentorEvoluaChatCard(trail: null, onOpenPremium: onOpenPremium),
         ],
@@ -119,6 +124,202 @@ class _MentorHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MentorPremiumPassPanel extends ConsumerStatefulWidget {
+  const _MentorPremiumPassPanel({this.onOpenPremium});
+
+  final VoidCallback? onOpenPremium;
+
+  @override
+  ConsumerState<_MentorPremiumPassPanel> createState() =>
+      _MentorPremiumPassPanelState();
+}
+
+class _MentorPremiumPassPanelState
+    extends ConsumerState<_MentorPremiumPassPanel> {
+  bool _isRewardLoading = false;
+  String? _rewardStatusMessage;
+
+  Future<void> _watchMentorPassAd() async {
+    if (_isRewardLoading) {
+      return;
+    }
+
+    setState(() {
+      _isRewardLoading = true;
+      _rewardStatusMessage = null;
+    });
+    try {
+      final result = await ref
+          .read(mentorPremiumPassRewardServiceProvider)
+          .watchAdAndConfirm(
+            onAwaitingConfirmation: () {
+              if (!mounted) {
+                return;
+              }
+              setState(() {
+                _rewardStatusMessage =
+                    'Estamos confirmando seu passe de mentoria...';
+              });
+            },
+          );
+      if (!mounted) {
+        return;
+      }
+      final message = switch (result.status) {
+        MentorPremiumPassRewardStatus.confirmed =>
+          'Passe de mentoria liberado por hoje.',
+        MentorPremiumPassRewardStatus.unavailable =>
+          'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.',
+        MentorPremiumPassRewardStatus.confirmationPending =>
+          'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.',
+      };
+      AppSnackBar.show(
+        context,
+        message: message,
+        icon: result.confirmed
+            ? Icons.workspace_premium_rounded
+            : Icons.ondemand_video_rounded,
+      );
+      if (!result.confirmed) {
+        setState(() => _rewardStatusMessage = message);
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message:
+            'Nao foi possivel liberar a mentoria agora. Tente novamente em instantes.',
+        icon: Icons.wifi_off_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isRewardLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subscriptionState = ref.watch(subscriptionControllerProvider);
+    final current = subscriptionState.asData?.value.current;
+    final premium = current?.premium ?? false;
+    final passActive = current?.mentorPremiumPassActive ?? false;
+    final passEndsAt = current?.mentorPremiumPassEndsAt;
+    final rewardedAvailable = current?.mentorRewardedAdAvailable ?? false;
+
+    final title = premium
+        ? 'Mentoria premium liberada'
+        : passActive
+        ? 'Passe de mentoria ativo'
+        : 'Conteudos exclusivos de mentoria';
+    final subtitle = premium
+        ? 'Seu plano Premium ja libera os conteudos completos de mentoria, sem anuncios.'
+        : passActive
+        ? 'A mentoria premium esta aberta hoje${_formatPassEndsAt(passEndsAt)}.'
+        : 'Assista a um anuncio premiado para liberar por hoje trilhas premium selecionadas de mentoria.';
+
+    return PrimaryPanel(
+      semanticLabel: 'Passe diario de mentoria',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  color: AppColors.accentGold.withValues(alpha: 0.14),
+                  border: Border.all(
+                    color: AppColors.accentGold.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: AppColors.accentGold,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: context.evoluaColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!premium && !passActive) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (rewardedAvailable)
+                  FilledButton.icon(
+                    onPressed: _isRewardLoading ? null : _watchMentorPassAd,
+                    icon: _isRewardLoading
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.ondemand_video_rounded),
+                    label: Text(
+                      _isRewardLoading
+                          ? 'Carregando anuncio'
+                          : 'Assistir anuncio para liberar mentoria por hoje',
+                    ),
+                  ),
+                if (widget.onOpenPremium != null)
+                  OutlinedButton.icon(
+                    onPressed: widget.onOpenPremium,
+                    icon: const Icon(Icons.workspace_premium_rounded),
+                    label: const Text('Assinar Premium'),
+                  ),
+              ],
+            ),
+            if (_rewardStatusMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _rewardStatusMessage!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _formatPassEndsAt(DateTime? value) {
+  if (value == null) {
+    return '';
+  }
+  final local = value.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return ', ate $hour:$minute';
 }
 
 class MentorEvoluaChatCard extends ConsumerStatefulWidget {

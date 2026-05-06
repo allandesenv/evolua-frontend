@@ -30,7 +30,10 @@ class CurrentSubscription {
     required this.premium,
     required this.adsEnabled,
     required this.aiQuotaRemainingToday,
+    required this.mentorPremiumPassActive,
+    required this.mentorRewardedAdAvailable,
     this.provider,
+    this.mentorPremiumPassEndsAt,
     this.currentPeriodEndsAt,
     this.canceledAt,
   });
@@ -41,7 +44,10 @@ class CurrentSubscription {
   final bool premium;
   final bool adsEnabled;
   final int aiQuotaRemainingToday;
+  final bool mentorPremiumPassActive;
+  final bool mentorRewardedAdAvailable;
   final String? provider;
+  final DateTime? mentorPremiumPassEndsAt;
   final DateTime? currentPeriodEndsAt;
   final DateTime? canceledAt;
 }
@@ -88,7 +94,9 @@ class CheckoutSession {
   final DateTime? confirmedAt;
 
   bool get isPending =>
-      status == 'PENDING_PAYMENT' || status == 'PENDING' || status == 'IN_PROCESS';
+      status == 'PENDING_PAYMENT' ||
+      status == 'PENDING' ||
+      status == 'IN_PROCESS';
   bool get isApproved => status == 'APPROVED' || status == 'ACTIVE';
 }
 
