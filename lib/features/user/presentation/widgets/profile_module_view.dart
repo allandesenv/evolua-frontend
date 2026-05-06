@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
@@ -682,52 +683,19 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
 
     _seedForm(profile, fallbackName);
 
-    return Column(
-      children: [
-        PrimaryPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ProfileHero(
-                displayName: profile?.displayName ?? fallbackName,
-                email: session?.email ?? 'voce@evolua.app',
-                avatarUrl: profile?.avatarUrl ?? session?.avatarUrl,
-                onRefresh: () =>
-                    ref.read(profileControllerProvider.notifier).refresh(),
-                onChangeAvatar: _pickAvatar,
-              ),
-              const SizedBox(height: 18),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: ProfileModuleSection.values
-                        .map(
-                          (section) => ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth,
-                            ),
-                            child: ChoiceChip(
-                              label: Text(
-                                _sectionLabel(section),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              selected: _section == section,
-                              onSelected: (_) =>
-                                  setState(() => _section = section),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
+    return _ProfilePreferencesLayout(
+      hero: _ProfileHero(
+        displayName: profile?.displayName ?? fallbackName,
+        email: session?.email ?? 'voce@evolua.app',
+        avatarUrl: profile?.avatarUrl ?? session?.avatarUrl,
+        onRefresh: () => ref.read(profileControllerProvider.notifier).refresh(),
+        onChangeAvatar: _pickAvatar,
+      ),
+      selectedSection: _section,
+      onSectionSelected: (section) => setState(() => _section = section),
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         if (_section == ProfileModuleSection.overview)
           _OverviewSection(
             formKey: _formKey,
@@ -963,9 +931,301 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           const SizedBox(height: 16),
           const NotificationAdminConsole(),
         ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfilePreferencesLayout extends StatelessWidget {
+  const _ProfilePreferencesLayout({
+    required this.hero,
+    required this.selectedSection,
+    required this.onSectionSelected,
+    required this.content,
+  });
+
+  final Widget hero;
+  final ProfileModuleSection selectedSection;
+  final ValueChanged<ProfileModuleSection> onSectionSelected;
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) {
+    final expanded = ResponsiveBreakpoints.isExpanded(context);
+
+    if (expanded) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 288,
+            child: PrimaryPanel(
+              semanticLabel: 'Preferencias do perfil',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  hero,
+                  const SizedBox(height: 22),
+                  _ProfileSectionNavigation(
+                    selectedSection: selectedSection,
+                    onSectionSelected: onSectionSelected,
+                    compact: false,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(child: content),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          semanticLabel: 'Resumo do perfil',
+          child: hero,
+        ),
+        const SizedBox(height: 16),
+        content,
       ],
     );
   }
+}
+
+class _ProfileSectionNavigation extends StatelessWidget {
+  const _ProfileSectionNavigation({
+    required this.selectedSection,
+    required this.onSectionSelected,
+    required this.compact,
+  });
+
+  final ProfileModuleSection selectedSection;
+  final ValueChanged<ProfileModuleSection> onSectionSelected;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Preferencias',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Escolha uma area para ajustar sua experiencia no Evolua.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 16),
+        for (final group in _profileSectionGroups) ...[
+          Padding(
+            padding: EdgeInsets.only(
+              top: group == _profileSectionGroups.first ? 0 : 14,
+              bottom: 8,
+            ),
+            child: Text(
+              group.title,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+          ),
+          for (final section in group.sections)
+            _ProfileSectionNavItem(
+              meta: _profileSectionMeta(section),
+              selected: selectedSection == section,
+              compact: compact,
+              onTap: () => onSectionSelected(section),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProfileSectionNavItem extends StatelessWidget {
+  const _ProfileSectionNavItem({
+    required this.meta,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final _ProfileSectionMeta meta;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.evoluaColors;
+    final backgroundColor = selected
+        ? AppColors.accent.withValues(alpha: 0.16)
+        : colors.surfaceStrong.withValues(alpha: 0.24);
+    final borderColor = selected
+        ? AppColors.accent.withValues(alpha: 0.48)
+        : colors.outline.withValues(alpha: 0.14);
+    final iconColor = selected ? AppColors.accent : colors.textSecondary;
+    final titleColor = selected ? colors.textPrimary : colors.textPrimary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: meta.title,
+        child: Material(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 12 : 14,
+                vertical: compact ? 11 : 12,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(meta.icon, color: iconColor, size: compact ? 22 : 21),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meta.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: titleColor),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          meta.description,
+                          maxLines: compact ? 2 : 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (selected) ...[
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.accent,
+                      size: 18,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSectionGroup {
+  const _ProfileSectionGroup({
+    required this.title,
+    required this.sections,
+  });
+
+  final String title;
+  final List<ProfileModuleSection> sections;
+}
+
+class _ProfileSectionMeta {
+  const _ProfileSectionMeta({
+    required this.section,
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final ProfileModuleSection section;
+  final IconData icon;
+  final String title;
+  final String description;
+}
+
+const _profileSectionGroups = [
+  _ProfileSectionGroup(
+    title: 'Conta',
+    sections: [
+      ProfileModuleSection.overview,
+      ProfileModuleSection.plansSubscriptions,
+    ],
+  ),
+  _ProfileSectionGroup(
+    title: 'Preferencias',
+    sections: [
+      ProfileModuleSection.settingsPrivacy,
+      ProfileModuleSection.displayAccessibility,
+    ],
+  ),
+  _ProfileSectionGroup(
+    title: 'Apoio',
+    sections: [
+      ProfileModuleSection.helpSupport,
+      ProfileModuleSection.feedback,
+    ],
+  ),
+];
+
+_ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
+  return switch (section) {
+    ProfileModuleSection.overview => const _ProfileSectionMeta(
+      section: ProfileModuleSection.overview,
+      icon: Icons.person_rounded,
+      title: 'Visao geral',
+      description: 'Dados principais e identidade da conta.',
+    ),
+    ProfileModuleSection.plansSubscriptions => const _ProfileSectionMeta(
+      section: ProfileModuleSection.plansSubscriptions,
+      icon: Icons.workspace_premium_rounded,
+      title: 'Planos e assinaturas',
+      description: 'Plano atual, beneficios e upgrade.',
+    ),
+    ProfileModuleSection.settingsPrivacy => const _ProfileSectionMeta(
+      section: ProfileModuleSection.settingsPrivacy,
+      icon: Icons.shield_rounded,
+      title: 'Configuracoes e privacidade',
+      description: 'Conta, dados, seguranca e preferencias.',
+    ),
+    ProfileModuleSection.displayAccessibility => const _ProfileSectionMeta(
+      section: ProfileModuleSection.displayAccessibility,
+      icon: Icons.contrast_rounded,
+      title: 'Tela e acessibilidade',
+      description: 'Conforto visual, leitura e interacao.',
+    ),
+    ProfileModuleSection.helpSupport => const _ProfileSectionMeta(
+      section: ProfileModuleSection.helpSupport,
+      icon: Icons.help_outline_rounded,
+      title: 'Ajuda e suporte',
+      description: 'Central de ajuda, chamados e status.',
+    ),
+    ProfileModuleSection.feedback => const _ProfileSectionMeta(
+      section: ProfileModuleSection.feedback,
+      icon: Icons.feedback_outlined,
+      title: 'Dar feedback',
+      description: 'Compartilhe percepcoes e sugestoes.',
+    ),
+  };
 }
 
 class _ProfileHero extends StatelessWidget {

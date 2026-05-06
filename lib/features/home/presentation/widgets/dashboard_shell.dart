@@ -688,30 +688,6 @@ class _AccountMenuButton extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: context.evoluaColors.surface.withValues(alpha: 0.86),
-                    border: Border.all(
-                      color: context.evoluaColors.outline.withValues(
-                        alpha: 0.2,
-                      ),
-                    ),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.person_search_rounded),
-                      SizedBox(width: 10),
-                      Expanded(child: Text('Ver perfil')),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -720,6 +696,13 @@ class _AccountMenuButton extends StatelessWidget {
         const PopupMenuItem(
           value: _AccountMenuAction.overview,
           child: _MenuLabel(icon: Icons.person_rounded, label: 'Ver perfil'),
+        ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.plans,
+          child: _MenuLabel(
+            icon: Icons.workspace_premium_rounded,
+            label: 'Planos e assinaturas',
+          ),
         ),
         const PopupMenuItem(
           value: _AccountMenuAction.settings,
@@ -759,6 +742,8 @@ class _AccountMenuButton extends StatelessWidget {
         switch (value) {
           case _AccountMenuAction.overview:
             onOpenProfileSection(ProfileModuleSection.overview);
+          case _AccountMenuAction.plans:
+            onOpenProfileSection(ProfileModuleSection.plansSubscriptions);
           case _AccountMenuAction.settings:
             onOpenProfileSection(ProfileModuleSection.settingsPrivacy);
           case _AccountMenuAction.help:
@@ -782,6 +767,7 @@ class _AccountMenuButton extends StatelessWidget {
 
 enum _AccountMenuAction {
   overview,
+  plans,
   settings,
   help,
   accessibility,
