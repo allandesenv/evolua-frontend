@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
@@ -467,7 +468,9 @@ class _ContentSectionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.background : AppColors.textSecondary;
+    final color = selected
+        ? context.evoluaColors.background
+        : context.evoluaColors.textSecondary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -480,7 +483,7 @@ class _ContentSectionButton extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? AppColors.accent
-                : AppColors.outline.withValues(alpha: 0.4),
+                : context.evoluaColors.outline.withValues(alpha: 0.4),
           ),
         ),
         child: Row(
@@ -527,7 +530,7 @@ class _CurrentJourneyBanner extends StatelessWidget {
                 Text(
                   'Minha jornada ativa',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.textPrimary,
+                    color: context.evoluaColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -809,9 +812,11 @@ class _JourneyStickyCta extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + bottomInset),
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.96),
+        color: context.evoluaColors.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.28),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -854,18 +859,20 @@ class _JourneyMentorEntryCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.32),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.28),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Precisa adaptar sua jornada hoje?',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -949,7 +956,7 @@ class _JourneyHeader extends StatelessWidget {
               ),
             _StatusBadge(
               label: '${journey.steps.length} etapas',
-              color: AppColors.textSecondary,
+              color: context.evoluaColors.textSecondary,
             ),
           ],
         ),
@@ -1032,15 +1039,15 @@ class _JourneyProgressSummary extends StatelessWidget {
                 child: Text(
                   '${journey.progressPercent}% da jornada',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.textPrimary,
+                    color: context.evoluaColors.textPrimary,
                   ),
                 ),
               ),
               Text(
                 '${journey.completedSteps}/${journey.steps.length} etapas',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -1050,7 +1057,9 @@ class _JourneyProgressSummary extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 8,
               value: journey.progressPercent / 100,
-              backgroundColor: AppColors.surfaceStrong.withValues(alpha: 0.5),
+              backgroundColor: context.evoluaColors.surfaceStrong.withValues(
+                alpha: 0.5,
+              ),
               color: activeColor,
             ),
           ),
@@ -1105,7 +1114,7 @@ class _JourneyTimelineNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final nodeColor = step.isCompleted || step.isCurrent
         ? activeColor
-        : AppColors.outline;
+        : context.evoluaColors.outline;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -1122,7 +1131,9 @@ class _JourneyTimelineNode extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: step.isCompleted
                       ? activeColor
-                      : AppColors.surfaceStrong.withValues(alpha: 0.9),
+                      : context.evoluaColors.surfaceStrong.withValues(
+                          alpha: 0.9,
+                        ),
                   border: Border.all(
                     color: nodeColor,
                     width: step.isCurrent ? 2 : 1,
@@ -1144,7 +1155,9 @@ class _JourneyTimelineNode extends StatelessWidget {
                       ? Icons.local_fire_department_rounded
                       : Icons.circle_outlined,
                   size: 17,
-                  color: step.isCompleted ? AppColors.background : nodeColor,
+                  color: step.isCompleted
+                      ? context.evoluaColors.background
+                      : nodeColor,
                 ),
               ),
               if (!isLast)
@@ -1155,7 +1168,7 @@ class _JourneyTimelineNode extends StatelessWidget {
                     gradient: LinearGradient(
                       colors: [
                         nodeColor.withValues(alpha: 0.8),
-                        AppColors.outline.withValues(alpha: 0.14),
+                        context.evoluaColors.outline.withValues(alpha: 0.14),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -1175,8 +1188,8 @@ class _JourneyTimelineNode extends StatelessWidget {
                     step.title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: step.isCurrent
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
+                          ? context.evoluaColors.textPrimary
+                          : context.evoluaColors.textSecondary,
                       fontWeight: step.isCurrent
                           ? FontWeight.w700
                           : FontWeight.w500,
@@ -1215,7 +1228,7 @@ class _JourneyStepDetailCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.34),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.34),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: activeColor.withValues(alpha: 0.22)),
       ),
@@ -1244,7 +1257,7 @@ class _JourneyStepDetailCard extends StatelessWidget {
             styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
                 .copyWith(
                   p: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textPrimary,
+                    color: context.evoluaColors.textPrimary,
                   ),
                   listBullet: Theme.of(
                     context,
@@ -1306,7 +1319,7 @@ void _showStepSheet(
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: AppColors.backgroundSecondary,
+    backgroundColor: context.evoluaColors.backgroundSecondary,
     builder: (context) => _JourneyStepSheet(
       journey: journey,
       initialStep: initialStep,
@@ -1366,7 +1379,7 @@ void _showJourneyDetails(BuildContext context, Trail trail) {
   showDialog<void>(
     context: context,
     builder: (context) => Dialog(
-      backgroundColor: AppColors.backgroundSecondary,
+      backgroundColor: context.evoluaColors.backgroundSecondary,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820, maxHeight: 820),
         child: Padding(
@@ -1380,7 +1393,7 @@ void _showJourneyDetails(BuildContext context, Trail trail) {
                     child: Text(
                       trail.title,
                       style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(color: AppColors.textPrimary),
+                          ?.copyWith(color: context.evoluaColors.textPrimary),
                     ),
                   ),
                   IconButton(
@@ -1410,11 +1423,17 @@ void _showJourneyDetails(BuildContext context, Trail trail) {
                               Theme.of(context),
                             ).copyWith(
                               p: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(color: AppColors.textPrimary),
+                                  ?.copyWith(
+                                    color: context.evoluaColors.textPrimary,
+                                  ),
                               h1: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(color: AppColors.textPrimary),
+                                  ?.copyWith(
+                                    color: context.evoluaColors.textPrimary,
+                                  ),
                               h2: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(color: AppColors.textPrimary),
+                                  ?.copyWith(
+                                    color: context.evoluaColors.textPrimary,
+                                  ),
                               listBullet: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(color: AppColors.accent),
                             ),
@@ -1424,7 +1443,9 @@ void _showJourneyDetails(BuildContext context, Trail trail) {
                         Text(
                           'Links curados',
                           style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(color: AppColors.textPrimary),
+                              ?.copyWith(
+                                color: context.evoluaColors.textPrimary,
+                              ),
                         ),
                         const SizedBox(height: 12),
                         ...trail.mediaLinks.map(
@@ -1495,9 +1516,9 @@ class _AdminTrailEditor extends StatelessWidget {
         children: [
           Text(
             isEditing ? 'Editar trilha' : 'Criar nova trilha',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
           ),
           if (isEditing) ...[
             const SizedBox(height: 6),
@@ -1580,9 +1601,9 @@ class _AdminTrailEditor extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               'Links de apoio',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -1644,9 +1665,11 @@ class _MediaLinkEditor extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceStrong.withValues(alpha: 0.4),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         children: [
@@ -1767,9 +1790,9 @@ class _TrailExplorer extends ConsumerWidget {
             children: [
               Text(
                 'Encontrar uma trilha certa',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -1843,7 +1866,9 @@ class _TrailExplorer extends ConsumerWidget {
                               child: Text(
                                 trail.title,
                                 style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(color: AppColors.textPrimary),
+                                    ?.copyWith(
+                                      color: context.evoluaColors.textPrimary,
+                                    ),
                               ),
                             ),
                             Text(
@@ -1878,7 +1903,7 @@ class _TrailExplorer extends ConsumerWidget {
                               _StatusBadge(
                                 label:
                                     '${journeyState!.requireValue.progressPercent}% concluido',
-                                color: AppColors.textSecondary,
+                                color: context.evoluaColors.textSecondary,
                               ),
                             if (!trail.accessible &&
                                 !isAdmin &&
@@ -1982,7 +2007,7 @@ class _TrailExplorer extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: AppColors.backgroundSecondary,
+        backgroundColor: context.evoluaColors.backgroundSecondary,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760, maxHeight: 780),
           child: Padding(
@@ -1996,7 +2021,7 @@ class _TrailExplorer extends ConsumerWidget {
                       child: Text(
                         trail.title,
                         style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(color: AppColors.textPrimary),
+                            ?.copyWith(color: context.evoluaColors.textPrimary),
                       ),
                     ),
                     IconButton(
@@ -2031,17 +2056,23 @@ class _TrailExplorer extends ConsumerWidget {
                                     ).copyWith(
                                       p: Theme.of(context).textTheme.bodyLarge
                                           ?.copyWith(
-                                            color: AppColors.textPrimary,
+                                            color: context
+                                                .evoluaColors
+                                                .textPrimary,
                                           ),
                                       h1: Theme.of(context)
                                           .textTheme
                                           .headlineSmall
                                           ?.copyWith(
-                                            color: AppColors.textPrimary,
+                                            color: context
+                                                .evoluaColors
+                                                .textPrimary,
                                           ),
                                       h2: Theme.of(context).textTheme.titleLarge
                                           ?.copyWith(
-                                            color: AppColors.textPrimary,
+                                            color: context
+                                                .evoluaColors
+                                                .textPrimary,
                                           ),
                                       listBullet: Theme.of(context)
                                           .textTheme
@@ -2054,7 +2085,9 @@ class _TrailExplorer extends ConsumerWidget {
                                 Text(
                                   'Conteudos de apoio',
                                   style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(color: AppColors.textPrimary),
+                                      ?.copyWith(
+                                        color: context.evoluaColors.textPrimary,
+                                      ),
                                 ),
                                 const SizedBox(height: 12),
                                 ...trail.mediaLinks.map(
@@ -2066,15 +2099,16 @@ class _TrailExplorer extends ConsumerWidget {
                                       child: Container(
                                         padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
-                                          color: AppColors.surfaceStrong
+                                          color: context
+                                              .evoluaColors
+                                              .surfaceStrong
                                               .withValues(alpha: 0.4),
                                           borderRadius: BorderRadius.circular(
                                             18,
                                           ),
                                           border: Border.all(
-                                            color: AppColors.outline.withValues(
-                                              alpha: 0.4,
-                                            ),
+                                            color: context.evoluaColors.outline
+                                                .withValues(alpha: 0.4),
                                           ),
                                         ),
                                         child: Row(

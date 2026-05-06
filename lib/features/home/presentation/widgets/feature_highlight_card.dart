@@ -1,4 +1,4 @@
-import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
@@ -36,22 +36,19 @@ class FeatureHighlightCard extends StatelessWidget {
           const SizedBox(height: 18),
           Text(
             eyebrow,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: accent,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: accent),
           ),
           const SizedBox(height: 8),
           Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
+              color: context.evoluaColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 10),
-          Text(
-            description,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text(description, style: Theme.of(context).textTheme.bodyMedium),
           const Spacer(),
           const SizedBox(height: 18),
           Row(
@@ -59,8 +56,8 @@ class FeatureHighlightCard extends StatelessWidget {
               Text(
                 'Preparado para integrar',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
+                  color: context.evoluaColors.textPrimary,
+                ),
               ),
               const Spacer(),
               Icon(Icons.arrow_forward_rounded, color: accent),
