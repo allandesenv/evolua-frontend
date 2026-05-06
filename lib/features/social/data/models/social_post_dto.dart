@@ -28,6 +28,17 @@ class SocialPostDto {
     );
   }
 
+  factory SocialPostDto.fromEntity(SocialPost post) {
+    return SocialPostDto(
+      id: post.id,
+      userId: post.userId,
+      content: post.content,
+      community: post.community,
+      visibility: post.visibility,
+      createdAt: post.createdAt,
+    );
+  }
+
   SocialPost toEntity() {
     return SocialPost(
       id: id,
@@ -37,5 +48,16 @@ class SocialPostDto {
       visibility: visibility,
       createdAt: createdAt,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'content': content,
+      'community': community,
+      'visibility': visibility,
+      'createdAt': createdAt.toIso8601String(),
+    };
   }
 }
