@@ -309,6 +309,11 @@ class _DashboardContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(currentProfileProvider);
     final session = ref.watch(authControllerProvider).asData?.value;
+    final currentSubscription = ref
+        .watch(subscriptionControllerProvider)
+        .asData
+        ?.value
+        .current;
     final trailsCount =
         ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
     final checkInsCount =
@@ -332,6 +337,10 @@ class _DashboardContent extends ConsumerWidget {
         checkInsCount: checkInsCount,
         postsCount: postsCount,
         communitiesCount: communitiesCount,
+        displayName: profile?.displayName,
+        mentorPremiumPassActive:
+            currentSubscription?.mentorPremiumPassActive ?? false,
+        mentorPremiumPassEndsAt: currentSubscription?.mentorPremiumPassEndsAt,
         onOpenTrails: () => onNavigate(1),
         onOpenFeed: () => onOpenSpacesSection(SocialModuleTab.reflections),
         onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
@@ -348,6 +357,8 @@ class _DashboardContent extends ConsumerWidget {
         section: trailSection,
         showSectionChips: compact,
         onOpenMentor: onOpenMentor,
+        onOpenPremium: () =>
+            onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
       SocialModuleView(
         key: ValueKey('spaces-${spaceSection.name}-${reflectionScope.name}'),

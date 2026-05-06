@@ -58,7 +58,9 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
 
   @override
   Future<CheckoutSession> checkoutStatus(String checkoutId) async {
-    final response = await _dio.get<dynamic>('/v1/billing/checkout/$checkoutId');
+    final response = await _dio.get<dynamic>(
+      '/v1/billing/checkout/$checkoutId',
+    );
     return _checkoutFromJson(ApiPayloadParser.dataMap(response.data));
   }
 
@@ -82,7 +84,8 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       provider: json['provider']?.toString() ?? 'ADMOB',
       rewardType: json['rewardType']?.toString() ?? rewardType,
       status: json['status']?.toString() ?? 'CREATED',
-      customData: json['customData']?.toString() ?? json['id']?.toString() ?? '',
+      customData:
+          json['customData']?.toString() ?? json['id']?.toString() ?? '',
       expiresAt:
           DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
           DateTime.now().add(const Duration(minutes: 15)),
@@ -102,8 +105,16 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       billingCycle: json['billingCycle']?.toString() ?? 'MONTHLY',
       premium: json['premium'] as bool? ?? false,
       adsEnabled: json['adsEnabled'] as bool? ?? true,
-      aiQuotaRemainingToday: (json['aiQuotaRemainingToday'] as num?)?.toInt() ?? 0,
+      aiQuotaRemainingToday:
+          (json['aiQuotaRemainingToday'] as num?)?.toInt() ?? 0,
+      mentorPremiumPassActive:
+          json['mentorPremiumPassActive'] as bool? ?? false,
+      mentorRewardedAdAvailable:
+          json['mentorRewardedAdAvailable'] as bool? ?? false,
       provider: json['provider']?.toString(),
+      mentorPremiumPassEndsAt: json['mentorPremiumPassEndsAt'] == null
+          ? null
+          : DateTime.tryParse(json['mentorPremiumPassEndsAt'].toString()),
       currentPeriodEndsAt: json['currentPeriodEndsAt'] == null
           ? null
           : DateTime.tryParse(json['currentPeriodEndsAt'].toString()),
