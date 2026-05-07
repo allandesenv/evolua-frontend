@@ -29,6 +29,7 @@ class SocialModuleView extends ConsumerStatefulWidget {
     this.communityScope = SocialCommunityScope.explore,
     this.showScopeChips = true,
     this.onTabChanged,
+    this.onOpenFutureMessages,
   });
 
   final SocialModuleTab initialTab;
@@ -37,6 +38,7 @@ class SocialModuleView extends ConsumerStatefulWidget {
   final SocialCommunityScope communityScope;
   final bool showScopeChips;
   final ValueChanged<SocialModuleTab>? onTabChanged;
+  final VoidCallback? onOpenFutureMessages;
 
   @override
   ConsumerState<SocialModuleView> createState() => _SocialModuleViewState();
@@ -388,6 +390,10 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
             if (currentTab == SocialModuleTab.reflections) {
               return Column(
                 children: [
+                  _FutureMessageReflectionCard(
+                    onOpen: widget.onOpenFutureMessages,
+                  ),
+                  const SizedBox(height: 16),
                   SocialPostComposer(
                     formKey: _postFormKey,
                     contentController: _postContentController,
@@ -562,6 +568,61 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       return 'Seu momento recente abre espaco para clareza. Estas reflexoes priorizam presenca, constancia e aplicacao pratica.';
     }
     return 'Leia reflexoes curtas, aprendizados e relatos leves sem entrar no ritmo de uma rede social.';
+  }
+}
+
+class _FutureMessageReflectionCard extends StatelessWidget {
+  const _FutureMessageReflectionCard({required this.onOpen});
+
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: AppColors.accent.withValues(alpha: 0.14),
+            ),
+            child: const Icon(
+              Icons.forward_to_inbox_rounded,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mensagens do seu eu anterior',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Abra sua tela privada de cartas: escreva para o futuro e leia quando uma versao sua voltar no momento certo.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: const Text('Abrir mensagens'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

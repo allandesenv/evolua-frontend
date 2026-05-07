@@ -348,6 +348,7 @@ class _DashboardContent extends ConsumerWidget {
             onOpenProfileSection(ProfileModuleSection.overview),
         onOpenEvolutionMirror: () =>
             onOpenProfileSection(ProfileModuleSection.evolutionMirror),
+        onOpenFutureMessage: (id) => context.push('/future-messages/$id'),
         onOpenCheckIn: () => context.push('/check-in'),
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
@@ -367,6 +368,7 @@ class _DashboardContent extends ConsumerWidget {
         showTabs: true,
         showScopeChips: false,
         onTabChanged: onOpenSpacesSection,
+        onOpenFutureMessages: () => context.push('/future-messages'),
       ),
       MentorEvoluaModuleView(
         onOpenTrails: () => onNavigate(1),

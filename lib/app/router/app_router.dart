@@ -3,6 +3,7 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/google_auth_callback_page.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
+import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,8 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? googleCallbackPageBuilder,
   GoRouterWidgetBuilder? homePageBuilder,
   GoRouterWidgetBuilder? checkInPageBuilder,
+  GoRouterWidgetBuilder? futureMessagesPageBuilder,
+  GoRouterWidgetBuilder? futureMessageDetailPageBuilder,
   String initialLocation = '/auth',
   bool overridePlatformDefaultLocation = false,
 }) {
@@ -61,6 +64,20 @@ GoRouter buildAppRouter({
         path: '/check-in',
         builder:
             checkInPageBuilder ?? (context, state) => const CheckInQuickPage(),
+      ),
+      GoRoute(
+        path: '/future-messages',
+        builder:
+            futureMessagesPageBuilder ??
+            (context, state) => const FutureMessagesPage(),
+      ),
+      GoRoute(
+        path: '/future-messages/:id',
+        builder:
+            futureMessageDetailPageBuilder ??
+            (context, state) => FutureMessagesPage(
+              initialMessageId: int.tryParse(state.pathParameters['id'] ?? ''),
+            ),
       ),
     ],
     redirect: (context, state) {

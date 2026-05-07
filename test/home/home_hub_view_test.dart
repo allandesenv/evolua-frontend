@@ -13,6 +13,9 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -249,6 +252,9 @@ Widget _testApp({
       trailRepositoryProvider.overrideWithValue(
         trailRepository ?? _FakeTrailRepository(currentJourney: _testTrail()),
       ),
+      futureMessageRepositoryProvider.overrideWithValue(
+        _FakeFutureMessageRepository(),
+      ),
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.dark(),
@@ -267,6 +273,7 @@ Widget _testApp({
             onOpenCommunity: () {},
             onOpenProfile: () {},
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
+            onOpenFutureMessage: (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},
           ),
         ),
@@ -439,6 +446,48 @@ class _FakeTrailRepository implements TrailRepository {
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
   }) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeFutureMessageRepository implements FutureMessageRepository {
+  @override
+  Future<PaginatedResponse<FutureMessage>> list({
+    required int page,
+    required int size,
+    List<String>? statuses,
+  }) async {
+    return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<PaginatedResponse<FutureMessage>> delivered({
+    required int page,
+    required int size,
+  }) async {
+    return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<FutureMessage> create(FutureMessageDraft draft) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<FutureMessage> get(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> heartbeat() async {}
+
+  @override
+  Future<FutureMessage> markRead(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<FutureMessage> react(int id, String reaction) {
     throw UnimplementedError();
   }
 }

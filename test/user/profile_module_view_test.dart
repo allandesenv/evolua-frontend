@@ -19,6 +19,9 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
@@ -260,7 +263,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
-    expect(find.text('Visao de progresso'), findsOneWidget);
+    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
+    expect(find.text('Resumo da semana'), findsOneWidget);
   });
 
   testWidgets('profile preferences render sidebar on expanded desktop', (
@@ -433,13 +437,16 @@ void main() {
     await _pumpEvolutionMirror(tester);
 
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
-    expect(find.text('Visao de progresso'), findsOneWidget);
-    expect(find.text('Padroes emocionais'), findsOneWidget);
-    expect(find.text('Evolucao nas trilhas'), findsOneWidget);
-    expect(find.text('Insights da IA'), findsOneWidget);
-    expect(find.text('Conquistas'), findsOneWidget);
+    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
+    expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.text('Padroes percebidos'), findsOneWidget);
+    expect(find.text('Mensagem da IA'), findsOneWidget);
+    expect(find.text('Mensagens do seu eu anterior'), findsNothing);
+    expect(find.text('Trilhas em andamento'), findsOneWidget);
+    expect(find.text('Marcos da jornada'), findsOneWidget);
     expect(find.text('Consistencia'), findsAtLeastNWidgets(1));
     expect(find.text('sem padrao ainda'), findsOneWidget);
+    expect(find.text('em formacao'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -463,10 +470,71 @@ void main() {
     expect(find.text('Clareza pratica'), findsAtLeastNWidgets(1));
     expect(find.textContaining('50% concluido'), findsOneWidget);
     expect(find.text('Proximo passo: Escolher'), findsOneWidget);
-    expect(find.text('Insight da IA'), findsAtLeastNWidgets(1));
-    expect(find.text('Jornada ativa'), findsOneWidget);
-    expect(find.text('Etapas concluidas'), findsOneWidget);
+    expect(find.text('Mensagem da IA'), findsOneWidget);
+    expect(
+      find.text('Voce tende a registrar mais ansiedade a noite.'),
+      findsAtLeastNWidgets(1),
+    );
+    expect(find.text('1 padrao emocional identificado'), findsOneWidget);
+    expect(find.text('3 dias de check-in'), findsOneWidget);
+    expect(
+      find.text('Proximo passo: Escolha uma proxima acao simples.'),
+      findsOneWidget,
+    );
     expect(find.text('Ansioso'), findsOneWidget);
+  });
+
+  testWidgets('renders previous-self messages in mirror only when delivered', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      checkInRepository: _FakeCheckInRepository(items: _evolutionCheckIns()),
+      futureMessageRepository: _FakeFutureMessageRepository(
+        deliveredItems: [_deliveredFutureMessage()],
+      ),
+    );
+
+    expect(find.text('Mensagens do seu eu anterior'), findsOneWidget);
+    expect(
+      find.text('Ha uma carta sua pronta para ser lida com calma.'),
+      findsOneWidget,
+    );
+    expect(find.text('Quero ler'), findsOneWidget);
+  });
+
+  testWidgets('renders evolution mirror milestones with rich progress data', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    final trail = _testTrail();
+
+    await _pumpEvolutionMirror(
+      tester,
+      trailRepository: _FakeTrailRepository(
+        currentJourney: trail,
+        journey: _testCompletedJourney(trail),
+      ),
+      checkInRepository: _FakeCheckInRepository(
+        items: _evolutionRichCheckIns(),
+      ),
+    );
+
+    expect(find.textContaining('100% concluido'), findsOneWidget);
+    expect(find.text('Primeira trilha concluida'), findsOneWidget);
+    expect(find.text('7 reflexoes registradas'), findsOneWidget);
+    expect(find.text('1 padrao emocional identificado'), findsOneWidget);
+    expect(
+      find.text('Seus melhores dias aparecem quando faz check-in pela manha.'),
+      findsAtLeastNWidgets(1),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('renders help support and creates real ticket', (tester) async {
@@ -873,6 +941,7 @@ Future<void> _pumpEvolutionMirror(
   WidgetTester tester, {
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
+  FutureMessageRepository? futureMessageRepository,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 1100));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -890,6 +959,9 @@ Future<void> _pumpEvolutionMirror(
         ),
         checkInRepositoryProvider.overrideWithValue(
           checkInRepository ?? _FakeCheckInRepository(),
+        ),
+        futureMessageRepositoryProvider.overrideWithValue(
+          futureMessageRepository ?? _FakeFutureMessageRepository(),
         ),
         authenticatedDioProvider(
           AppConfig.userBaseUrl,
@@ -929,6 +1001,9 @@ Widget _dashboardShell() {
       communityRepositoryProvider.overrideWithValue(_FakeCommunityRepository()),
       notificationRepositoryProvider.overrideWithValue(
         _FakeNotificationRepository(),
+      ),
+      futureMessageRepositoryProvider.overrideWithValue(
+        _FakeFutureMessageRepository(),
       ),
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
@@ -1176,8 +1251,63 @@ TrailJourney _testJourney(Trail trail) {
   );
 }
 
+FutureMessage _deliveredFutureMessage() {
+  return FutureMessage(
+    id: 88,
+    title: 'Carta para mim mesmo',
+    body: 'Lembre que voce ja atravessou dias assim antes.',
+    bodyPreview: 'Lembre que voce ja atravessou dias assim antes.',
+    triggerType: 'LOW_ENERGY_CHECKIN',
+    triggerConfig: const {'energyMax': 3},
+    triggerLabel: 'Quando a energia estiver baixa',
+    status: 'DELIVERED',
+    createdContext: const {'mood': 'ansioso', 'energyLevel': 4},
+    deliveredContext: const {'mood': 'cansado', 'energyLevel': 2},
+    createdAt: DateTime(2026, 1, 1),
+    scheduledFor: null,
+    deliveredAt: DateTime(2026, 1, 30),
+  );
+}
+
+TrailJourney _testCompletedJourney(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Respirar',
+      summary: 'Dois minutos de presenca.',
+      content: 'Respire por quatro ciclos.',
+      status: 'completed',
+      estimatedMinutes: 2,
+      mediaLinks: [],
+    ),
+    const TrailJourneyStep(
+      index: 1,
+      title: 'Escolher',
+      summary: 'Uma proxima acao simples.',
+      content: 'Escolha uma acao pequena.',
+      status: 'completed',
+      estimatedMinutes: 4,
+      mediaLinks: [],
+    ),
+  ];
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 1,
+      completedStepIndexes: const [0, 1],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 3),
+      completedAt: DateTime(2026, 1, 3),
+    ),
+    progressPercent: 100,
+    nextStep: null,
+  );
+}
+
 List<CheckIn> _evolutionCheckIns() {
   final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
   return [
     CheckIn(
       id: 1,
@@ -1198,19 +1328,74 @@ List<CheckIn> _evolutionCheckIns() {
         generatedTrailDraft: null,
         fallbackUsed: false,
       ),
-      createdAt: now,
+      createdAt: today.add(const Duration(hours: 21)),
     ),
     CheckIn(
       id: 2,
       userId: 'user-123',
+      mood: 'ansioso',
+      reflection: 'Ansiedade voltou no fim do dia.',
+      energyLevel: 5,
+      recommendedPractice: 'Pausa curta antes de dormir.',
+      aiInsight: null,
+      createdAt: today
+          .subtract(const Duration(days: 1))
+          .add(const Duration(hours: 22)),
+    ),
+    CheckIn(
+      id: 3,
+      userId: 'user-123',
       mood: 'calmo',
-      reflection: 'Melhorou um pouco.',
+      reflection: 'Manha mais clara.',
       energyLevel: 8,
       recommendedPractice: 'Caminhada curta.',
       aiInsight: null,
-      createdAt: now.subtract(const Duration(days: 1)),
+      createdAt: today
+          .subtract(const Duration(days: 2))
+          .add(const Duration(hours: 8)),
     ),
   ];
+}
+
+List<CheckIn> _evolutionRichCheckIns() {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final moods = [
+    'calmo',
+    'confiante',
+    'calmo',
+    'criativo',
+    'ansioso',
+    'calmo',
+    'grato',
+  ];
+  final energies = [9, 8, 8, 9, 5, 7, 8];
+  return List.generate(7, (index) {
+    final day = today.subtract(Duration(days: index));
+    return CheckIn(
+      id: index + 10,
+      userId: 'user-123',
+      mood: moods[index],
+      reflection: 'Reflexao registrada ${index + 1}.',
+      energyLevel: energies[index],
+      recommendedPractice: 'Pratica curta.',
+      aiInsight: index == 0
+          ? const CheckInAiInsight(
+              insight: 'Voce esta percebendo melhor seus ritmos.',
+              suggestedAction: 'Mantenha o check-in pela manha.',
+              riskLevel: 'low',
+              suggestedTrailId: 7,
+              suggestedTrailTitle: 'Clareza pratica',
+              suggestedTrailReason: 'Ajuda a manter constancia.',
+              suggestedSpace: null,
+              journeyPlan: null,
+              generatedTrailDraft: null,
+              fallbackUsed: false,
+            )
+          : null,
+      createdAt: day.add(Duration(hours: index < 3 ? 8 : 17)),
+    );
+  });
 }
 
 class _FakeAuthAdapter implements HttpClientAdapter {
@@ -1520,6 +1705,65 @@ class _FakeCheckInRepository implements CheckInRepository {
       aiInsight: null,
       createdAt: DateTime(2026, 1, 1),
     );
+  }
+}
+
+class _FakeFutureMessageRepository implements FutureMessageRepository {
+  const _FakeFutureMessageRepository({
+    this.deliveredItems = const <FutureMessage>[],
+  });
+
+  final List<FutureMessage> deliveredItems;
+
+  @override
+  Future<PaginatedResponse<FutureMessage>> list({
+    required int page,
+    required int size,
+    List<String>? statuses,
+  }) async {
+    return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<PaginatedResponse<FutureMessage>> delivered({
+    required int page,
+    required int size,
+  }) async {
+    return PaginatedResponse<FutureMessage>(
+      items: deliveredItems,
+      page: page,
+      size: size,
+      totalItems: deliveredItems.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: 'deliveredAt',
+      sortDir: 'desc',
+      filters: const {},
+    );
+  }
+
+  @override
+  Future<FutureMessage> create(FutureMessageDraft draft) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<FutureMessage> get(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> heartbeat() async {}
+
+  @override
+  Future<FutureMessage> markRead(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<FutureMessage> react(int id, String reaction) {
+    throw UnimplementedError();
   }
 }
 
