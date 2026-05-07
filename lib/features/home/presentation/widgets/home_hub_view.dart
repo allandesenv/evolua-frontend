@@ -7,6 +7,8 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/home/application/proactive_greeting.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -29,6 +31,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenCommunity,
     required this.onOpenProfile,
     required this.onOpenEvolutionMirror,
+    required this.onOpenFutureMessage,
     required this.onOpenCheckIn,
     this.onOpenPremium,
     this.mentorPremiumPassEndsAt,
@@ -46,6 +49,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenEvolutionMirror;
+  final ValueChanged<int> onOpenFutureMessage;
   final VoidCallback onOpenCheckIn;
   final VoidCallback? onOpenPremium;
   final DateTime? mentorPremiumPassEndsAt;
@@ -141,6 +145,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final checkInState = ref.watch(checkInControllerProvider);
+    final futureMessageState = ref.watch(futureMessageControllerProvider);
     final currentJourney = ref.watch(currentJourneyTrailProvider).asData?.value;
     final result = checkInState.asData?.value.result;
     final recentItems = result?.items ?? const <CheckIn>[];
@@ -196,6 +201,9 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       mentorPremiumPassActive: widget.mentorPremiumPassActive,
       mentorPremiumPassEndsAt: widget.mentorPremiumPassEndsAt,
     );
+    final readyFutureMessage = futureMessageState.asData?.value.readyToRead.firstOrNull;
+    final showFutureMessage =
+        readyFutureMessage != null && _isDifficultCheckIn(latestCreatedCheckIn ?? recentItems.firstOrNull);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -206,6 +214,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onContinueJourney: widget.onOpenTrails,
           onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
         ),
+        if (showFutureMessage) ...[
+          const SizedBox(height: 14),
+          _FutureMessageReadyCard(
+            message: readyFutureMessage,
+            onOpen: () => widget.onOpenFutureMessage(readyFutureMessage.id),
+          ),
+        ],
         const SizedBox(height: 18),
         _InsightBriefingCard(
           insight: latestInsight,
@@ -237,6 +252,18 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         ),
       ],
     );
+  }
+
+  bool _isDifficultCheckIn(CheckIn? checkIn) {
+    if (checkIn == null) {
+      return false;
+    }
+    final mood = checkIn.mood.toLowerCase();
+    return checkIn.energyLevel <= 4 ||
+        mood.contains('ans') ||
+        mood.contains('cans') ||
+        mood.contains('trist') ||
+        mood.contains('desanim');
   }
 }
 
@@ -312,6 +339,63 @@ class _ProactiveGreetingCard extends StatelessWidget {
                     icon: Icon(icon),
                     label: Text(greeting.actionLabel),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FutureMessageReadyCard extends StatelessWidget {
+  const _FutureMessageReadyCard({required this.message, required this.onOpen});
+
+  final FutureMessage message;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: AppColors.accentWarm.withValues(alpha: 0.16),
+            ),
+            child: const Icon(
+              Icons.mark_email_unread_rounded,
+              color: AppColors.accentWarm,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ha uma mensagem sua pronta',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Hoje parece um dia que merece cuidado. Uma carta do seu eu anterior pode ajudar a atravessar esse momento.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Quero ler'),
                 ),
               ],
             ),
