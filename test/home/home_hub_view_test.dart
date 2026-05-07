@@ -9,6 +9,9 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey_s
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
+import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:evolua_frontend/features/daily_ritual/domain/repositories/daily_ritual_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
@@ -45,7 +48,7 @@ void main() {
     });
 
     testWidgets(
-      'shows proactive check-in greeting when user has no check-in today',
+      'shows daytime check-in action when user has no check-in today',
       (tester) async {
         var openedCheckIn = false;
         final yesterday = DateTime.now().subtract(const Duration(days: 1));
@@ -53,6 +56,7 @@ void main() {
         await tester.pumpWidget(
           _testApp(
             onOpenCheckIn: () => openedCheckIn = true,
+            now: DateTime(2026, 5, 7, 13),
             checkInRepository: _FakeCheckInRepository(
               items: [
                 CheckIn(
@@ -71,7 +75,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.textContaining('Leo'), findsOneWidget);
+        expect(find.text('Como esta seu dia ate aqui?'), findsOneWidget);
         expect(find.text('Fazer check-in'), findsOneWidget);
 
         await tester.tap(find.text('Fazer check-in'));
@@ -80,6 +84,73 @@ void main() {
         expect(openedCheckIn, isTrue);
       },
     );
+
+    testWidgets('shows morning ritual entry point first', (tester) async {
+      String? openedType;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 8),
+          onOpenDailyRitual: (type) => openedType = type,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bom dia, Leo'), findsOneWidget);
+      expect(find.text('Iniciar Ritual do Dia'), findsOneWidget);
+      expect(find.text('Fazer check-in'), findsOneWidget);
+
+      await tester.tap(find.text('Iniciar Ritual do Dia'));
+      await tester.pumpAndSettle();
+
+      expect(openedType, DailyRitualType.morning);
+    });
+
+    testWidgets('shows evening closing entry point', (tester) async {
+      String? openedType;
+      var openedReflections = false;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 20),
+          onOpenDailyRitual: (type) => openedType = type,
+          onOpenFeed: () => openedReflections = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vamos fechar o dia?'), findsOneWidget);
+      expect(find.text('Fazer Fechamento do Dia'), findsOneWidget);
+      expect(find.text('Escrever reflexao'), findsOneWidget);
+
+      await tester.tap(find.text('Fazer Fechamento do Dia'));
+      await tester.pumpAndSettle();
+      expect(openedType, DailyRitualType.evening);
+
+      await tester.tap(find.text('Escrever reflexao'));
+      await tester.pumpAndSettle();
+      expect(openedReflections, isTrue);
+    });
+
+    testWidgets('shows completed morning ritual until evening', (tester) async {
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 14),
+          dailyRitualRepository: _FakeDailyRitualRepository(
+            morning: _testRitual(DailyRitualType.morning),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ritual do Dia concluido'), findsOneWidget);
+      expect(find.text('Intencao de hoje: agir com calma'), findsOneWidget);
+      expect(
+        find.text('Pequeno passo: pausar antes de reagir'),
+        findsOneWidget,
+      );
+      expect(find.text('Ver meu ritual'), findsOneWidget);
+    });
 
     testWidgets('opens full intelligent analysis from summarized card', (
       tester,
@@ -240,8 +311,13 @@ void main() {
 Widget _testApp({
   CheckInRepository? checkInRepository,
   TrailRepository? trailRepository,
+  DailyRitualRepository? dailyRitualRepository,
   ThemeData? theme,
+  DateTime? now,
+  VoidCallback? onOpenTrails,
+  VoidCallback? onOpenFeed,
   VoidCallback? onOpenEvolutionMirror,
+  ValueChanged<String>? onOpenDailyRitual,
   VoidCallback? onOpenCheckIn,
 }) {
   return ProviderScope(
@@ -254,6 +330,9 @@ Widget _testApp({
       ),
       futureMessageRepositoryProvider.overrideWithValue(
         _FakeFutureMessageRepository(),
+      ),
+      dailyRitualRepositoryProvider.overrideWithValue(
+        dailyRitualRepository ?? const _FakeDailyRitualRepository(),
       ),
     ],
     child: MaterialApp(
@@ -268,12 +347,14 @@ Widget _testApp({
             communitiesCount: 1,
             displayName: 'Leo Respiro',
             mentorPremiumPassActive: false,
-            onOpenTrails: () {},
-            onOpenFeed: () {},
+            now: now,
+            onOpenTrails: onOpenTrails ?? () {},
+            onOpenFeed: onOpenFeed ?? () {},
             onOpenCommunity: () {},
             onOpenProfile: () {},
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
             onOpenFutureMessage: (_) {},
+            onOpenDailyRitual: onOpenDailyRitual ?? (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},
           ),
         ),
@@ -492,6 +573,25 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
   }
 }
 
+class _FakeDailyRitualRepository implements DailyRitualRepository {
+  const _FakeDailyRitualRepository({this.morning});
+
+  final DailyRitual? morning;
+
+  @override
+  Future<DailyRitual?> today({
+    required String type,
+    required DateTime localDate,
+  }) async {
+    return type == DailyRitualType.evening ? null : morning;
+  }
+
+  @override
+  Future<DailyRitual> create(DailyRitualDraft draft) {
+    throw UnimplementedError();
+  }
+}
+
 List<CheckIn> _checkIns() {
   final now = DateTime.now();
   return [
@@ -546,6 +646,19 @@ CheckInAiInsight _insight({
     journeyPlan: null,
     generatedTrailDraft: null,
     fallbackUsed: fallbackUsed,
+  );
+}
+
+DailyRitual _testRitual(String type) {
+  return DailyRitual(
+    id: type == DailyRitualType.evening ? 2 : 1,
+    localDate: DateTime(2026, 5, 7),
+    type: type,
+    emotionalState: 'calmo',
+    dayNeed: 'clareza',
+    intention: 'agir com calma',
+    microAction: 'pausar antes de reagir',
+    createdAt: DateTime(2026, 5, 7, 8),
   );
 }
 

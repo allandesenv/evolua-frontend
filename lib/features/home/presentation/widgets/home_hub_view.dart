@@ -3,13 +3,14 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
-import 'package:evolua_frontend/features/home/application/proactive_greeting.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -32,9 +33,11 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenProfile,
     required this.onOpenEvolutionMirror,
     required this.onOpenFutureMessage,
+    required this.onOpenDailyRitual,
     required this.onOpenCheckIn,
     this.onOpenPremium,
     this.mentorPremiumPassEndsAt,
+    this.now,
   });
 
   final int profilesCount;
@@ -50,9 +53,11 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenEvolutionMirror;
   final ValueChanged<int> onOpenFutureMessage;
+  final ValueChanged<String> onOpenDailyRitual;
   final VoidCallback onOpenCheckIn;
   final VoidCallback? onOpenPremium;
   final DateTime? mentorPremiumPassEndsAt;
+  final DateTime? now;
 
   @override
   ConsumerState<HomeHubView> createState() => _HomeHubViewState();
@@ -146,6 +151,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final checkInState = ref.watch(checkInControllerProvider);
     final futureMessageState = ref.watch(futureMessageControllerProvider);
+    final dailyRitualState = ref.watch(dailyRitualControllerProvider);
     final currentJourney = ref.watch(currentJourneyTrailProvider).asData?.value;
     final result = checkInState.asData?.value.result;
     final recentItems = result?.items ?? const <CheckIn>[];
@@ -193,26 +199,26 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       suggestedAction: latestInsight?.suggestedAction,
       currentJourneySummary: currentJourney?.summary,
     );
-    final proactiveGreeting = buildProactiveGreeting(
-      displayName: widget.displayName,
-      checkIns: recentItems,
-      latestCreatedCheckIn: latestCreatedCheckIn,
-      activeJourney: currentJourney,
-      mentorPremiumPassActive: widget.mentorPremiumPassActive,
-      mentorPremiumPassEndsAt: widget.mentorPremiumPassEndsAt,
-    );
-    final readyFutureMessage = futureMessageState.asData?.value.readyToRead.firstOrNull;
+    final currentTime = widget.now ?? DateTime.now();
+    final readyFutureMessage =
+        futureMessageState.asData?.value.readyToRead.firstOrNull;
     final showFutureMessage =
-        readyFutureMessage != null && _isDifficultCheckIn(latestCreatedCheckIn ?? recentItems.firstOrNull);
+        readyFutureMessage != null &&
+        _isDifficultCheckIn(latestCreatedCheckIn ?? recentItems.firstOrNull);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ProactiveGreetingCard(
-          greeting: proactiveGreeting,
+        _DailyJourneyCard(
+          displayName: widget.displayName,
+          now: currentTime,
+          morningRitual: dailyRitualState.asData?.value.morning,
+          eveningRitual: dailyRitualState.asData?.value.evening,
+          isLoading: dailyRitualState.isLoading && !dailyRitualState.hasValue,
           onCheckIn: widget.onOpenCheckIn,
-          onContinueJourney: widget.onOpenTrails,
-          onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
+          onOpenDailyRitual: widget.onOpenDailyRitual,
+          onOpenNextStep: widget.onOpenTrails,
+          onOpenReflection: widget.onOpenFeed,
         ),
         if (showFutureMessage) ...[
           const SizedBox(height: 14),
@@ -267,34 +273,44 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   }
 }
 
-class _ProactiveGreetingCard extends StatelessWidget {
-  const _ProactiveGreetingCard({
-    required this.greeting,
+class _DailyJourneyCard extends StatelessWidget {
+  const _DailyJourneyCard({
+    required this.displayName,
+    required this.now,
+    required this.morningRitual,
+    required this.eveningRitual,
+    required this.isLoading,
     required this.onCheckIn,
-    required this.onContinueJourney,
-    required this.onOpenEvolutionMirror,
+    required this.onOpenDailyRitual,
+    required this.onOpenNextStep,
+    required this.onOpenReflection,
   });
 
-  final ProactiveGreeting greeting;
+  final String? displayName;
+  final DateTime now;
+  final DailyRitual? morningRitual;
+  final DailyRitual? eveningRitual;
+  final bool isLoading;
   final VoidCallback onCheckIn;
-  final VoidCallback onContinueJourney;
-  final VoidCallback onOpenEvolutionMirror;
+  final ValueChanged<String> onOpenDailyRitual;
+  final VoidCallback onOpenNextStep;
+  final VoidCallback onOpenReflection;
 
   @override
   Widget build(BuildContext context) {
-    final action = switch (greeting.action) {
-      ProactiveGreetingAction.checkIn => onCheckIn,
-      ProactiveGreetingAction.continueJourney => onContinueJourney,
-      ProactiveGreetingAction.evolutionMirror => onOpenEvolutionMirror,
-    };
-    final icon = switch (greeting.action) {
-      ProactiveGreetingAction.checkIn => Icons.favorite_rounded,
-      ProactiveGreetingAction.continueJourney => Icons.play_arrow_rounded,
-      ProactiveGreetingAction.evolutionMirror => Icons.auto_graph_rounded,
-    };
+    final model = _DailyJourneyCardModel.from(
+      displayName: displayName,
+      now: now,
+      morningRitual: morningRitual,
+      eveningRitual: eveningRitual,
+      onCheckIn: onCheckIn,
+      onOpenDailyRitual: onOpenDailyRitual,
+      onOpenNextStep: onOpenNextStep,
+      onOpenReflection: onOpenReflection,
+    );
 
     return PrimaryPanel(
-      semanticLabel: 'Mensagem proativa personalizada',
+      semanticLabel: 'Jornada Diaria',
       padding: const EdgeInsets.all(18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,10 +325,7 @@ class _ProactiveGreetingCard extends StatelessWidget {
                 color: AppColors.accent.withValues(alpha: 0.24),
               ),
             ),
-            child: const Icon(
-              Icons.waving_hand_rounded,
-              color: AppColors.accent,
-            ),
+            child: const Icon(Icons.wb_sunny_rounded, color: AppColors.accent),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -320,7 +333,7 @@ class _ProactiveGreetingCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  greeting.greeting,
+                  model.title,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: context.evoluaColors.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -328,17 +341,34 @@ class _ProactiveGreetingCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  greeting.message,
+                  model.message,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
+                if (model.ritual != null) ...[
+                  const SizedBox(height: 12),
+                  _DailyJourneySummary(ritual: model.ritual!),
+                ],
                 const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.icon(
-                    onPressed: action,
-                    icon: Icon(icon),
-                    label: Text(greeting.actionLabel),
-                  ),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: isLoading ? null : model.primaryAction,
+                      icon: isLoading
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(model.primaryIcon),
+                      label: Text(model.primaryLabel),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: isLoading ? null : model.secondaryAction,
+                      icon: Icon(model.secondaryIcon),
+                      label: Text(model.secondaryLabel),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -346,6 +376,161 @@ class _ProactiveGreetingCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _DailyJourneySummary extends StatelessWidget {
+  const _DailyJourneySummary({required this.ritual});
+
+  final DailyRitual ritual;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Intencao de hoje: ${ritual.intention}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Pequeno passo: ${ritual.microAction}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyJourneyCardModel {
+  const _DailyJourneyCardModel({
+    required this.title,
+    required this.message,
+    required this.primaryLabel,
+    required this.primaryIcon,
+    required this.primaryAction,
+    required this.secondaryLabel,
+    required this.secondaryIcon,
+    required this.secondaryAction,
+    this.ritual,
+  });
+
+  final String title;
+  final String message;
+  final String primaryLabel;
+  final IconData primaryIcon;
+  final VoidCallback primaryAction;
+  final String secondaryLabel;
+  final IconData secondaryIcon;
+  final VoidCallback secondaryAction;
+  final DailyRitual? ritual;
+
+  static _DailyJourneyCardModel from({
+    required String? displayName,
+    required DateTime now,
+    required DailyRitual? morningRitual,
+    required DailyRitual? eveningRitual,
+    required VoidCallback onCheckIn,
+    required ValueChanged<String> onOpenDailyRitual,
+    required VoidCallback onOpenNextStep,
+    required VoidCallback onOpenReflection,
+  }) {
+    final name = _firstName(displayName);
+    final hour = now.toLocal().hour;
+    final isMorning = hour >= 6 && hour < 12;
+    final isDay = hour >= 12 && hour < 18;
+    final isEvening = !isMorning && !isDay;
+
+    if (isEvening) {
+      if (eveningRitual != null) {
+        return _DailyJourneyCardModel(
+          title: 'Fechamento do Dia concluido',
+          message:
+              'Voce ja fechou o dia com mais consciencia. Agora pode descansar com menos peso.',
+          ritual: eveningRitual,
+          primaryLabel: 'Ver fechamento',
+          primaryIcon: Icons.visibility_rounded,
+          primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
+          secondaryLabel: 'Escrever reflexao',
+          secondaryIcon: Icons.edit_note_rounded,
+          secondaryAction: onOpenReflection,
+        );
+      }
+      return _DailyJourneyCardModel(
+        title: 'Vamos fechar o dia?',
+        message:
+            'Revise o que pesou, reconheca o que foi bom e solte o que nao precisa carregar.',
+        primaryLabel: 'Fazer Fechamento do Dia',
+        primaryIcon: Icons.nightlight_round,
+        primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
+        secondaryLabel: 'Escrever reflexao',
+        secondaryIcon: Icons.edit_note_rounded,
+        secondaryAction: onOpenReflection,
+      );
+    }
+
+    if (morningRitual != null) {
+      return _DailyJourneyCardModel(
+        title: 'Ritual do Dia concluido',
+        message: 'Sua jornada diaria ja tem um norte simples para hoje.',
+        ritual: morningRitual,
+        primaryLabel: 'Ver meu ritual',
+        primaryIcon: Icons.visibility_rounded,
+        primaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
+        secondaryLabel: 'Fazer check-in',
+        secondaryIcon: Icons.favorite_rounded,
+        secondaryAction: onCheckIn,
+      );
+    }
+
+    if (isMorning) {
+      return _DailyJourneyCardModel(
+        title: 'Bom dia${name == null ? '' : ', $name'}',
+        message:
+            'Comece o dia com presenca. Escolha uma intencao simples e uma microacao possivel.',
+        primaryLabel: 'Iniciar Ritual do Dia',
+        primaryIcon: Icons.wb_sunny_rounded,
+        primaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
+        secondaryLabel: 'Fazer check-in',
+        secondaryIcon: Icons.favorite_rounded,
+        secondaryAction: onCheckIn,
+      );
+    }
+
+    return _DailyJourneyCardModel(
+      title: 'Como esta seu dia ate aqui?',
+      message:
+          'Faca uma pausa curta para perceber seu estado e escolher o proximo passo.',
+      primaryLabel: 'Fazer check-in',
+      primaryIcon: Icons.favorite_rounded,
+      primaryAction: onCheckIn,
+      secondaryLabel: 'Ver proximo passo',
+      secondaryIcon: Icons.play_arrow_rounded,
+      secondaryAction: onOpenNextStep,
+    );
+  }
+
+  static String? _firstName(String? displayName) {
+    final normalized = displayName?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return normalized.split(RegExp(r'\s+')).first;
   }
 }
 

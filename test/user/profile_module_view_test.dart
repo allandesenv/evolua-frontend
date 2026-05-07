@@ -15,6 +15,9 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey_s
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
+import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:evolua_frontend/features/daily_ritual/domain/repositories/daily_ritual_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
@@ -1005,6 +1008,9 @@ Widget _dashboardShell() {
       futureMessageRepositoryProvider.overrideWithValue(
         _FakeFutureMessageRepository(),
       ),
+      dailyRitualRepositoryProvider.overrideWithValue(
+        const _FakeDailyRitualRepository(),
+      ),
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
       ).overrideWithValue(_fakeUserDio()),
@@ -1763,6 +1769,23 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
 
   @override
   Future<FutureMessage> react(int id, String reaction) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeDailyRitualRepository implements DailyRitualRepository {
+  const _FakeDailyRitualRepository();
+
+  @override
+  Future<DailyRitual?> today({
+    required String type,
+    required DateTime localDate,
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<DailyRitual> create(DailyRitualDraft draft) {
     throw UnimplementedError();
   }
 }
