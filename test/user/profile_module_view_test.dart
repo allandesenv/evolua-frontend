@@ -449,16 +449,46 @@ void main() {
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
     await tester.pumpAndSettle();
+    expect(find.byType(TabBar), findsNothing);
+    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Reflexoes'), findsOneWidget);
+    expect(find.text('Meus'), findsOneWidget);
+    expect(find.widgetWithText(Tab, 'Meus espacos'), findsNothing);
+
     await tester.tap(find.text('Reflexoes'));
     await tester.pumpAndSettle();
 
     expect(find.text('Mensagens para o futuro'), findsOneWidget);
     expect(find.text('Mensagens do seu eu anterior'), findsNothing);
 
+    await tester.ensureVisible(find.text('Abrir mensagens'));
     await tester.tap(find.text('Abrir mensagens'));
     await tester.pumpAndSettle();
 
     expect(find.text('Future messages route'), findsOneWidget);
+  });
+
+  testWidgets('spaces button switcher opens Meus area', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TabBar), findsNothing);
+    await tester.tap(find.text('Meus'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Meus espacos'), findsOneWidget);
+    expect(find.text('0 participando'), findsAtLeastNWidgets(1));
+    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Reflexoes'), findsOneWidget);
   });
 
   testWidgets('journey CTA still opens mentor after removing nav item', (
@@ -538,6 +568,8 @@ void main() {
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsNothing);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -717,6 +749,8 @@ void main() {
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsNothing);
     expect(find.text('Padroes percebidos'), findsOneWidget);
     expect(find.text('Mensagem da IA'), findsOneWidget);
     expect(find.text('Mensagens do seu eu anterior'), findsNothing);
@@ -1363,7 +1397,10 @@ Future<void> _openAvatarMenu(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Abrir menu da conta'));
 }
 
-Future<void> _swipeDashboard(WidgetTester tester, double horizontalOffset) async {
+Future<void> _swipeDashboard(
+  WidgetTester tester,
+  double horizontalOffset,
+) async {
   await tester.fling(
     find.byType(DashboardShell),
     Offset(horizontalOffset, 0),

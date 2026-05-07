@@ -197,6 +197,29 @@ void main() {
       expect(find.text('Abrir trilha sugerida'), findsOneWidget);
     });
 
+    testWidgets(
+      'suggested trail action closes full analysis before opening trails',
+      (tester) async {
+        var openedTrails = false;
+        await tester.pumpWidget(
+          _testApp(onOpenTrails: () => openedTrails = true),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Ver analise completa'));
+        await tester.tap(find.text('Ver analise completa'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Analise completa'), findsOneWidget);
+
+        await tester.tap(find.text('Abrir trilha sugerida'));
+        await tester.pumpAndSettle();
+
+        expect(openedTrails, isTrue);
+        expect(find.text('Analise completa'), findsNothing);
+      },
+    );
+
     testWidgets('shows next-step metadata as auxiliary context', (
       tester,
     ) async {

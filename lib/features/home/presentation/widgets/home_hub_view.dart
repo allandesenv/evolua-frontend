@@ -75,7 +75,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         title: 'Analise completa',
         child: CheckInAiInsightCard(
           insight: insight,
-          onOpenTrails: widget.onOpenTrails,
+          onOpenTrails: () {
+            Navigator.of(context).pop();
+            widget.onOpenTrails();
+          },
           isRewardLoading: _isRewardLoading,
           onWatchRewardedAd: _watchRewardedAd,
           onOpenPremium: widget.onOpenPremium,

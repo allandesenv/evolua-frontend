@@ -61,165 +61,204 @@ class SocialCommunitiesArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMine = headline == 'Meus espacos';
     return Column(
       children: [
         PrimaryPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+              final fieldWidth = compact ? constraints.maxWidth : 220.0;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      headline,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  if (canCreate)
-                    OutlinedButton.icon(
-                      onPressed: onCreate,
-                      icon: const Icon(Icons.add_circle_outline_rounded),
-                      label: const Text('Criar espaco'),
-                    ),
-                ],
-              ),
-              if (showScopeChips || onRefresh != null) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (showScopeChips)
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Explorar'),
-                            selected: currentScope == 'explore',
-                            onSelected: (_) => onExploreSelected?.call(),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: AppColors.accent.withValues(alpha: 0.12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.22),
                           ),
-                          ChoiceChip(
-                            label: const Text('Meus espacos'),
-                            selected: currentScope == 'mine',
-                            onSelected: (_) => onMineSelected?.call(),
-                          ),
-                        ],
-                      ),
-                    if (onRefresh != null)
-                      OutlinedButton.icon(
-                        onPressed: onRefresh,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Atualizar'),
-                      ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(description, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 8),
-              Text(
-                headline == 'Meus espacos'
-                    ? '${result.totalItems} espacos em que voce ja entrou.'
-                    : '${result.totalItems} espacos para explorar sem pressa.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: searchController,
-                onChanged: onSearchChanged,
-                decoration: const InputDecoration(
-                  labelText: 'Buscar por espaco, descricao ou tema',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  if (showMembershipFilter)
-                    SizedBox(
-                      width: 220,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: membershipFilter,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Recorte'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'TODAS',
-                            child: Text('Todas'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'INGRESSADAS',
-                            child: Text('Participando'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'DESCOBRIR',
-                            child: Text('Descobrir'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            onMembershipChanged(value);
-                          }
-                        },
-                      ),
-                    ),
-                  SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: visibilityFilter,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Visibilidade',
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(
-                          value: 'PUBLIC',
-                          child: Text('Publicas'),
                         ),
-                        DropdownMenuItem(
-                          value: 'PRIVATE',
-                          child: Text('Privadas'),
+                        child: Icon(
+                          isMine
+                              ? Icons.verified_user_rounded
+                              : Icons.explore_rounded,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: compact
+                              ? constraints.maxWidth
+                              : constraints.maxWidth - 180,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              headline,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              description,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (canCreate)
+                        OutlinedButton.icon(
+                          onPressed: onCreate,
+                          icon: const Icon(Icons.add_circle_outline_rounded),
+                          label: const Text('Criar espaco'),
+                        ),
+                      if (onRefresh != null)
+                        OutlinedButton.icon(
+                          onPressed: onRefresh,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Atualizar'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SocialMetaPill(
+                        label: isMine
+                            ? '${result.totalItems} participando'
+                            : '${result.totalItems} para explorar',
+                      ),
+                      if (showScopeChips) ...[
+                        ChoiceChip(
+                          label: const Text('Explorar'),
+                          selected: currentScope == 'explore',
+                          onSelected: (_) => onExploreSelected?.call(),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Meus espacos'),
+                          selected: currentScope == 'mine',
+                          onSelected: (_) => onMineSelected?.call(),
                         ),
                       ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          onVisibilityChanged(value);
-                        }
-                      },
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    decoration: const InputDecoration(
+                      labelText: 'Buscar por espaco, descricao ou tema',
+                      prefixIcon: Icon(Icons.search_rounded),
                     ),
                   ),
-                  SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: categoryFilter,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Categoria'),
-                      items: categories
-                          .map(
-                            (item) => DropdownMenuItem<String>(
-                              value: item,
-                              child: Text(item == 'TODAS' ? 'Todas' : item),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      if (showMembershipFilter)
+                        SizedBox(
+                          width: fieldWidth,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: membershipFilter,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Recorte',
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          onCategoryChanged(value);
-                        }
-                      },
-                    ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'TODAS',
+                                child: Text('Todas'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'INGRESSADAS',
+                                child: Text('Participando'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'DESCOBRIR',
+                                child: Text('Descobrir'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                onMembershipChanged(value);
+                              }
+                            },
+                          ),
+                        ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: visibilityFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Visibilidade',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'TODAS',
+                              child: Text('Todas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'PUBLIC',
+                              child: Text('Publicas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'PRIVATE',
+                              child: Text('Privadas'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              onVisibilityChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: categoryFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Categoria',
+                          ),
+                          items: categories
+                              .map(
+                                (item) => DropdownMenuItem<String>(
+                                  value: item,
+                                  child: Text(item == 'TODAS' ? 'Todas' : item),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              onCategoryChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
@@ -252,31 +291,72 @@ class SocialCommunitiesArea extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                community.name,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(color: AppColors.textPrimary),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: community.joined
+                                    ? AppColors.accent.withValues(alpha: 0.14)
+                                    : AppColors.surfaceStrong.withValues(
+                                        alpha: 0.58,
+                                      ),
+                                border: Border.all(
+                                  color: community.joined
+                                      ? AppColors.accent.withValues(alpha: 0.24)
+                                      : AppColors.outline.withValues(
+                                          alpha: 0.24,
+                                        ),
+                                ),
+                              ),
+                              child: Icon(
+                                community.joined
+                                    ? Icons.check_rounded
+                                    : Icons.groups_rounded,
+                                color: community.joined
+                                    ? AppColors.accent
+                                    : AppColors.textSecondary,
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    community.name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      SocialMetaPill(label: community.category),
+                                      SocialMetaPill(
+                                        label:
+                                            '${community.memberCount} pessoas',
+                                      ),
+                                      SocialMetaPill(
+                                        label: community.joined
+                                            ? 'Participando'
+                                            : 'Explorar',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             SocialMetaPill(label: community.visibility),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            SocialMetaPill(label: community.category),
-                            SocialMetaPill(
-                              label: '${community.memberCount} pessoas',
-                            ),
-                            SocialMetaPill(
-                              label: community.joined
-                                  ? 'Participando'
-                                  : 'Explorar',
-                            ),
                           ],
                         ),
                         const SizedBox(height: 12),

@@ -51,138 +51,178 @@ class SocialFeedArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMine = sectionLabel == 'Minhas reflexoes';
     return Column(
       children: [
         PrimaryPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                sectionLabel,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
-              ),
-              if (showScopeChips || onRefresh != null) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (showScopeChips)
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Do momento'),
-                            selected: currentScope == 'moment',
-                            onSelected: (_) => onMomentSelected?.call(),
-                          ),
-                          ChoiceChip(
-                            label: const Text('Minhas reflexoes'),
-                            selected: currentScope == 'mine',
-                            onSelected: (_) => onMineSelected?.call(),
-                          ),
-                        ],
-                      ),
-                    if (onRefresh != null)
-                      OutlinedButton.icon(
-                        onPressed: onRefresh,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Atualizar'),
-                      ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                contextualHint,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              if (isFromCache && offlineMessage != null) ...[
-                const SizedBox(height: 12),
-                _OfflineFeedNotice(
-                  message: offlineMessage!,
-                  onRefresh: onRefresh,
-                ),
-              ],
-              const SizedBox(height: 10),
-              Text(
-                sectionLabel == 'Minhas reflexoes'
-                    ? '${result.totalItems} reflexoes suas neste recorte.'
-                    : '${result.totalItems} reflexoes no ritmo de hoje.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: searchController,
-                onChanged: onSearchChanged,
-                decoration: const InputDecoration(
-                  labelText: 'Buscar por reflexao ou espaco',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 560;
+              final communityWidth = compact ? constraints.maxWidth : 280.0;
+              final visibilityWidth = compact ? constraints.maxWidth : 220.0;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 280,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: communityFilter,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Espaco'),
-                      items: communityOptions
-                          .map(
-                            (item) => DropdownMenuItem<String>(
-                              value: item,
-                              child: Text(
-                                item == 'TODAS' ? 'Todos os espacos' : item,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          onCommunityFilterChanged(value);
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: visibilityFilter,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Visibilidade',
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'TODAS', child: Text('Todas')),
-                        DropdownMenuItem(
-                          value: 'PUBLIC',
-                          child: Text('Publicas'),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: AppColors.accentWarm.withValues(alpha: 0.12),
+                          border: Border.all(
+                            color: AppColors.accentWarm.withValues(alpha: 0.22),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'PRIVATE',
-                          child: Text('Privadas'),
+                        child: Icon(
+                          isMine
+                              ? Icons.bookmarks_rounded
+                              : Icons.dynamic_feed_rounded,
+                          color: AppColors.accentWarm,
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: compact
+                              ? constraints.maxWidth
+                              : constraints.maxWidth - 180,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              sectionLabel,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              contextualHint,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (onRefresh != null)
+                        OutlinedButton.icon(
+                          onPressed: onRefresh,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Atualizar'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SocialMetaPill(
+                        label: isMine
+                            ? '${result.totalItems} suas'
+                            : '${result.totalItems} no ritmo de hoje',
+                      ),
+                      if (showScopeChips) ...[
+                        ChoiceChip(
+                          label: const Text('Do momento'),
+                          selected: currentScope == 'moment',
+                          onSelected: (_) => onMomentSelected?.call(),
+                        ),
+                        ChoiceChip(
+                          label: const Text('Minhas reflexoes'),
+                          selected: currentScope == 'mine',
+                          onSelected: (_) => onMineSelected?.call(),
                         ),
                       ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          onVisibilityFilterChanged(value);
-                        }
-                      },
+                    ],
+                  ),
+                  if (isFromCache && offlineMessage != null) ...[
+                    const SizedBox(height: 12),
+                    _OfflineFeedNotice(
+                      message: offlineMessage!,
+                      onRefresh: onRefresh,
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    decoration: const InputDecoration(
+                      labelText: 'Buscar por reflexao ou espaco',
+                      prefixIcon: Icon(Icons.search_rounded),
                     ),
                   ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: communityWidth,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: communityFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Espaco',
+                          ),
+                          items: communityOptions
+                              .map(
+                                (item) => DropdownMenuItem<String>(
+                                  value: item,
+                                  child: Text(
+                                    item == 'TODAS' ? 'Todos os espacos' : item,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              onCommunityFilterChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: visibilityWidth,
+                        child: DropdownButtonFormField<String>(
+                          initialValue: visibilityFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Visibilidade',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'TODAS',
+                              child: Text('Todas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'PUBLIC',
+                              child: Text('Publicas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'PRIVATE',
+                              child: Text('Privadas'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              onVisibilityFilterChanged(value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
@@ -219,15 +259,40 @@ class SocialFeedArea extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              post.community,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(color: AppColors.textPrimary),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: AppColors.accentWarm.withValues(
+                                  alpha: 0.12,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.accentWarm.withValues(
+                                    alpha: 0.22,
+                                  ),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.format_quote_rounded,
+                                color: AppColors.accentWarm,
+                              ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                post.community,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             SocialMetaPill(label: post.visibility),
                           ],
                         ),
