@@ -21,6 +21,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const _sessionStorageKey = 'evolua.auth.session';
+
 void main() {
   group('AuthFormCard', () {
     testWidgets('logs in successfully, shows loading and redirects home', (
@@ -352,6 +354,9 @@ ProviderContainer _buildContainer(_FakeAuthRepository repository) {
   return ProviderContainer(
     overrides: [
       authRepositoryProvider.overrideWithValue(repository),
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
     ],
   );
@@ -365,6 +370,9 @@ Widget _testApp({
   return ProviderScope(
     overrides: [
       authRepositoryProvider.overrideWithValue(repository),
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
       if (googleLauncher != null)
         googleOAuthLauncherProvider.overrideWithValue(googleLauncher),
@@ -389,6 +397,9 @@ Widget _authPageTestApp({required _FakeAuthRepository repository}) {
   return ProviderScope(
     overrides: [
       authRepositoryProvider.overrideWithValue(repository),
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
     ],
     child: const MaterialApp(home: AuthPage()),
@@ -428,6 +439,26 @@ class _PlaceholderPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(body: Center(child: Text(label)));
+  }
+}
+
+class _SharedPreferencesAuthSessionStorage implements AuthSessionStorage {
+  @override
+  Future<String?> read() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_sessionStorageKey);
+  }
+
+  @override
+  Future<void> write(String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_sessionStorageKey, value);
+  }
+
+  @override
+  Future<void> clear() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_sessionStorageKey);
   }
 }
 
@@ -475,6 +506,11 @@ class _FakeAuthRepository implements AuthRepository {
       return handler(email: email, password: password);
     }
     return _testSession(email: email);
+  }
+
+  @override
+  Future<AuthSession> refresh({required String refreshToken}) async {
+    return _testSession();
   }
 
   @override

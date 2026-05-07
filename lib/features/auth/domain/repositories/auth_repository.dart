@@ -7,12 +7,9 @@ abstract class AuthRepository {
     required String displayName,
   });
 
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  });
+  Future<AuthSession> login({required String email, required String password});
 
-  Future<AuthSession> exchangeGoogleCode({
-    required String code,
-  });
+  Future<AuthSession> exchangeGoogleCode({required String code});
+
+  Future<AuthSession> refresh({required String refreshToken});
 }

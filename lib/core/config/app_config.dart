@@ -8,47 +8,47 @@ class AppConfig {
 
   static const authBaseUrl = String.fromEnvironment(
     'EVOLUA_AUTH_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8081',
+    defaultValue: apiBaseUrl,
   );
 
   static const userBaseUrl = String.fromEnvironment(
     'EVOLUA_USER_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8082',
+    defaultValue: apiBaseUrl,
   );
 
   static const contentBaseUrl = String.fromEnvironment(
     'EVOLUA_CONTENT_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8083',
+    defaultValue: apiBaseUrl,
   );
 
   static const emotionalBaseUrl = String.fromEnvironment(
     'EVOLUA_EMOTIONAL_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8084',
+    defaultValue: apiBaseUrl,
   );
 
   static const aiBaseUrl = String.fromEnvironment(
     'EVOLUA_AI_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8089',
+    defaultValue: apiBaseUrl,
   );
 
   static const socialBaseUrl = String.fromEnvironment(
     'EVOLUA_SOCIAL_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8085',
+    defaultValue: apiBaseUrl,
   );
 
   static const chatBaseUrl = String.fromEnvironment(
     'EVOLUA_CHAT_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8086',
+    defaultValue: apiBaseUrl,
   );
 
   static const subscriptionBaseUrl = String.fromEnvironment(
     'EVOLUA_SUBSCRIPTION_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8087',
+    defaultValue: apiBaseUrl,
   );
 
   static const notificationBaseUrl = String.fromEnvironment(
     'EVOLUA_NOTIFICATION_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8088',
+    defaultValue: apiBaseUrl,
   );
 
   static const adMobAndroidRewardedAdUnitId = String.fromEnvironment(

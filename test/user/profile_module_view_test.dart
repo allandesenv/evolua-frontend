@@ -71,6 +71,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -78,9 +81,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -124,6 +124,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -131,9 +134,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -172,6 +172,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -179,9 +182,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -590,6 +590,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -597,9 +600,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -644,6 +644,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -651,9 +654,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -693,6 +693,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -700,9 +703,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -860,6 +860,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -867,9 +870,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -929,6 +929,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -936,9 +939,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -993,6 +993,9 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
@@ -1000,9 +1003,6 @@ void main() {
           authenticatedDioProvider(
             AppConfig.userBaseUrl,
           ).overrideWithValue(_fakeUserDio()),
-          authenticatedDioProvider(
-            AppConfig.authBaseUrl,
-          ).overrideWithValue(_fakeAuthDio()),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),
@@ -1192,6 +1192,9 @@ Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
     ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        authSessionStorageProvider.overrideWithValue(
+          _SharedPreferencesAuthSessionStorage(),
+        ),
         profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         subscriptionRepositoryProvider.overrideWithValue(
           _FakeSubscriptionRepository(),
@@ -1199,9 +1202,6 @@ Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
         authenticatedDioProvider(
           AppConfig.userBaseUrl,
         ).overrideWithValue(_fakeUserDio()),
-        authenticatedDioProvider(
-          AppConfig.authBaseUrl,
-        ).overrideWithValue(_fakeAuthDio()),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -1223,6 +1223,9 @@ Future<void> _pumpDisplayAccessibility(WidgetTester tester) async {
     ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        authSessionStorageProvider.overrideWithValue(
+          _SharedPreferencesAuthSessionStorage(),
+        ),
         profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         subscriptionRepositoryProvider.overrideWithValue(
           _FakeSubscriptionRepository(),
@@ -1230,9 +1233,6 @@ Future<void> _pumpDisplayAccessibility(WidgetTester tester) async {
         authenticatedDioProvider(
           AppConfig.userBaseUrl,
         ).overrideWithValue(_fakeUserDio()),
-        authenticatedDioProvider(
-          AppConfig.authBaseUrl,
-        ).overrideWithValue(_fakeAuthDio()),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -1262,6 +1262,9 @@ Future<void> _pumpEvolutionMirror(
     ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+        authSessionStorageProvider.overrideWithValue(
+          _SharedPreferencesAuthSessionStorage(),
+        ),
         profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         subscriptionRepositoryProvider.overrideWithValue(
           _FakeSubscriptionRepository(),
@@ -1278,9 +1281,6 @@ Future<void> _pumpEvolutionMirror(
         authenticatedDioProvider(
           AppConfig.userBaseUrl,
         ).overrideWithValue(_fakeUserDio()),
-        authenticatedDioProvider(
-          AppConfig.authBaseUrl,
-        ).overrideWithValue(_fakeAuthDio()),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -1304,6 +1304,9 @@ Widget _dashboardShell({
   return ProviderScope(
     overrides: [
       authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
       subscriptionRepositoryProvider.overrideWithValue(
         _FakeSubscriptionRepository(),
@@ -1328,9 +1331,6 @@ Widget _dashboardShell({
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
       ).overrideWithValue(_fakeUserDio()),
-      authenticatedDioProvider(
-        AppConfig.authBaseUrl,
-      ).overrideWithValue(_fakeAuthDio()),
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
@@ -1363,6 +1363,9 @@ Widget _dashboardShellWithFutureMessagesRoute() {
   return ProviderScope(
     overrides: [
       authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
       subscriptionRepositoryProvider.overrideWithValue(
         _FakeSubscriptionRepository(),
@@ -1385,9 +1388,6 @@ Widget _dashboardShellWithFutureMessagesRoute() {
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
       ).overrideWithValue(_fakeUserDio()),
-      authenticatedDioProvider(
-        AppConfig.authBaseUrl,
-      ).overrideWithValue(_fakeAuthDio()),
     ],
     child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
   );
@@ -1411,10 +1411,6 @@ Future<void> _swipeDashboard(
 
 Dio _fakeUserDio() {
   return Dio()..httpClientAdapter = _FakeUserAdapter();
-}
-
-Dio _fakeAuthDio() {
-  return Dio()..httpClientAdapter = _FakeAuthAdapter();
 }
 
 class _FakeUserAdapter implements HttpClientAdapter {
@@ -1529,6 +1525,9 @@ class _FakeUserAdapter implements HttpClientAdapter {
           'screenshotAttached': formData.files.isNotEmpty,
         },
       }, statusCode: 201);
+    }
+    if (options.path.startsWith('/v1/auth/me')) {
+      return _jsonResponse({'data': null});
     }
     return _jsonResponse({'data': null}, statusCode: 404);
   }
@@ -1781,20 +1780,6 @@ List<CheckIn> _evolutionRichCheckIns() {
   });
 }
 
-class _FakeAuthAdapter implements HttpClientAdapter {
-  @override
-  void close({bool force = false}) {}
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    return _jsonResponse({'data': null});
-  }
-}
-
 ResponseBody _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
   return ResponseBody.fromString(
     jsonEncode(body),
@@ -1803,6 +1788,28 @@ ResponseBody _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
       Headers.contentTypeHeader: [Headers.jsonContentType],
     },
   );
+}
+
+class _SharedPreferencesAuthSessionStorage implements AuthSessionStorage {
+  static const _key = 'evolua.auth.session';
+
+  @override
+  Future<String?> read() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_key);
+  }
+
+  @override
+  Future<void> write(String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_key, value);
+  }
+
+  @override
+  Future<void> clear() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_key);
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {
@@ -1817,6 +1824,11 @@ class _FakeAuthRepository implements AuthRepository {
     required String password,
   }) async {
     return _testSession(email: email);
+  }
+
+  @override
+  Future<AuthSession> refresh({required String refreshToken}) async {
+    return _testSession();
   }
 
   @override

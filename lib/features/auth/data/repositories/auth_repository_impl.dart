@@ -16,11 +16,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     await _dio.post<void>(
       '/v1/public/auth/register',
-      data: {
-        'email': email,
-        'password': password,
-        'displayName': displayName,
-      },
+      data: {'email': email, 'password': password, 'displayName': displayName},
     );
   }
 
@@ -31,10 +27,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/public/auth/login',
-      data: {
-        'email': email,
-        'password': password,
-      },
+      data: {'email': email, 'password': password},
     );
 
     final payload = _normalizePayload(response.data);
@@ -43,14 +36,22 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AuthSession> exchangeGoogleCode({
-    required String code,
-  }) async {
+  Future<AuthSession> exchangeGoogleCode({required String code}) async {
     final response = await _dio.post<dynamic>(
       '/v1/public/auth/google/exchange',
-      data: {
-        'code': code,
-      },
+      data: {'code': code},
+    );
+
+    final payload = _normalizePayload(response.data);
+    final dto = AuthSessionDto.fromJson(payload, fallbackEmail: '');
+    return dto.toEntity();
+  }
+
+  @override
+  Future<AuthSession> refresh({required String refreshToken}) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/public/auth/refresh',
+      data: {'refreshToken': refreshToken},
     );
 
     final payload = _normalizePayload(response.data);
