@@ -49,6 +49,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -219,6 +220,7 @@ void main() {
     expect(find.text('Ver perfil'), findsAtLeastNWidgets(1));
     expect(find.text('Planos e assinaturas'), findsOneWidget);
     expect(find.text('Espelho da Evolucao'), findsOneWidget);
+    expect(find.text('Mensagens para o futuro'), findsOneWidget);
     expect(find.text('Configuracoes e privacidade'), findsOneWidget);
     expect(find.text('Ajuda e suporte'), findsOneWidget);
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
@@ -236,7 +238,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Inicio'), findsAtLeastNWidgets(1));
+    expect(find.text('Espelho'), findsOneWidget);
     expect(find.text('Home'), findsNothing);
+    expect(
+      find.widgetWithText(NavigationDestination, 'Mentor Evolua'),
+      findsNothing,
+    );
   });
 
   testWidgets('dashboard mobile back walks internal history to Inicio', (
@@ -264,6 +271,15 @@ void main() {
     expect(find.text('Em destaque'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espelho'));
+    await tester.pumpAndSettle();
+    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Em destaque'), findsOneWidget);
+
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(ContentModuleView), findsOneWidget);
@@ -271,6 +287,83 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+  });
+
+  testWidgets('avatar menu opens future messages route', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShellWithFutureMessagesRoute());
+    await tester.pumpAndSettle();
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mensagens para o futuro'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Future messages route'), findsOneWidget);
+  });
+
+  testWidgets('reflections card opens future messages route with new title', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShellWithFutureMessagesRoute());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reflexoes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagens para o futuro'), findsOneWidget);
+    expect(find.text('Mensagens do seu eu anterior'), findsNothing);
+
+    await tester.tap(find.text('Abrir mensagens'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Future messages route'), findsOneWidget);
+  });
+
+  testWidgets('journey CTA still opens mentor after removing nav item', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final trail = _testTrail();
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        trailRepository: _FakeTrailRepository(
+          currentJourney: trail,
+          journey: _testJourney(trail),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Abrir Mentor Evolua'));
+    await tester.tap(find.text('Abrir Mentor Evolua'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mentor Evolua'), findsAtLeastNWidgets(1));
+    expect(
+      find.widgetWithText(NavigationDestination, 'Mentor Evolua'),
+      findsNothing,
+    );
   });
 
   testWidgets('avatar menu opens plans and overview sections', (tester) async {
@@ -1084,6 +1177,57 @@ Widget _dashboardShell({
         child: const Scaffold(body: DashboardShell()),
       ),
     ),
+  );
+}
+
+Widget _dashboardShellWithFutureMessagesRoute() {
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const MediaQuery(
+          data: MediaQueryData(size: Size(390, 900)),
+          child: Scaffold(body: DashboardShell()),
+        ),
+      ),
+      GoRoute(
+        path: '/future-messages',
+        builder: (context, state) =>
+            const Scaffold(body: Text('Future messages route')),
+      ),
+    ],
+  );
+
+  return ProviderScope(
+    overrides: [
+      authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+      profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+      subscriptionRepositoryProvider.overrideWithValue(
+        _FakeSubscriptionRepository(),
+      ),
+      trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
+      checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
+      socialPostRepositoryProvider.overrideWithValue(
+        _FakeSocialPostRepository(),
+      ),
+      communityRepositoryProvider.overrideWithValue(_FakeCommunityRepository()),
+      notificationRepositoryProvider.overrideWithValue(
+        _FakeNotificationRepository(),
+      ),
+      futureMessageRepositoryProvider.overrideWithValue(
+        _FakeFutureMessageRepository(),
+      ),
+      dailyRitualRepositoryProvider.overrideWithValue(
+        const _FakeDailyRitualRepository(),
+      ),
+      authenticatedDioProvider(
+        AppConfig.userBaseUrl,
+      ).overrideWithValue(_fakeUserDio()),
+      authenticatedDioProvider(
+        AppConfig.authBaseUrl,
+      ).overrideWithValue(_fakeAuthDio()),
+    ],
+    child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
   );
 }
 

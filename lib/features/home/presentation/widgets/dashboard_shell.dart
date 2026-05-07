@@ -43,12 +43,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _NavItem(label: 'Inicio', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
     _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
-    _NavItem(label: 'Mentor Evolua', icon: Icons.auto_awesome_rounded),
+    _NavItem(label: 'Espelho', icon: Icons.auto_graph_rounded),
   ];
 
   static const _spacesIndex = 2;
-  static const _mentorIndex = 3;
+  static const _mirrorIndex = 3;
   static const _profileIndex = 4;
+  static const _mentorIndex = 5;
 
   _DashboardLocation _currentLocation() {
     return _DashboardLocation(
@@ -85,6 +86,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         _pushCurrentLocation();
       }
       _selectedIndex = index;
+      if (index == _mirrorIndex) {
+        _profileSection = ProfileModuleSection.evolutionMirror;
+      }
     });
   }
 
@@ -113,13 +117,16 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 
   void _openProfileSection(ProfileModuleSection section) {
-    if (_selectedIndex == _profileIndex && _profileSection == section) {
+    final targetIndex = section == ProfileModuleSection.evolutionMirror
+        ? _mirrorIndex
+        : _profileIndex;
+    if (_selectedIndex == targetIndex && _profileSection == section) {
       return;
     }
 
     setState(() {
       _pushCurrentLocation();
-      _selectedIndex = _profileIndex;
+      _selectedIndex = targetIndex;
       _profileSection = section;
     });
   }
@@ -174,6 +181,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenSpacesSection: _openSpacesSection,
       onOpenMentor: () => _goTo(_mentorIndex),
       onOpenProfileSection: _openProfileSection,
+      onOpenFutureMessages: () => context.push('/future-messages'),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
 
@@ -398,6 +406,7 @@ class _DashboardContent extends ConsumerWidget {
     required this.onOpenSpacesSection,
     required this.onOpenMentor,
     required this.onOpenProfileSection,
+    required this.onOpenFutureMessages,
     required this.onLogout,
   });
 
@@ -410,6 +419,7 @@ class _DashboardContent extends ConsumerWidget {
   final void Function(SocialModuleTab section) onOpenSpacesSection;
   final VoidCallback onOpenMentor;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final VoidCallback onOpenFutureMessages;
   final VoidCallback onLogout;
 
   @override
@@ -480,12 +490,13 @@ class _DashboardContent extends ConsumerWidget {
         onTabChanged: onOpenSpacesSection,
         onOpenFutureMessages: () => context.push('/future-messages'),
       ),
+      const _ProfileArea(section: ProfileModuleSection.evolutionMirror),
+      _ProfileArea(section: profileSection),
       MentorEvoluaModuleView(
         onOpenTrails: () => onNavigate(1),
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
-      _ProfileArea(section: profileSection),
     ];
 
     return Column(
@@ -513,6 +524,7 @@ class _DashboardContent extends ConsumerWidget {
                   profile: profile,
                   onOpenCheckIn: () => context.push('/check-in'),
                   onOpenProfileSection: onOpenProfileSection,
+                  onOpenFutureMessages: onOpenFutureMessages,
                   onLogout: onLogout,
                 ),
               ],
@@ -575,8 +587,9 @@ class _DashboardContent extends ConsumerWidget {
       0 => 'Inicio',
       1 => 'Trilhas',
       2 => 'Espacos',
-      3 => 'Mentor Evolua',
+      3 => 'Espelho',
       4 => 'Perfil',
+      5 => 'Mentor Evolua',
       _ => 'Evolua',
     };
   }
@@ -585,7 +598,9 @@ class _DashboardContent extends ConsumerWidget {
     return switch (selectedIndex) {
       1 => 'trails-${trailSection.name}',
       2 => 'spaces-${spaceSection.name}-${reflectionScope.name}',
+      3 => 'profile-${ProfileModuleSection.evolutionMirror.name}',
       4 => 'profile-${profileSection.name}',
+      5 => 'mentor',
       _ => 'main-$selectedIndex',
     };
   }
@@ -720,6 +735,7 @@ class _HeaderActions extends StatelessWidget {
     required this.profile,
     required this.onOpenCheckIn,
     required this.onOpenProfileSection,
+    required this.onOpenFutureMessages,
     required this.onLogout,
   });
 
@@ -728,6 +744,7 @@ class _HeaderActions extends StatelessWidget {
   final Profile? profile;
   final VoidCallback onOpenCheckIn;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final VoidCallback onOpenFutureMessages;
   final VoidCallback onLogout;
 
   @override
@@ -744,6 +761,7 @@ class _HeaderActions extends StatelessWidget {
           session: session,
           profile: profile,
           onOpenProfileSection: onOpenProfileSection,
+          onOpenFutureMessages: onOpenFutureMessages,
           onLogout: onLogout,
         ),
       ],
@@ -797,12 +815,14 @@ class _AccountMenuButton extends StatelessWidget {
     required this.session,
     required this.profile,
     required this.onOpenProfileSection,
+    required this.onOpenFutureMessages,
     required this.onLogout,
   });
 
   final AuthSession? session;
   final Profile? profile;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final VoidCallback onOpenFutureMessages;
   final VoidCallback onLogout;
 
   @override
@@ -879,6 +899,13 @@ class _AccountMenuButton extends StatelessWidget {
           ),
         ),
         const PopupMenuItem(
+          value: _AccountMenuAction.futureMessages,
+          child: _MenuLabel(
+            icon: Icons.forward_to_inbox_rounded,
+            label: 'Mensagens para o futuro',
+          ),
+        ),
+        const PopupMenuItem(
           value: _AccountMenuAction.settings,
           child: _MenuLabel(
             icon: Icons.settings_rounded,
@@ -920,6 +947,8 @@ class _AccountMenuButton extends StatelessWidget {
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions);
           case _AccountMenuAction.evolutionMirror:
             onOpenProfileSection(ProfileModuleSection.evolutionMirror);
+          case _AccountMenuAction.futureMessages:
+            onOpenFutureMessages();
           case _AccountMenuAction.settings:
             onOpenProfileSection(ProfileModuleSection.settingsPrivacy);
           case _AccountMenuAction.help:
@@ -945,6 +974,7 @@ enum _AccountMenuAction {
   overview,
   plans,
   evolutionMirror,
+  futureMessages,
   settings,
   help,
   accessibility,

@@ -134,6 +134,7 @@ class SocialFeedArea extends StatelessWidget {
                     width: 280,
                     child: DropdownButtonFormField<String>(
                       initialValue: communityFilter,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Espaco'),
                       items: communityOptions
                           .map(
@@ -157,6 +158,7 @@ class SocialFeedArea extends StatelessWidget {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: visibilityFilter,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Visibilidade',
                       ),

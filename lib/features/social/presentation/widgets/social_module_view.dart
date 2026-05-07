@@ -600,7 +600,7 @@ class _FutureMessageReflectionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Mensagens do seu eu anterior',
+                  'Mensagens para o futuro',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
