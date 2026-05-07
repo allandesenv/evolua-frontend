@@ -2,6 +2,8 @@ import 'package:evolua_frontend/app/router/auth_router_notifier.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/google_auth_callback_page.dart';
+import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:evolua_frontend/features/daily_ritual/presentation/pages/daily_ritual_page.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
@@ -28,6 +30,7 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? googleCallbackPageBuilder,
   GoRouterWidgetBuilder? homePageBuilder,
   GoRouterWidgetBuilder? checkInPageBuilder,
+  GoRouterWidgetBuilder? dailyRitualPageBuilder,
   GoRouterWidgetBuilder? futureMessagesPageBuilder,
   GoRouterWidgetBuilder? futureMessageDetailPageBuilder,
   String initialLocation = '/auth',
@@ -64,6 +67,16 @@ GoRouter buildAppRouter({
         path: '/check-in',
         builder:
             checkInPageBuilder ?? (context, state) => const CheckInQuickPage(),
+      ),
+      GoRoute(
+        path: '/daily-ritual',
+        builder:
+            dailyRitualPageBuilder ??
+            (context, state) => DailyRitualPage(
+              type: DailyRitualType.fromRouteValue(
+                state.uri.queryParameters['type'],
+              ),
+            ),
       ),
       GoRoute(
         path: '/future-messages',

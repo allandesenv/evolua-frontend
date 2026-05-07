@@ -349,6 +349,9 @@ class _DashboardContent extends ConsumerWidget {
         onOpenEvolutionMirror: () =>
             onOpenProfileSection(ProfileModuleSection.evolutionMirror),
         onOpenFutureMessage: (id) => context.push('/future-messages/$id'),
+        onOpenDailyRitual: (type) => context.push(
+          '/daily-ritual?type=${type == 'EVENING' ? 'evening' : 'morning'}',
+        ),
         onOpenCheckIn: () => context.push('/check-in'),
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
