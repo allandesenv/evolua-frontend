@@ -15,6 +15,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey_s
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
+import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/repositories/daily_ritual_repository.dart';
@@ -48,6 +49,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -218,10 +220,308 @@ void main() {
     expect(find.text('Ver perfil'), findsAtLeastNWidgets(1));
     expect(find.text('Planos e assinaturas'), findsOneWidget);
     expect(find.text('Espelho da Evolucao'), findsOneWidget);
+    expect(find.text('Mensagens para o futuro'), findsOneWidget);
     expect(find.text('Configuracoes e privacidade'), findsOneWidget);
     expect(find.text('Ajuda e suporte'), findsOneWidget);
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
     expect(find.text('Dar feedback'), findsOneWidget);
+  });
+
+  testWidgets('dashboard uses Inicio copy in navigation', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell(size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inicio'), findsAtLeastNWidgets(1));
+    expect(find.text('Espelho'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
+    expect(
+      find.widgetWithText(NavigationDestination, 'Mentor Evolua'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('dashboard mobile back walks internal history to Inicio', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ContentModuleView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
+    expect(find.text('Em destaque'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espelho'));
+    await tester.pumpAndSettle();
+    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Em destaque'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ContentModuleView), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+  });
+
+  testWidgets('dashboard mobile swipe navigates between bottom tabs', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+
+    await _swipeDashboard(tester, -520);
+    expect(find.byType(ContentModuleView), findsOneWidget);
+
+    await _swipeDashboard(tester, -520);
+    expect(find.text('Em destaque'), findsOneWidget);
+
+    await _swipeDashboard(tester, -520);
+    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
+
+    await _swipeDashboard(tester, -520);
+    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
+
+    await _swipeDashboard(tester, 520);
+    expect(find.text('Em destaque'), findsOneWidget);
+
+    await _swipeDashboard(tester, 520);
+    expect(find.byType(ContentModuleView), findsOneWidget);
+
+    await _swipeDashboard(tester, 520);
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+
+    await _swipeDashboard(tester, 520);
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+  });
+
+  testWidgets('dashboard mobile back respects swipe navigation history', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await _swipeDashboard(tester, -520);
+    await _swipeDashboard(tester, -520);
+    expect(find.text('Em destaque'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ContentModuleView), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+  });
+
+  testWidgets('dashboard mobile swipe ignores hidden internal sections', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final trail = _testTrail();
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        trailRepository: _FakeTrailRepository(
+          currentJourney: trail,
+          journey: _testJourney(trail),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver perfil').last);
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
+    await _swipeDashboard(tester, -520);
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
+    expect(find.byType(ContentModuleView), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Abrir Mentor Evolua'));
+    await tester.tap(find.text('Abrir Mentor Evolua'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mentor Evolua'), findsAtLeastNWidgets(1));
+    await _swipeDashboard(tester, 520);
+    expect(find.text('Mentor Evolua'), findsAtLeastNWidgets(1));
+    expect(find.text('Em destaque'), findsNothing);
+  });
+
+  testWidgets('dashboard desktop ignores horizontal swipe gestures', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell(size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+
+    await _swipeDashboard(tester, -520);
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+    expect(find.byType(ContentModuleView), findsNothing);
+  });
+
+  testWidgets('avatar menu opens future messages route', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShellWithFutureMessagesRoute());
+    await tester.pumpAndSettle();
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mensagens para o futuro'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Future messages route'), findsOneWidget);
+  });
+
+  testWidgets('reflections card opens future messages route with new title', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShellWithFutureMessagesRoute());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TabBar), findsNothing);
+    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Reflexoes'), findsOneWidget);
+    expect(find.text('Meus'), findsOneWidget);
+    expect(find.widgetWithText(Tab, 'Meus espacos'), findsNothing);
+
+    await tester.tap(find.text('Reflexoes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagens para o futuro'), findsOneWidget);
+    expect(find.text('Mensagens do seu eu anterior'), findsNothing);
+
+    await tester.ensureVisible(find.text('Abrir mensagens'));
+    await tester.tap(find.text('Abrir mensagens'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Future messages route'), findsOneWidget);
+  });
+
+  testWidgets('spaces button switcher opens Meus area', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TabBar), findsNothing);
+    await tester.tap(find.text('Meus'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Meus espacos'), findsOneWidget);
+    expect(find.text('0 participando'), findsAtLeastNWidgets(1));
+    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Reflexoes'), findsOneWidget);
+  });
+
+  testWidgets('journey CTA still opens mentor after removing nav item', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final trail = _testTrail();
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        trailRepository: _FakeTrailRepository(
+          currentJourney: trail,
+          journey: _testJourney(trail),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Abrir Mentor Evolua'));
+    await tester.tap(find.text('Abrir Mentor Evolua'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mentor Evolua'), findsAtLeastNWidgets(1));
+    expect(
+      find.widgetWithText(NavigationDestination, 'Mentor Evolua'),
+      findsNothing,
+    );
   });
 
   testWidgets('avatar menu opens plans and overview sections', (tester) async {
@@ -268,6 +568,13 @@ void main() {
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
   });
 
   testWidgets('profile preferences render sidebar on expanded desktop', (
@@ -442,6 +749,8 @@ void main() {
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsNothing);
     expect(find.text('Padroes percebidos'), findsOneWidget);
     expect(find.text('Mensagem da IA'), findsOneWidget);
     expect(find.text('Mensagens do seu eu anterior'), findsNothing);
@@ -988,7 +1297,69 @@ Future<void> _pumpEvolutionMirror(
   await tester.pumpAndSettle();
 }
 
-Widget _dashboardShell() {
+Widget _dashboardShell({
+  Size size = const Size(390, 900),
+  TrailRepository? trailRepository,
+}) {
+  return ProviderScope(
+    overrides: [
+      authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+      profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+      subscriptionRepositoryProvider.overrideWithValue(
+        _FakeSubscriptionRepository(),
+      ),
+      trailRepositoryProvider.overrideWithValue(
+        trailRepository ?? _FakeTrailRepository(),
+      ),
+      checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
+      socialPostRepositoryProvider.overrideWithValue(
+        _FakeSocialPostRepository(),
+      ),
+      communityRepositoryProvider.overrideWithValue(_FakeCommunityRepository()),
+      notificationRepositoryProvider.overrideWithValue(
+        _FakeNotificationRepository(),
+      ),
+      futureMessageRepositoryProvider.overrideWithValue(
+        _FakeFutureMessageRepository(),
+      ),
+      dailyRitualRepositoryProvider.overrideWithValue(
+        const _FakeDailyRitualRepository(),
+      ),
+      authenticatedDioProvider(
+        AppConfig.userBaseUrl,
+      ).overrideWithValue(_fakeUserDio()),
+      authenticatedDioProvider(
+        AppConfig.authBaseUrl,
+      ).overrideWithValue(_fakeAuthDio()),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.dark(),
+      home: MediaQuery(
+        data: MediaQueryData(size: size),
+        child: const Scaffold(body: DashboardShell()),
+      ),
+    ),
+  );
+}
+
+Widget _dashboardShellWithFutureMessagesRoute() {
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const MediaQuery(
+          data: MediaQueryData(size: Size(390, 900)),
+          child: Scaffold(body: DashboardShell()),
+        ),
+      ),
+      GoRoute(
+        path: '/future-messages',
+        builder: (context, state) =>
+            const Scaffold(body: Text('Future messages route')),
+      ),
+    ],
+  );
+
   return ProviderScope(
     overrides: [
       authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
@@ -1018,18 +1389,24 @@ Widget _dashboardShell() {
         AppConfig.authBaseUrl,
       ).overrideWithValue(_fakeAuthDio()),
     ],
-    child: MaterialApp(
-      theme: AppTheme.dark(),
-      home: const MediaQuery(
-        data: MediaQueryData(size: Size(390, 900)),
-        child: Scaffold(body: DashboardShell()),
-      ),
-    ),
+    child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
   );
 }
 
 Future<void> _openAvatarMenu(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Abrir menu da conta'));
+}
+
+Future<void> _swipeDashboard(
+  WidgetTester tester,
+  double horizontalOffset,
+) async {
+  await tester.fling(
+    find.byType(DashboardShell),
+    Offset(horizontalOffset, 0),
+    1200,
+  );
+  await tester.pumpAndSettle();
 }
 
 Dio _fakeUserDio() {
