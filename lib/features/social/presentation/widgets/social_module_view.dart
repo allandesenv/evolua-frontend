@@ -235,6 +235,14 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     };
   }
 
+  void _selectTab(SocialModuleTab tab) {
+    final index = _indexForTab(tab);
+    if (_tabController.index == index) {
+      return;
+    }
+    _tabController.animateTo(index);
+  }
+
   Future<void> _openCreateCommunityModal() async {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
@@ -347,40 +355,22 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       'TODAS',
       ...allCommunities.map((item) => item.category),
     }.toList();
+    final postsCount = postsState.asData?.value.result.totalItems ?? 0;
 
     return Column(
       children: [
         if (widget.showTabs)
-          PrimaryPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Espacos',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Ambientes de troca, reflexao e pertencimento para encontrar contexto antes de compartilhar.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                TabBar(
-                  controller: _tabController,
-                  dividerColor: Colors.transparent,
-                  labelColor: AppColors.textPrimary,
-                  unselectedLabelColor: AppColors.textSecondary,
-                  indicatorColor: AppColors.accent,
-                  tabs: const [
-                    Tab(text: 'Em destaque'),
-                    Tab(text: 'Reflexoes'),
-                    Tab(text: 'Meus espacos'),
-                  ],
-                ),
-              ],
-            ),
+          AnimatedBuilder(
+            animation: _tabController,
+            builder: (context, _) {
+              return _SocialModuleHeader(
+                selected: _tabForIndex(_tabController.index),
+                spacesCount: communitiesState.asData?.value.totalItems ?? 0,
+                joinedCount: joinedCommunities.length,
+                reflectionsCount: postsCount,
+                onSelected: _selectTab,
+              );
+            },
           ),
         if (widget.showTabs) const SizedBox(height: 16),
         AnimatedBuilder(
@@ -571,6 +561,239 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
   }
 }
 
+class _SocialModuleHeader extends StatelessWidget {
+  const _SocialModuleHeader({
+    required this.selected,
+    required this.spacesCount,
+    required this.joinedCount,
+    required this.reflectionsCount,
+    required this.onSelected,
+  });
+
+  final SocialModuleTab selected;
+  final int spacesCount;
+  final int joinedCount;
+  final int reflectionsCount;
+  final ValueChanged<SocialModuleTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      semanticLabel: 'Alternar area de espacos',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.accent.withValues(alpha: 0.14),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.groups_rounded,
+                  color: AppColors.accent,
+                ),
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Espacos',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ambientes de troca, reflexao e pertencimento para entrar com contexto e sair com clareza.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _SocialMetricPill(
+                icon: Icons.explore_rounded,
+                label: '$spacesCount espacos',
+              ),
+              _SocialMetricPill(
+                icon: Icons.check_circle_rounded,
+                label: '$joinedCount participando',
+              ),
+              _SocialMetricPill(
+                icon: Icons.edit_note_rounded,
+                label: '$reflectionsCount reflexoes',
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SocialSectionSwitcher(selected: selected, onSelected: onSelected),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialSectionSwitcher extends StatelessWidget {
+  const _SocialSectionSwitcher({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final SocialModuleTab selected;
+  final ValueChanged<SocialModuleTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceStrong.withValues(alpha: 0.34),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      constraints: const BoxConstraints(minHeight: 58),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SocialSectionButton(
+              icon: Icons.auto_awesome_rounded,
+              label: 'Em destaque',
+              selected: selected == SocialModuleTab.featured,
+              onTap: () => onSelected(SocialModuleTab.featured),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _SocialSectionButton(
+              icon: Icons.edit_note_rounded,
+              label: 'Reflexoes',
+              selected: selected == SocialModuleTab.reflections,
+              onTap: () => onSelected(SocialModuleTab.reflections),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _SocialSectionButton(
+              icon: Icons.groups_2_rounded,
+              label: 'Meus',
+              selected: selected == SocialModuleTab.mySpaces,
+              onTap: () => onSelected(SocialModuleTab.mySpaces),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialSectionButton extends StatelessWidget {
+  const _SocialSectionButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.background : AppColors.textSecondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? AppColors.accent
+                : AppColors.outline.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialMetricPill extends StatelessWidget {
+  const _SocialMetricPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: AppColors.surfaceStrong.withValues(alpha: 0.48),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppColors.accent),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FutureMessageReflectionCard extends StatelessWidget {
   const _FutureMessageReflectionCard({required this.onOpen});
 
@@ -600,7 +823,7 @@ class _FutureMessageReflectionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Mensagens do seu eu anterior',
+                  'Mensagens para o futuro',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,

@@ -708,6 +708,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         onRefresh: () => ref.read(profileControllerProvider.notifier).refresh(),
         onChangeAvatar: _pickAvatar,
       ),
+      showHero: _section != ProfileModuleSection.evolutionMirror,
       selectedSection: _section,
       onSectionSelected: (section) => setState(() => _section = section),
       content: Column(
@@ -974,12 +975,14 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
 class _ProfilePreferencesLayout extends StatelessWidget {
   const _ProfilePreferencesLayout({
     required this.hero,
+    required this.showHero,
     required this.selectedSection,
     required this.onSectionSelected,
     required this.content,
   });
 
   final Widget hero;
+  final bool showHero;
   final ProfileModuleSection selectedSection;
   final ValueChanged<ProfileModuleSection> onSectionSelected;
   final Widget content;
@@ -999,8 +1002,7 @@ class _ProfilePreferencesLayout extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  hero,
-                  const SizedBox(height: 22),
+                  if (showHero) ...[hero, const SizedBox(height: 22)],
                   _ProfileSectionNavigation(
                     selectedSection: selectedSection,
                     onSectionSelected: onSectionSelected,
@@ -1019,8 +1021,10 @@ class _ProfilePreferencesLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PrimaryPanel(semanticLabel: 'Resumo do perfil', child: hero),
-        const SizedBox(height: 16),
+        if (showHero) ...[
+          PrimaryPanel(semanticLabel: 'Resumo do perfil', child: hero),
+          const SizedBox(height: 16),
+        ],
         content,
       ],
     );

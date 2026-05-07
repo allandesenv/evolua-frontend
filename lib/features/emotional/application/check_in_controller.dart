@@ -52,14 +52,19 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   @override
   Future<CheckInHistoryState> build() async {
     final result = await _fetch(page: 0);
-    return _stateFromResult(result);
+    return _stateFromResult(
+      result,
+      latestCreatedCheckIn: result.items.firstOrNull,
+    );
   }
 
   Future<void> refresh() async {
+    final current = state.asData?.value;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
       () async => _stateFromResult(
-        await _fetch(page: state.asData?.value.result.page ?? 0),
+        await _fetch(page: current?.result.page ?? 0),
+        latestCreatedCheckIn: current?.latestCreatedCheckIn,
       ),
     );
   }
@@ -77,9 +82,13 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     _from = _normalizeDate(from);
     _to = _normalizeDate(to);
 
+    final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(await _fetch(page: 0)),
+      () async => _stateFromResult(
+        await _fetch(page: 0),
+        latestCreatedCheckIn: latestCreatedCheckIn,
+      ),
     );
   }
 
@@ -90,16 +99,24 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     _from = null;
     _to = null;
 
+    final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(await _fetch(page: 0)),
+      () async => _stateFromResult(
+        await _fetch(page: 0),
+        latestCreatedCheckIn: latestCreatedCheckIn,
+      ),
     );
   }
 
   Future<void> goToPage(int page) async {
+    final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(await _fetch(page: page)),
+      () async => _stateFromResult(
+        await _fetch(page: page),
+        latestCreatedCheckIn: latestCreatedCheckIn,
+      ),
     );
   }
 
