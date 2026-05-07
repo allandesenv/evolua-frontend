@@ -50,6 +50,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _mirrorIndex = 3;
   static const _profileIndex = 4;
   static const _mentorIndex = 5;
+  static const _swipeVelocityThreshold = 350.0;
 
   _DashboardLocation _currentLocation() {
     return _DashboardLocation(
@@ -143,6 +144,26 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
+  void _handleMobileSwipe(DragEndDetails details) {
+    if (_selectedIndex < 0 || _selectedIndex >= _destinations.length) {
+      return;
+    }
+
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < _swipeVelocityThreshold) {
+      return;
+    }
+
+    if (velocity < 0 && _selectedIndex < _destinations.length - 1) {
+      _goTo(_selectedIndex + 1);
+      return;
+    }
+
+    if (velocity > 0 && _selectedIndex > 0) {
+      _goTo(_selectedIndex - 1);
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -203,7 +224,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         child: isCompact
             ? Column(
                 children: [
-                  Expanded(child: content),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onHorizontalDragEnd: _handleMobileSwipe,
+                      child: content,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   PrimaryPanel(
                     padding: const EdgeInsets.symmetric(
