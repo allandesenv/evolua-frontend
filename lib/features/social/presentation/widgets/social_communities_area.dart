@@ -147,6 +147,7 @@ class SocialCommunitiesArea extends StatelessWidget {
                       width: 220,
                       child: DropdownButtonFormField<String>(
                         initialValue: membershipFilter,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Recorte'),
                         items: const [
                           DropdownMenuItem(
@@ -173,6 +174,7 @@ class SocialCommunitiesArea extends StatelessWidget {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: visibilityFilter,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Visibilidade',
                       ),
@@ -198,6 +200,7 @@ class SocialCommunitiesArea extends StatelessWidget {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       initialValue: categoryFilter,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Categoria'),
                       items: categories
                           .map(

@@ -251,7 +251,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         _RhythmBriefingCard(
           compact: compact,
           summary: rhythmSummary,
-          onOpenDetails: () => _openRhythmDetails(rhythmSummary, recentItems),
+          onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
           onOpenLastCheckIns: () =>
               _openRhythmDetails(rhythmSummary, recentItems),
           onOpenProfile: widget.onOpenProfile,
@@ -298,6 +298,7 @@ class _DailyJourneyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = ResponsiveBreakpoints.isCompact(context);
     final model = _DailyJourneyCardModel.from(
       displayName: displayName,
       now: now,
@@ -312,34 +313,18 @@ class _DailyJourneyCard extends StatelessWidget {
     return PrimaryPanel(
       semanticLabel: 'Jornada Diaria',
       padding: const EdgeInsets.all(18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: AppColors.accent.withValues(alpha: 0.14),
-              border: Border.all(
-                color: AppColors.accent.withValues(alpha: 0.24),
-              ),
-            ),
-            child: const Icon(Icons.wb_sunny_rounded, color: AppColors.accent),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  model.title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: context.evoluaColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Row(
+                  children: [
+                    const _DailyJourneyIcon(),
+                    const SizedBox(width: 12),
+                    Expanded(child: _DailyJourneyTitle(title: model.title)),
+                  ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
                 Text(
                   model.message,
                   style: Theme.of(context).textTheme.bodyMedium,
@@ -349,31 +334,118 @@ class _DailyJourneyCard extends StatelessWidget {
                   _DailyJourneySummary(ritual: model.ritual!),
                 ],
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: isLoading ? null : model.primaryAction,
-                      icon: isLoading
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(model.primaryIcon),
-                      label: Text(model.primaryLabel),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: isLoading ? null : model.secondaryAction,
-                      icon: Icon(model.secondaryIcon),
-                      label: Text(model.secondaryLabel),
-                    ),
-                  ],
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _dailyJourneyActions(model, compact: compact),
+                ),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _DailyJourneyIcon(),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _DailyJourneyTitle(title: model.title),
+                      const SizedBox(height: 6),
+                      Text(
+                        model.message,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      if (model.ritual != null) ...[
+                        const SizedBox(height: 12),
+                        _DailyJourneySummary(ritual: model.ritual!),
+                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _dailyJourneyActions(model, compact: compact),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+    );
+  }
+
+  List<Widget> _dailyJourneyActions(
+    _DailyJourneyCardModel model, {
+    required bool compact,
+  }) {
+    final actions = [
+      FilledButton.icon(
+        onPressed: isLoading ? null : model.primaryAction,
+        icon: isLoading
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(model.primaryIcon),
+        label: Text(
+          model.primaryLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      OutlinedButton.icon(
+        onPressed: isLoading ? null : model.secondaryAction,
+        icon: Icon(model.secondaryIcon),
+        label: Text(
+          model.secondaryLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ];
+
+    if (!compact) {
+      return actions;
+    }
+
+    return [
+      for (final (index, action) in actions.indexed) ...[
+        if (index > 0) const SizedBox(height: 8),
+        action,
+      ],
+    ];
+  }
+}
+
+class _DailyJourneyIcon extends StatelessWidget {
+  const _DailyJourneyIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: AppColors.accent.withValues(alpha: 0.14),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.24)),
+      ),
+      child: const Icon(Icons.wb_sunny_rounded, color: AppColors.accent),
+    );
+  }
+}
+
+class _DailyJourneyTitle extends StatelessWidget {
+  const _DailyJourneyTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        color: context.evoluaColors.textPrimary,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
@@ -847,14 +919,14 @@ class _RhythmBriefingCard extends StatelessWidget {
   const _RhythmBriefingCard({
     required this.compact,
     required this.summary,
-    required this.onOpenDetails,
+    required this.onOpenEvolutionMirror,
     required this.onOpenLastCheckIns,
     required this.onOpenProfile,
   });
 
   final bool compact;
   final _RhythmSummary summary;
-  final VoidCallback onOpenDetails;
+  final VoidCallback onOpenEvolutionMirror;
   final VoidCallback onOpenLastCheckIns;
   final VoidCallback onOpenProfile;
 
@@ -890,30 +962,55 @@ class _RhythmBriefingCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onOpenDetails,
-                icon: const Icon(Icons.insights_rounded),
-                label: const Text('Ver detalhes do seu ritmo'),
-              ),
-              TextButton.icon(
-                onPressed: onOpenLastCheckIns,
-                icon: const Icon(Icons.history_rounded),
-                label: const Text('Ver ultimos check-ins'),
-              ),
-              TextButton.icon(
-                onPressed: onOpenProfile,
-                icon: const Icon(Icons.person_rounded),
-                label: const Text('Ver perfil'),
-              ),
-            ],
-          ),
+          if (compact)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _rhythmActions(),
+            )
+          else
+            Wrap(spacing: 12, runSpacing: 12, children: _rhythmActions()),
         ],
       ),
     );
+  }
+
+  List<Widget> _rhythmActions() {
+    final actions = [
+      OutlinedButton.icon(
+        onPressed: onOpenEvolutionMirror,
+        icon: const Icon(Icons.auto_graph_rounded),
+        label: const Text(
+          'Ver Espelho da Evolucao',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      TextButton.icon(
+        onPressed: onOpenLastCheckIns,
+        icon: const Icon(Icons.history_rounded),
+        label: const Text(
+          'Ver ultimos check-ins',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      TextButton.icon(
+        onPressed: onOpenProfile,
+        icon: const Icon(Icons.person_rounded),
+        label: const Text('Ver perfil'),
+      ),
+    ];
+
+    if (!compact) {
+      return actions;
+    }
+
+    return [
+      for (final (index, action) in actions.indexed) ...[
+        if (index > 0) const SizedBox(height: 8),
+        action,
+      ],
+    ];
   }
 }
 

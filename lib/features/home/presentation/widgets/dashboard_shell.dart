@@ -36,10 +36,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   SocialModuleTab _spaceSection = SocialModuleTab.featured;
   final SocialFeedScope _reflectionScope = SocialFeedScope.moment;
   ProfileModuleSection _profileSection = ProfileModuleSection.overview;
+  final List<_DashboardLocation> _history = [];
   bool _handledBillingReturn = false;
 
   static const _destinations = [
-    _NavItem(label: 'Home', icon: Icons.home_rounded),
+    _NavItem(label: 'Inicio', icon: Icons.home_rounded),
     _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
     _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
     _NavItem(label: 'Mentor Evolua', icon: Icons.auto_awesome_rounded),
@@ -49,14 +50,89 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _mentorIndex = 3;
   static const _profileIndex = 4;
 
-  void _goTo(int index) {
-    setState(() => _selectedIndex = index);
+  _DashboardLocation _currentLocation() {
+    return _DashboardLocation(
+      selectedIndex: _selectedIndex,
+      trailSection: _trailSection,
+      spaceSection: _spaceSection,
+      profileSection: _profileSection,
+    );
+  }
+
+  void _pushCurrentLocation() {
+    final location = _currentLocation();
+    if (_history.isEmpty || _history.last != location) {
+      _history.add(location);
+    }
+  }
+
+  void _restoreLocation(_DashboardLocation location) {
+    _selectedIndex = location.selectedIndex;
+    _trailSection = location.trailSection;
+    _spaceSection = location.spaceSection;
+    _profileSection = location.profileSection;
+  }
+
+  void _goTo(int index, {bool recordHistory = true}) {
+    if (_selectedIndex == index) {
+      return;
+    }
+
+    setState(() {
+      if (index == 0) {
+        _history.clear();
+      } else if (recordHistory) {
+        _pushCurrentLocation();
+      }
+      _selectedIndex = index;
+    });
+  }
+
+  void _setTrailSection(ContentModuleSection section) {
+    if (_selectedIndex == 1 && _trailSection == section) {
+      return;
+    }
+
+    setState(() {
+      _pushCurrentLocation();
+      _selectedIndex = 1;
+      _trailSection = section;
+    });
   }
 
   void _openSpacesSection(SocialModuleTab section) {
+    if (_selectedIndex == _spacesIndex && _spaceSection == section) {
+      return;
+    }
+
     setState(() {
+      _pushCurrentLocation();
       _selectedIndex = _spacesIndex;
       _spaceSection = section;
+    });
+  }
+
+  void _openProfileSection(ProfileModuleSection section) {
+    if (_selectedIndex == _profileIndex && _profileSection == section) {
+      return;
+    }
+
+    setState(() {
+      _pushCurrentLocation();
+      _selectedIndex = _profileIndex;
+      _profileSection = section;
+    });
+  }
+
+  void _handleMobileBack() {
+    setState(() {
+      if (_history.isNotEmpty) {
+        _restoreLocation(_history.removeLast());
+        return;
+      }
+      if (_selectedIndex != 0) {
+        _selectedIndex = 0;
+      }
     });
   }
 
@@ -97,187 +173,218 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onNavigate: _goTo,
       onOpenSpacesSection: _openSpacesSection,
       onOpenMentor: () => _goTo(_mentorIndex),
-      onOpenProfileSection: (section) {
-        setState(() {
-          _selectedIndex = _profileIndex;
-          _profileSection = section;
-        });
-      },
+      onOpenProfileSection: _openProfileSection,
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        pagePadding,
-        16,
-        pagePadding,
-        isCompact ? 10 : 24,
-      ),
-      child: isCompact
-          ? Column(
-              children: [
-                Expanded(child: content),
-                const SizedBox(height: 12),
-                PrimaryPanel(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  semanticLabel: 'Navegacao principal',
-                  child: NavigationBar(
-                    selectedIndex: _selectedIndex >= _destinations.length
-                        ? 0
-                        : _selectedIndex,
-                    height: 72,
-                    labelBehavior:
-                        NavigationDestinationLabelBehavior.alwaysShow,
-                    onDestinationSelected: _goTo,
-                    destinations: _destinations
-                        .map(
-                          (item) => NavigationDestination(
-                            icon: Tooltip(
-                              message: item.label,
-                              child: Icon(item.icon),
-                            ),
-                            selectedIcon: Icon(item.icon),
-                            label: item.label,
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ],
-            )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                return Row(
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 308),
-                      child: SizedBox(
-                        height: constraints.maxHeight,
-                        child: PrimaryPanel(
-                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                          semanticLabel: 'Menu lateral',
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const EvoluaLogo(
-                                variant: EvoluaLogoVariant.sidebar,
+    return PopScope<void>(
+      canPop: !isCompact || (_selectedIndex == 0 && _history.isEmpty),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !isCompact) {
+          return;
+        }
+        _handleMobileBack();
+      },
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          pagePadding,
+          16,
+          pagePadding,
+          isCompact ? 10 : 24,
+        ),
+        child: isCompact
+            ? Column(
+                children: [
+                  Expanded(child: content),
+                  const SizedBox(height: 12),
+                  PrimaryPanel(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    semanticLabel: 'Navegacao principal',
+                    child: NavigationBar(
+                      selectedIndex: _selectedIndex >= _destinations.length
+                          ? 0
+                          : _selectedIndex,
+                      height: 72,
+                      labelBehavior:
+                          NavigationDestinationLabelBehavior.alwaysShow,
+                      onDestinationSelected: _goTo,
+                      destinations: _destinations
+                          .map(
+                            (item) => NavigationDestination(
+                              icon: Tooltip(
+                                message: item.label,
+                                child: Icon(item.icon),
                               ),
-                              const SizedBox(height: 24),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    children: List.generate(
-                                      _destinations.length,
-                                      (index) {
-                                        final item = _destinations[index];
-                                        final isSelected =
-                                            index == _selectedIndex;
-                                        return Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 10,
-                                          ),
-                                          child: _NavEntry(
-                                            item: item,
-                                            isSelected: isSelected,
-                                            onTap: () => _goTo(index),
-                                            submenu: switch (index) {
-                                              1 when isSelected =>
-                                                _buildDesktopSubmenu(
-                                                  context,
-                                                  entries: [
-                                                    _SubnavEntry(
-                                                      label: 'Minha jornada',
-                                                      selected:
-                                                          _trailSection ==
-                                                          ContentModuleSection
-                                                              .journey,
-                                                      onTap: () => setState(
-                                                        () => _trailSection =
+                              selectedIcon: Icon(item.icon),
+                              label: item.label,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ],
+              )
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  return Row(
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 308),
+                        child: SizedBox(
+                          height: constraints.maxHeight,
+                          child: PrimaryPanel(
+                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                            semanticLabel: 'Menu lateral',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const EvoluaLogo(
+                                  variant: EvoluaLogoVariant.sidebar,
+                                ),
+                                const SizedBox(height: 24),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      children: List.generate(
+                                        _destinations.length,
+                                        (index) {
+                                          final item = _destinations[index];
+                                          final isSelected =
+                                              index == _selectedIndex;
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 10,
+                                            ),
+                                            child: _NavEntry(
+                                              item: item,
+                                              isSelected: isSelected,
+                                              onTap: () => _goTo(index),
+                                              submenu: switch (index) {
+                                                1 when isSelected =>
+                                                  _buildDesktopSubmenu(
+                                                    context,
+                                                    entries: [
+                                                      _SubnavEntry(
+                                                        label: 'Minha jornada',
+                                                        selected:
+                                                            _trailSection ==
                                                             ContentModuleSection
                                                                 .journey,
+                                                        onTap: () =>
+                                                            _setTrailSection(
+                                                              ContentModuleSection
+                                                                  .journey,
+                                                            ),
                                                       ),
-                                                    ),
-                                                    _SubnavEntry(
-                                                      label: 'Catalogo',
-                                                      selected:
-                                                          _trailSection ==
-                                                          ContentModuleSection
-                                                              .catalog,
-                                                      onTap: () => setState(
-                                                        () => _trailSection =
+                                                      _SubnavEntry(
+                                                        label: 'Catalogo',
+                                                        selected:
+                                                            _trailSection ==
                                                             ContentModuleSection
                                                                 .catalog,
+                                                        onTap: () =>
+                                                            _setTrailSection(
+                                                              ContentModuleSection
+                                                                  .catalog,
+                                                            ),
                                                       ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              2 when isSelected =>
-                                                _buildDesktopSubmenu(
-                                                  context,
-                                                  entries: [
-                                                    _SubnavEntry(
-                                                      label: 'Em destaque',
-                                                      selected:
-                                                          _spaceSection ==
-                                                          SocialModuleTab
-                                                              .featured,
-                                                      onTap: () => setState(
-                                                        () => _spaceSection =
+                                                    ],
+                                                  ),
+                                                2 when isSelected =>
+                                                  _buildDesktopSubmenu(
+                                                    context,
+                                                    entries: [
+                                                      _SubnavEntry(
+                                                        label: 'Em destaque',
+                                                        selected:
+                                                            _spaceSection ==
                                                             SocialModuleTab
                                                                 .featured,
+                                                        onTap: () =>
+                                                            _openSpacesSection(
+                                                              SocialModuleTab
+                                                                  .featured,
+                                                            ),
                                                       ),
-                                                    ),
-                                                    _SubnavEntry(
-                                                      label: 'Reflexoes',
-                                                      selected:
-                                                          _spaceSection ==
-                                                          SocialModuleTab
-                                                              .reflections,
-                                                      onTap: () => setState(
-                                                        () => _spaceSection =
+                                                      _SubnavEntry(
+                                                        label: 'Reflexoes',
+                                                        selected:
+                                                            _spaceSection ==
                                                             SocialModuleTab
                                                                 .reflections,
+                                                        onTap: () =>
+                                                            _openSpacesSection(
+                                                              SocialModuleTab
+                                                                  .reflections,
+                                                            ),
                                                       ),
-                                                    ),
-                                                    _SubnavEntry(
-                                                      label: 'Meus espacos',
-                                                      selected:
-                                                          _spaceSection ==
-                                                          SocialModuleTab
-                                                              .mySpaces,
-                                                      onTap: () => setState(
-                                                        () => _spaceSection =
+                                                      _SubnavEntry(
+                                                        label: 'Meus espacos',
+                                                        selected:
+                                                            _spaceSection ==
                                                             SocialModuleTab
                                                                 .mySpaces,
+                                                        onTap: () =>
+                                                            _openSpacesSection(
+                                                              SocialModuleTab
+                                                                  .mySpaces,
+                                                            ),
                                                       ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              _ => null,
-                                            },
-                                          ),
-                                        );
-                                      },
+                                                    ],
+                                                  ),
+                                                _ => null,
+                                              },
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(child: content),
-                  ],
-                );
-              },
-            ),
+                      const SizedBox(width: 18),
+                      Expanded(child: content),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
+}
+
+class _DashboardLocation {
+  const _DashboardLocation({
+    required this.selectedIndex,
+    required this.trailSection,
+    required this.spaceSection,
+    required this.profileSection,
+  });
+
+  final int selectedIndex;
+  final ContentModuleSection trailSection;
+  final SocialModuleTab spaceSection;
+  final ProfileModuleSection profileSection;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _DashboardLocation &&
+        other.selectedIndex == selectedIndex &&
+        other.trailSection == trailSection &&
+        other.spaceSection == spaceSection &&
+        other.profileSection == profileSection;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(selectedIndex, trailSection, spaceSection, profileSection);
 }
 
 class _DashboardContent extends ConsumerWidget {
@@ -465,7 +572,7 @@ class _DashboardContent extends ConsumerWidget {
 
   String _pageTitleFor(int index) {
     return switch (index) {
-      0 => 'Home',
+      0 => 'Inicio',
       1 => 'Trilhas',
       2 => 'Espacos',
       3 => 'Mentor Evolua',

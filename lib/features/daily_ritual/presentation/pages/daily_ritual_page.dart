@@ -345,7 +345,7 @@ class _DailyRitualResult extends StatelessWidget {
           FilledButton.icon(
             onPressed: () => context.go('/home'),
             icon: const Icon(Icons.home_rounded),
-            label: const Text('Voltar para Home'),
+            label: const Text('Voltar para Inicio'),
           ),
         ],
       ),

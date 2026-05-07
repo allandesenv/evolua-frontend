@@ -29,7 +29,7 @@ void main() {
     testWidgets('renders the briefing flow in the intended order', (
       tester,
     ) async {
-      await tester.pumpWidget(_testApp());
+      await tester.pumpWidget(_testApp(now: DateTime(2026, 5, 7, 8)));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Leo'), findsOneWidget);
@@ -84,6 +84,35 @@ void main() {
         expect(openedCheckIn, isTrue);
       },
     );
+
+    testWidgets('shows persisted intelligent reading from history', (
+      tester,
+    ) async {
+      const persistedInsight =
+          'Leitura recuperada do historico salvo no servidor.';
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: _FakeCheckInRepository(
+            items: [
+              CheckIn(
+                id: 30,
+                userId: 'user-123',
+                mood: 'calmo',
+                reflection: 'voltei para ver minha leitura',
+                energyLevel: 7,
+                recommendedPractice: 'Respirar por dois minutos.',
+                aiInsight: _insight(insight: persistedInsight),
+                createdAt: DateTime(2026, 5, 7, 9),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(persistedInsight), findsOneWidget);
+      expect(find.textContaining('Depois do proximo check-in'), findsNothing);
+    });
 
     testWidgets('shows morning ritual entry point first', (tester) async {
       String? openedType;
@@ -237,7 +266,7 @@ void main() {
       expect(find.text(safeInsightText), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('opens polished rhythm details and evolution mirror CTA', (
+    testWidgets('opens evolution mirror directly from rhythm card', (
       tester,
     ) async {
       var openedMirror = false;
@@ -246,8 +275,25 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Ver detalhes do seu ritmo'));
-      await tester.tap(find.text('Ver detalhes do seu ritmo'));
+      await tester.ensureVisible(find.text('Ver Espelho da Evolucao'));
+      await tester.tap(find.text('Ver Espelho da Evolucao'));
+      await tester.pumpAndSettle();
+
+      expect(openedMirror, isTrue);
+      expect(find.text('Seu ritmo hoje'), findsNothing);
+    });
+
+    testWidgets('opens rhythm details from recent check-ins action', (
+      tester,
+    ) async {
+      var openedMirror = false;
+      await tester.pumpWidget(
+        _testApp(onOpenEvolutionMirror: () => openedMirror = true),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver ultimos check-ins'));
+      await tester.tap(find.text('Ver ultimos check-ins'));
       await tester.pumpAndSettle();
 
       expect(find.text('Seu ritmo hoje'), findsOneWidget);

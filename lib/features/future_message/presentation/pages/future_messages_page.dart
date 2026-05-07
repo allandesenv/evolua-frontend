@@ -252,7 +252,7 @@ class _FutureMessagesHeader extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: IconButton(
-              tooltip: 'Voltar para Home',
+              tooltip: 'Voltar para Inicio',
               onPressed: onBack,
               icon: const Icon(Icons.arrow_back_rounded),
             ),

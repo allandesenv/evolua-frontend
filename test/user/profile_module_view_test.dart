@@ -15,6 +15,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey_s
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
+import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/repositories/daily_ritual_repository.dart';
@@ -224,6 +225,54 @@ void main() {
     expect(find.text('Dar feedback'), findsOneWidget);
   });
 
+  testWidgets('dashboard uses Inicio copy in navigation', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell(size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inicio'), findsAtLeastNWidgets(1));
+    expect(find.text('Home'), findsNothing);
+  });
+
+  testWidgets('dashboard mobile back walks internal history to Inicio', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ContentModuleView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
+    expect(find.text('Em destaque'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ContentModuleView), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+  });
+
   testWidgets('avatar menu opens plans and overview sections', (tester) async {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
@@ -268,6 +317,11 @@ void main() {
     expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
   });
 
   testWidgets('profile preferences render sidebar on expanded desktop', (
@@ -988,7 +1042,10 @@ Future<void> _pumpEvolutionMirror(
   await tester.pumpAndSettle();
 }
 
-Widget _dashboardShell() {
+Widget _dashboardShell({
+  Size size = const Size(390, 900),
+  TrailRepository? trailRepository,
+}) {
   return ProviderScope(
     overrides: [
       authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
@@ -996,7 +1053,9 @@ Widget _dashboardShell() {
       subscriptionRepositoryProvider.overrideWithValue(
         _FakeSubscriptionRepository(),
       ),
-      trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
+      trailRepositoryProvider.overrideWithValue(
+        trailRepository ?? _FakeTrailRepository(),
+      ),
       checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
       socialPostRepositoryProvider.overrideWithValue(
         _FakeSocialPostRepository(),
@@ -1020,9 +1079,9 @@ Widget _dashboardShell() {
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
-      home: const MediaQuery(
-        data: MediaQueryData(size: Size(390, 900)),
-        child: Scaffold(body: DashboardShell()),
+      home: MediaQuery(
+        data: MediaQueryData(size: size),
+        child: const Scaffold(body: DashboardShell()),
       ),
     ),
   );
