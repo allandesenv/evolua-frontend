@@ -10,6 +10,8 @@ import 'package:evolua_frontend/features/notification/presentation/widgets/notif
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
@@ -22,6 +24,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -683,6 +686,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final supportConfigState = ref.watch(supportConfigProvider);
     final supportStatusState = ref.watch(supportStatusProvider);
     final checkInState = ref.watch(checkInControllerProvider);
+    final futureMessageState = ref.watch(futureMessageControllerProvider);
     final currentJourneyState = ref.watch(currentJourneyTrailProvider);
     final activeJourney = currentJourneyState.asData?.value;
     final journeyState = activeJourney == null
@@ -830,8 +834,10 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           else if (_section == ProfileModuleSection.evolutionMirror)
             _EvolutionMirrorSection(
               checkInState: checkInState,
+              futureMessageState: futureMessageState,
               currentJourneyState: currentJourneyState,
               journeyState: journeyState,
+              onOpenFutureMessages: () => context.push('/future-messages'),
             )
           else if (_section == ProfileModuleSection.displayAccessibility)
             accessibilityState.when(
@@ -1503,13 +1509,17 @@ class _OverviewSection extends StatelessWidget {
 class _EvolutionMirrorSection extends StatelessWidget {
   const _EvolutionMirrorSection({
     required this.checkInState,
+    required this.futureMessageState,
     required this.currentJourneyState,
     required this.journeyState,
+    required this.onOpenFutureMessages,
   });
 
   final AsyncValue<CheckInHistoryState> checkInState;
+  final AsyncValue<FutureMessageState> futureMessageState;
   final AsyncValue<Trail?> currentJourneyState;
   final AsyncValue<TrailJourney>? journeyState;
+  final VoidCallback onOpenFutureMessages;
 
   @override
   Widget build(BuildContext context) {
@@ -1524,6 +1534,11 @@ class _EvolutionMirrorSection extends StatelessWidget {
             .firstOrNull;
     final activeTrail = currentJourneyState.asData?.value;
     final journey = journeyState?.asData?.value;
+    final futureMessages = futureMessageState.asData?.value;
+    final shouldShowFutureMessages =
+        futureMessages != null &&
+        (futureMessages.readyToRead.isNotEmpty ||
+            futureMessages.delivered.items.isNotEmpty);
     final stats = _EvolutionMirrorStats.from(
       checkIns: checkIns,
       totalCheckIns: totalCheckIns,
@@ -1535,81 +1550,66 @@ class _EvolutionMirrorSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PrimaryPanel(
-          semanticLabel: 'Espelho da Evolucao',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Espelho da Evolucao',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: context.evoluaColors.textPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Um retrato vivo do seu progresso, dos seus padroes e das conquistas que estao se formando na sua jornada.',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ],
-          ),
-        ),
+        _EvolutionHero(stats: stats),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
-          title: 'Visao de progresso',
+          title: 'Resumo da semana',
           description:
-              'Veja como seus registros, sua constancia e sua jornada ativa estao se conectando.',
+              'Uma leitura curta para entender como seus registros recentes estao se organizando.',
           child: _EvolutionMetricGrid(
             metrics: [
               _EvolutionMetric(
                 icon: Icons.favorite_rounded,
-                label: 'Check-ins',
-                value: '$totalCheckIns',
+                label: 'Check-ins esta semana',
+                value: '${stats.weeklyCheckIns}',
+              ),
+              _EvolutionMetric(
+                icon: Icons.mood_rounded,
+                label: 'Emocao predominante',
+                value: stats.dominantMood,
+              ),
+              _EvolutionMetric(
+                icon: Icons.bolt_rounded,
+                label: 'Energia media',
+                value: stats.averageEnergyLabel,
               ),
               _EvolutionMetric(
                 icon: Icons.local_fire_department_rounded,
                 label: 'Consistencia',
                 value: '${stats.streak} dias',
               ),
-              _EvolutionMetric(
-                icon: Icons.route_rounded,
-                label: 'Jornada',
-                value: journey == null
-                    ? 'em preparo'
-                    : '${journey.progressPercent}%',
-              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
-          title: 'Padroes emocionais',
+          title: 'Padroes percebidos',
           description:
-              'Leituras simples para perceber energia, repeticoes e sinais recentes sem transformar isso em cobranca.',
-          child: Column(
-            children: [
-              _EvolutionSignalRow(
-                icon: Icons.mood_rounded,
-                label: 'Estado dominante',
-                value: stats.dominantMood,
-              ),
-              _EvolutionSignalRow(
-                icon: Icons.bolt_rounded,
-                label: 'Energia media',
-                value: stats.averageEnergyLabel,
-              ),
-              _EvolutionSignalRow(
-                icon: Icons.schedule_rounded,
-                label: 'Melhor horario',
-                value: stats.bestTimeWindow,
-              ),
-            ],
-          ),
+              'Sinais simples do seu historico, para perceber repeticoes sem transformar isso em cobranca.',
+          child: _PatternPanel(stats: stats),
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
-          title: 'Evolucao nas trilhas',
+          title: 'Mensagem da IA',
+          description:
+              'Uma leitura curta a partir do ultimo insight salvo, sem gerar nova analise.',
+          child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
+        ),
+        const SizedBox(height: 16),
+        if (shouldShowFutureMessages) ...[
+          _EvolutionSectionGroup(
+            title: 'Mensagens do seu eu anterior',
+            description:
+                'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
+            child: _FutureMessagesMirrorPanel(
+              state: futureMessageState,
+              onOpen: onOpenFutureMessages,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        _EvolutionSectionGroup(
+          title: 'Trilhas em andamento',
           description:
               'Acompanhe a trilha que esta guiando seus proximos passos.',
           child: _TrailEvolutionPanel(
@@ -1619,21 +1619,14 @@ class _EvolutionMirrorSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
-          title: 'Insights da IA',
-          description:
-              'O ultimo insight vira um espelho pratico, com cuidado e contexto.',
-          child: _AiInsightMirrorPanel(insight: latestInsight),
-        ),
-        const SizedBox(height: 16),
-        _EvolutionSectionGroup(
-          title: 'Conquistas',
+          title: 'Marcos da jornada',
           description:
               'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
           child: Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: stats.achievements
-                .map((item) => _AchievementBadge(label: item))
+            children: stats.milestones
+                .map((item) => _MilestoneBadge(milestone: item))
                 .toList(),
           ),
         ),
@@ -1645,6 +1638,72 @@ class _EvolutionMirrorSection extends StatelessWidget {
           child: _ConsistencyPanel(stats: stats),
         ),
       ],
+    );
+  }
+}
+
+class _EvolutionHero extends StatelessWidget {
+  const _EvolutionHero({required this.stats});
+
+  final _EvolutionMirrorStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      semanticLabel: 'Espelho da Evolucao',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Espelho da Evolucao',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Como eu estou evoluindo?',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            stats.weeklySummary,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: AppColors.accent.withValues(alpha: 0.12),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.24),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.auto_graph_rounded, color: AppColors.accent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    stats.primaryPattern,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.evoluaColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1709,7 +1768,7 @@ class _EvolutionMetricGrid extends StatelessWidget {
       children: metrics
           .map(
             (metric) => SizedBox(
-              width: 160,
+              width: 168,
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -1728,6 +1787,8 @@ class _EvolutionMetricGrid extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       metric.value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: context.evoluaColors.textPrimary,
                         fontWeight: FontWeight.w900,
@@ -1744,6 +1805,53 @@ class _EvolutionMetricGrid extends StatelessWidget {
             ),
           )
           .toList(),
+    );
+  }
+}
+
+class _PatternPanel extends StatelessWidget {
+  const _PatternPanel({required this.stats});
+
+  final _EvolutionMirrorStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _EvolutionSignalRow(
+          icon: Icons.auto_awesome_rounded,
+          label: 'Principal padrao identificado',
+          value: stats.patternLabel,
+        ),
+        _EvolutionSignalRow(
+          icon: Icons.schedule_rounded,
+          label: 'Melhor horario',
+          value: stats.bestTimeWindow,
+        ),
+        _EvolutionSignalRow(
+          icon: Icons.edit_note_rounded,
+          label: 'Reflexoes registradas',
+          value: '${stats.reflectionCount}',
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
+            border: Border.all(
+              color: context.evoluaColors.outline.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Text(
+            stats.patternDescription,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1827,11 +1935,17 @@ class _TrailEvolutionPanel extends StatelessWidget {
         const SizedBox(height: 14),
         LinearProgressIndicator(value: progress / 100),
         const SizedBox(height: 10),
-        Text(
-          journey == null
-              ? 'Carregando progresso da trilha...'
-              : '$progress% concluido - ${journey.completedSteps}/${journey.steps.length} etapas',
-          style: Theme.of(context).textTheme.bodySmall,
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            _MiniStatusPill(label: '$progress% concluido'),
+            if (journey != null)
+              _MiniStatusPill(
+                label:
+                    '${journey.completedSteps}/${journey.steps.length} etapas',
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         Text(
@@ -1844,80 +1958,313 @@ class _TrailEvolutionPanel extends StatelessWidget {
 }
 
 class _AiInsightMirrorPanel extends StatelessWidget {
-  const _AiInsightMirrorPanel({required this.insight});
+  const _AiInsightMirrorPanel({required this.insight, required this.stats});
 
   final CheckInAiInsight? insight;
+  final _EvolutionMirrorStats stats;
 
   @override
   Widget build(BuildContext context) {
     if (insight == null) {
-      return Text(
-        'Depois dos proximos check-ins, os insights da IA aparecem aqui com acoes e padroes mais claros.',
-        style: Theme.of(context).textTheme.bodyMedium,
+      return _AiMessageCard(
+        message: stats.localAiFallback,
+        nextStep: 'Faca um check-in simples hoje para criar a proxima leitura.',
+      );
+    }
+
+    return _AiMessageCard(
+      message: insight!.insight,
+      nextStep: insight!.suggestedAction,
+      footer: insight!.suggestedTrailTitle == null
+          ? (insight!.fallbackUsed ? 'modo seguro' : insight!.riskLevel)
+          : 'Trilha sugerida: ${insight!.suggestedTrailTitle}',
+    );
+  }
+}
+
+class _FutureMessagesMirrorPanel extends StatelessWidget {
+  const _FutureMessagesMirrorPanel({required this.state, required this.onOpen});
+
+  final AsyncValue<FutureMessageState> state;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = state.asData?.value;
+    final ready = data?.readyToRead ?? const <FutureMessage>[];
+    final delivered = data?.delivered.items ?? const <FutureMessage>[];
+    final scheduled =
+        data?.result.items.where((item) => item.isScheduled).toList() ??
+        const <FutureMessage>[];
+    final highlight = ready.firstOrNull ?? delivered.firstOrNull;
+
+    if (state.isLoading && data == null) {
+      return const LinearProgressIndicator();
+    }
+
+    if (highlight == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quando uma carta encontrar um contexto importante, ela aparece aqui como uma ponte entre momentos da sua jornada.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onOpen,
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('Abrir mensagens'),
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(insight!.insight, style: Theme.of(context).textTheme.bodyMedium),
+        _FutureMessageTimelineCard(message: highlight),
         const SizedBox(height: 12),
-        _EvolutionSignalRow(
-          icon: Icons.task_alt_rounded,
-          label: 'Acao sugerida',
-          value: insight!.suggestedAction,
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            _MiniStatusPill(
+              label: '${ready.length} pronta${ready.length == 1 ? '' : 's'}',
+            ),
+            _MiniStatusPill(
+              label:
+                  '${scheduled.length} agendada${scheduled.length == 1 ? '' : 's'}',
+            ),
+            _MiniStatusPill(
+              label:
+                  '${delivered.length} entregue${delivered.length == 1 ? '' : 's'}',
+            ),
+          ],
         ),
-        _EvolutionSignalRow(
-          icon: Icons.shield_rounded,
-          label: 'Risco / cuidado',
-          value: insight!.fallbackUsed ? 'modo seguro' : insight!.riskLevel,
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: onOpen,
+          icon: const Icon(Icons.mark_email_unread_rounded),
+          label: Text(ready.isEmpty ? 'Abrir cartas' : 'Quero ler'),
         ),
-        if (insight!.suggestedTrailTitle != null)
-          _EvolutionSignalRow(
-            icon: Icons.route_rounded,
-            label: 'Trilha sugerida',
-            value: insight!.suggestedTrailTitle!,
-          ),
       ],
     );
   }
 }
 
-class _AchievementBadge extends StatelessWidget {
-  const _AchievementBadge({required this.label});
+class _FutureMessageTimelineCard extends StatelessWidget {
+  const _FutureMessageTimelineCard({required this.message});
+
+  final FutureMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final createdMood = message.createdContext['mood']?.toString();
+    final deliveredMood = message.deliveredContext['mood']?.toString();
+    final createdEnergy = message.createdContext['energyLevel']?.toString();
+    final deliveredEnergy = message.deliveredContext['energyLevel']?.toString();
+    final statusLabel = message.isRead
+        ? 'Voce ja leu essa carta.'
+        : message.isDelivered
+        ? 'Ha uma carta sua pronta para ser lida com calma.'
+        : 'Essa carta ainda esta guardada.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.34),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message.title ?? 'Carta para mim mesmo',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(statusLabel, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 14),
+          _EvolutionSignalRow(
+            icon: Icons.history_rounded,
+            label: 'Quando escreveu',
+            value: _contextLabel(createdMood, createdEnergy),
+          ),
+          _EvolutionSignalRow(
+            icon: Icons.today_rounded,
+            label: message.isDelivered ? 'Quando chegou' : 'Entrega',
+            value: message.isDelivered
+                ? _contextLabel(deliveredMood, deliveredEnergy)
+                : message.triggerLabel,
+          ),
+          Text(
+            message.bodyPreview.isEmpty
+                ? message.triggerLabel
+                : message.bodyPreview,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _contextLabel(String? mood, String? energy) {
+    final cleanMood = mood == null || mood.isEmpty
+        ? 'contexto registrado'
+        : mood;
+    if (energy == null || energy.isEmpty) {
+      return cleanMood;
+    }
+    return '$cleanMood, energia $energy';
+  }
+}
+
+class _AiMessageCard extends StatelessWidget {
+  const _AiMessageCard({
+    required this.message,
+    required this.nextStep,
+    this.footer,
+  });
+
+  final String message;
+  final String nextStep;
+  final String? footer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.34),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.task_alt_rounded,
+                color: AppColors.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Proximo passo: $nextStep',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (footer != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              footer!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneBadge extends StatelessWidget {
+  const _MilestoneBadge({required this.milestone});
+
+  final _EvolutionMilestone milestone;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = milestone.achieved
+        ? AppColors.accent
+        : context.evoluaColors.textSecondary;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 270),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: color.withValues(alpha: milestone.achieved ? 0.14 : 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            milestone.achieved
+                ? Icons.emoji_events_rounded
+                : Icons.radio_button_unchecked_rounded,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              milestone.label,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: milestone.achieved
+                    ? FontWeight.w800
+                    : FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStatusPill extends StatelessWidget {
+  const _MiniStatusPill({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: AppColors.accent.withValues(alpha: 0.14),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.26)),
+        color: AppColors.accent.withValues(alpha: 0.12),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.emoji_events_rounded,
-            size: 16,
-            color: AppColors.accent,
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: context.evoluaColors.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: context.evoluaColors.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1930,7 +2277,6 @@ class _ConsistencyPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeDays = stats.weeklyCheckIns.clamp(0, 7);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1944,7 +2290,7 @@ class _ConsistencyPanel extends StatelessWidget {
               height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: index < activeDays
+                color: stats.weeklyActivity[index]
                     ? AppColors.accent
                     : context.evoluaColors.surfaceStrong.withValues(
                         alpha: 0.36,
@@ -1970,8 +2316,16 @@ class _EvolutionMirrorStats {
     required this.dominantMood,
     required this.averageEnergyLabel,
     required this.bestTimeWindow,
+    required this.reflectionCount,
+    required this.primaryPattern,
+    required this.patternLabel,
+    required this.patternDescription,
+    required this.patternIdentified,
+    required this.weeklySummary,
+    required this.localAiFallback,
     required this.consistencyMessage,
-    required this.achievements,
+    required this.weeklyActivity,
+    required this.milestones,
   });
 
   final int weeklyCheckIns;
@@ -1979,8 +2333,16 @@ class _EvolutionMirrorStats {
   final String dominantMood;
   final String averageEnergyLabel;
   final String bestTimeWindow;
+  final int reflectionCount;
+  final String primaryPattern;
+  final String patternLabel;
+  final String patternDescription;
+  final bool patternIdentified;
+  final String weeklySummary;
+  final String localAiFallback;
   final String consistencyMessage;
-  final List<String> achievements;
+  final List<bool> weeklyActivity;
+  final List<_EvolutionMilestone> milestones;
 
   factory _EvolutionMirrorStats.from({
     required List<CheckIn> checkIns,
@@ -1991,37 +2353,89 @@ class _EvolutionMirrorStats {
   }) {
     final weeklyCheckIns = _mirrorWeeklyCheckIns(checkIns);
     final streak = _mirrorStreak(checkIns);
+    final weeklyActivity = _mirrorWeeklyActivity(checkIns);
+    final reflectionCount = checkIns
+        .where((item) => item.reflection.trim().isNotEmpty)
+        .length;
     final averageEnergy = checkIns.isEmpty
         ? null
         : checkIns.fold<int>(0, (sum, item) => sum + item.energyLevel) /
               checkIns.length;
-    final achievements = <String>[
-      if (totalCheckIns > 0) 'Primeiro check-in',
-      if (streak >= 2) 'Constancia emocional',
-      if (activeTrail != null) 'Jornada ativa',
-      if ((journey?.completedSteps ?? 0) > 0) 'Etapas concluidas',
-      if (latestInsight != null) 'Insight da IA',
-      if ((journey?.progressPercent ?? 0) >= 100) 'Ciclo completo',
+    final dominantMood = checkIns.isEmpty
+        ? 'sem padrao ainda'
+        : _mirrorCapitalize(_mirrorDominantMood(checkIns));
+    final pattern = _mirrorPrimaryPattern(checkIns);
+    final milestones = [
+      _EvolutionMilestone(
+        label: '3 dias de check-in',
+        achieved: _mirrorUniqueDays(checkIns) >= 3,
+      ),
+      _EvolutionMilestone(
+        label: 'Primeira trilha concluida',
+        achieved: (journey?.progressPercent ?? 0) >= 100,
+      ),
+      _EvolutionMilestone(
+        label: '7 reflexoes registradas',
+        achieved: reflectionCount >= 7,
+      ),
+      _EvolutionMilestone(
+        label: '1 padrao emocional identificado',
+        achieved: pattern.identified,
+      ),
+      _EvolutionMilestone(
+        label: 'Primeiro check-in',
+        achieved: totalCheckIns > 0,
+      ),
     ];
 
     return _EvolutionMirrorStats(
       weeklyCheckIns: weeklyCheckIns,
       streak: streak,
-      dominantMood: checkIns.isEmpty
-          ? 'sem padrao ainda'
-          : _mirrorCapitalize(_mirrorDominantMood(checkIns)),
+      dominantMood: dominantMood,
       averageEnergyLabel: averageEnergy == null
           ? 'sem dados'
           : '${averageEnergy.toStringAsFixed(1)}/10',
       bestTimeWindow: _mirrorBestTimeWindow(checkIns),
+      reflectionCount: reflectionCount,
+      primaryPattern: pattern.headline,
+      patternLabel: pattern.label,
+      patternDescription: pattern.description,
+      patternIdentified: pattern.identified,
+      weeklySummary: _mirrorWeeklySummary(
+        weeklyCheckIns: weeklyCheckIns,
+        dominantMood: dominantMood,
+        averageEnergy: averageEnergy,
+        activeTrail: activeTrail,
+      ),
+      localAiFallback: _mirrorLocalAiFallback(checkIns),
       consistencyMessage: weeklyCheckIns == 0
           ? 'Seu espelho ainda esta se formando. Um check-in curto ja cria o primeiro ponto de referencia.'
           : 'Voce registrou $weeklyCheckIns momento(s) nesta semana. A constancia aqui e voltar com honestidade, nao fazer tudo perfeito.',
-      achievements: achievements.isEmpty
-          ? const ['Primeiro passo disponivel']
-          : achievements,
+      weeklyActivity: weeklyActivity,
+      milestones: milestones,
     );
   }
+}
+
+class _EvolutionMilestone {
+  const _EvolutionMilestone({required this.label, required this.achieved});
+
+  final String label;
+  final bool achieved;
+}
+
+class _MirrorPattern {
+  const _MirrorPattern({
+    required this.label,
+    required this.headline,
+    required this.description,
+    required this.identified,
+  });
+
+  final String label;
+  final String headline;
+  final String description;
+  final bool identified;
 }
 
 String _mirrorDominantMood(List<CheckIn> items) {
@@ -2032,6 +2446,19 @@ String _mirrorDominantMood(List<CheckIn> items) {
   return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
 }
 
+int _mirrorUniqueDays(List<CheckIn> items) {
+  return items
+      .map(
+        (item) => DateTime(
+          item.createdAt.year,
+          item.createdAt.month,
+          item.createdAt.day,
+        ),
+      )
+      .toSet()
+      .length;
+}
+
 int _mirrorWeeklyCheckIns(List<CheckIn> items) {
   final now = DateTime.now();
   final start = DateTime(
@@ -2040,6 +2467,24 @@ int _mirrorWeeklyCheckIns(List<CheckIn> items) {
     now.day,
   ).subtract(const Duration(days: 6));
   return items.where((item) => !item.createdAt.isBefore(start)).length;
+}
+
+List<bool> _mirrorWeeklyActivity(List<CheckIn> items) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final days = items
+      .map(
+        (item) => DateTime(
+          item.createdAt.year,
+          item.createdAt.month,
+          item.createdAt.day,
+        ),
+      )
+      .toSet();
+  return List.generate(7, (index) {
+    final day = today.subtract(Duration(days: 6 - index));
+    return days.contains(day);
+  });
 }
 
 int _mirrorStreak(List<CheckIn> items) {
@@ -2081,6 +2526,105 @@ String _mirrorBestTimeWindow(List<CheckIn> items) {
     return 'tarde';
   }
   return 'noite';
+}
+
+_MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
+  if (items.length < 2) {
+    return const _MirrorPattern(
+      label: 'em formacao',
+      headline:
+          'Seu espelho ainda esta reunindo pontos suficientes para mostrar um padrao confiavel.',
+      description:
+          'Com mais alguns check-ins, o Evolua consegue perceber horarios, energia e emocoes recorrentes com mais clareza.',
+      identified: false,
+    );
+  }
+
+  final nightAnxiety = items
+      .where(
+        (item) =>
+            item.mood.toLowerCase().contains('ansi') &&
+            item.createdAt.hour >= 18,
+      )
+      .length;
+  if (nightAnxiety >= 2) {
+    return const _MirrorPattern(
+      label: 'ansiedade a noite',
+      headline: 'Voce tende a registrar mais ansiedade a noite.',
+      description:
+          'Esse pode ser um bom horario para reduzir estimulos, fazer uma pausa curta e escolher uma acao simples antes de dormir.',
+      identified: true,
+    );
+  }
+
+  final morning = items.where((item) => item.createdAt.hour < 12).toList();
+  final later = items.where((item) => item.createdAt.hour >= 12).toList();
+  final morningAverage = _mirrorAverageEnergy(morning);
+  final laterAverage = _mirrorAverageEnergy(later);
+  if (morning.length >= 2 &&
+      morningAverage != null &&
+      (laterAverage == null || morningAverage >= laterAverage + 0.5)) {
+    return const _MirrorPattern(
+      label: 'manha fortalece',
+      headline: 'Seus melhores dias aparecem quando faz check-in pela manha.',
+      description:
+          'Registrar cedo parece te ajudar a nomear o momento antes que o dia acelere. Vale manter esse ritual leve.',
+      identified: true,
+    );
+  }
+
+  final distinctMoods = items.map((item) => item.mood.toLowerCase()).toSet();
+  if (distinctMoods.length >= 3) {
+    return const _MirrorPattern(
+      label: 'nomeacao emocional',
+      headline: 'Voce evoluiu na capacidade de nomear emocoes.',
+      description:
+          'Seu historico mostra mais nuances emocionais. Isso e sinal de percepcao crescendo, nao de instabilidade.',
+      identified: true,
+    );
+  }
+
+  return const _MirrorPattern(
+    label: 'constancia em construcao',
+    headline: 'Um padrao emocional ja comeca a se formar.',
+    description:
+        'Continue registrando com honestidade. A leitura fica mais precisa quando o historico ganha ritmo.',
+    identified: true,
+  );
+}
+
+double? _mirrorAverageEnergy(List<CheckIn> items) {
+  if (items.isEmpty) {
+    return null;
+  }
+  return items.fold<int>(0, (sum, item) => sum + item.energyLevel) /
+      items.length;
+}
+
+String _mirrorWeeklySummary({
+  required int weeklyCheckIns,
+  required String dominantMood,
+  required double? averageEnergy,
+  required Trail? activeTrail,
+}) {
+  if (weeklyCheckIns == 0) {
+    return 'Esta tela vai ganhar vida conforme voce registra seus check-ins, reflexoes e passos nas trilhas.';
+  }
+  final energy = averageEnergy == null
+      ? 'energia ainda em leitura'
+      : 'energia media ${averageEnergy.toStringAsFixed(1)}/10';
+  final trailText = activeTrail == null
+      ? 'sem uma trilha ativa neste momento'
+      : 'com a trilha ${activeTrail.title} em movimento';
+  return 'Nesta semana, seu estado mais presente foi $dominantMood, com $energy, $trailText.';
+}
+
+String _mirrorLocalAiFallback(List<CheckIn> items) {
+  if (items.isEmpty) {
+    return 'Ainda nao ha historico suficiente para uma mensagem personalizada, mas o primeiro check-in ja cria um ponto de partida.';
+  }
+  final mood = _mirrorCapitalize(_mirrorDominantMood(items));
+  return 'Seu historico recente aponta para $mood. Um proximo passo simples e escolher uma pratica curta e observar como sua energia responde.';
 }
 
 String _mirrorCapitalize(String value) {
