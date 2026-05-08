@@ -224,10 +224,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             ? Column(
                 children: [
                   Expanded(
-                    child: _MobileSwipeRegion(
-                      onSwipeVelocity: _handleMobileSwipeVelocity,
-                      child: content,
-                    ),
+                    child: content,
                   ),
                   const SizedBox(height: 12),
                   PrimaryPanel(
