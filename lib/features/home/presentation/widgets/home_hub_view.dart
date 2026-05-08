@@ -32,6 +32,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenCommunity,
     required this.onOpenProfile,
     required this.onOpenEvolutionMirror,
+    required this.onOpenFutureMessages,
     required this.onOpenFutureMessage,
     required this.onOpenDailyRitual,
     required this.onOpenCheckIn,
@@ -52,6 +53,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenEvolutionMirror;
+  final VoidCallback onOpenFutureMessages;
   final ValueChanged<int> onOpenFutureMessage;
   final ValueChanged<String> onOpenDailyRitual;
   final VoidCallback onOpenCheckIn;
@@ -223,6 +225,16 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenNextStep: widget.onOpenTrails,
           onOpenReflection: widget.onOpenFeed,
         ),
+        const SizedBox(height: 14),
+        _ContextMiniCardsCarousel(
+          insight: latestInsight,
+          onOpenFutureMessages: widget.onOpenFutureMessages,
+          onOpenReflection: widget.onOpenFeed,
+          onOpenInsight: latestInsight == null
+              ? widget.onOpenCheckIn
+              : () => _openInsightSheet(latestInsight),
+          onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
+        ),
         if (showFutureMessage) ...[
           const SizedBox(height: 14),
           _FutureMessageReadyCard(
@@ -233,6 +245,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         const SizedBox(height: 18),
         _InsightBriefingCard(
           insight: latestInsight,
+          checkIn: latestCreatedCheckIn ?? recentItems.firstOrNull,
           onOpenFullAnalysis: latestInsight == null
               ? null
               : () => _openInsightSheet(latestInsight),
@@ -669,19 +682,16 @@ class _FutureMessageReadyCard extends StatelessWidget {
 class _InsightBriefingCard extends StatelessWidget {
   const _InsightBriefingCard({
     required this.insight,
+    required this.checkIn,
     required this.onOpenFullAnalysis,
   });
 
   final CheckInAiInsight? insight;
+  final CheckIn? checkIn;
   final VoidCallback? onOpenFullAnalysis;
 
   @override
   Widget build(BuildContext context) {
-    final riskColor = switch (insight?.riskLevel.toLowerCase()) {
-      'high' => AppColors.accentWarm,
-      'medium' => AppColors.accentGold,
-      _ => AppColors.accent,
-    };
     final summary = _summaryFromInsight(insight);
 
     return PrimaryPanel(
@@ -698,29 +708,30 @@ class _InsightBriefingCard extends StatelessWidget {
           ),
           if (insight != null) ...[
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _SoftChip(
-                  icon: Icons.psychology_alt_rounded,
-                  label: 'Risco ${insight!.riskLevel}',
-                  color: riskColor,
-                ),
-                if (insight!.fallbackUsed)
-                  _SoftChip(
-                    icon: Icons.shield_outlined,
-                    label: 'Modo seguro',
-                    color: context.evoluaColors.textSecondary,
-                  ),
-              ],
+            _InsightBullet(
+              label: 'Energia',
+              value: checkIn == null
+                  ? 'ultimo check-in'
+                  : '${checkIn!.energyLevel}/10',
             ),
-            const SizedBox(height: 14),
-            TextButton.icon(
-              onPressed: onOpenFullAnalysis,
-              icon: const Icon(Icons.open_in_full_rounded),
-              label: const Text('Ver analise completa'),
+            _InsightBullet(
+              label: 'Estado',
+              value: checkIn == null
+                  ? 'momento registrado'
+                  : _capitalize(checkIn!.mood),
+            ),
+            _InsightBullet(
+              label: 'Melhor resposta agora',
+              value: _compactText(insight!.suggestedAction, maxLength: 72),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onOpenFullAnalysis,
+                icon: const Icon(Icons.open_in_full_rounded),
+                label: const Text('Ver analise completa'),
+              ),
             ),
           ],
         ],
@@ -733,12 +744,220 @@ class _InsightBriefingCard extends StatelessWidget {
       return 'Depois do proximo check-in, a IA resume o momento e transforma a leitura em uma acao simples.';
     }
 
-    final text = insight.insight.trim();
-    if (text.length <= 180) {
+    return _compactText(_firstSentence(insight.insight), maxLength: 118);
+  }
+
+  String _firstSentence(String value) {
+    final text = value.trim();
+    if (text.isEmpty) {
+      return 'Seu momento atual pede uma acao simples e possivel.';
+    }
+
+    final stops = [
+      '.',
+      '!',
+      '?',
+    ].map(text.indexOf).where((index) => index >= 24).toList();
+    if (stops.isEmpty) {
       return text;
     }
 
-    return '${text.substring(0, 177).trimRight()}...';
+    stops.sort();
+    return text.substring(0, stops.first + 1);
+  }
+}
+
+class _InsightBullet extends StatelessWidget {
+  const _InsightBullet({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.accentWarm,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: TextStyle(
+                      color: context.evoluaColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(text: value),
+                ],
+              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContextMiniCardsCarousel extends StatelessWidget {
+  const _ContextMiniCardsCarousel({
+    required this.insight,
+    required this.onOpenFutureMessages,
+    required this.onOpenReflection,
+    required this.onOpenInsight,
+    required this.onOpenEvolutionMirror,
+  });
+
+  final CheckInAiInsight? insight;
+  final VoidCallback onOpenFutureMessages;
+  final VoidCallback onOpenReflection;
+  final VoidCallback onOpenInsight;
+  final VoidCallback onOpenEvolutionMirror;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = ResponsiveBreakpoints.isCompact(context);
+    final cardWidth = compact ? 168.0 : 190.0;
+    final cards = [
+      _ContextMiniCard(
+        width: cardWidth,
+        icon: Icons.mail_outline_rounded,
+        title: 'Carta para o futuro',
+        subtitle: 'Escreva ou leia uma mensagem sua.',
+        color: AppColors.accent,
+        onTap: onOpenFutureMessages,
+      ),
+      _ContextMiniCard(
+        width: cardWidth,
+        icon: Icons.edit_note_rounded,
+        title: 'Reflexao recente',
+        subtitle: 'Volte para o que voce sentiu.',
+        color: AppColors.accentWarm,
+        onTap: onOpenReflection,
+      ),
+      _ContextMiniCard(
+        width: cardWidth,
+        icon: Icons.bolt_rounded,
+        title: 'Insight rapido',
+        subtitle: insight == null
+            ? 'Faca um check-in para liberar.'
+            : 'Veja a leitura do momento.',
+        color: AppColors.accentGold,
+        onTap: onOpenInsight,
+      ),
+      _ContextMiniCard(
+        width: cardWidth,
+        icon: Icons.auto_graph_rounded,
+        title: 'Marco de evolucao',
+        subtitle: 'Compare seu agora com antes.',
+        color: AppColors.accent,
+        onTap: onOpenEvolutionMirror,
+      ),
+    ];
+
+    return Semantics(
+      label: 'Atalhos contextuais da Home',
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.none,
+        child: Row(
+          children: [
+            for (final (index, card) in cards.indexed) ...[
+              if (index > 0) const SizedBox(width: 10),
+              card,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContextMiniCard extends StatelessWidget {
+  const _ContextMiniCard({
+    required this.width,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final double width;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.42),
+              border: Border.all(
+                color: context.evoluaColors.outline.withValues(alpha: 0.58),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: color.withValues(alpha: 0.14),
+                  ),
+                  child: Icon(icon, color: color, size: 19),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1251,45 +1470,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _SoftChip extends StatelessWidget {
-  const _SoftChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: color.withValues(alpha: 0.14),
-        border: Border.all(color: color.withValues(alpha: 0.32)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 7),
-          Flexible(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _InsightPill extends StatelessWidget {
   const _InsightPill({
     required this.width,
@@ -1755,4 +1935,20 @@ String _capitalize(String value) {
     return '';
   }
   return trimmed[0].toUpperCase() + trimmed.substring(1).toLowerCase();
+}
+
+String _compactText(String value, {required int maxLength}) {
+  final text = value.trim();
+  if (text.length <= maxLength) {
+    return _stripTrailingSentenceMark(text);
+  }
+
+  final clipped = text.substring(0, maxLength).trimRight();
+  final lastSpace = clipped.lastIndexOf(' ');
+  final safeClip = lastSpace > 24 ? clipped.substring(0, lastSpace) : clipped;
+  return '${_stripTrailingSentenceMark(safeClip)}...';
+}
+
+String _stripTrailingSentenceMark(String value) {
+  return value.replaceFirst(RegExp(r'[.!?]+$'), '');
 }
