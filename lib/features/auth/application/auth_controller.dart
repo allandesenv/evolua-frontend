@@ -136,6 +136,19 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
+  Future<void> forgotPassword({required String email}) {
+    return ref.read(authRepositoryProvider).forgotPassword(email: email);
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) {
+    return ref
+        .read(authRepositoryProvider)
+        .resetPassword(token: token, newPassword: newPassword);
+  }
+
   Future<void> _syncGoogleProfile(AuthSession session) async {
     try {
       await ref

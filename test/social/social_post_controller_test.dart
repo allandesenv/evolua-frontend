@@ -1,11 +1,17 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/social_post.dart';
 import 'package:evolua_frontend/features/social/domain/repositories/social_post_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+const _sessionStorageKey = 'evolua.auth.session';
 
 void main() {
   group('SocialPostController offline cache', () {
@@ -48,6 +54,73 @@ void main() {
       },
     );
 
+    test('does not reuse cached posts from another authenticated user', () async {
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(
+          _session(userId: 'user-a', email: 'a@evolua.test').toJson(),
+        ),
+      });
+      final onlineContainer = ProviderContainer(
+        overrides: [
+          socialPostRepositoryProvider.overrideWithValue(
+            _FakeSocialPostRepository(result: _response(_posts())),
+          ),
+        ],
+      );
+      addTearDown(onlineContainer.dispose);
+      await onlineContainer.read(authControllerProvider.future);
+      final onlineState = await onlineContainer.read(
+        socialPostControllerProvider.future,
+      );
+      expect(onlineState.result.items, hasLength(2));
+
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        _sessionStorageKey,
+        jsonEncode(
+          _session(userId: 'user-b', email: 'b@evolua.test').toJson(),
+        ),
+      );
+      final offlineContainer = ProviderContainer(
+        overrides: [
+          socialPostRepositoryProvider.overrideWithValue(
+            _FakeSocialPostRepository(error: _networkError()),
+          ),
+        ],
+      );
+      addTearDown(offlineContainer.dispose);
+      await offlineContainer.read(authControllerProvider.future);
+
+      final offlineState = await offlineContainer.read(
+        socialPostControllerProvider.future,
+      );
+
+      expect(offlineState.isFromCache, isTrue);
+      expect(offlineState.result.items, isEmpty);
+      expect(
+        offlineState.offlineMessage,
+        contains('Nao encontramos reflexoes salvas'),
+      );
+    });
+
+    test('clears legacy and user-scoped offline cache keys', () async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.social_feed_cache.v1.old': 'legacy',
+        'evolua.social_feed_cache.v2.user-a.new': 'scoped',
+        'evolua.theme': 'preserve-me',
+      });
+      final preferences = await SharedPreferences.getInstance();
+
+      await SocialPostController.clearOfflineCacheFromPreferences(preferences);
+
+      expect(preferences.getString('evolua.social_feed_cache.v1.old'), isNull);
+      expect(
+        preferences.getString('evolua.social_feed_cache.v2.user-a.new'),
+        isNull,
+      );
+      expect(preferences.getString('evolua.theme'), 'preserve-me');
+    });
+
     test('returns friendly offline empty state when no cache exists', () async {
       SharedPreferences.setMockInitialValues({});
       final container = ProviderContainer(
@@ -69,6 +142,34 @@ void main() {
       );
     });
   });
+}
+
+AuthSession _session({required String userId, required String email}) {
+  return AuthSession(
+    userId: userId,
+    email: email,
+    roles: const ['ROLE_USER'],
+    accessToken: _jwt(userId: userId, email: email),
+    refreshToken: 'refresh-$userId',
+    expiresAt: DateTime.now().add(const Duration(hours: 1)),
+  );
+}
+
+String _jwt({required String userId, required String email}) {
+  String encode(Map<String, Object> value) {
+    return base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
+  }
+
+  final header = encode({'alg': 'none', 'typ': 'JWT'});
+  final payload = encode({
+    'sub': userId,
+    'email': email,
+    'roles': const ['ROLE_USER'],
+    'exp':
+        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
+        1000,
+  });
+  return '$header.$payload.signature';
 }
 
 class _FakeSocialPostRepository implements SocialPostRepository {

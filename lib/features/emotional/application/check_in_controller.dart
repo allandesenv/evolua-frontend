@@ -62,10 +62,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     final current = state.asData?.value;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(
-        await _fetch(page: current?.result.page ?? 0),
-        latestCreatedCheckIn: current?.latestCreatedCheckIn,
-      ),
+      () async {
+        final result = await _fetch(page: current?.result.page ?? 0);
+        return _stateFromResult(
+          result,
+          latestCreatedCheckIn: _canonicalLatestCheckIn(
+            result,
+            current?.latestCreatedCheckIn,
+          ),
+        );
+      },
     );
   }
 
@@ -85,10 +91,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(
-        await _fetch(page: 0),
-        latestCreatedCheckIn: latestCreatedCheckIn,
-      ),
+      () async {
+        final result = await _fetch(page: 0);
+        return _stateFromResult(
+          result,
+          latestCreatedCheckIn: _canonicalLatestCheckIn(
+            result,
+            latestCreatedCheckIn,
+          ),
+        );
+      },
     );
   }
 
@@ -102,10 +114,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(
-        await _fetch(page: 0),
-        latestCreatedCheckIn: latestCreatedCheckIn,
-      ),
+      () async {
+        final result = await _fetch(page: 0);
+        return _stateFromResult(
+          result,
+          latestCreatedCheckIn: _canonicalLatestCheckIn(
+            result,
+            latestCreatedCheckIn,
+          ),
+        );
+      },
     );
   }
 
@@ -113,10 +131,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () async => _stateFromResult(
-        await _fetch(page: page),
-        latestCreatedCheckIn: latestCreatedCheckIn,
-      ),
+      () async {
+        final result = await _fetch(page: page);
+        return _stateFromResult(
+          result,
+          latestCreatedCheckIn: _canonicalLatestCheckIn(
+            result,
+            latestCreatedCheckIn,
+          ),
+        );
+      },
     );
   }
 
@@ -158,9 +182,10 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(trailControllerProvider);
 
+      final result = await _fetch(page: 0);
       return _stateFromResult(
-        await _fetch(page: 0),
-        latestCreatedCheckIn: created,
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(result, created),
       );
     });
   }
@@ -194,6 +219,35 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       from: _from,
       to: _to,
     );
+  }
+
+  CheckIn? _canonicalLatestCheckIn(
+    PaginatedResponse<CheckIn> result,
+    CheckIn? fallback,
+  ) {
+    if (fallback != null) {
+      final listed = result.items
+          .where((item) => item.id == fallback.id)
+          .firstOrNull;
+      if (listed != null) {
+        return _preferMoreCompleteCheckIn(listed, fallback);
+      }
+    }
+
+    return fallback ?? result.items.firstOrNull;
+  }
+
+  CheckIn _preferMoreCompleteCheckIn(CheckIn listed, CheckIn fallback) {
+    if (listed.aiInsight != null && fallback.aiInsight == null) {
+      return listed;
+    }
+
+    if (listed.recommendedPractice.trim().isNotEmpty &&
+        fallback.recommendedPractice.trim().isEmpty) {
+      return listed;
+    }
+
+    return listed.createdAt.isAfter(fallback.createdAt) ? listed : fallback;
   }
 
   String? _normalizeText(String? value) {

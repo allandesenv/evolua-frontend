@@ -289,7 +289,7 @@ void main() {
     expect(find.text('Como anda meu ritmo?'), findsOneWidget);
   });
 
-  testWidgets('dashboard mobile swipe navigates between bottom tabs', (
+  testWidgets('dashboard mobile ignores swipe between bottom tabs', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -304,31 +304,19 @@ void main() {
     expect(find.text('Como anda meu ritmo?'), findsOneWidget);
 
     await _swipeDashboard(tester, -520);
+    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+    expect(find.byType(ContentModuleView), findsNothing);
+
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
     expect(find.byType(ContentModuleView), findsOneWidget);
 
     await _swipeDashboard(tester, -520);
-    expect(find.text('Em destaque'), findsOneWidget);
-
-    await _swipeDashboard(tester, -520);
-    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
-
-    await _swipeDashboard(tester, -520);
-    expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
-
-    await _swipeDashboard(tester, 520);
-    expect(find.text('Em destaque'), findsOneWidget);
-
-    await _swipeDashboard(tester, 520);
     expect(find.byType(ContentModuleView), findsOneWidget);
-
-    await _swipeDashboard(tester, 520);
-    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
-
-    await _swipeDashboard(tester, 520);
-    expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+    expect(find.text('Em destaque'), findsNothing);
   });
 
-  testWidgets('dashboard mobile back respects swipe navigation history', (
+  testWidgets('dashboard mobile back respects bottom navigation history', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -340,8 +328,10 @@ void main() {
     await tester.pumpWidget(_dashboardShell());
     await tester.pumpAndSettle();
 
-    await _swipeDashboard(tester, -520);
-    await _swipeDashboard(tester, -520);
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.pumpAndSettle();
     expect(find.text('Em destaque'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
@@ -1830,6 +1820,15 @@ class _FakeAuthRepository implements AuthRepository {
   Future<AuthSession> refresh({required String refreshToken}) async {
     return _testSession();
   }
+
+  @override
+  Future<void> forgotPassword({required String email}) async {}
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {}
 
   @override
   Future<void> register({

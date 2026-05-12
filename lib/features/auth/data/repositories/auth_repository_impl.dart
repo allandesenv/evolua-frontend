@@ -59,6 +59,25 @@ class AuthRepositoryImpl implements AuthRepository {
     return dto.toEntity();
   }
 
+  @override
+  Future<void> forgotPassword({required String email}) async {
+    await _dio.post<void>(
+      '/v1/public/auth/password/forgot',
+      data: {'email': email},
+    );
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _dio.post<void>(
+      '/v1/public/auth/password/reset',
+      data: {'token': token, 'newPassword': newPassword},
+    );
+  }
+
   Map<String, dynamic> _normalizePayload(dynamic data) {
     if (data is Map<String, dynamic>) {
       if (data['data'] is Map<String, dynamic>) {

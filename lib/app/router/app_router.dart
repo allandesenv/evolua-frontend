@@ -1,7 +1,9 @@
 import 'package:evolua_frontend/app/router/auth_router_notifier.dart';
+import 'package:evolua_frontend/features/auth/application/authenticated_session_reset.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/google_auth_callback_page.dart';
+import 'package:evolua_frontend/features/auth/presentation/pages/reset_password_page.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/presentation/pages/daily_ritual_page.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
@@ -12,6 +14,7 @@ import 'package:go_router/go_router.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authRouterNotifier = AuthRouterNotifier();
+  ref.watch(authenticatedSessionResetObserverProvider);
   authRouterNotifier.sync(ref.read(authControllerProvider));
   ref.listen(authControllerProvider, (previous, next) {
     final changed = authRouterNotifier.sync(next);
@@ -27,6 +30,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 GoRouter buildAppRouter({
   required AuthRouterNotifier authRouterNotifier,
   GoRouterWidgetBuilder? authPageBuilder,
+  GoRouterWidgetBuilder? resetPasswordPageBuilder,
   GoRouterWidgetBuilder? googleCallbackPageBuilder,
   GoRouterWidgetBuilder? homePageBuilder,
   GoRouterWidgetBuilder? checkInPageBuilder,
@@ -49,6 +53,13 @@ GoRouter buildAppRouter({
       GoRoute(
         path: '/auth',
         builder: authPageBuilder ?? (context, state) => const AuthPage(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder:
+            resetPasswordPageBuilder ??
+            (context, state) =>
+                ResetPasswordPage(token: state.uri.queryParameters['token']),
       ),
       GoRoute(
         path: '/auth/google/callback',
@@ -99,11 +110,13 @@ GoRouter buildAppRouter({
       }
 
       final goingToAuth = state.matchedLocation == '/auth';
+      final goingToResetPassword = state.matchedLocation == '/reset-password';
       final goingToGoogleCallback =
           state.matchedLocation == '/auth/google/callback';
 
       if (!authRouterNotifier.isAuthenticated &&
           !goingToAuth &&
+          !goingToResetPassword &&
           !goingToGoogleCallback) {
         return '/auth';
       }

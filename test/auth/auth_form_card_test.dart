@@ -144,10 +144,11 @@ void main() {
     );
 
     testWidgets(
-      'toggles password visibility and shows forgot password feedback',
+      'toggles password visibility and sends forgot password email',
       (tester) async {
         SharedPreferences.setMockInitialValues({});
-        await tester.pumpWidget(_testApp(repository: _FakeAuthRepository()));
+        final repository = _FakeAuthRepository();
+        await tester.pumpWidget(_testApp(repository: repository));
 
         final passwordField = find.byType(EditableText).last;
         expect(tester.widget<EditableText>(passwordField).obscureText, isTrue);
@@ -156,9 +157,18 @@ void main() {
         await tester.pump();
         expect(tester.widget<EditableText>(passwordField).obscureText, isFalse);
 
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Email'),
+          ' USER@Evolua.App ',
+        );
         await tester.tap(find.text('Esqueci minha senha'));
         await tester.pumpAndSettle();
-        expect(find.textContaining('recuperacao de senha'), findsOneWidget);
+        expect(find.text('Recuperar senha'), findsOneWidget);
+
+        await tester.tap(find.text('Enviar link'));
+        await tester.pumpAndSettle();
+        expect(repository.lastForgotPasswordEmail, 'user@evolua.app');
+        expect(find.textContaining('instrucoes de recuperacao'), findsOneWidget);
 
         final forgotButton = tester.widget<TextButton>(
           find.widgetWithText(TextButton, 'Esqueci minha senha'),
@@ -487,6 +497,9 @@ class _FakeAuthRepository implements AuthRepository {
   String? lastRegisterName;
   String? lastRegisterEmail;
   String? lastRegisterPassword;
+  String? lastForgotPasswordEmail;
+  String? lastResetToken;
+  String? lastResetPassword;
 
   @override
   Future<AuthSession> exchangeGoogleCode({required String code}) async {
@@ -511,6 +524,20 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<AuthSession> refresh({required String refreshToken}) async {
     return _testSession();
+  }
+
+  @override
+  Future<void> forgotPassword({required String email}) async {
+    lastForgotPasswordEmail = email;
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    lastResetToken = token;
+    lastResetPassword = newPassword;
   }
 
   @override

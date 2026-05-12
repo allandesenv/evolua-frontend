@@ -262,6 +262,15 @@ class _FakeAuthRepository implements AuthRepository {
     }
     return refreshSession ?? _testSession();
   }
+
+  @override
+  Future<void> forgotPassword({required String email}) async {}
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {}
 }
 
 class _QueuedAdapter implements HttpClientAdapter {
