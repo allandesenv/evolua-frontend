@@ -32,6 +32,9 @@ void main() {
             authRepositoryProvider.overrideWithValue(
               _FakeAuthRepository(googleSession: session),
             ),
+            authSessionStorageProvider.overrideWithValue(
+              _SharedPreferencesAuthSessionStorage(),
+            ),
             profileRepositoryProvider.overrideWithValue(
               _FakeProfileRepository(),
             ),
@@ -53,6 +56,9 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(
               _FakeAuthRepository(googleSession: session),
+            ),
+            authSessionStorageProvider.overrideWithValue(
+              _SharedPreferencesAuthSessionStorage(),
             ),
             profileRepositoryProvider.overrideWithValue(
               _FakeProfileRepository(),
@@ -77,6 +83,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(
             _FakeAuthRepository(googleSession: _testSession()),
+          ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
           ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         ],
@@ -117,6 +126,9 @@ void main() {
           authRepositoryProvider.overrideWithValue(
             _FakeAuthRepository(googleSession: session),
           ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         ],
       );
@@ -153,6 +165,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(
             _FakeAuthRepository(googleSession: session),
+          ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
           ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         ],
@@ -215,6 +230,9 @@ void main() {
           authRepositoryProvider.overrideWithValue(
             _FakeAuthRepository(googleSession: session),
           ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         ],
       );
@@ -262,6 +280,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(
             _FakeAuthRepository(googleSession: session),
+          ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
           ),
           profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         ],
@@ -407,6 +428,9 @@ void main() {
             authRepositoryProvider.overrideWithValue(
               _FakeAuthRepository(googleSession: session),
             ),
+            authSessionStorageProvider.overrideWithValue(
+              _SharedPreferencesAuthSessionStorage(),
+            ),
             profileRepositoryProvider.overrideWithValue(profileRepository),
           ],
         );
@@ -489,6 +513,9 @@ Future<GoRouter> _pumpGoogleCallbackScenario(
       authRepositoryProvider.overrideWithValue(
         repository ?? _FakeAuthRepository(googleSession: _testSession()),
       ),
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
     ],
   );
@@ -526,6 +553,26 @@ class _PlaceholderPage extends StatelessWidget {
   }
 }
 
+class _SharedPreferencesAuthSessionStorage implements AuthSessionStorage {
+  @override
+  Future<String?> read() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_sessionStorageKey);
+  }
+
+  @override
+  Future<void> write(String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_sessionStorageKey, value);
+  }
+
+  @override
+  Future<void> clear() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_sessionStorageKey);
+  }
+}
+
 typedef _ExchangeHandler = Future<AuthSession> Function(String code);
 
 class _FakeAuthRepository implements AuthRepository {
@@ -551,6 +598,11 @@ class _FakeAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
+    return googleSession;
+  }
+
+  @override
+  Future<AuthSession> refresh({required String refreshToken}) async {
     return googleSession;
   }
 
