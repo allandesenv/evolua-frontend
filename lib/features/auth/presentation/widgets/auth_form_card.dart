@@ -198,13 +198,41 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     }
   }
 
-  void _handleForgotPassword() {
-    AppSnackBar.show(
-      context,
-      message:
-          'A recuperacao de senha sera enviada para seu email quando estiver disponivel.',
-      icon: Icons.info_outline_rounded,
+  Future<void> _handleForgotPassword() async {
+    final email = await showDialog<String>(
+      context: context,
+      builder: (context) => _ForgotPasswordDialog(
+        initialEmail: normalizeEmail(_emailController.text),
+      ),
     );
+    if (email == null || email.isEmpty || !mounted) {
+      return;
+    }
+
+    try {
+      await ref.read(authControllerProvider.notifier).forgotPassword(email: email);
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message:
+            'Se este email estiver cadastrado, enviaremos as instrucoes de recuperacao.',
+        icon: Icons.mark_email_unread_rounded,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: extractApiErrorMessage(
+          error,
+          fallback: 'Nao foi possivel solicitar a recuperacao agora.',
+        ),
+        icon: Icons.info_outline_rounded,
+      );
+    }
   }
 
   Future<void> _pickBirthDate() async {
@@ -469,6 +497,83 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    Navigator.of(context).pop(normalizeEmail(_emailController.text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Recuperar senha'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Informe seu email de acesso. Se ele estiver cadastrado, enviaremos um link para criar uma nova senha.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _emailController,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.alternate_email_rounded),
+              ),
+              validator: validateEmail,
+              onFieldSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.mark_email_unread_rounded),
+          label: const Text('Enviar link'),
+        ),
+      ],
     );
   }
 }

@@ -50,7 +50,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _mirrorIndex = 3;
   static const _profileIndex = 4;
   static const _mentorIndex = 5;
-  static const _swipeVelocityThreshold = 350.0;
 
   _DashboardLocation _currentLocation() {
     return _DashboardLocation(
@@ -142,25 +141,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         _selectedIndex = 0;
       }
     });
-  }
-
-  void _handleMobileSwipeVelocity(double velocity) {
-    if (_selectedIndex < 0 || _selectedIndex >= _destinations.length) {
-      return;
-    }
-
-    if (velocity.abs() < _swipeVelocityThreshold) {
-      return;
-    }
-
-    if (velocity < 0 && _selectedIndex < _destinations.length - 1) {
-      _goTo(_selectedIndex + 1);
-      return;
-    }
-
-    if (velocity > 0 && _selectedIndex > 0) {
-      _goTo(_selectedIndex - 1);
-    }
   }
 
   @override
