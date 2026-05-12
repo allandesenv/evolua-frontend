@@ -3,7 +3,7 @@ class AppConfig {
 
   static const apiBaseUrl = String.fromEnvironment(
     'EVOLUA_API_BASE_URL',
-    defaultValue: 'http://192.168.0.42:8080',
+    defaultValue: 'http://localhost:8080',
   );
 
   static const authBaseUrl = String.fromEnvironment(
