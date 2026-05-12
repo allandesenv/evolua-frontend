@@ -165,6 +165,72 @@ void main() {
       expect(find.text(longInsight), findsOneWidget);
     });
 
+    testWidgets('updates intelligent reading after check-in creation', (
+      tester,
+    ) async {
+      final repository = _MutableCheckInRepository(
+        initialItems: const <CheckIn>[],
+        created: CheckIn(
+          id: 77,
+          userId: 'user-123',
+          mood: 'ansioso',
+          reflection: '',
+          energyLevel: 6,
+          recommendedPractice: '',
+          aiInsight: null,
+          createdAt: DateTime(2026, 5, 7, 9),
+        ),
+        listedAfterCreate: [
+          CheckIn(
+            id: 77,
+            userId: 'user-123',
+            mood: 'ansioso',
+            reflection: '',
+            energyLevel: 6,
+            recommendedPractice: 'Desacelerar',
+            aiInsight: _insight(
+              insight: 'Seu momento atual pede reducao de carga.',
+            ),
+            createdAt: DateTime(2026, 5, 7, 9),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          now: DateTime(2026, 5, 7, 13),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Depois do proximo check-in'),
+        findsOneWidget,
+      );
+
+      final context = tester.element(find.byType(HomeHubView));
+      final container = ProviderScope.containerOf(context);
+      await container.read(checkInControllerProvider.notifier).create(
+            mood: 'ansioso',
+            reflection: null,
+            energyLevel: 6,
+          );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Seu momento atual pede reducao de carga'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Energia: 6/10', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Estado: Ansioso', findRichText: true),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('shows contextual mini cards and opens direct actions', (
       tester,
     ) async {
@@ -605,6 +671,54 @@ class _FakeCheckInRepository implements CheckInRepository {
       aiInsight: _insight(),
       createdAt: DateTime.now(),
     );
+  }
+}
+
+class _MutableCheckInRepository implements CheckInRepository {
+  _MutableCheckInRepository({
+    required List<CheckIn> initialItems,
+    required this.created,
+    required this.listedAfterCreate,
+  }) : _items = initialItems;
+
+  List<CheckIn> _items;
+  final CheckIn created;
+  final List<CheckIn> listedAfterCreate;
+
+  @override
+  Future<PaginatedResponse<CheckIn>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    return PaginatedResponse(
+      items: _items,
+      page: page,
+      size: size,
+      totalItems: _items.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      filters: const {},
+    );
+  }
+
+  @override
+  Future<CheckIn> create({
+    required String mood,
+    String? reflection,
+    required int energyLevel,
+  }) async {
+    _items = listedAfterCreate;
+    return created;
   }
 }
 

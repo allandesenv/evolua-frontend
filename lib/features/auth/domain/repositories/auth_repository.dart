@@ -12,4 +12,11 @@ abstract class AuthRepository {
   Future<AuthSession> exchangeGoogleCode({required String code});
 
   Future<AuthSession> refresh({required String refreshToken});
+
+  Future<void> forgotPassword({required String email});
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  });
 }

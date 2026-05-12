@@ -11,6 +11,7 @@ import 'package:evolua_frontend/features/social/application/social_feed_state.da
 import 'package:evolua_frontend/features/social/domain/entities/social_post.dart';
 import 'package:evolua_frontend/features/social/domain/repositories/social_post_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final socialPostRepositoryProvider = Provider<SocialPostRepository>((ref) {
   final dio = ref.watch(authenticatedDioProvider(AppConfig.socialBaseUrl));
@@ -24,11 +25,33 @@ final socialPostControllerProvider =
 
 class SocialPostController extends AsyncNotifier<SocialFeedState> {
   static const _pageSize = 4;
-  static const _cachePrefix = 'evolua.social_feed_cache.v1';
+  static const _legacyCachePrefix = 'evolua.social_feed_cache.v1';
+  static const _cachePrefix = 'evolua.social_feed_cache.v2';
   String? _search;
   String? _community;
   String? _visibility;
   bool? _mine;
+
+  static Future<void> clearOfflineCache(Ref ref) async {
+    final preferences = await ref.read(sharedPreferencesProvider.future);
+    await clearOfflineCacheFromPreferences(preferences);
+  }
+
+  static Future<void> clearOfflineCacheFromPreferences(
+    SharedPreferences preferences,
+  ) async {
+    final keys = preferences
+        .getKeys()
+        .where(
+          (key) =>
+              key.startsWith(_legacyCachePrefix) ||
+              key.startsWith(_cachePrefix),
+        )
+        .toList();
+    for (final key in keys) {
+      await preferences.remove(key);
+    }
+  }
 
   @override
   Future<SocialFeedState> build() async {
@@ -83,7 +106,10 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
     const sortBy = 'createdAt';
     const sortDir = 'desc';
     final filters = _filters();
+    final userId =
+        ref.read(authControllerProvider).asData?.value?.userId ?? 'anonymous';
     final key = _cacheKey(
+      userId: userId,
       page: page,
       size: _pageSize,
       sortBy: sortBy,
@@ -134,6 +160,7 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
   }
 
   String _cacheKey({
+    required String userId,
     required int page,
     required int size,
     required String sortBy,
@@ -143,6 +170,7 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
     final encoded = base64Url.encode(
       utf8.encode(
         jsonEncode({
+          'userId': userId,
           'page': page,
           'size': size,
           'sortBy': sortBy,
@@ -151,7 +179,7 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
         }),
       ),
     );
-    return '$_cachePrefix.$encoded';
+    return '$_cachePrefix.$userId.$encoded';
   }
 
   Future<void> _writeCache(
