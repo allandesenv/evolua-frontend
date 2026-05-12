@@ -337,6 +337,11 @@ class _DailyRitualResult extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          _RitualIntentionHighlight(
+            title: copy.resultCarryTitle,
+            intention: ritual.intention,
+          ),
+          const SizedBox(height: 16),
           _ResultRow(label: 'Estado emocional', value: ritual.emotionalState),
           _ResultRow(label: 'Necessidade do dia', value: ritual.dayNeed),
           _ResultRow(label: 'Intencao escolhida', value: ritual.intention),
@@ -346,6 +351,49 @@ class _DailyRitualResult extends StatelessWidget {
             onPressed: () => context.go('/home'),
             icon: const Icon(Icons.home_rounded),
             label: const Text('Voltar para Inicio'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RitualIntentionHighlight extends StatelessWidget {
+  const _RitualIntentionHighlight({
+    required this.title,
+    required this.intention,
+  });
+
+  final String title;
+  final String intention;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.accent.withValues(alpha: 0.14),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            intention,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),
@@ -411,12 +459,14 @@ class _DailyRitualCopy {
     required this.title,
     required this.description,
     required this.resultTitle,
+    required this.resultCarryTitle,
     required this.questions,
   });
 
   final String title;
   final String description;
   final String resultTitle;
+  final String resultCarryTitle;
   final List<String> questions;
 
   static _DailyRitualCopy forType(String type) {
@@ -426,6 +476,7 @@ class _DailyRitualCopy {
         description:
             'Uma pausa curta para revisar o que pesou, reconhecer o que foi bom e soltar o que nao precisa carregar.',
         resultTitle: 'Seu fechamento de hoje esta pronto',
+        resultCarryTitle: 'Guarde isso do seu dia',
         questions: [
           'Como voce esta agora?',
           'O que voce mais precisa soltar hoje?',
@@ -439,6 +490,7 @@ class _DailyRitualCopy {
       description:
           'Uma pausa curta para perceber como voce esta, escolher uma intencao e definir um pequeno passo possivel para hoje.',
       resultTitle: 'Seu ritual de hoje esta pronto',
+      resultCarryTitle: 'Leve isso com voce hoje',
       questions: [
         'Como voce esta agora?',
         'O que voce mais precisa hoje?',

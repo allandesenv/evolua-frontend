@@ -110,8 +110,131 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(persistedInsight), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Leitura recuperada do historico salvo no servidor',
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('Depois do proximo check-in'), findsNothing);
+    });
+
+    testWidgets('shows compact intelligent reading bullets on Home', (
+      tester,
+    ) async {
+      const longInsight =
+          'Seu momento atual pede reducao de carga e foco em uma unica acao simples. Este segundo bloco fica guardado para a analise completa.';
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: _FakeCheckInRepository(
+            items: [
+              CheckIn(
+                id: 31,
+                userId: 'user-123',
+                mood: 'tensao relevante',
+                reflection: 'muitas frentes abertas',
+                energyLevel: 7,
+                recommendedPractice: 'Desacelerar por dois minutos.',
+                aiInsight: _insight(insight: longInsight),
+                createdAt: DateTime(2026, 5, 7, 9),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(longInsight), findsNothing);
+      expect(
+        find.textContaining('Energia: 7/10', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Estado: Tensao relevante', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Melhor resposta agora:', findRichText: true),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(find.text('Ver analise completa'));
+      await tester.tap(find.text('Ver analise completa'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(longInsight), findsOneWidget);
+    });
+
+    testWidgets('shows contextual mini cards and opens direct actions', (
+      tester,
+    ) async {
+      var openedFutureMessages = false;
+      var openedReflections = false;
+      var openedMirror = false;
+
+      await tester.pumpWidget(
+        _testApp(
+          onOpenFutureMessages: () => openedFutureMessages = true,
+          onOpenFeed: () => openedReflections = true,
+          onOpenEvolutionMirror: () => openedMirror = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Carta para o futuro'), findsOneWidget);
+      expect(find.text('Reflexao recente'), findsOneWidget);
+      expect(find.text('Insight rapido'), findsOneWidget);
+      expect(find.text('Marco de evolucao'), findsOneWidget);
+
+      await tester.tap(find.text('Carta para o futuro'));
+      await tester.tap(find.text('Reflexao recente'));
+      await tester.tap(find.text('Marco de evolucao'));
+      await tester.pumpAndSettle();
+
+      expect(openedFutureMessages, isTrue);
+      expect(openedReflections, isTrue);
+      expect(openedMirror, isTrue);
+    });
+
+    testWidgets('insight mini card opens analysis when insight exists', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Insight rapido'));
+      await tester.pumpAndSettle();
+      expect(find.text('Analise completa'), findsOneWidget);
+    });
+
+    testWidgets('insight mini card opens check-in when insight is missing', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: _FakeCheckInRepository(
+            items: [
+              CheckIn(
+                id: 32,
+                userId: 'user-123',
+                mood: 'calmo',
+                reflection: 'sem insight ainda',
+                energyLevel: 7,
+                recommendedPractice: 'Respirar.',
+                aiInsight: null,
+                createdAt: DateTime(2026, 5, 7, 9),
+              ),
+            ],
+          ),
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Insight rapido'));
+      await tester.pumpAndSettle();
+      expect(openedCheckIn, isTrue);
     });
 
     testWidgets('shows morning ritual entry point first', (tester) async {
@@ -385,7 +508,9 @@ Widget _testApp({
   DateTime? now,
   VoidCallback? onOpenTrails,
   VoidCallback? onOpenFeed,
+  VoidCallback? onOpenCommunity,
   VoidCallback? onOpenEvolutionMirror,
+  VoidCallback? onOpenFutureMessages,
   ValueChanged<String>? onOpenDailyRitual,
   VoidCallback? onOpenCheckIn,
 }) {
@@ -419,9 +544,10 @@ Widget _testApp({
             now: now,
             onOpenTrails: onOpenTrails ?? () {},
             onOpenFeed: onOpenFeed ?? () {},
-            onOpenCommunity: () {},
+            onOpenCommunity: onOpenCommunity ?? () {},
             onOpenProfile: () {},
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
+            onOpenFutureMessages: onOpenFutureMessages ?? () {},
             onOpenFutureMessage: (_) {},
             onOpenDailyRitual: onOpenDailyRitual ?? (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},

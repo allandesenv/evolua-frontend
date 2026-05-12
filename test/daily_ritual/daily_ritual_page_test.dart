@@ -25,9 +25,10 @@ void main() {
     await _answerStep(tester, 'pausar antes de reagir', submit: true);
 
     expect(find.text('Seu ritual de hoje esta pronto'), findsOneWidget);
+    expect(find.text('Leve isso com voce hoje'), findsOneWidget);
     expect(find.text('calmo'), findsOneWidget);
     expect(find.text('clareza'), findsOneWidget);
-    expect(find.text('agir com calma'), findsOneWidget);
+    expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
     expect(find.text('pausar antes de reagir'), findsOneWidget);
   });
 
@@ -43,7 +44,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Seu fechamento de hoje esta pronto'), findsOneWidget);
-    expect(find.text('agir com calma'), findsOneWidget);
+    expect(find.text('Guarde isso do seu dia'), findsOneWidget);
+    expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
     expect(find.text('Comecar agora'), findsNothing);
   });
 }

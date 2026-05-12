@@ -7,7 +7,9 @@ import 'package:evolua_frontend/features/auth/data/repositories/auth_repository_
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _sessionStorageKey = 'evolua.auth.session';
@@ -16,6 +18,10 @@ final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
   ref,
 ) async {
   return SharedPreferences.getInstance();
+});
+
+final authSessionStorageProvider = Provider<AuthSessionStorage>((ref) {
+  return DefaultAuthSessionStorage(ref);
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -39,42 +45,38 @@ final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession?>(AuthController.new);
 
 class AuthController extends AsyncNotifier<AuthSession?> {
+  Future<AuthSession?>? _refreshInFlight;
+
   @override
   Future<AuthSession?> build() async {
-    final preferences = await ref.watch(sharedPreferencesProvider.future);
-    final rawSession = preferences.getString(_sessionStorageKey);
+    final storage = ref.watch(authSessionStorageProvider);
+    final session = await _readStoredSession(storage);
 
-    if (rawSession == null || rawSession.isEmpty) {
+    if (session == null) {
       return null;
     }
 
-    try {
-      final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
-      final session = AuthSession.fromJson(decoded);
-
-      if (session.isExpired) {
-        await preferences.remove(_sessionStorageKey);
-        return null;
-      }
-
+    if (!session.isExpired) {
       return session;
-    } catch (_) {
-      await preferences.remove(_sessionStorageKey);
-      return null;
     }
+
+    final future = _refreshStoredSession(session, updateState: false);
+    _refreshInFlight = future;
+    future.whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
+    });
+    return future;
   }
 
   Future<void> login({required String email, required String password}) async {
     final repository = ref.read(authRepositoryProvider);
-    final preferences = await ref.read(sharedPreferencesProvider.future);
 
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final session = await repository.login(email: email, password: password);
-      await preferences.setString(
-        _sessionStorageKey,
-        jsonEncode(session.toJson()),
-      );
+      await _saveSession(session);
       return session;
     });
   }
@@ -88,7 +90,6 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     required String password,
   }) async {
     final repository = ref.read(authRepositoryProvider);
-    final preferences = await ref.read(sharedPreferencesProvider.future);
     await repository.register(
       email: email,
       password: password,
@@ -97,10 +98,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
 
     state = const AsyncLoading();
     final session = await repository.login(email: email, password: password);
-    await preferences.setString(
-      _sessionStorageKey,
-      jsonEncode(session.toJson()),
-    );
+    await _saveSession(session);
     state = AsyncData(session);
 
     try {
@@ -124,15 +122,11 @@ class AuthController extends AsyncNotifier<AuthSession?> {
 
   Future<void> completeGoogleLogin({required String code}) async {
     final repository = ref.read(authRepositoryProvider);
-    final preferences = await ref.read(sharedPreferencesProvider.future);
 
     state = const AsyncLoading();
     final nextState = await AsyncValue.guard(() async {
       final session = await repository.exchangeGoogleCode(code: code);
-      await preferences.setString(
-        _sessionStorageKey,
-        jsonEncode(session.toJson()),
-      );
+      await _saveSession(session);
       return session;
     });
 
@@ -160,9 +154,177 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
+  Future<AuthSession?> refreshSession() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _refreshCurrentSession();
+    _refreshInFlight = future;
+    future.whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
+    });
+    return future;
+  }
+
+  Future<AuthSession?> _refreshCurrentSession() async {
+    final storage = ref.read(authSessionStorageProvider);
+    final current = state.asData?.value ?? await _readStoredSession(storage);
+    return _refreshStoredSession(current);
+  }
+
+  Future<AuthSession?> _refreshStoredSession(
+    AuthSession? session, {
+    bool updateState = true,
+  }) async {
+    final refreshToken = session?.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await _clearSession();
+      if (updateState) {
+        state = const AsyncData(null);
+      }
+      return null;
+    }
+
+    try {
+      final refreshed = await ref
+          .read(authRepositoryProvider)
+          .refresh(refreshToken: refreshToken);
+      await _saveSession(refreshed);
+      if (updateState) {
+        state = AsyncData(refreshed);
+      }
+      return refreshed;
+    } catch (_) {
+      await _clearSession();
+      if (updateState) {
+        state = const AsyncData(null);
+      }
+      return null;
+    }
+  }
+
+  Future<AuthSession?> _readStoredSession(AuthSessionStorage storage) async {
+    final rawSession = await storage.read();
+    if (rawSession == null || rawSession.isEmpty) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
+      return AuthSession.fromJson(decoded);
+    } catch (_) {
+      await storage.clear();
+      return null;
+    }
+  }
+
+  Future<void> _saveSession(AuthSession session) async {
+    await ref
+        .read(authSessionStorageProvider)
+        .write(jsonEncode(session.toJson()));
+  }
+
+  Future<void> _clearSession() async {
+    await ref.read(authSessionStorageProvider).clear();
+  }
+
   Future<void> logout() async {
-    final preferences = await ref.read(sharedPreferencesProvider.future);
-    await preferences.remove(_sessionStorageKey);
+    await _clearSession();
     state = const AsyncData(null);
+  }
+}
+
+abstract class AuthSessionStorage {
+  Future<String?> read();
+
+  Future<void> write(String value);
+
+  Future<void> clear();
+}
+
+class DefaultAuthSessionStorage implements AuthSessionStorage {
+  DefaultAuthSessionStorage(this._ref, {FlutterSecureStorage? secureStorage})
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+
+  final Ref _ref;
+  final FlutterSecureStorage _secureStorage;
+
+  bool get _shouldUseSecureStorage {
+    if (kIsWeb) {
+      return false;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  @override
+  Future<String?> read() async {
+    if (_shouldUseSecureStorage) {
+      final secureValue = await _readSecure();
+      if (secureValue != null && secureValue.isNotEmpty) {
+        return secureValue;
+      }
+    }
+
+    final preferences = await _ref.read(sharedPreferencesProvider.future);
+    final fallbackValue = preferences.getString(_sessionStorageKey);
+    if (_shouldUseSecureStorage &&
+        fallbackValue != null &&
+        fallbackValue.isNotEmpty) {
+      await write(fallbackValue);
+    }
+    return fallbackValue;
+  }
+
+  @override
+  Future<void> write(String value) async {
+    if (_shouldUseSecureStorage && await _writeSecure(value)) {
+      final preferences = await _ref.read(sharedPreferencesProvider.future);
+      await preferences.remove(_sessionStorageKey);
+      return;
+    }
+
+    final preferences = await _ref.read(sharedPreferencesProvider.future);
+    await preferences.setString(_sessionStorageKey, value);
+  }
+
+  @override
+  Future<void> clear() async {
+    if (_shouldUseSecureStorage) {
+      await _deleteSecure();
+    }
+
+    final preferences = await _ref.read(sharedPreferencesProvider.future);
+    await preferences.remove(_sessionStorageKey);
+  }
+
+  Future<String?> _readSecure() async {
+    try {
+      return await _secureStorage.read(key: _sessionStorageKey);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<bool> _writeSecure(String value) async {
+    try {
+      await _secureStorage.write(key: _sessionStorageKey, value: value);
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _deleteSecure() async {
+    try {
+      await _secureStorage.delete(key: _sessionStorageKey);
+    } on Object {
+      return;
+    }
   }
 }

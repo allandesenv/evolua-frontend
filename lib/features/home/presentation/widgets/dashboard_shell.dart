@@ -144,12 +144,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
-  void _handleMobileSwipe(DragEndDetails details) {
+  void _handleMobileSwipeVelocity(double velocity) {
     if (_selectedIndex < 0 || _selectedIndex >= _destinations.length) {
       return;
     }
 
-    final velocity = details.primaryVelocity ?? 0;
     if (velocity.abs() < _swipeVelocityThreshold) {
       return;
     }
@@ -225,11 +224,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             ? Column(
                 children: [
                   Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onHorizontalDragEnd: _handleMobileSwipe,
-                      child: content,
-                    ),
+                    child: content,
                   ),
                   const SizedBox(height: 12),
                   PrimaryPanel(
@@ -492,6 +487,7 @@ class _DashboardContent extends ConsumerWidget {
             onOpenProfileSection(ProfileModuleSection.overview),
         onOpenEvolutionMirror: () =>
             onOpenProfileSection(ProfileModuleSection.evolutionMirror),
+        onOpenFutureMessages: () => context.push('/future-messages'),
         onOpenFutureMessage: (id) => context.push('/future-messages/$id'),
         onOpenDailyRitual: (type) => context.push(
           '/daily-ritual?type=${type == 'EVENING' ? 'evening' : 'morning'}',
@@ -683,6 +679,57 @@ Widget? _buildDesktopSubmenu(
           .toList(),
     ),
   );
+}
+
+class _MobileSwipeRegion extends StatefulWidget {
+  const _MobileSwipeRegion({
+    required this.child,
+    required this.onSwipeVelocity,
+  });
+
+  final Widget child;
+  final ValueChanged<double> onSwipeVelocity;
+
+  @override
+  State<_MobileSwipeRegion> createState() => _MobileSwipeRegionState();
+}
+
+class _MobileSwipeRegionState extends State<_MobileSwipeRegion> {
+  Offset? _startPosition;
+  DateTime? _startTime;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        _startPosition = event.position;
+        _startTime = DateTime.now();
+      },
+      onPointerUp: (event) {
+        final start = _startPosition;
+        final startTime = _startTime;
+        _startPosition = null;
+        _startTime = null;
+        if (start == null || startTime == null) {
+          return;
+        }
+
+        final delta = event.position - start;
+        if (delta.dx.abs() < 80 || delta.dx.abs() < delta.dy.abs() * 1.2) {
+          return;
+        }
+
+        final elapsedMs = DateTime.now().difference(startTime).inMilliseconds;
+        if (elapsedMs <= 0) {
+          return;
+        }
+
+        widget.onSwipeVelocity(delta.dx / (elapsedMs / 1000));
+      },
+      child: widget.child,
+    );
+  }
 }
 
 class _ProfileArea extends StatelessWidget {
