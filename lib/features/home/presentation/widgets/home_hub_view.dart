@@ -12,6 +12,7 @@ import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -74,7 +75,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       isScrollControlled: true,
       backgroundColor: context.evoluaColors.surface,
       builder: (context) => _BriefingBottomSheet(
-        title: 'Analise completa',
+        title: 'Análise completa',
         child: CheckInAiInsightCard(
           insight: insight,
           onOpenTrails: () {
@@ -98,7 +99,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     try {
       final rewarded = await ref
           .read(rewardedAdServiceProvider)
-          .showRewardedAd(rewardType: 'AI_ACTION');
+          .showRewardedAd(rewardType: 'DEEP_EMOTIONAL_READING');
       if (!mounted) {
         return;
       }
@@ -109,8 +110,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       AppSnackBar.show(
         context,
         message: rewarded
-            ? 'Credito extra de IA liberado. Faca um novo check-in quando quiser.'
-            : 'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.',
+            ? 'Crédito extra de IA liberado. Faça um novo check-in quando quiser.'
+            : 'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.',
         icon: rewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
@@ -122,7 +123,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       AppSnackBar.show(
         context,
         message:
-            'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
+            'Não foi possível carregar o anúncio agora. Tente novamente em instantes.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -162,6 +163,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final recentItems = result?.items ?? const <CheckIn>[];
     final latestCreatedCheckIn =
         checkInState.asData?.value.latestCreatedCheckIn;
+    final isInsightPending =
+        checkInState.asData?.value.isLatestInsightPending ?? false;
+    final isInsightUnavailable =
+        checkInState.asData?.value.isLatestInsightUnavailable ?? false;
     final latestInsight =
         latestCreatedCheckIn?.aiInsight ??
         recentItems
@@ -178,10 +183,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       _ when currentJourney != null => currentJourney.title,
       0 => 'Monte sua primeira trilha pessoal',
       _ when widget.checkInsCount == 0 =>
-        'Registre como voce esta para receber a direcao do dia',
+        'Registre como você está para receber a direção do dia',
       _ when widget.postsCount == 0 =>
         'Encontre uma reflexao curta para o seu momento',
-      _ => 'Respiracao guiada',
+      _ => 'Respiração guiada',
     };
     final paceAction = switch (widget.trailsCount) {
       _ when currentJourney != null => widget.onOpenTrails,
@@ -246,6 +251,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         _InsightBriefingCard(
           insight: latestInsight,
           checkIn: latestCreatedCheckIn ?? recentItems.firstOrNull,
+          isLoading: isInsightPending,
+          isUnavailable: isInsightUnavailable,
           onOpenFullAnalysis: latestInsight == null
               ? null
               : () => _openInsightSheet(latestInsight),
@@ -257,7 +264,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           description:
               currentJourney?.summary ??
               latestInsight?.suggestedAction ??
-              'Uma unica acao agora vale mais do que abrir muitas frentes ao mesmo tempo.',
+              'Uma única ação agora vale mais do que abrir muitas frentes ao mesmo tempo.',
           meta: paceMeta,
           buttonLabel: paceButtonLabel,
           onPrimaryAction: paceAction,
@@ -316,6 +323,7 @@ class _DailyJourneyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final model = _DailyJourneyCardModel.from(
+      context: context,
       displayName: displayName,
       now: now,
       morningRitual: morningRitual,
@@ -327,7 +335,7 @@ class _DailyJourneyCard extends StatelessWidget {
     );
 
     return PrimaryPanel(
-      semanticLabel: 'Jornada Diaria',
+      semanticLabel: 'Jornada Diária',
       padding: const EdgeInsets.all(18),
       child: compact
           ? Column(
@@ -529,6 +537,7 @@ class _DailyJourneyCardModel {
   final DailyRitual? ritual;
 
   static _DailyJourneyCardModel from({
+    required BuildContext context,
     required String? displayName,
     required DateTime now,
     required DailyRitual? morningRitual,
@@ -538,6 +547,7 @@ class _DailyJourneyCardModel {
     required VoidCallback onOpenNextStep,
     required VoidCallback onOpenReflection,
   }) {
+    final l10n = context.l10n;
     final name = _firstName(displayName);
     final hour = now.toLocal().hour;
     final isMorning = hour >= 6 && hour < 12;
@@ -547,26 +557,25 @@ class _DailyJourneyCardModel {
     if (isEvening) {
       if (eveningRitual != null) {
         return _DailyJourneyCardModel(
-          title: 'Fechamento do Dia concluido',
+          title: 'Fechamento do Dia concluído',
           message:
-              'Voce ja fechou o dia com mais consciencia. Agora pode descansar com menos peso.',
+              'Você ja fechou o dia com mais consciencia. Agora pode descansar com menos peso.',
           ritual: eveningRitual,
-          primaryLabel: 'Ver fechamento',
+          primaryLabel: l10n.homeDailyViewRitual,
           primaryIcon: Icons.visibility_rounded,
           primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
-          secondaryLabel: 'Escrever reflexao',
+          secondaryLabel: l10n.homeDailyEveningSecondary,
           secondaryIcon: Icons.edit_note_rounded,
           secondaryAction: onOpenReflection,
         );
       }
       return _DailyJourneyCardModel(
-        title: 'Vamos fechar o dia?',
-        message:
-            'Revise o que pesou, reconheca o que foi bom e solte o que nao precisa carregar.',
-        primaryLabel: 'Fazer Fechamento do Dia',
+        title: l10n.homeDailyEveningTitle,
+        message: l10n.homeDailyEveningBody,
+        primaryLabel: l10n.homeDailyEveningPrimary,
         primaryIcon: Icons.nightlight_round,
         primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
-        secondaryLabel: 'Escrever reflexao',
+        secondaryLabel: l10n.homeDailyEveningSecondary,
         secondaryIcon: Icons.edit_note_rounded,
         secondaryAction: onOpenReflection,
       );
@@ -574,13 +583,13 @@ class _DailyJourneyCardModel {
 
     if (morningRitual != null) {
       return _DailyJourneyCardModel(
-        title: 'Ritual do Dia concluido',
+        title: l10n.homeDailyRitualDone,
         message: 'Sua jornada diaria ja tem um norte simples para hoje.',
         ritual: morningRitual,
-        primaryLabel: 'Ver meu ritual',
+        primaryLabel: l10n.homeDailyViewRitual,
         primaryIcon: Icons.visibility_rounded,
         primaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
-        secondaryLabel: 'Fazer check-in',
+        secondaryLabel: l10n.homeDailyDayPrimary,
         secondaryIcon: Icons.favorite_rounded,
         secondaryAction: onCheckIn,
       );
@@ -588,26 +597,26 @@ class _DailyJourneyCardModel {
 
     if (isMorning) {
       return _DailyJourneyCardModel(
-        title: 'Bom dia${name == null ? '' : ', $name'}',
-        message:
-            'Comece o dia com presenca. Escolha uma intencao simples e uma microacao possivel.',
-        primaryLabel: 'Iniciar Ritual do Dia',
+        title: name == null
+            ? l10n.homeDailyMorningTitleNoName
+            : l10n.homeDailyMorningTitle(name),
+        message: l10n.homeDailyMorningBody,
+        primaryLabel: l10n.homeDailyMorningPrimary,
         primaryIcon: Icons.wb_sunny_rounded,
         primaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
-        secondaryLabel: 'Fazer check-in',
+        secondaryLabel: l10n.homeDailyDayPrimary,
         secondaryIcon: Icons.favorite_rounded,
         secondaryAction: onCheckIn,
       );
     }
 
     return _DailyJourneyCardModel(
-      title: 'Como esta seu dia ate aqui?',
-      message:
-          'Faca uma pausa curta para perceber seu estado e escolher o proximo passo.',
-      primaryLabel: 'Fazer check-in',
+      title: l10n.homeDailyDayTitle,
+      message: l10n.homeDailyDayBody,
+      primaryLabel: l10n.homeDailyDayPrimary,
       primaryIcon: Icons.favorite_rounded,
       primaryAction: onCheckIn,
-      secondaryLabel: 'Ver proximo passo',
+      secondaryLabel: l10n.homeDailyDaySecondary,
       secondaryIcon: Icons.play_arrow_rounded,
       secondaryAction: onOpenNextStep,
     );
@@ -683,46 +692,70 @@ class _InsightBriefingCard extends StatelessWidget {
   const _InsightBriefingCard({
     required this.insight,
     required this.checkIn,
+    required this.isLoading,
+    required this.isUnavailable,
     required this.onOpenFullAnalysis,
   });
 
   final CheckInAiInsight? insight;
   final CheckIn? checkIn;
+  final bool isLoading;
+  final bool isUnavailable;
   final VoidCallback? onOpenFullAnalysis;
 
   @override
   Widget build(BuildContext context) {
-    final summary = _summaryFromInsight(insight);
+    final l10n = context.l10n;
+    final summary = _summaryFromInsight(context, insight);
 
     return PrimaryPanel(
-      semanticLabel: 'Leitura inteligente resumida',
+      semanticLabel: l10n.homeIntelligentReadingTitle,
       padding: const EdgeInsets.all(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
-            eyebrow: 'O que isso significa?',
-            title: 'Leitura inteligente',
+            eyebrow: l10n.homeIntelligentReadingEyebrow,
+            title: l10n.homeIntelligentReadingTitle,
             subtitle: summary,
             accentColor: AppColors.accentWarm,
           ),
-          if (insight != null) ...[
+          if (isLoading) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Preparando sua leitura emocional...',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.evoluaColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (insight != null) ...[
             const SizedBox(height: 14),
             _InsightBullet(
-              label: 'Energia',
-              value: checkIn == null
-                  ? 'ultimo check-in'
-                  : '${checkIn!.energyLevel}/10',
+              text: l10n.homeEnergyBullet(
+                checkIn == null ? '-' : checkIn!.energyLevel.toString(),
+              ),
             ),
             _InsightBullet(
-              label: 'Estado',
-              value: checkIn == null
-                  ? 'momento registrado'
-                  : _capitalize(checkIn!.mood),
+              text: l10n.homeStateBullet(
+                checkIn == null ? '-' : _capitalize(checkIn!.mood),
+              ),
             ),
             _InsightBullet(
-              label: 'Melhor resposta agora',
-              value: _compactText(insight!.suggestedAction, maxLength: 72),
+              text: l10n.homeBestResponseBullet(
+                _compactText(insight!.suggestedAction, maxLength: 72),
+              ),
             ),
             const SizedBox(height: 10),
             Align(
@@ -730,7 +763,7 @@ class _InsightBriefingCard extends StatelessWidget {
               child: TextButton.icon(
                 onPressed: onOpenFullAnalysis,
                 icon: const Icon(Icons.open_in_full_rounded),
-                label: const Text('Ver analise completa'),
+                label: Text(l10n.homeFullAnalysis),
               ),
             ),
           ],
@@ -739,9 +772,15 @@ class _InsightBriefingCard extends StatelessWidget {
     );
   }
 
-  String _summaryFromInsight(CheckInAiInsight? insight) {
+  String _summaryFromInsight(BuildContext context, CheckInAiInsight? insight) {
+    if (isLoading) {
+      return 'Seu check-in foi salvo. Estamos aguardando a resposta do backend para atualizar esta leitura.';
+    }
+    if (isUnavailable) {
+      return 'Seu check-in foi salvo, mas a leitura ainda não ficou disponível. Tente atualizar em instantes.';
+    }
     if (insight == null) {
-      return 'Depois do proximo check-in, a IA resume o momento e transforma a leitura em uma acao simples.';
+      return context.l10n.homeIntelligentReadingEmpty;
     }
 
     return _compactText(_firstSentence(insight.insight), maxLength: 118);
@@ -750,7 +789,7 @@ class _InsightBriefingCard extends StatelessWidget {
   String _firstSentence(String value) {
     final text = value.trim();
     if (text.isEmpty) {
-      return 'Seu momento atual pede uma acao simples e possivel.';
+      return 'Seu momento atual pede uma ação simples e possível.';
     }
 
     final stops = [
@@ -768,10 +807,9 @@ class _InsightBriefingCard extends StatelessWidget {
 }
 
 class _InsightBullet extends StatelessWidget {
-  const _InsightBullet({required this.label, required this.value});
+  const _InsightBullet({required this.text});
 
-  final String label;
-  final String value;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -791,20 +829,12 @@ class _InsightBullet extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$label: ',
-                    style: TextStyle(
-                      color: context.evoluaColors.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  TextSpan(text: value),
-                ],
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w700,
               ),
-              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
         ],
@@ -831,12 +861,13 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
+    final l10n = context.l10n;
     final cardWidth = compact ? 168.0 : 190.0;
     final cards = [
       _ContextMiniCard(
         width: cardWidth,
         icon: Icons.mail_outline_rounded,
-        title: 'Carta para o futuro',
+        title: l10n.homeFutureLetter,
         subtitle: 'Escreva ou leia uma mensagem sua.',
         color: AppColors.accent,
         onTap: onOpenFutureMessages,
@@ -844,17 +875,17 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
       _ContextMiniCard(
         width: cardWidth,
         icon: Icons.edit_note_rounded,
-        title: 'Reflexao recente',
-        subtitle: 'Volte para o que voce sentiu.',
+        title: l10n.homeRecentReflection,
+        subtitle: 'Volte para o que você sentiu.',
         color: AppColors.accentWarm,
         onTap: onOpenReflection,
       ),
       _ContextMiniCard(
         width: cardWidth,
         icon: Icons.bolt_rounded,
-        title: 'Insight rapido',
+        title: l10n.homeQuickInsight,
         subtitle: insight == null
-            ? 'Faca um check-in para liberar.'
+            ? 'Faça um check-in para liberar.'
             : 'Veja a leitura do momento.',
         color: AppColors.accentGold,
         onTap: onOpenInsight,
@@ -862,7 +893,7 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
       _ContextMiniCard(
         width: cardWidth,
         icon: Icons.auto_graph_rounded,
-        title: 'Marco de evolucao',
+        title: l10n.homeEvolutionMilestone,
         subtitle: 'Compare seu agora com antes.',
         color: AppColors.accent,
         onTap: onOpenEvolutionMirror,
@@ -983,16 +1014,16 @@ class _NextStepHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PrimaryPanel(
-      semanticLabel: 'Proximo passo principal',
+      semanticLabel: 'Próximo passo principal',
       padding: EdgeInsets.all(compact ? 24 : 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
-            eyebrow: 'O que faco agora?',
-            title: 'Proximo passo',
+            eyebrow: 'O que faço agora?',
+            title: 'Próximo passo',
             subtitle:
-                'A acao principal do seu dia, escolhida para caber no seu momento.',
+                'A ação principal do seu dia, escolhida para caber no seu momento.',
             accentColor: AppColors.accentGold,
           ),
           const SizedBox(height: 20),
@@ -1022,7 +1053,7 @@ class _NextStepHeroCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onOpenCommunity,
                 icon: const Icon(Icons.groups_rounded),
-                label: const Text('Espacos'),
+                label: const Text('Espaços'),
               ),
             ],
           ),
@@ -1202,7 +1233,7 @@ class _RhythmBriefingCard extends StatelessWidget {
         onPressed: onOpenEvolutionMirror,
         icon: const Icon(Icons.auto_graph_rounded),
         label: const Text(
-          'Ver Espelho da Evolucao',
+          'Ver Espelho da Evolução',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1211,7 +1242,7 @@ class _RhythmBriefingCard extends StatelessWidget {
         onPressed: onOpenLastCheckIns,
         icon: const Icon(Icons.history_rounded),
         label: const Text(
-          'Ver ultimos check-ins',
+          'Ver últimos check-ins',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1305,12 +1336,12 @@ class _RhythmDetailsSheet extends StatelessWidget {
           metrics: [
             _RhythmMetric(
               icon: Icons.bolt_rounded,
-              label: 'Energia media',
+              label: 'Energia média',
               value: '${summary.averageEnergy.toStringAsFixed(1)}/10',
             ),
             _RhythmMetric(
               icon: Icons.schedule_rounded,
-              label: 'Melhor horario',
+              label: 'Melhor horário',
               value: summary.bestTime,
             ),
             _RhythmMetric(
@@ -1332,7 +1363,7 @@ class _RhythmDetailsSheet extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          'Consistencia da semana',
+          'Consistência da semana',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: context.evoluaColors.textPrimary,
             fontWeight: FontWeight.w800,
@@ -1350,13 +1381,13 @@ class _RhythmDetailsSheet extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           summary.weeklyCheckIns == 0
-              ? 'Seu ritmo ainda esta se formando. Um check-in curto ja ajuda a criar contexto.'
-              : 'Voce registrou ${summary.weeklyCheckIns} momento(s) nesta semana.',
+              ? 'Seu ritmo ainda está se formando. Um check-in curto já ajuda a criar contexto.'
+              : 'Você registrou ${summary.weeklyCheckIns} momento(s) nesta semana.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 22),
         Text(
-          'Ultimos check-ins',
+          'Últimos check-ins',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: context.evoluaColors.textPrimary,
             fontWeight: FontWeight.w800,
@@ -1372,7 +1403,7 @@ class _RhythmDetailsSheet extends StatelessWidget {
               color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
             ),
             child: Text(
-              'Seus proximos check-ins aparecem aqui.',
+              'Seus próximos check-ins aparecem aqui.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           )
@@ -1384,7 +1415,7 @@ class _RhythmDetailsSheet extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onOpenEvolutionMirror,
             icon: const Icon(Icons.auto_graph_rounded),
-            label: const Text('Abrir Espelho da Evolucao'),
+            label: const Text('Abrir Espelho da Evolução'),
           ),
         ),
       ],
@@ -1716,7 +1747,7 @@ class _PaceMeta {
     if (hasJourney) {
       return const _PaceMeta(
         duration: '8 min',
-        benefit: 'mantem constancia',
+        benefit: 'mantém constância',
         reason: 'jornada ativa',
       );
     }
@@ -1776,7 +1807,7 @@ class _RhythmSummary {
         : items.fold<int>(0, (sum, item) => sum + item.energyLevel) /
               items.length;
     final dominantMood = items.isEmpty
-        ? 'sem padrao ainda'
+        ? 'sem padrão ainda'
         : _capitalize(_dominantMood(items));
     final bestTime = _bestTimeWindow(items);
     final weeklyCheckIns = _weeklyCheckIns(items);
@@ -1784,12 +1815,12 @@ class _RhythmSummary {
     final energyTrend = _energyTrend(items);
     final timeInsight = items.isEmpty
         ? 'Seu melhor horario aparece depois dos primeiros registros.'
-        : 'Voce tem respondido melhor em torno de $bestTime.';
+        : 'Você tem respondido melhor em torno de $bestTime.';
     final personalInsight = items.isEmpty
-        ? 'Seu ritmo comeca a ficar claro a partir dos proximos check-ins.'
+        ? 'Seu ritmo comeca a ficar claro a partir dos próximos check-ins.'
         : activeJourneyTitle == null
-        ? 'Seu estado dominante recente foi $dominantMood, com energia media ${averageEnergy.toStringAsFixed(1)}/10.'
-        : 'Voce mantem uma jornada ativa e seu padrao recente aponta para $dominantMood.';
+        ? 'Seu estado dominante recente foi $dominantMood, com energia média ${averageEnergy.toStringAsFixed(1)}/10.'
+        : 'Você mantém uma jornada ativa e seu padrão recente aponta para $dominantMood.';
 
     return _RhythmSummary(
       averageEnergy: averageEnergy,
@@ -1865,7 +1896,7 @@ int _weeklyCheckIns(List<CheckIn> items) {
 
 String _energyTrend(List<CheckIn> items) {
   if (items.length < 2) {
-    return 'Ainda nao ha oscilacao suficiente para comparar.';
+    return 'Ainda não ha oscilação suficiente para comparar.';
   }
 
   final midpoint = (items.length / 2).ceil();

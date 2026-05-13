@@ -1,0 +1,835 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for English (`en`).
+class AppLocalizationsEn extends AppLocalizations {
+  AppLocalizationsEn([String locale = 'en']) : super(locale);
+
+  @override
+  String get appTitle => 'Evolua';
+
+  @override
+  String get authFormSemanticLabel => 'Authentication form';
+
+  @override
+  String get authLoginTab => 'Sign in';
+
+  @override
+  String get authRegisterTab => 'Create account';
+
+  @override
+  String get authGoogleContinue => 'Continue with Google';
+
+  @override
+  String get authLoginFallbackError =>
+      'We could not authenticate you. Review your details and try again.';
+
+  @override
+  String get authGoogleStartError =>
+      'We could not start Google sign-in. Try again.';
+
+  @override
+  String get authDisplayNameLabel => 'Name';
+
+  @override
+  String get authDisplayNameHint => 'How would you like to be called?';
+
+  @override
+  String get authBirthDateLabel => 'Birth date';
+
+  @override
+  String get authBirthDateEmpty => 'Select your date';
+
+  @override
+  String get authGenderLabel => 'Gender';
+
+  @override
+  String get authGenderMale => 'Male';
+
+  @override
+  String get authGenderFemale => 'Female';
+
+  @override
+  String get authGenderPreferNotToSay => 'Prefer not to say';
+
+  @override
+  String get authGenderCustom => 'Custom';
+
+  @override
+  String get authCustomGenderLabel => 'How do you identify?';
+
+  @override
+  String get authCustomGenderHint => 'Write it your way';
+
+  @override
+  String get authEmailLabel => 'Email';
+
+  @override
+  String get authEmailHint => 'you@evolua.app';
+
+  @override
+  String get authPasswordLabel => 'Password';
+
+  @override
+  String get authPasswordHint => 'At least 6 characters';
+
+  @override
+  String get authHidePassword => 'Hide password';
+
+  @override
+  String get authShowPassword => 'Show password';
+
+  @override
+  String get authForgotPassword => 'Forgot password';
+
+  @override
+  String get authForgotPasswordTitle => 'Recover password';
+
+  @override
+  String get authForgotPasswordBody =>
+      'Enter your access email. If it is registered, we will send a link to create a new password.';
+
+  @override
+  String get authForgotPasswordSuccess =>
+      'If this email is registered, we will send recovery instructions.';
+
+  @override
+  String get authForgotPasswordError =>
+      'We could not request recovery right now.';
+
+  @override
+  String get commonCancel => 'Cancel';
+
+  @override
+  String get commonClose => 'Close';
+
+  @override
+  String get commonSave => 'Save';
+
+  @override
+  String get commonLoading => 'Loading...';
+
+  @override
+  String get commonSend => 'Send';
+
+  @override
+  String get commonRetry => 'Try again';
+
+  @override
+  String get commonRefresh => 'Refresh';
+
+  @override
+  String get commonBack => 'Back';
+
+  @override
+  String get commonNext => 'Next';
+
+  @override
+  String get commonPrevious => 'Previous';
+
+  @override
+  String get authSendLink => 'Send link';
+
+  @override
+  String get resetPasswordSemanticLabel => 'Reset password';
+
+  @override
+  String get resetPasswordInvalidLink => 'Invalid recovery link.';
+
+  @override
+  String get resetPasswordCompletedSnack =>
+      'Password reset. You can sign in now.';
+
+  @override
+  String get resetPasswordError => 'We could not reset your password.';
+
+  @override
+  String get resetPasswordCreateTitle => 'Create new password';
+
+  @override
+  String get resetPasswordCreateBody =>
+      'Choose a password with at least 6 characters to return to Evolua.';
+
+  @override
+  String get resetPasswordNewLabel => 'New password';
+
+  @override
+  String get resetPasswordConfirmLabel => 'Confirm new password';
+
+  @override
+  String get resetPasswordMismatch => 'Passwords do not match.';
+
+  @override
+  String get resetPasswordSubmit => 'Reset password';
+
+  @override
+  String get resetPasswordBackToLogin => 'Back to sign in';
+
+  @override
+  String get resetPasswordSuccessTitle => 'Password reset';
+
+  @override
+  String get resetPasswordSuccessBody =>
+      'You can now sign in with your new password.';
+
+  @override
+  String get authHeroTitle => 'Continue your journey';
+
+  @override
+  String get authHeroSubtitle =>
+      'Access your self-knowledge space in a few seconds.';
+
+  @override
+  String get authHeroQuickCheckIn => 'Quick check-in';
+
+  @override
+  String get authHeroShortTrails => 'Short trails';
+
+  @override
+  String get authHeroReflections => 'Current reflections';
+
+  @override
+  String get navHome => 'Home';
+
+  @override
+  String get navTrails => 'Trails';
+
+  @override
+  String get navSpaces => 'Spaces';
+
+  @override
+  String get navMirror => 'Mirror';
+
+  @override
+  String get navAdminPanel => 'Admin Panel';
+
+  @override
+  String get navProfile => 'Profile';
+
+  @override
+  String get avatarFutureMessages => 'Future messages';
+
+  @override
+  String get avatarPlans => 'Plans and subscriptions';
+
+  @override
+  String get avatarEvolutionMirror => 'Evolution Mirror';
+
+  @override
+  String get avatarLogout => 'Sign out';
+
+  @override
+  String get languageSectionTitle => 'Language';
+
+  @override
+  String get languageSectionSubtitle =>
+      'Choose how Evolua should appear to you.';
+
+  @override
+  String get languagePortuguese => 'Português (Brasil)';
+
+  @override
+  String get languageEnglish => 'English (US)';
+
+  @override
+  String get languageSystem => 'Use system language';
+
+  @override
+  String get settingsPrivacyTitle => 'Settings and privacy';
+
+  @override
+  String get settingsPreferencesSaved => 'Preferences saved safely.';
+
+  @override
+  String get settingsVisualPreferencesSaved =>
+      'Visual preferences saved comfortably.';
+
+  @override
+  String homeDailyMorningTitle(Object name) {
+    return 'Good morning, $name';
+  }
+
+  @override
+  String get homeDailyMorningTitleNoName => 'Good morning';
+
+  @override
+  String get homeDailyMorningBody =>
+      'Start the day with presence. Choose one simple intention and one possible micro-action.';
+
+  @override
+  String get homeDailyMorningPrimary => 'Start Daily Ritual';
+
+  @override
+  String get homeDailyDayTitle => 'How is your day so far?';
+
+  @override
+  String get homeDailyDayBody =>
+      'Take a short pause to notice your state and choose the next step.';
+
+  @override
+  String get homeDailyDayPrimary => 'Check in';
+
+  @override
+  String get homeDailyDaySecondary => 'See next step';
+
+  @override
+  String get homeDailyEveningTitle => 'Shall we close the day?';
+
+  @override
+  String get homeDailyEveningBody =>
+      'Review what felt heavy, acknowledge what was good, and release what you do not need to carry.';
+
+  @override
+  String get homeDailyEveningPrimary => 'Start Evening Closing';
+
+  @override
+  String get homeDailyEveningSecondary => 'Write reflection';
+
+  @override
+  String get homeDailyRitualDone => 'Daily Ritual completed';
+
+  @override
+  String get homeDailyClosingDone => 'Evening Closing completed';
+
+  @override
+  String get homeDailyViewRitual => 'View my ritual';
+
+  @override
+  String get homeFutureLetter => 'Letter to the future';
+
+  @override
+  String get homeRecentReflection => 'Recent reflection';
+
+  @override
+  String get homeQuickInsight => 'Quick insight';
+
+  @override
+  String get homeEvolutionMilestone => 'Evolution milestone';
+
+  @override
+  String get homeIntelligentReadingEyebrow => 'What does this mean?';
+
+  @override
+  String get homeIntelligentReadingTitle => 'Intelligent reading';
+
+  @override
+  String get homeIntelligentReadingEmpty =>
+      'After your next check-in, AI will summarize the moment and turn the reading into one simple action.';
+
+  @override
+  String get homeFullAnalysis => 'View full analysis';
+
+  @override
+  String homeEnergyBullet(Object value) {
+    return 'Energy: $value/10';
+  }
+
+  @override
+  String homeStateBullet(Object value) {
+    return 'State: $value';
+  }
+
+  @override
+  String homeBestResponseBullet(Object value) {
+    return 'Best response now: $value';
+  }
+
+  @override
+  String get trailCatalog => 'Catalog';
+
+  @override
+  String get trailMyJourney => 'My journey';
+
+  @override
+  String get trailStart => 'Start trail';
+
+  @override
+  String get trailCompleteJourney => 'Full journey';
+
+  @override
+  String get trailViewCatalog => 'View catalog';
+
+  @override
+  String get trailNoActiveJourney => 'No active journey.';
+
+  @override
+  String get trailVideo => 'Video';
+
+  @override
+  String get trailListen => 'Listen';
+
+  @override
+  String get trailPause => 'Pause';
+
+  @override
+  String get trailStop => 'Stop';
+
+  @override
+  String get trailFullscreen => 'Fullscreen';
+
+  @override
+  String get trailSpeed => 'Speed';
+
+  @override
+  String get trailVideoUnavailable => 'We could not prepare this video.';
+
+  @override
+  String get adminTrailsTitle => 'Trail admin';
+
+  @override
+  String get adminNotificationsTitle => 'Notification admin';
+
+  @override
+  String get spacesFeatured => 'Featured';
+
+  @override
+  String get spacesReflections => 'Reflections';
+
+  @override
+  String get spacesMine => 'Mine';
+
+  @override
+  String get futureMessagesTitle => 'Future messages';
+
+  @override
+  String get mirrorTitle => 'Evolution Mirror';
+
+  @override
+  String get profileChangePhoto => 'Change photo';
+
+  @override
+  String get profileUpdate => 'Refresh';
+
+  @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get plansTitle => 'Plans and subscriptions';
+
+  @override
+  String get checkInTitle => 'Check-in';
+
+  @override
+  String get dailyRitualCarryMorning => 'Take this with you today';
+
+  @override
+  String get dailyRitualCarryEvening => 'Keep this from your day';
+}
+
+/// The translations for English, as used in the United States (`en_US`).
+class AppLocalizationsEnUs extends AppLocalizationsEn {
+  AppLocalizationsEnUs() : super('en_US');
+
+  @override
+  String get appTitle => 'Evolua';
+
+  @override
+  String get authFormSemanticLabel => 'Authentication form';
+
+  @override
+  String get authLoginTab => 'Sign in';
+
+  @override
+  String get authRegisterTab => 'Create account';
+
+  @override
+  String get authGoogleContinue => 'Continue with Google';
+
+  @override
+  String get authLoginFallbackError =>
+      'We could not authenticate you. Review your details and try again.';
+
+  @override
+  String get authGoogleStartError =>
+      'We could not start Google sign-in. Try again.';
+
+  @override
+  String get authDisplayNameLabel => 'Name';
+
+  @override
+  String get authDisplayNameHint => 'How would you like to be called?';
+
+  @override
+  String get authBirthDateLabel => 'Birth date';
+
+  @override
+  String get authBirthDateEmpty => 'Select your date';
+
+  @override
+  String get authGenderLabel => 'Gender';
+
+  @override
+  String get authGenderMale => 'Male';
+
+  @override
+  String get authGenderFemale => 'Female';
+
+  @override
+  String get authGenderPreferNotToSay => 'Prefer not to say';
+
+  @override
+  String get authGenderCustom => 'Custom';
+
+  @override
+  String get authCustomGenderLabel => 'How do you identify?';
+
+  @override
+  String get authCustomGenderHint => 'Write it your way';
+
+  @override
+  String get authEmailLabel => 'Email';
+
+  @override
+  String get authEmailHint => 'you@evolua.app';
+
+  @override
+  String get authPasswordLabel => 'Password';
+
+  @override
+  String get authPasswordHint => 'At least 6 characters';
+
+  @override
+  String get authHidePassword => 'Hide password';
+
+  @override
+  String get authShowPassword => 'Show password';
+
+  @override
+  String get authForgotPassword => 'Forgot password';
+
+  @override
+  String get authForgotPasswordTitle => 'Recover password';
+
+  @override
+  String get authForgotPasswordBody =>
+      'Enter your access email. If it is registered, we will send a link to create a new password.';
+
+  @override
+  String get authForgotPasswordSuccess =>
+      'If this email is registered, we will send recovery instructions.';
+
+  @override
+  String get authForgotPasswordError =>
+      'We could not request recovery right now.';
+
+  @override
+  String get commonCancel => 'Cancel';
+
+  @override
+  String get commonClose => 'Close';
+
+  @override
+  String get commonSave => 'Save';
+
+  @override
+  String get commonLoading => 'Loading...';
+
+  @override
+  String get commonSend => 'Send';
+
+  @override
+  String get commonRetry => 'Try again';
+
+  @override
+  String get commonRefresh => 'Refresh';
+
+  @override
+  String get commonBack => 'Back';
+
+  @override
+  String get commonNext => 'Next';
+
+  @override
+  String get commonPrevious => 'Previous';
+
+  @override
+  String get authSendLink => 'Send link';
+
+  @override
+  String get resetPasswordSemanticLabel => 'Reset password';
+
+  @override
+  String get resetPasswordInvalidLink => 'Invalid recovery link.';
+
+  @override
+  String get resetPasswordCompletedSnack =>
+      'Password reset. You can sign in now.';
+
+  @override
+  String get resetPasswordError => 'We could not reset your password.';
+
+  @override
+  String get resetPasswordCreateTitle => 'Create new password';
+
+  @override
+  String get resetPasswordCreateBody =>
+      'Choose a password with at least 6 characters to return to Evolua.';
+
+  @override
+  String get resetPasswordNewLabel => 'New password';
+
+  @override
+  String get resetPasswordConfirmLabel => 'Confirm new password';
+
+  @override
+  String get resetPasswordMismatch => 'Passwords do not match.';
+
+  @override
+  String get resetPasswordSubmit => 'Reset password';
+
+  @override
+  String get resetPasswordBackToLogin => 'Back to sign in';
+
+  @override
+  String get resetPasswordSuccessTitle => 'Password reset';
+
+  @override
+  String get resetPasswordSuccessBody =>
+      'You can now sign in with your new password.';
+
+  @override
+  String get authHeroTitle => 'Continue your journey';
+
+  @override
+  String get authHeroSubtitle =>
+      'Access your self-knowledge space in a few seconds.';
+
+  @override
+  String get authHeroQuickCheckIn => 'Quick check-in';
+
+  @override
+  String get authHeroShortTrails => 'Short trails';
+
+  @override
+  String get authHeroReflections => 'Current reflections';
+
+  @override
+  String get navHome => 'Home';
+
+  @override
+  String get navTrails => 'Trails';
+
+  @override
+  String get navSpaces => 'Spaces';
+
+  @override
+  String get navMirror => 'Mirror';
+
+  @override
+  String get navAdminPanel => 'Admin Panel';
+
+  @override
+  String get navProfile => 'Profile';
+
+  @override
+  String get avatarFutureMessages => 'Future messages';
+
+  @override
+  String get avatarPlans => 'Plans and subscriptions';
+
+  @override
+  String get avatarEvolutionMirror => 'Evolution Mirror';
+
+  @override
+  String get avatarLogout => 'Sign out';
+
+  @override
+  String get languageSectionTitle => 'Language';
+
+  @override
+  String get languageSectionSubtitle =>
+      'Choose how Evolua should appear to you.';
+
+  @override
+  String get languagePortuguese => 'Português (Brasil)';
+
+  @override
+  String get languageEnglish => 'English (US)';
+
+  @override
+  String get languageSystem => 'Use system language';
+
+  @override
+  String get settingsPrivacyTitle => 'Settings and privacy';
+
+  @override
+  String get settingsPreferencesSaved => 'Preferences saved safely.';
+
+  @override
+  String get settingsVisualPreferencesSaved =>
+      'Visual preferences saved comfortably.';
+
+  @override
+  String homeDailyMorningTitle(Object name) {
+    return 'Good morning, $name';
+  }
+
+  @override
+  String get homeDailyMorningTitleNoName => 'Good morning';
+
+  @override
+  String get homeDailyMorningBody =>
+      'Start the day with presence. Choose one simple intention and one possible micro-action.';
+
+  @override
+  String get homeDailyMorningPrimary => 'Start Daily Ritual';
+
+  @override
+  String get homeDailyDayTitle => 'How is your day so far?';
+
+  @override
+  String get homeDailyDayBody =>
+      'Take a short pause to notice your state and choose the next step.';
+
+  @override
+  String get homeDailyDayPrimary => 'Check in';
+
+  @override
+  String get homeDailyDaySecondary => 'See next step';
+
+  @override
+  String get homeDailyEveningTitle => 'Shall we close the day?';
+
+  @override
+  String get homeDailyEveningBody =>
+      'Review what felt heavy, acknowledge what was good, and release what you do not need to carry.';
+
+  @override
+  String get homeDailyEveningPrimary => 'Start Evening Closing';
+
+  @override
+  String get homeDailyEveningSecondary => 'Write reflection';
+
+  @override
+  String get homeDailyRitualDone => 'Daily Ritual completed';
+
+  @override
+  String get homeDailyClosingDone => 'Evening Closing completed';
+
+  @override
+  String get homeDailyViewRitual => 'View my ritual';
+
+  @override
+  String get homeFutureLetter => 'Letter to the future';
+
+  @override
+  String get homeRecentReflection => 'Recent reflection';
+
+  @override
+  String get homeQuickInsight => 'Quick insight';
+
+  @override
+  String get homeEvolutionMilestone => 'Evolution milestone';
+
+  @override
+  String get homeIntelligentReadingEyebrow => 'What does this mean?';
+
+  @override
+  String get homeIntelligentReadingTitle => 'Intelligent reading';
+
+  @override
+  String get homeIntelligentReadingEmpty =>
+      'After your next check-in, AI will summarize the moment and turn the reading into one simple action.';
+
+  @override
+  String get homeFullAnalysis => 'View full analysis';
+
+  @override
+  String homeEnergyBullet(Object value) {
+    return 'Energy: $value/10';
+  }
+
+  @override
+  String homeStateBullet(Object value) {
+    return 'State: $value';
+  }
+
+  @override
+  String homeBestResponseBullet(Object value) {
+    return 'Best response now: $value';
+  }
+
+  @override
+  String get trailCatalog => 'Catalog';
+
+  @override
+  String get trailMyJourney => 'My journey';
+
+  @override
+  String get trailStart => 'Start trail';
+
+  @override
+  String get trailCompleteJourney => 'Full journey';
+
+  @override
+  String get trailViewCatalog => 'View catalog';
+
+  @override
+  String get trailNoActiveJourney => 'No active journey.';
+
+  @override
+  String get trailVideo => 'Video';
+
+  @override
+  String get trailListen => 'Listen';
+
+  @override
+  String get trailPause => 'Pause';
+
+  @override
+  String get trailStop => 'Stop';
+
+  @override
+  String get trailFullscreen => 'Fullscreen';
+
+  @override
+  String get trailSpeed => 'Speed';
+
+  @override
+  String get trailVideoUnavailable => 'We could not prepare this video.';
+
+  @override
+  String get adminTrailsTitle => 'Trail admin';
+
+  @override
+  String get adminNotificationsTitle => 'Notification admin';
+
+  @override
+  String get spacesFeatured => 'Featured';
+
+  @override
+  String get spacesReflections => 'Reflections';
+
+  @override
+  String get spacesMine => 'Mine';
+
+  @override
+  String get futureMessagesTitle => 'Future messages';
+
+  @override
+  String get mirrorTitle => 'Evolution Mirror';
+
+  @override
+  String get profileChangePhoto => 'Change photo';
+
+  @override
+  String get profileUpdate => 'Refresh';
+
+  @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get plansTitle => 'Plans and subscriptions';
+
+  @override
+  String get checkInTitle => 'Check-in';
+
+  @override
+  String get dailyRitualCarryMorning => 'Take this with you today';
+
+  @override
+  String get dailyRitualCarryEvening => 'Keep this from your day';
+}

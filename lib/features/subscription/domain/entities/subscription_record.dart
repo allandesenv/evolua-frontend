@@ -57,6 +57,7 @@ class AdRewardSession {
     required this.id,
     required this.provider,
     required this.rewardType,
+    this.contextId,
     required this.status,
     required this.customData,
     required this.expiresAt,
@@ -66,10 +67,33 @@ class AdRewardSession {
   final String id;
   final String provider;
   final String rewardType;
+  final String? contextId;
   final String status;
   final String customData;
   final DateTime expiresAt;
   final DateTime? grantedAt;
+}
+
+class MonetizationAccessStatus {
+  const MonetizationAccessStatus({
+    required this.resource,
+    this.contextId,
+    required this.allowed,
+    required this.premium,
+    required this.rewardedAdAvailable,
+    required this.upgradeRecommended,
+    this.limitMessage,
+    this.entitlementExpiresAt,
+  });
+
+  final String resource;
+  final String? contextId;
+  final bool allowed;
+  final bool premium;
+  final bool rewardedAdAvailable;
+  final bool upgradeRecommended;
+  final String? limitMessage;
+  final DateTime? entitlementExpiresAt;
 }
 
 class CheckoutSession {

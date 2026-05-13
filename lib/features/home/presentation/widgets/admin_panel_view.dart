@@ -51,7 +51,7 @@ class AdminAccessDeniedPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Esta area esta disponivel apenas para administradores.',
+            'Esta área está disponível apenas para administradores.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -83,7 +83,7 @@ class _AdminPanelOverview extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Gerencie conteudos e comunicacoes operacionais do Evolua em telas separadas.',
+                'Gerencie conteúdos e comunicações operacionais do Evolua em telas separadas.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -97,13 +97,13 @@ class _AdminPanelOverview extends StatelessWidget {
             _AdminActionCard(
               icon: Icons.auto_stories_rounded,
               title: 'Trilhas',
-              subtitle: 'Criar, editar, excluir e revisar midias do catalogo.',
+              subtitle: 'Criar, editar, excluir e revisar mídias do catálogo.',
               onTap: () => onOpenSection(AdminPanelSection.trails),
             ),
             _AdminActionCard(
               icon: Icons.notifications_active_rounded,
               title: 'Notificações',
-              subtitle: 'Enviar comunicacoes manuais para usuarios.',
+              subtitle: 'Enviar comunicações manuais para usuários.',
               onTap: () => onOpenSection(AdminPanelSection.notifications),
             ),
           ],

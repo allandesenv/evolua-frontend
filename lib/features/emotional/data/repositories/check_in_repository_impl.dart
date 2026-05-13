@@ -67,6 +67,17 @@ class CheckInRepositoryImpl implements CheckInRepository {
     ).toEntity();
   }
 
+  @override
+  Future<CheckIn> generateDeepReading(int checkInId) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/check-ins/$checkInId/deep-reading',
+    );
+
+    return CheckInDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
   String? _formatDate(DateTime? value) {
     if (value == null) {
       return null;

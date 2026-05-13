@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/auth_form_validators.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_launcher_provider.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -53,8 +54,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
       final message = extractApiErrorMessage(
         error,
-        fallback:
-            'Nao foi possivel autenticar. Revise os dados e tente novamente.',
+        fallback: context.l10n.authLoginFallbackError,
       );
 
       AppSnackBar.show(
@@ -191,8 +191,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       setState(() => _isOAuthStarting = false);
       AppSnackBar.show(
         context,
-        message:
-            'Nao foi possivel iniciar o login com Google. Tente novamente.',
+        message: context.l10n.authGoogleStartError,
         icon: Icons.info_outline_rounded,
       );
     }
@@ -210,14 +209,15 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     }
 
     try {
-      await ref.read(authControllerProvider.notifier).forgotPassword(email: email);
+      await ref
+          .read(authControllerProvider.notifier)
+          .forgotPassword(email: email);
       if (!mounted) {
         return;
       }
       AppSnackBar.show(
         context,
-        message:
-            'Se este email estiver cadastrado, enviaremos as instrucoes de recuperacao.',
+        message: context.l10n.authForgotPasswordSuccess,
         icon: Icons.mark_email_unread_rounded,
       );
     } catch (error) {
@@ -228,7 +228,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         context,
         message: extractApiErrorMessage(
           error,
-          fallback: 'Nao foi possivel solicitar a recuperacao agora.',
+          fallback: context.l10n.authForgotPasswordError,
         ),
         icon: Icons.info_outline_rounded,
       );
@@ -242,7 +242,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       initialDate: _birthDate ?? DateTime(now.year - 18, now.month, now.day),
       firstDate: DateTime(1900, 1, 1),
       lastDate: now,
-      locale: const Locale('pt', 'BR'),
+      locale: Localizations.localeOf(context),
     );
     if (selected != null) {
       setState(() {
@@ -268,6 +268,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading || _isSubmitting || _isOAuthStarting;
+    final l10n = context.l10n;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -275,7 +276,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
         return PrimaryPanel(
           padding: EdgeInsets.all(compact ? 18 : 24),
-          semanticLabel: 'Formulario de autenticacao',
+          semanticLabel: l10n.authFormSemanticLabel,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -283,16 +284,16 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                 width: compact ? double.infinity : null,
                 child: SegmentedButton<bool>(
                   showSelectedIcon: false,
-                  segments: const [
+                  segments: [
                     ButtonSegment<bool>(
                       value: false,
-                      icon: Icon(Icons.login_rounded),
-                      label: Text('Entrar'),
+                      icon: const Icon(Icons.login_rounded),
+                      label: Text(l10n.authLoginTab),
                     ),
                     ButtonSegment<bool>(
                       value: true,
-                      icon: Icon(Icons.person_add_alt_1_rounded),
-                      label: Text('Criar conta'),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: Text(l10n.authRegisterTab),
                     ),
                   ],
                   selected: {_isRegisterMode},
@@ -312,7 +313,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.account_circle_rounded),
-                  label: const Text('Continuar com Google'),
+                  label: Text(l10n.authGoogleContinue),
                 ),
               ),
               SizedBox(height: compact ? 16 : 18),
@@ -327,10 +328,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           focusNode: _displayNameFocusNode,
                           autofillHints: const [AutofillHints.name],
                           textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Nome',
-                            hintText: 'Como voce quer ser chamado',
-                            prefixIcon: Icon(Icons.badge_rounded),
+                          decoration: InputDecoration(
+                            labelText: l10n.authDisplayNameLabel,
+                            hintText: l10n.authDisplayNameHint,
+                            prefixIcon: const Icon(Icons.badge_rounded),
                           ),
                           validator: validateDisplayName,
                         ),
@@ -343,13 +344,13 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                             child: InputDecorator(
                               key: const Key('auth-birth-date-field'),
                               decoration: InputDecoration(
-                                labelText: 'Data de nascimento',
+                                labelText: l10n.authBirthDateLabel,
                                 prefixIcon: const Icon(Icons.cake_rounded),
                                 errorText: _submitted ? _birthDateError : null,
                               ),
                               child: Text(
                                 _birthDate == null
-                                    ? 'Selecione sua data'
+                                    ? l10n.authBirthDateEmpty
                                     : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
                               ),
                             ),
@@ -358,26 +359,26 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                         SizedBox(height: compact ? 12 : 14),
                         DropdownButtonFormField<String>(
                           initialValue: _gender,
-                          decoration: const InputDecoration(
-                            labelText: 'Genero',
-                            prefixIcon: Icon(Icons.wc_rounded),
+                          decoration: InputDecoration(
+                            labelText: l10n.authGenderLabel,
+                            prefixIcon: const Icon(Icons.wc_rounded),
                           ),
-                          items: const [
+                          items: [
                             DropdownMenuItem(
                               value: genderMale,
-                              child: Text('Masculino'),
+                              child: Text(l10n.authGenderMale),
                             ),
                             DropdownMenuItem(
                               value: genderFemale,
-                              child: Text('Feminino'),
+                              child: Text(l10n.authGenderFemale),
                             ),
                             DropdownMenuItem(
                               value: genderPreferNotToSay,
-                              child: Text('Prefiro nao informar'),
+                              child: Text(l10n.authGenderPreferNotToSay),
                             ),
                             DropdownMenuItem(
                               value: genderCustom,
-                              child: Text('Personalizado'),
+                              child: Text(l10n.authGenderCustom),
                             ),
                           ],
                           validator: validateGender,
@@ -393,10 +394,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                             controller: _customGenderController,
                             focusNode: _customGenderFocusNode,
                             textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Como voce se identifica',
-                              hintText: 'Escreva do seu jeito',
-                              prefixIcon: Icon(Icons.edit_note_rounded),
+                            decoration: InputDecoration(
+                              labelText: l10n.authCustomGenderLabel,
+                              hintText: l10n.authCustomGenderHint,
+                              prefixIcon: const Icon(Icons.edit_note_rounded),
                             ),
                             validator: (value) => validateCustomGender(
                               selectedGender: _gender,
@@ -412,10 +413,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          hintText: 'voce@evolua.app',
-                          prefixIcon: Icon(Icons.alternate_email_rounded),
+                        decoration: InputDecoration(
+                          labelText: l10n.authEmailLabel,
+                          hintText: l10n.authEmailHint,
+                          prefixIcon: const Icon(Icons.alternate_email_rounded),
                         ),
                         validator: validateEmail,
                       ),
@@ -428,13 +429,13 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
                         decoration: InputDecoration(
-                          labelText: 'Senha',
-                          hintText: 'Minimo de 6 caracteres',
+                          labelText: l10n.authPasswordLabel,
+                          hintText: l10n.authPasswordHint,
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: IconButton(
                             tooltip: _isPasswordVisible
-                                ? 'Ocultar senha'
-                                : 'Mostrar senha',
+                                ? l10n.authHidePassword
+                                : l10n.authShowPassword,
                             onPressed: () {
                               setState(
                                 () => _isPasswordVisible = !_isPasswordVisible,
@@ -466,7 +467,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             onPressed: isLoading ? null : _handleForgotPassword,
-                            child: const Text('Esqueci minha senha'),
+                            child: Text(l10n.authForgotPassword),
                           ),
                         ),
                       ],
@@ -485,7 +486,9 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                                   ),
                                 )
                               : Text(
-                                  _isRegisterMode ? 'Criar conta' : 'Entrar',
+                                  _isRegisterMode
+                                      ? l10n.authRegisterTab
+                                      : l10n.authLoginTab,
                                 ),
                         ),
                       ),
@@ -536,7 +539,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Recuperar senha'),
+      title: Text(context.l10n.authForgotPasswordTitle),
       content: Form(
         key: _formKey,
         child: Column(
@@ -544,7 +547,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Informe seu email de acesso. Se ele estiver cadastrado, enviaremos um link para criar uma nova senha.',
+              context.l10n.authForgotPasswordBody,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -553,9 +556,9 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
               autofocus: true,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.alternate_email_rounded),
+              decoration: InputDecoration(
+                labelText: context.l10n.authEmailLabel,
+                prefixIcon: const Icon(Icons.alternate_email_rounded),
               ),
               validator: validateEmail,
               onFieldSubmitted: (_) => _submit(),
@@ -566,12 +569,12 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton.icon(
           onPressed: _submit,
           icon: const Icon(Icons.mark_email_unread_rounded),
-          label: const Text('Enviar link'),
+          label: Text(context.l10n.authSendLink),
         ),
       ],
     );

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:evolua_frontend/app/app.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,28 @@ void main() {
     expect(find.text('Evolua'), findsWidgets);
     expect(find.text('Continue sua jornada'), findsWidgets);
     expect(find.textContaining('Entre e continue sua jornada'), findsNothing);
+  });
+
+  testWidgets('uses pt-BR as default locale', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue sua jornada'), findsWidgets);
+    expect(find.text('Continue your journey'), findsNothing);
+  });
+
+  testWidgets('uses persisted en-US locale preference', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      localePreferenceStorageKey: LocalePreference.enUs.storageValue,
+    });
+
+    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue your journey'), findsWidgets);
+    expect(find.text('Continue sua jornada'), findsNothing);
   });
 
   testWidgets('applies cached accessibility preferences globally', (

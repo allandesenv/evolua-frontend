@@ -15,7 +15,10 @@ void main() {
     await tester.pumpWidget(_testApp(_FakeAuthRepository()));
 
     expect(find.text('Criar nova senha'), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextFormField, 'Nova senha'), '123456');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nova senha'),
+      '123456',
+    );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Confirmar nova senha'),
       '654321',
@@ -23,7 +26,7 @@ void main() {
     await tester.tap(find.text('Redefinir senha'));
     await tester.pump();
 
-    expect(find.text('As senhas nao conferem.'), findsOneWidget);
+    expect(find.text('As senhas não conferem.'), findsOneWidget);
   });
 
   testWidgets('submits reset password token and shows success state', (
@@ -32,7 +35,10 @@ void main() {
     final repository = _FakeAuthRepository();
     await tester.pumpWidget(_testApp(repository));
 
-    await tester.enterText(find.widgetWithText(TextFormField, 'Nova senha'), '123456');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nova senha'),
+      '123456',
+    );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Confirmar nova senha'),
       '123456',
@@ -49,9 +55,7 @@ void main() {
 Widget _testApp(_FakeAuthRepository repository) {
   return ProviderScope(
     overrides: [authRepositoryProvider.overrideWithValue(repository)],
-    child: const MaterialApp(
-      home: ResetPasswordPage(token: 'token-123'),
-    ),
+    child: const MaterialApp(home: ResetPasswordPage(token: 'token-123')),
   );
 }
 
@@ -60,7 +64,8 @@ class _FakeAuthRepository implements AuthRepository {
   String? lastResetPassword;
 
   @override
-  Future<AuthSession> exchangeGoogleCode({required String code}) async => _session();
+  Future<AuthSession> exchangeGoogleCode({required String code}) async =>
+      _session();
 
   @override
   Future<void> forgotPassword({required String email}) async {}
@@ -72,7 +77,8 @@ class _FakeAuthRepository implements AuthRepository {
   }) async => _session();
 
   @override
-  Future<AuthSession> refresh({required String refreshToken}) async => _session();
+  Future<AuthSession> refresh({required String refreshToken}) async =>
+      _session();
 
   @override
   Future<void> register({

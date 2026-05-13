@@ -4,6 +4,8 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -67,6 +69,23 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   }
 
   Future<void> _create() async {
+    final subscription = ref
+        .read(subscriptionControllerProvider)
+        .asData
+        ?.value
+        .current;
+    final messages = ref.read(futureMessageControllerProvider).asData?.value;
+    final activeCount =
+        messages?.result.items.where((item) => item.isScheduled).length ?? 0;
+    if (subscription?.premium != true && activeCount >= 3) {
+      AppSnackBar.show(
+        context,
+        message:
+            'No plano gratuito, você pode manter até 3 cartas ativas. O Premium libera cartas ilimitadas.',
+        icon: Icons.workspace_premium_rounded,
+      );
+      return;
+    }
     if (_bodyController.text.trim().isEmpty) {
       AppSnackBar.show(
         context,
@@ -151,6 +170,11 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(futureMessageControllerProvider);
+    final subscription = ref
+        .watch(subscriptionControllerProvider)
+        .asData
+        ?.value
+        .current;
 
     return Center(
       child: ConstrainedBox(
@@ -183,6 +207,29 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
                     setState(() => _afterDays = value),
                 onPickDate: _pickDate,
                 onSubmit: _create,
+              ),
+              state.maybeWhen(
+                data: (data) {
+                  final activeCount = data.result.items
+                      .where((item) => item.isScheduled)
+                      .length;
+                  if (subscription?.premium == true || activeCount < 3) {
+                    return const SizedBox.shrink();
+                  }
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: SoftPremiumPrompt(
+                      title: 'Cartas ilimitadas no Premium',
+                      message:
+                          'Você já tem 3 cartas ativas no plano gratuito. Suas cartas continuam guardadas e serão entregues no momento certo.',
+                      benefit:
+                          'Premium libera cartas ilimitadas para você conversar com versões futuras de si mesmo sem apagar nada.',
+                      onOpenPremium: null,
+                      primaryLabel: 'Ver Premium no menu do perfil',
+                    ),
+                  );
+                },
+                orElse: () => const SizedBox.shrink(),
               ),
               const SizedBox(height: 16),
               state.when(
