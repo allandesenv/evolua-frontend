@@ -9,7 +9,10 @@ class WebRewardedAdService implements RewardedAdService {
   const WebRewardedAdService();
 
   @override
-  Future<bool> showRewardedAd({required String rewardType}) async {
+  Future<bool> showRewardedAd({
+    required String rewardType,
+    String? contextId,
+  }) async {
     return false;
   }
 }

@@ -9,7 +9,6 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_message.dart';
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_reply.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
-import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/panel_skeleton.dart';
@@ -30,24 +29,38 @@ class MentorEvoluaModuleView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentJourney = ref.watch(currentJourneyTrailProvider);
+    final currentSubscription = ref
+        .watch(subscriptionControllerProvider)
+        .asData
+        ?.value
+        .current;
+    final premium = currentSubscription?.premium ?? false;
 
     return currentJourney.when(
       data: (trail) => Column(
         children: [
           _MentorHeader(trail: trail, onOpenTrails: onOpenTrails),
           const SizedBox(height: 16),
-          _MentorPremiumPassPanel(onOpenPremium: onOpenPremium),
-          const SizedBox(height: 16),
-          MentorEvoluaChatCard(trail: trail, onOpenPremium: onOpenPremium),
+          if (!premium)
+            _MentorPremiumGate(onOpenPremium: onOpenPremium)
+          else ...[
+            _MentorPremiumGate(onOpenPremium: onOpenPremium),
+            const SizedBox(height: 16),
+            MentorEvoluaChatCard(trail: trail, onOpenPremium: onOpenPremium),
+          ],
         ],
       ),
       error: (_, _) => Column(
         children: [
           _MentorHeader(trail: null, onOpenTrails: onOpenTrails),
           const SizedBox(height: 16),
-          _MentorPremiumPassPanel(onOpenPremium: onOpenPremium),
-          const SizedBox(height: 16),
-          MentorEvoluaChatCard(trail: null, onOpenPremium: onOpenPremium),
+          if (!premium)
+            _MentorPremiumGate(onOpenPremium: onOpenPremium)
+          else ...[
+            _MentorPremiumGate(onOpenPremium: onOpenPremium),
+            const SizedBox(height: 16),
+            MentorEvoluaChatCard(trail: null, onOpenPremium: onOpenPremium),
+          ],
         ],
       ),
       loading: () => const PanelSkeleton(rows: 4, tileHeight: 92),
@@ -127,101 +140,23 @@ class _MentorHeader extends StatelessWidget {
   }
 }
 
-class _MentorPremiumPassPanel extends ConsumerStatefulWidget {
-  const _MentorPremiumPassPanel({this.onOpenPremium});
+class _MentorPremiumGate extends ConsumerWidget {
+  const _MentorPremiumGate({this.onOpenPremium});
 
   final VoidCallback? onOpenPremium;
 
   @override
-  ConsumerState<_MentorPremiumPassPanel> createState() =>
-      _MentorPremiumPassPanelState();
-}
-
-class _MentorPremiumPassPanelState
-    extends ConsumerState<_MentorPremiumPassPanel> {
-  bool _isRewardLoading = false;
-  String? _rewardStatusMessage;
-
-  Future<void> _watchMentorPassAd() async {
-    if (_isRewardLoading) {
-      return;
-    }
-
-    setState(() {
-      _isRewardLoading = true;
-      _rewardStatusMessage = null;
-    });
-    try {
-      final result = await ref
-          .read(mentorPremiumPassRewardServiceProvider)
-          .watchAdAndConfirm(
-            onAwaitingConfirmation: () {
-              if (!mounted) {
-                return;
-              }
-              setState(() {
-                _rewardStatusMessage =
-                    'Estamos confirmando seu passe de mentoria...';
-              });
-            },
-          );
-      if (!mounted) {
-        return;
-      }
-      final message = switch (result.status) {
-        MentorPremiumPassRewardStatus.confirmed =>
-          'Passe de mentoria liberado por hoje.',
-        MentorPremiumPassRewardStatus.unavailable =>
-          'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.',
-        MentorPremiumPassRewardStatus.confirmationPending =>
-          'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.',
-      };
-      AppSnackBar.show(
-        context,
-        message: message,
-        icon: result.confirmed
-            ? Icons.workspace_premium_rounded
-            : Icons.ondemand_video_rounded,
-      );
-      if (!result.confirmed) {
-        setState(() => _rewardStatusMessage = message);
-      }
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      AppSnackBar.show(
-        context,
-        message:
-            'Não foi possível liberar a mentoria agora. Tente novamente em instantes.',
-        icon: Icons.wifi_off_rounded,
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isRewardLoading = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final subscriptionState = ref.watch(subscriptionControllerProvider);
     final current = subscriptionState.asData?.value.current;
     final premium = current?.premium ?? false;
-    final passActive = current?.mentorPremiumPassActive ?? false;
-    final passEndsAt = current?.mentorPremiumPassEndsAt;
-    final rewardedAvailable = current?.mentorRewardedAdAvailable ?? false;
 
     final title = premium
         ? 'Mentoria premium liberada'
-        : passActive
-        ? 'Passe de mentoria ativo'
         : 'Conteúdos exclusivos de mentoria';
     final subtitle = premium
         ? 'Seu plano Premium já libera os conteúdos completos de mentoria, sem anúncios.'
-        : passActive
-        ? 'A mentoria premium está aberta hoje${_formatPassEndsAt(passEndsAt)}.'
-        : 'Assista a um anúncio recompensado para liberar por hoje trilhas premium selecionadas de mentoria.';
+        : 'O Mentor Evolua faz parte do Premium para oferecer acompanhamento mais profundo, sem anúncios e com mais continuidade.';
 
     return PrimaryPanel(
       semanticLabel: 'Passe diario de mentoria',
@@ -268,44 +203,23 @@ class _MentorPremiumPassPanelState
               ),
             ],
           ),
-          if (!premium && !passActive) ...[
+          if (!premium) ...[
             const SizedBox(height: 14),
-            RewardedAdPrompt(
-              title: 'Liberar com anúncio opcional',
+            SoftPremiumPrompt(
+              title: 'Mentor disponível no Premium',
               message:
-                  'O anúncio recompensado libera a mentoria por hoje. O Premium remove anúncios e mantém o acesso completo.',
-              rewardLabel:
-                  'Recompensa: passe de mentoria premium até o fim do dia.',
-              rewardedAdAvailable: rewardedAvailable,
-              isRewardLoading: _isRewardLoading,
-              onWatchRewardedAd: _watchMentorPassAd,
-              onOpenPremium: widget.onOpenPremium,
-              premiumLabel: 'Aprofundar com Premium',
+                  'Você pode continuar sua jornada pelas trilhas gratuitas. O Premium abre o Mentor para adaptar etapas, aprofundar leituras e manter sua evolução com mais contexto.',
+              benefit:
+                  'Premium libera Mentor Evolua, trilhas premium, Espelho avançado, histórico completo e uma experiência sem anúncios.',
+              onOpenPremium: onOpenPremium,
+              primaryLabel: 'Evoluir com Premium',
+              secondaryLabel: 'Continuar nas trilhas gratuitas',
             ),
-            if (_rewardStatusMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _rewardStatusMessage!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.evoluaColors.textSecondary,
-                ),
-              ),
-            ],
           ],
         ],
       ),
     );
   }
-}
-
-String _formatPassEndsAt(DateTime? value) {
-  if (value == null) {
-    return '';
-  }
-  final local = value.toLocal();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return ', até $hour:$minute';
 }
 
 class MentorEvoluaChatCard extends ConsumerStatefulWidget {

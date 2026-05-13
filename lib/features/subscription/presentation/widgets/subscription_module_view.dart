@@ -75,17 +75,20 @@ class _SubscriptionModuleViewState
           orElse: () => const PlanView(
             planCode: 'essential-free',
             title: 'Essencial',
-            subtitle: 'Para começar e manter presença.',
+            subtitle:
+                'Comece sua jornada de autoconhecimento com leveza e constância.',
             billingCycle: 'MONTHLY',
             premium: false,
             price: 0,
             currency: 'BRL',
             benefits: [
-              'Check-ins simples ilimitados',
-              'Reflexões básicas e diário',
-              'Trilhas grátis',
-              '1 análise de IA por dia',
-              'Histórico dos últimos 30 dias',
+              'Check-ins emocionais ilimitados',
+              'Diário e reflexões pessoais',
+              'Trilhas gratuitas de desenvolvimento',
+              'Insights básicos com IA',
+              '1 leitura emocional aprofundada por dia',
+              'Histórico emocional dos últimos 30 dias',
+              'Espelho da Evolução resumido',
             ],
             active: true,
           ),
@@ -106,7 +109,7 @@ class _SubscriptionModuleViewState
                   Text(
                     current?.premium == true
                         ? 'Seu Premium está ativo. Você aprofunda sua jornada sem anúncios e com mais contexto emocional.'
-                        : 'Você está no plano Essencial. Quando quiser aprofundar a jornada, o Premium amplia suas leituras sem pressionar seu ritmo.',
+                        : 'Você está no plano Essencial. Comece sua jornada de autoconhecimento com leveza e constância.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 20),
@@ -126,19 +129,12 @@ class _SubscriptionModuleViewState
                 final cards = [
                   _PlanCard(
                     title: essential.title,
-                    subtitle: 'Para começar e manter presença.',
+                    subtitle: essential.subtitle,
                     bullets: essential.benefits,
                     accent: AppColors.accentWarm,
                     highlighted: current?.premium != true,
-                    cta: current?.premium == true
-                        ? 'Voltar ao Essencial'
-                        : 'Plano atual',
-                    disabled: data.isBusy || current?.premium != true,
-                    onTap: current?.premium == true
-                        ? () => ref
-                              .read(subscriptionControllerProvider.notifier)
-                              .cancelPremium()
-                        : null,
+                    cta: 'Plano atual',
+                    disabled: true,
                   ),
                   ...premiumPlans.map(
                     (plan) => _PlanCard(
@@ -149,11 +145,16 @@ class _SubscriptionModuleViewState
                           : '${_formatPrice(plan.price, plan.currency)}/mês',
                       bullets: plan.benefits,
                       accent: AppColors.accentGold,
+                      badge: plan.billingCycle == 'YEARLY'
+                          ? 'Economize 33%'
+                          : null,
                       highlighted: current?.planCode == plan.planCode,
                       cta:
                           current?.planCode == plan.planCode &&
                               current?.premium == true
                           ? 'Plano ativo'
+                          : plan.billingCycle == 'YEARLY'
+                          ? 'Evoluir continuamente'
                           : 'Aprofundar jornada',
                       disabled:
                           data.isBusy ||
@@ -325,6 +326,7 @@ class _PlanCard extends StatelessWidget {
     required this.accent,
     required this.cta,
     this.priceLabel,
+    this.badge,
     this.highlighted = false,
     this.disabled = false,
     this.onTap,
@@ -336,6 +338,7 @@ class _PlanCard extends StatelessWidget {
   final Color accent;
   final String cta;
   final String? priceLabel;
+  final String? badge;
   final bool highlighted;
   final bool disabled;
   final VoidCallback? onTap;
@@ -356,6 +359,24 @@ class _PlanCard extends StatelessWidget {
             child: Icon(Icons.workspace_premium_rounded, color: accent),
           ),
           const SizedBox(height: 16),
+          if (badge != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: accent.withValues(alpha: 0.36)),
+              ),
+              child: Text(
+                badge!,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Text(title, style: Theme.of(context).textTheme.headlineSmall),
           if (priceLabel != null) ...[
             const SizedBox(height: 8),

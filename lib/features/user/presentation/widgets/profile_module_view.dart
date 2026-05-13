@@ -11,6 +11,9 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
@@ -1512,7 +1515,7 @@ class _OverviewSection extends StatelessWidget {
   }
 }
 
-class _EvolutionMirrorSection extends StatelessWidget {
+class _EvolutionMirrorSection extends ConsumerWidget {
   const _EvolutionMirrorSection({
     required this.checkInState,
     required this.futureMessageState,
@@ -1528,7 +1531,15 @@ class _EvolutionMirrorSection extends StatelessWidget {
   final VoidCallback onOpenFutureMessages;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final premium =
+        ref
+            .watch(subscriptionControllerProvider)
+            .asData
+            ?.value
+            .current
+            ?.premium ??
+        false;
     final history = checkInState.asData?.value;
     final checkIns = history?.result.items ?? const <CheckIn>[];
     final totalCheckIns = history?.result.totalItems ?? checkIns.length;
@@ -1588,62 +1599,108 @@ class _EvolutionMirrorSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _EvolutionSectionGroup(
-          title: 'Padroes percebidos',
-          description:
-              'Sinais simples do seu histórico, para perceber repeticoes sem transformar isso em cobranca.',
-          child: _PatternPanel(stats: stats),
-        ),
-        const SizedBox(height: 16),
-        _EvolutionSectionGroup(
-          title: 'Mensagem da IA',
-          description:
-              'Uma leitura curta a partir do último insight salvo, sem gerar nova análise.',
-          child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
-        ),
-        const SizedBox(height: 16),
-        if (shouldShowFutureMessages) ...[
+        if (!premium) ...[
+          const _AdvancedMirrorPrompt(),
+          const SizedBox(height: 16),
+        ],
+        if (premium) ...[
           _EvolutionSectionGroup(
-            title: 'Mensagens do seu eu anterior',
+            title: 'Padroes percebidos',
             description:
-                'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
-            child: _FutureMessagesMirrorPanel(
-              state: futureMessageState,
-              onOpen: onOpenFutureMessages,
+                'Sinais simples do seu histórico, para perceber repeticoes sem transformar isso em cobranca.',
+            child: _PatternPanel(stats: stats),
+          ),
+          const SizedBox(height: 16),
+          _EvolutionSectionGroup(
+            title: 'Mensagem da IA',
+            description:
+                'Uma leitura curta a partir do último insight salvo, sem gerar nova análise.',
+            child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
+          ),
+          const SizedBox(height: 16),
+          if (shouldShowFutureMessages) ...[
+            _EvolutionSectionGroup(
+              title: 'Mensagens do seu eu anterior',
+              description:
+                  'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
+              child: _FutureMessagesMirrorPanel(
+                state: futureMessageState,
+                onOpen: onOpenFutureMessages,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          _EvolutionSectionGroup(
+            title: 'Trilhas em andamento',
+            description:
+                'Acompanhe a trilha que esta guiando seus próximos passos.',
+            child: _TrailEvolutionPanel(
+              currentJourneyState: currentJourneyState,
+              journeyState: journeyState,
             ),
           ),
           const SizedBox(height: 16),
+          _EvolutionSectionGroup(
+            title: 'Marcos da jornada',
+            description:
+                'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: stats.milestones
+                  .map((item) => _MilestoneBadge(milestone: item))
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _EvolutionSectionGroup(
+            title: 'Consistência',
+            description:
+                'Uma leitura de continuidade para ajudar você a voltar sem peso quando o ritmo oscilar.',
+            child: _ConsistencyPanel(stats: stats),
+          ),
         ],
-        _EvolutionSectionGroup(
-          title: 'Trilhas em andamento',
-          description:
-              'Acompanhe a trilha que esta guiando seus próximos passos.',
-          child: _TrailEvolutionPanel(
-            currentJourneyState: currentJourneyState,
-            journeyState: journeyState,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _EvolutionSectionGroup(
-          title: 'Marcos da jornada',
-          description:
-              'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: stats.milestones
-                .map((item) => _MilestoneBadge(milestone: item))
-                .toList(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _EvolutionSectionGroup(
-          title: 'Consistência',
-          description:
-              'Uma leitura de continuidade para ajudar você a voltar sem peso quando o ritmo oscilar.',
-          child: _ConsistencyPanel(stats: stats),
-        ),
       ],
+    );
+  }
+}
+
+class _AdvancedMirrorPrompt extends ConsumerStatefulWidget {
+  const _AdvancedMirrorPrompt();
+
+  @override
+  ConsumerState<_AdvancedMirrorPrompt> createState() =>
+      _AdvancedMirrorPromptState();
+}
+
+class _AdvancedMirrorPromptState extends ConsumerState<_AdvancedMirrorPrompt> {
+  bool _isLoading = false;
+
+  Future<void> _unlock() async {
+    if (_isLoading) {
+      return;
+    }
+    setState(() => _isLoading = true);
+    await ref
+        .read(monetizationAccessControllerProvider.notifier)
+        .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR');
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RewardedAdPrompt(
+      title: 'Veja padrões emocionais dos últimos 90 dias',
+      message:
+          'A visão semanal continua disponível no plano gratuito. Para ampliar o Espelho com padrões, comparações e continuidade histórica, assista a um anúncio ou evolua com Premium.',
+      rewardLabel: 'Recompensa: Espelho avançado liberado até o fim do dia.',
+      rewardedAdAvailable: true,
+      isRewardLoading: _isLoading,
+      onWatchRewardedAd: _unlock,
+      onOpenPremium: null,
+      premiumLabel: 'Evoluir com Premium',
     );
   }
 }

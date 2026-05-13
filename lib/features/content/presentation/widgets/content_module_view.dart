@@ -10,10 +10,8 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
-import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
-import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
@@ -108,8 +106,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         (session?.isPremium ?? false) ||
         (profile?.premium ?? false) ||
         (currentSubscription?.premium ?? false);
-    final mentorPremiumPassActive =
-        currentSubscription?.mentorPremiumPassActive ?? false;
 
     return LayoutBuilder(
       builder: (context, _) {
@@ -161,7 +157,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                   data: (result) => _TrailExplorer(
                     result: result,
                     hasPremiumAccess: hasPremiumAccess,
-                    mentorPremiumPassActive: mentorPremiumPassActive,
                     searchController: _searchController,
                     premiumFilter: _premiumFilter,
                     onSearchChanged: (_) => _applyFilters(),
@@ -1684,7 +1679,6 @@ class _TrailExplorer extends ConsumerWidget {
   const _TrailExplorer({
     required this.result,
     required this.hasPremiumAccess,
-    required this.mentorPremiumPassActive,
     required this.searchController,
     required this.premiumFilter,
     required this.onSearchChanged,
@@ -1696,7 +1690,6 @@ class _TrailExplorer extends ConsumerWidget {
 
   final PaginatedResponse<Trail> result;
   final bool hasPremiumAccess;
-  final bool mentorPremiumPassActive;
   final TextEditingController searchController;
   final bool? premiumFilter;
   final ValueChanged<String> onSearchChanged;
@@ -1776,12 +1769,9 @@ class _TrailExplorer extends ConsumerWidget {
             children: [
               ...result.items.map((trail) {
                 final effectiveAccessible =
-                    trail.accessible ||
-                    (mentorPremiumPassActive && _isMentorPremiumTrail(trail));
+                    trail.accessible || (hasPremiumAccess && trail.premium);
                 final lockedMentorTrail =
-                    _isLockedMentorPremiumTrail(trail) &&
-                    !mentorPremiumPassActive &&
-                    !hasPremiumAccess;
+                    _isLockedMentorPremiumTrail(trail) && !hasPremiumAccess;
                 final journeyState = effectiveAccessible
                     ? ref.watch(trailJourneyProvider(trail.id))
                     : null;
@@ -1846,7 +1836,7 @@ class _TrailExplorer extends ConsumerWidget {
                               ),
                               if (lockedMentorTrail)
                                 const _StatusBadge(
-                                  label: 'Anuncio libera hoje',
+                                  label: 'Premium',
                                   color: AppColors.accentGold,
                                 ),
                             ],
@@ -1940,9 +1930,6 @@ class _TrailExplorer extends ConsumerWidget {
       context: context,
       builder: (context) => Consumer(
         builder: (context, ref, _) {
-          var isRewardLoading = false;
-          String? rewardStatusMessage;
-
           return StatefulBuilder(
             builder: (context, setDialogState) => Dialog(
               backgroundColor: context.evoluaColors.backgroundSecondary,
@@ -1983,83 +1970,14 @@ class _TrailExplorer extends ConsumerWidget {
                         child: SingleChildScrollView(
                           child: trail.accessible
                               ? _UnlockedTrailDetails(trail: trail)
-                              : lockedMentorTrail
-                              ? _LockedMentorTrailState(
-                                  isRewardLoading: isRewardLoading,
-                                  onWatchAd: () async {
-                                    if (isRewardLoading) {
-                                      return;
-                                    }
-                                    setDialogState(() {
-                                      isRewardLoading = true;
-                                      rewardStatusMessage = null;
-                                    });
-                                    try {
-                                      final result = await ref
-                                          .read(
-                                            mentorPremiumPassRewardServiceProvider,
-                                          )
-                                          .watchAdAndConfirm(
-                                            trailId: trail.id,
-                                            onAwaitingConfirmation: () {
-                                              if (!context.mounted) {
-                                                return;
-                                              }
-                                              setDialogState(() {
-                                                rewardStatusMessage =
-                                                    'Estamos confirmando seu passe de mentoria...';
-                                              });
-                                            },
-                                          );
-                                      if (!context.mounted) {
-                                        return;
-                                      }
-                                      if (result.confirmed) {
-                                        AppSnackBar.show(
-                                          context,
-                                          message:
-                                              'Passe de mentoria liberado por hoje.',
-                                          icon: Icons.workspace_premium_rounded,
-                                        );
-                                        Navigator.of(context).pop();
-                                      } else {
-                                        final message =
-                                            result.status ==
-                                                MentorPremiumPassRewardStatus
-                                                    .unavailable
-                                            ? 'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.'
-                                            : 'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.';
-                                        setDialogState(() {
-                                          rewardStatusMessage = message;
-                                        });
-                                        AppSnackBar.show(
-                                          context,
-                                          message: message,
-                                          icon: Icons.workspace_premium_rounded,
-                                        );
-                                      }
-                                    } finally {
-                                      if (context.mounted) {
-                                        setDialogState(
-                                          () => isRewardLoading = false,
-                                        );
-                                      }
-                                    }
-                                  },
-                                  statusMessage: rewardStatusMessage,
-                                  onOpenPremium: onOpenPremium == null
-                                      ? null
-                                      : () {
-                                          Navigator.of(context).pop();
-                                          onOpenPremium?.call();
-                                        },
-                                )
                               : SoftPremiumPrompt(
                                   icon: Icons.auto_stories_rounded,
-                                  title:
-                                      'Esta trilha aprofunda sua evolução emocional',
-                                  message:
-                                      'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua jornada com mais contexto, sem anúncios e sem pressão.',
+                                  title: lockedMentorTrail
+                                      ? 'Mentoria disponível no Premium'
+                                      : 'Esta trilha aprofunda sua evolução emocional',
+                                  message: lockedMentorTrail
+                                      ? 'O Mentor Evolua e as trilhas de mentoria ficam no Premium para manter uma experiência profunda, contínua e sem anúncios.'
+                                      : 'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua jornada com mais contexto, sem anúncios e sem pressão.',
                                   benefit:
                                       'Premium libera trilhas premium, Espelho da Evolução completo, histórico completo e insights avançados.',
                                   primaryLabel: 'Aprofundar com Premium',
@@ -2182,51 +2100,6 @@ class _UnlockedTrailDetails extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _LockedMentorTrailState extends StatelessWidget {
-  const _LockedMentorTrailState({
-    required this.isRewardLoading,
-    required this.onWatchAd,
-    required this.statusMessage,
-    required this.onOpenPremium,
-  });
-
-  final bool isRewardLoading;
-  final VoidCallback onWatchAd;
-  final String? statusMessage;
-  final VoidCallback? onOpenPremium;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        RewardedAdPrompt(
-          title: 'Libere esta mentoria por hoje',
-          message:
-              'Assista a um anúncio recompensado para acessar trilhas de mentoria até o fim do dia. Se preferir uma jornada sem anúncios, o Premium libera o acesso completo.',
-          rewardLabel:
-              'Recompensa: passe de mentoria premium até o fim do dia.',
-          rewardedAdAvailable: true,
-          isRewardLoading: isRewardLoading,
-          onWatchRewardedAd: onWatchAd,
-          onOpenPremium: onOpenPremium,
-          premiumLabel: 'Aprofundar com Premium',
-        ),
-        if (statusMessage != null) ...[
-          const SizedBox(height: 12),
-          Text(
-            statusMessage!,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: context.evoluaColors.textSecondary,
             ),
           ),
         ],

@@ -61,18 +61,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   Future<void> refresh() async {
     final current = state.asData?.value;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () async {
-        final result = await _fetch(page: current?.result.page ?? 0);
-        return _stateFromResult(
+    state = await AsyncValue.guard(() async {
+      final result = await _fetch(page: current?.result.page ?? 0);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(
           result,
-          latestCreatedCheckIn: _canonicalLatestCheckIn(
-            result,
-            current?.latestCreatedCheckIn,
-          ),
-        );
-      },
-    );
+          current?.latestCreatedCheckIn,
+        ),
+      );
+    });
   }
 
   Future<void> applyFilters({
@@ -90,18 +88,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
 
     final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () async {
-        final result = await _fetch(page: 0);
-        return _stateFromResult(
+    state = await AsyncValue.guard(() async {
+      final result = await _fetch(page: 0);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(
           result,
-          latestCreatedCheckIn: _canonicalLatestCheckIn(
-            result,
-            latestCreatedCheckIn,
-          ),
-        );
-      },
-    );
+          latestCreatedCheckIn,
+        ),
+      );
+    });
   }
 
   Future<void> clearFilters() async {
@@ -113,35 +109,31 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
 
     final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () async {
-        final result = await _fetch(page: 0);
-        return _stateFromResult(
+    state = await AsyncValue.guard(() async {
+      final result = await _fetch(page: 0);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(
           result,
-          latestCreatedCheckIn: _canonicalLatestCheckIn(
-            result,
-            latestCreatedCheckIn,
-          ),
-        );
-      },
-    );
+          latestCreatedCheckIn,
+        ),
+      );
+    });
   }
 
   Future<void> goToPage(int page) async {
     final latestCreatedCheckIn = state.asData?.value.latestCreatedCheckIn;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () async {
-        final result = await _fetch(page: page);
-        return _stateFromResult(
+    state = await AsyncValue.guard(() async {
+      final result = await _fetch(page: page);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(
           result,
-          latestCreatedCheckIn: _canonicalLatestCheckIn(
-            result,
-            latestCreatedCheckIn,
-          ),
-        );
-      },
-    );
+          latestCreatedCheckIn,
+        ),
+      );
+    });
   }
 
   void setGrouping(String grouping) {
@@ -188,6 +180,29 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         latestCreatedCheckIn: _canonicalLatestCheckIn(result, created),
       );
     });
+  }
+
+  Future<CheckIn?> generateDeepReadingForLatest() async {
+    final current = state.asData?.value;
+    final latest = current?.latestCreatedCheckIn;
+    if (latest == null) {
+      return null;
+    }
+
+    final repository = ref.read(checkInRepositoryProvider);
+    state = const AsyncLoading();
+    CheckIn? refreshed;
+    state = await AsyncValue.guard(() async {
+      refreshed = await repository.generateDeepReading(latest.id);
+      ref.invalidate(currentJourneyTrailProvider);
+      ref.invalidate(trailControllerProvider);
+      final result = await _fetch(page: current?.result.page ?? 0);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(result, refreshed),
+      );
+    });
+    return refreshed;
   }
 
   Future<PaginatedResponse<CheckIn>> _fetch({required int page}) {

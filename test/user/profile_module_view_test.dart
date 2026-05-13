@@ -808,7 +808,7 @@ void main() {
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
 
-    await _pumpEvolutionMirror(tester);
+    await _pumpEvolutionMirror(tester, premium: true);
 
     expect(find.text('Espelho da Evolução'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
@@ -836,6 +836,7 @@ void main() {
 
     await _pumpEvolutionMirror(
       tester,
+      premium: true,
       trailRepository: _FakeTrailRepository(
         currentJourney: trail,
         journey: _testJourney(trail),
@@ -869,6 +870,7 @@ void main() {
 
     await _pumpEvolutionMirror(
       tester,
+      premium: true,
       checkInRepository: _FakeCheckInRepository(items: _evolutionCheckIns()),
       futureMessageRepository: _FakeFutureMessageRepository(
         deliveredItems: [_deliveredFutureMessage()],
@@ -893,6 +895,7 @@ void main() {
 
     await _pumpEvolutionMirror(
       tester,
+      premium: true,
       trailRepository: _FakeTrailRepository(
         currentJourney: trail,
         journey: _testCompletedJourney(trail),
@@ -1318,6 +1321,7 @@ Future<void> _pumpEvolutionMirror(
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
   FutureMessageRepository? futureMessageRepository,
+  bool premium = false,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 1100));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -1331,7 +1335,7 @@ Future<void> _pumpEvolutionMirror(
         ),
         profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         subscriptionRepositoryProvider.overrideWithValue(
-          _FakeSubscriptionRepository(),
+          _FakeSubscriptionRepository(premium: premium),
         ),
         trailRepositoryProvider.overrideWithValue(
           trailRepository ?? _FakeTrailRepository(),
@@ -1969,6 +1973,10 @@ class _FakeProfileRepository implements ProfileRepository {
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
+  _FakeSubscriptionRepository({this.premium = false});
+
+  final bool premium;
+
   @override
   Future<List<PlanView>> listPlans() async {
     return const [
@@ -1999,15 +2007,15 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<CurrentSubscription?> current() async {
-    return const CurrentSubscription(
-      planCode: 'essential-free',
+    return CurrentSubscription(
+      planCode: premium ? 'premium-monthly' : 'essential-free',
       status: 'ACTIVE',
       billingCycle: 'MONTHLY',
-      premium: false,
-      adsEnabled: true,
-      aiQuotaRemainingToday: 1,
+      premium: premium,
+      adsEnabled: !premium,
+      aiQuotaRemainingToday: premium ? 20 : 1,
       mentorPremiumPassActive: false,
-      mentorRewardedAdAvailable: true,
+      mentorRewardedAdAvailable: false,
     );
   }
 
@@ -2026,7 +2034,10 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
-  Future<AdRewardSession> createRewardSession({required String rewardType}) {
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+    String? contextId,
+  }) {
     throw UnimplementedError();
   }
 
@@ -2041,6 +2052,22 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       billingCycle: 'MONTHLY',
       status: 'PENDING',
       premium: true,
+    );
+  }
+
+  @override
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  }) async {
+    return MonetizationAccessStatus(
+      resource: resource,
+      contextId: contextId,
+      allowed: false,
+      premium: false,
+      rewardedAdAvailable: true,
+      upgradeRecommended: true,
+      limitMessage: null,
     );
   }
 }
@@ -2189,6 +2216,23 @@ class _FakeCheckInRepository implements CheckInRepository {
       recommendedPractice: 'Respire por alguns minutos.',
       aiInsight: null,
       createdAt: DateTime(2026, 1, 1),
+    );
+  }
+
+  @override
+  Future<CheckIn> generateDeepReading(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por alguns minutos.',
+        aiInsight: null,
+        createdAt: DateTime(2026, 1, 1),
+      ),
     );
   }
 }

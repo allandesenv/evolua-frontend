@@ -20,7 +20,13 @@ void main() {
       createdAt: DateTime(2026, 5, 4, 10),
       aiInsight: null,
     );
-    final container = _container(_FakeCheckInRepository(lists: [[latest, previous]]));
+    final container = _container(
+      _FakeCheckInRepository(
+        lists: [
+          [latest, previous],
+        ],
+      ),
+    );
     addTearDown(container.dispose);
 
     final state = await container.read(checkInControllerProvider.future);
@@ -51,11 +57,9 @@ void main() {
     addTearDown(container.dispose);
     await container.read(checkInControllerProvider.future);
 
-    await container.read(checkInControllerProvider.notifier).create(
-          mood: 'calmo',
-          reflection: null,
-          energyLevel: 7,
-        );
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: null, energyLevel: 7);
 
     final state = container.read(checkInControllerProvider).asData?.value;
     expect(state?.latestCreatedCheckIn?.id, 99);
@@ -65,76 +69,80 @@ void main() {
     );
   });
 
-  test('refresh replaces partial latest check-in with listed full version', () async {
-    final partial = _checkIn(
-      id: 20,
-      createdAt: DateTime(2026, 5, 5, 10),
-      aiInsight: null,
-    );
-    final complete = _checkIn(
-      id: 20,
-      createdAt: DateTime(2026, 5, 5, 10),
-      aiInsight: _insight(insight: 'Leitura depois do refresh.'),
-    );
-    final repository = _FakeCheckInRepository(
-      createResult: partial,
-      lists: [
-        const <CheckIn>[],
-        [partial],
-        [complete],
-      ],
-    );
-    final container = _container(repository);
-    addTearDown(container.dispose);
-    await container.read(checkInControllerProvider.future);
-    await container.read(checkInControllerProvider.notifier).create(
-          mood: 'calmo',
-          reflection: null,
-          energyLevel: 7,
-        );
+  test(
+    'refresh replaces partial latest check-in with listed full version',
+    () async {
+      final partial = _checkIn(
+        id: 20,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: null,
+      );
+      final complete = _checkIn(
+        id: 20,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura depois do refresh.'),
+      );
+      final repository = _FakeCheckInRepository(
+        createResult: partial,
+        lists: [
+          const <CheckIn>[],
+          [partial],
+          [complete],
+        ],
+      );
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 7);
 
-    await container.read(checkInControllerProvider.notifier).refresh();
+      await container.read(checkInControllerProvider.notifier).refresh();
 
-    final state = container.read(checkInControllerProvider).asData?.value;
-    expect(
-      state?.latestCreatedCheckIn?.aiInsight?.insight,
-      'Leitura depois do refresh.',
-    );
-  });
+      final state = container.read(checkInControllerProvider).asData?.value;
+      expect(
+        state?.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura depois do refresh.',
+      );
+    },
+  );
 
-  test('filters keep canonical latest check-in when filtered list omits it', () async {
-    final latest = _checkIn(
-      id: 30,
-      createdAt: DateTime(2026, 5, 5, 10),
-      aiInsight: _insight(insight: 'Leitura preservada.'),
-    );
-    final filtered = _checkIn(
-      id: 29,
-      createdAt: DateTime(2026, 5, 4, 10),
-      aiInsight: null,
-    );
-    final repository = _FakeCheckInRepository(
-      lists: [
-        [latest],
-        [filtered],
-      ],
-    );
-    final container = _container(repository);
-    addTearDown(container.dispose);
-    await container.read(checkInControllerProvider.future);
+  test(
+    'filters keep canonical latest check-in when filtered list omits it',
+    () async {
+      final latest = _checkIn(
+        id: 30,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura preservada.'),
+      );
+      final filtered = _checkIn(
+        id: 29,
+        createdAt: DateTime(2026, 5, 4, 10),
+        aiInsight: null,
+      );
+      final repository = _FakeCheckInRepository(
+        lists: [
+          [latest],
+          [filtered],
+        ],
+      );
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
 
-    await container
-        .read(checkInControllerProvider.notifier)
-        .applyFilters(mood: 'ansioso');
+      await container
+          .read(checkInControllerProvider.notifier)
+          .applyFilters(mood: 'ansioso');
 
-    final state = container.read(checkInControllerProvider).asData?.value;
-    expect(state?.result.items.single.id, 29);
-    expect(state?.latestCreatedCheckIn?.id, 30);
-    expect(
-      state?.latestCreatedCheckIn?.aiInsight?.insight,
-      'Leitura preservada.',
-    );
-  });
+      final state = container.read(checkInControllerProvider).asData?.value;
+      expect(state?.result.items.single.id, 29);
+      expect(state?.latestCreatedCheckIn?.id, 30);
+      expect(
+        state?.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura preservada.',
+      );
+    },
+  );
 }
 
 ProviderContainer _container(CheckInRepository repository) {
@@ -189,11 +197,19 @@ class _FakeCheckInRepository implements CheckInRepository {
     required int energyLevel,
   }) async {
     return createResult ??
-        _checkIn(
-          id: 99,
-          createdAt: DateTime(2026, 5, 5, 10),
-          aiInsight: null,
-        );
+        _checkIn(id: 99, createdAt: DateTime(2026, 5, 5, 10), aiInsight: null);
+  }
+
+  @override
+  Future<CheckIn> generateDeepReading(int checkInId) async {
+    return _lists.isNotEmpty && _lists.first.isNotEmpty
+        ? _lists.first.first
+        : createResult ??
+              _checkIn(
+                id: checkInId,
+                createdAt: DateTime(2026, 5, 5, 10),
+                aiInsight: null,
+              );
   }
 }
 
@@ -233,4 +249,3 @@ CheckInAiInsight _insight({String insight = 'Leitura salva.'}) {
     fallbackUsed: false,
   );
 }
-

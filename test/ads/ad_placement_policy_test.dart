@@ -61,6 +61,22 @@ void main() {
     expect(
       AdPlacementPolicy.canShow(
         format: AdFormat.rewarded,
+        context: AdPlacementContext.advancedMirror,
+        premium: false,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.rewarded,
+        context: AdPlacementContext.specialReport,
+        premium: false,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.rewarded,
         context: AdPlacementContext.trailCatalog,
         premium: false,
       ),
@@ -83,6 +99,15 @@ void main() {
         context: AdPlacementContext.neutralNavigation,
         premium: false,
       ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.neutralNavigation,
+        premium: false,
+        interstitialEnabled: true,
+      ),
       isTrue,
     );
     expect(
@@ -92,6 +117,26 @@ void main() {
         premium: false,
       ),
       isFalse,
+    );
+  });
+
+  test('keeps native ads feature-flagged off by default', () {
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.native,
+        context: AdPlacementContext.feedNeutral,
+        premium: false,
+      ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.native,
+        context: AdPlacementContext.feedNeutral,
+        premium: false,
+        nativeAdsEnabled: true,
+      ),
+      isTrue,
     );
   });
 }

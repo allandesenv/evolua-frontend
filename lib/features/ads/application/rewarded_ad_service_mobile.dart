@@ -15,18 +15,25 @@ RewardedAdService createRewardedAdService(Ref ref) {
 class MobileRewardedAdService implements RewardedAdService {
   MobileRewardedAdService(this._repository);
 
+  static const _ssvConfirmationAttempts = 8;
+  static const _ssvConfirmationDelay = Duration(seconds: 2);
+
   final SubscriptionRepository _repository;
 
   @override
-  Future<bool> showRewardedAd({required String rewardType}) async {
+  Future<bool> showRewardedAd({
+    required String rewardType,
+    String? contextId,
+  }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return false;
     }
 
-    final session = await _repository.createRewardSession(rewardType: rewardType);
-    final adUnitId = Platform.isIOS
-        ? AppConfig.adMobIosRewardedAdUnitId
-        : AppConfig.adMobAndroidRewardedAdUnitId;
+    final session = await _repository.createRewardSession(
+      rewardType: rewardType,
+      contextId: contextId,
+    );
+    final adUnitId = _adUnitIdFor(rewardType);
 
     await MobileAds.instance.initialize();
 
@@ -71,12 +78,62 @@ class MobileRewardedAdService implements RewardedAdService {
       ),
     );
 
-    return completer.future.timeout(
+    final earned = await completer.future.timeout(
       const Duration(seconds: 75),
       onTimeout: () {
         rewardedAd?.dispose();
         return earnedReward;
       },
     );
+    if (!earned) {
+      return false;
+    }
+    return _waitForServerSideReward(
+      rewardType: rewardType,
+      contextId: contextId,
+    );
+  }
+
+  String _adUnitIdFor(String rewardType) {
+    final normalized = rewardType.trim().toUpperCase();
+    if (Platform.isIOS) {
+      return switch (normalized) {
+        'DEEP_EMOTIONAL_READING' ||
+        'AI_ACTION' => AppConfig.adMobIosRewardedAiExtraAdUnitId,
+        'PREMIUM_TRAIL_STEP' => AppConfig.adMobIosRewardedPremiumPassAdUnitId,
+        _ => AppConfig.adMobIosRewardedAdUnitId,
+      };
+    }
+    return switch (normalized) {
+      'DEEP_EMOTIONAL_READING' ||
+      'AI_ACTION' => AppConfig.adMobAndroidRewardedAiExtraAdUnitId,
+      'PREMIUM_TRAIL_STEP' => AppConfig.adMobAndroidRewardedPremiumPassAdUnitId,
+      _ => AppConfig.adMobAndroidRewardedAdUnitId,
+    };
+  }
+
+  Future<bool> _waitForServerSideReward({
+    required String rewardType,
+    String? contextId,
+  }) async {
+    for (var attempt = 0; attempt < _ssvConfirmationAttempts; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(_ssvConfirmationDelay);
+      }
+      try {
+        final access = await _repository.monetizationAccess(
+          resource: rewardType,
+          contextId: contextId,
+        );
+        if (access.allowed || access.entitlementExpiresAt != null) {
+          return true;
+        }
+      } catch (_) {
+        if (attempt == _ssvConfirmationAttempts - 1) {
+          rethrow;
+        }
+      }
+    }
+    return false;
   }
 }

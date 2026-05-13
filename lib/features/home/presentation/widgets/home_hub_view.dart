@@ -99,7 +99,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     try {
       final rewarded = await ref
           .read(rewardedAdServiceProvider)
-          .showRewardedAd(rewardType: 'AI_ACTION');
+          .showRewardedAd(rewardType: 'DEEP_EMOTIONAL_READING');
       if (!mounted) {
         return;
       }

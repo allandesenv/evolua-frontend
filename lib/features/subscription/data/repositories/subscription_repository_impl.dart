@@ -73,16 +73,22 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
   @override
   Future<AdRewardSession> createRewardSession({
     required String rewardType,
+    String? contextId,
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/ads/reward-session',
-      data: {'rewardType': rewardType},
+      data: {
+        'rewardType': rewardType,
+        if (contextId != null && contextId.trim().isNotEmpty)
+          'contextId': contextId.trim(),
+      },
     );
     final json = ApiPayloadParser.dataMap(response.data);
     return AdRewardSession(
       id: json['id']?.toString() ?? '',
       provider: json['provider']?.toString() ?? 'ADMOB',
       rewardType: json['rewardType']?.toString() ?? rewardType,
+      contextId: json['contextId']?.toString(),
       status: json['status']?.toString() ?? 'CREATED',
       customData:
           json['customData']?.toString() ?? json['id']?.toString() ?? '',
@@ -92,6 +98,34 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       grantedAt: json['grantedAt'] == null
           ? null
           : DateTime.tryParse(json['grantedAt'].toString()),
+    );
+  }
+
+  @override
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  }) async {
+    final response = await _dio.get<dynamic>(
+      '/v1/monetization/access',
+      queryParameters: {
+        'resource': resource,
+        if (contextId != null && contextId.trim().isNotEmpty)
+          'contextId': contextId.trim(),
+      },
+    );
+    final json = ApiPayloadParser.dataMap(response.data);
+    return MonetizationAccessStatus(
+      resource: json['resource']?.toString() ?? resource,
+      contextId: json['contextId']?.toString(),
+      allowed: json['allowed'] as bool? ?? false,
+      premium: json['premium'] as bool? ?? false,
+      rewardedAdAvailable: json['rewardedAdAvailable'] as bool? ?? false,
+      upgradeRecommended: json['upgradeRecommended'] as bool? ?? true,
+      limitMessage: json['limitMessage']?.toString(),
+      entitlementExpiresAt: json['entitlementExpiresAt'] == null
+          ? null
+          : DateTime.tryParse(json['entitlementExpiresAt'].toString()),
     );
   }
 

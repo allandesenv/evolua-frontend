@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
@@ -56,6 +58,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   String _selectedMood = 'Calmo';
   double _energyLevel = 7;
   bool _isSubmitting = false;
+  bool _isRewardLoading = false;
 
   @override
   void initState() {
@@ -101,6 +104,16 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       }
 
       _reflectionController.clear();
+      final insight = ref
+          .read(checkInControllerProvider)
+          .asData
+          ?.value
+          .latestCreatedCheckIn
+          ?.aiInsight;
+      if (insight?.quotaLimited == true) {
+        await _showDeepReadingUnlockSheet();
+        return;
+      }
       AppSnackBar.show(
         context,
         message: 'Check-in registrado. Continue no seu ritmo.',
@@ -111,6 +124,73 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
+    }
+  }
+
+  Future<void> _showDeepReadingUnlockSheet() async {
+    if (!mounted) {
+      return;
+    }
+    var completed = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 18,
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 18,
+        ),
+        child: RewardedAdPrompt(
+          title: 'Deseja desbloquear mais uma leitura emocional?',
+          message:
+              'Seu check-in foi salvo. A leitura básica continua disponível, e você pode liberar uma leitura aprofundada assistindo a um anúncio ou assinando Premium.',
+          rewardLabel: 'Recompensa: +1 leitura emocional aprofundada hoje.',
+          rewardedAdAvailable: true,
+          isRewardLoading: _isRewardLoading,
+          onWatchRewardedAd: () async {
+            if (_isRewardLoading) {
+              return;
+            }
+            setState(() => _isRewardLoading = true);
+            final unlocked = await ref
+                .read(monetizationAccessControllerProvider.notifier)
+                .unlockWithRewardedAd(resource: 'DEEP_EMOTIONAL_READING');
+            if (unlocked) {
+              await ref
+                  .read(checkInControllerProvider.notifier)
+                  .generateDeepReadingForLatest();
+            }
+            if (!mounted || !sheetContext.mounted) {
+              return;
+            }
+            setState(() => _isRewardLoading = false);
+            Navigator.of(sheetContext).pop();
+            AppSnackBar.show(
+              context,
+              message: unlocked
+                  ? 'Leitura aprofundada liberada para hoje.'
+                  : 'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.',
+              icon: unlocked
+                  ? Icons.ondemand_video_rounded
+                  : Icons.info_outline_rounded,
+            );
+            completed = true;
+            widget.onCompleted?.call();
+          },
+          onOpenPremium: () {
+            Navigator.of(sheetContext).pop();
+            completed = true;
+            widget.onCompleted?.call();
+          },
+          premiumLabel: 'Assinar Premium',
+        ),
+      ),
+    );
+    if (mounted && !_isRewardLoading && !completed) {
+      widget.onCompleted?.call();
     }
   }
 

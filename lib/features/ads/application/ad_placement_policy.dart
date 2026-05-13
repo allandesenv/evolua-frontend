@@ -1,5 +1,8 @@
 enum AdPlacementContext {
   aiQuotaLimit,
+  advancedMirror,
+  smartRecommendation,
+  specialReport,
   premiumTrailPreview,
   trailCatalog,
   communitiesList,
@@ -13,9 +16,10 @@ enum AdPlacementContext {
   ritualResult,
   sensitiveEvolutionMirror,
   futureMessages,
+  feedNeutral,
 }
 
-enum AdFormat { rewarded, banner, interstitial }
+enum AdFormat { rewarded, banner, interstitial, native }
 
 class AdPlacementPolicy {
   const AdPlacementPolicy._();
@@ -24,6 +28,8 @@ class AdPlacementPolicy {
     required AdFormat format,
     required AdPlacementContext context,
     required bool premium,
+    bool nativeAdsEnabled = false,
+    bool interstitialEnabled = false,
   }) {
     if (premium || _sensitiveContexts.contains(context)) {
       return false;
@@ -32,7 +38,9 @@ class AdPlacementPolicy {
     return switch (format) {
       AdFormat.rewarded => _rewardedContexts.contains(context),
       AdFormat.banner => _bannerContexts.contains(context),
-      AdFormat.interstitial => _interstitialContexts.contains(context),
+      AdFormat.interstitial =>
+        interstitialEnabled && _interstitialContexts.contains(context),
+      AdFormat.native => nativeAdsEnabled && _nativeContexts.contains(context),
     };
   }
 
@@ -53,6 +61,9 @@ class AdPlacementPolicy {
 
   static const _rewardedContexts = {
     AdPlacementContext.aiQuotaLimit,
+    AdPlacementContext.advancedMirror,
+    AdPlacementContext.smartRecommendation,
+    AdPlacementContext.specialReport,
     AdPlacementContext.premiumTrailPreview,
   };
 
@@ -64,4 +75,10 @@ class AdPlacementPolicy {
   };
 
   static const _interstitialContexts = {AdPlacementContext.neutralNavigation};
+
+  static const _nativeContexts = {
+    AdPlacementContext.feedNeutral,
+    AdPlacementContext.trailCatalog,
+    AdPlacementContext.communitiesList,
+  };
 }

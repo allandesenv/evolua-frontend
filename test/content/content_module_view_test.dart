@@ -15,7 +15,6 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_progress.
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
-import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
@@ -103,7 +102,7 @@ void main() {
       );
     });
 
-    testWidgets('locked mentor premium trail offers rewarded ad in details', (
+    testWidgets('locked mentor premium trail offers Premium-only details', (
       tester,
     ) async {
       await _setCompactSurface(tester);
@@ -131,15 +130,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Mentoria premium'), findsOneWidget);
-      expect(find.text('Anuncio libera hoje'), findsOneWidget);
+      expect(find.text('Premium'), findsWidgets);
 
       await tester.ensureVisible(find.text('Ver detalhes'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ver detalhes'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Libere esta mentoria por hoje'), findsOneWidget);
-      expect(find.text('Assistir anúncio'), findsOneWidget);
+      expect(find.text('Mentoria disponível no Premium'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
       expect(find.text('Aprofundar com Premium'), findsOneWidget);
 
       await tester.ensureVisible(find.text('Aprofundar com Premium'));
@@ -151,7 +150,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('mentor rewarded pass refreshes subscription and trails', (
+    testWidgets('mentor premium trail does not use rewarded pass refresh', (
       tester,
     ) async {
       await _setCompactSurface(tester);
@@ -179,10 +178,6 @@ void main() {
           trailRepository: trailRepository,
           subscriptionRepository: subscriptionRepository,
           rewardedAdService: rewardedService,
-          pollingConfig: const MentorPremiumPassPollingConfig(
-            timeout: Duration(milliseconds: 80),
-            interval: Duration(milliseconds: 1),
-          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -191,22 +186,16 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ver detalhes'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Assistir anúncio'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Assistir anúncio'));
-      await tester.pumpAndSettle();
-
-      expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
-      expect(subscriptionRepository.currentCallCount, greaterThanOrEqualTo(2));
-      expect(trailRepository.listCallCount, greaterThanOrEqualTo(2));
-      expect(find.text('Anuncio libera hoje'), findsNothing);
-      expect(find.text('Continuar trilha'), findsOneWidget);
+      expect(find.text('Mentoria disponível no Premium'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
+      expect(rewardedService.lastRewardType, isNull);
+      expect(subscriptionRepository.currentCallCount, greaterThanOrEqualTo(1));
+      expect(trailRepository.listCallCount, 1);
+      expect(find.text('Continuar trilha'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('mentor trail stays blocked when SSV confirmation times out', (
-      tester,
-    ) async {
+    testWidgets('mentor trail stays blocked without Premium', (tester) async {
       await _setCompactSurface(tester);
       final rewardedService = _FakeRewardedAdService();
       final subscriptionRepository = _FakeSubscriptionRepository();
@@ -230,10 +219,6 @@ void main() {
           trailRepository: trailRepository,
           subscriptionRepository: subscriptionRepository,
           rewardedAdService: rewardedService,
-          pollingConfig: const MentorPremiumPassPollingConfig(
-            timeout: Duration(milliseconds: 20),
-            interval: Duration(milliseconds: 5),
-          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -242,18 +227,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ver detalhes'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Assistir anúncio'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Assistir anúncio'));
-      await tester.pumpAndSettle();
-
-      expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
-      expect(
-        find.text(
-          'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.',
-        ),
-        findsWidgets,
-      );
+      expect(find.text('Mentoria disponível no Premium'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
+      expect(rewardedService.lastRewardType, isNull);
       expect(find.text('Continuar trilha'), findsNothing);
       expect(trailRepository.listCallCount, 1);
       expect(tester.takeException(), isNull);
@@ -310,7 +286,6 @@ Widget _testApp({
   TrailRepository? trailRepository,
   SubscriptionRepository? subscriptionRepository,
   RewardedAdService? rewardedAdService,
-  MentorPremiumPassPollingConfig? pollingConfig,
   VoidCallback? onOpenPremium,
 }) {
   SharedPreferences.setMockInitialValues({});
@@ -326,8 +301,6 @@ Widget _testApp({
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
       if (rewardedAdService != null)
         rewardedAdServiceProvider.overrideWithValue(rewardedAdService),
-      if (pollingConfig != null)
-        mentorPremiumPassPollingConfigProvider.overrideWithValue(pollingConfig),
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.dark(),
@@ -460,7 +433,10 @@ class _FakeRewardedAdService implements RewardedAdService {
   String? lastRewardType;
 
   @override
-  Future<bool> showRewardedAd({required String rewardType}) async {
+  Future<bool> showRewardedAd({
+    required String rewardType,
+    String? contextId,
+  }) async {
     lastRewardType = rewardType;
     return true;
   }
@@ -503,7 +479,10 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
-  Future<AdRewardSession> createRewardSession({required String rewardType}) {
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+    String? contextId,
+  }) {
     throw UnimplementedError();
   }
 
@@ -513,6 +492,21 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
     required String frontendBaseUrl,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  }) async {
+    return MonetizationAccessStatus(
+      resource: resource,
+      contextId: contextId,
+      allowed: false,
+      premium: false,
+      rewardedAdAvailable: true,
+      upgradeRecommended: true,
+    );
   }
 }
 
