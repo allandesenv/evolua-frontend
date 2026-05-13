@@ -8,6 +8,7 @@ import 'package:evolua_frontend/features/content/domain/entities/journey_chat_re
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/journey_chat_repository.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
@@ -334,6 +335,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -359,6 +361,16 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Trail> update({
     required int id,
     required String title,
@@ -367,6 +379,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }

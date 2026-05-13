@@ -1,32 +1,24 @@
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_video.dart';
-import 'package:evolua_frontend/features/content/domain/entities/trail_step_video_progress.dart';
 
-class TrailJourneyStep {
-  const TrailJourneyStep({
-    required this.index,
+class TrailStep {
+  const TrailStep({
+    required this.position,
     required this.title,
     required this.type,
     required this.summary,
+    required this.durationMinutes,
     required this.content,
-    required this.status,
-    required this.estimatedMinutes,
     this.video,
-    this.videoProgress,
     required this.mediaLinks,
   });
 
-  final int index;
+  final int position;
   final String title;
   final String type;
   final String summary;
+  final int durationMinutes;
   final String content;
-  final String status;
-  final int estimatedMinutes;
   final TrailStepVideo? video;
-  final TrailStepVideoProgress? videoProgress;
   final List<TrailMediaLink> mediaLinks;
-
-  bool get isCompleted => status == 'completed';
-  bool get isCurrent => status == 'current';
 }

@@ -8,6 +8,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey.d
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
@@ -197,24 +198,16 @@ void main() {
       );
 
       await tester.pumpWidget(
-        _testApp(
-          checkInRepository: repository,
-          now: DateTime(2026, 5, 7, 13),
-        ),
+        _testApp(checkInRepository: repository, now: DateTime(2026, 5, 7, 13)),
       );
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining('Depois do proximo check-in'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Depois do proximo check-in'), findsOneWidget);
 
       final context = tester.element(find.byType(HomeHubView));
       final container = ProviderScope.containerOf(context);
-      await container.read(checkInControllerProvider.notifier).create(
-            mood: 'ansioso',
-            reflection: null,
-            energyLevel: 6,
-          );
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'ansioso', reflection: null, energyLevel: 6);
       await tester.pumpAndSettle();
 
       expect(
@@ -766,6 +759,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -787,6 +781,7 @@ class _FakeTrailRepository implements TrailRepository {
         title: 'Respirar',
         summary: 'Dois minutos de presenca.',
         content: 'Respire por quatro ciclos.',
+        type: 'EXERCISE',
         status: 'completed',
         estimatedMinutes: 2,
         mediaLinks: [],
@@ -796,6 +791,7 @@ class _FakeTrailRepository implements TrailRepository {
         title: 'Escolher',
         summary: 'Uma proxima acao simples.',
         content: 'Escolha uma acao pequena.',
+        type: 'REFLECTION',
         status: 'current',
         estimatedMinutes: 4,
         mediaLinks: [],
@@ -827,6 +823,16 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Trail> update({
     required int id,
     required String title,
@@ -835,6 +841,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -987,6 +994,7 @@ Trail _testTrail() {
     sourceStyle: 'briefing',
     accessible: true,
     mediaLinks: const [],
+    steps: const [],
     createdAt: DateTime(2026, 1, 1),
   );
 }

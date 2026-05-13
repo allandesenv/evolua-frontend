@@ -13,6 +13,7 @@ import 'package:evolua_frontend/features/social/application/community_controller
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/home/presentation/widgets/admin_panel_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
@@ -36,6 +37,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   SocialModuleTab _spaceSection = SocialModuleTab.featured;
   final SocialFeedScope _reflectionScope = SocialFeedScope.moment;
   ProfileModuleSection _profileSection = ProfileModuleSection.overview;
+  AdminPanelSection _adminSection = AdminPanelSection.overview;
   final List<_DashboardLocation> _history = [];
   bool _handledBillingReturn = false;
 
@@ -50,6 +52,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _mirrorIndex = 3;
   static const _profileIndex = 4;
   static const _mentorIndex = 5;
+  static const _adminIndex = 6;
 
   _DashboardLocation _currentLocation() {
     return _DashboardLocation(
@@ -57,6 +60,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       trailSection: _trailSection,
       spaceSection: _spaceSection,
       profileSection: _profileSection,
+      adminSection: _adminSection,
     );
   }
 
@@ -72,6 +76,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _trailSection = location.trailSection;
     _spaceSection = location.spaceSection;
     _profileSection = location.profileSection;
+    _adminSection = location.adminSection;
   }
 
   void _goTo(int index, {bool recordHistory = true}) {
@@ -131,6 +136,18 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
+  void _openAdminSection(AdminPanelSection section) {
+    if (_selectedIndex == _adminIndex && _adminSection == section) {
+      return;
+    }
+
+    setState(() {
+      _pushCurrentLocation();
+      _selectedIndex = _adminIndex;
+      _adminSection = section;
+    });
+  }
+
   void _handleMobileBack() {
     setState(() {
       if (_history.isNotEmpty) {
@@ -170,6 +187,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Widget build(BuildContext context) {
     final isCompact = ResponsiveBreakpoints.isCompact(context);
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
+    final session = ref.watch(authControllerProvider).asData?.value;
+    final isAdmin = session?.isAdmin ?? false;
 
     final content = _DashboardContent(
       selectedIndex: _selectedIndex,
@@ -177,10 +196,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       spaceSection: _spaceSection,
       reflectionScope: _reflectionScope,
       profileSection: _profileSection,
+      adminSection: _adminSection,
       onNavigate: _goTo,
       onOpenSpacesSection: _openSpacesSection,
       onOpenMentor: () => _goTo(_mentorIndex),
       onOpenProfileSection: _openProfileSection,
+      onOpenAdminSection: _openAdminSection,
       onOpenFutureMessages: () => context.push('/future-messages'),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
@@ -203,9 +224,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         child: isCompact
             ? Column(
                 children: [
-                  Expanded(
-                    child: content,
-                  ),
+                  Expanded(child: content),
                   const SizedBox(height: 12),
                   PrimaryPanel(
                     padding: const EdgeInsets.symmetric(
@@ -258,9 +277,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                 Expanded(
                                   child: SingleChildScrollView(
                                     child: Column(
-                                      children: List.generate(
-                                        _destinations.length,
-                                        (index) {
+                                      children: [
+                                        ...List.generate(_destinations.length, (
+                                          index,
+                                        ) {
                                           final item = _destinations[index];
                                           final isSelected =
                                               index == _selectedIndex;
@@ -349,8 +369,56 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                               },
                                             ),
                                           );
-                                        },
-                                      ),
+                                        }),
+                                        if (isAdmin)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 10,
+                                            ),
+                                            child: _NavEntry(
+                                              item: const _NavItem(
+                                                label: 'Painel Admin',
+                                                icon: Icons
+                                                    .admin_panel_settings_rounded,
+                                              ),
+                                              isSelected:
+                                                  _selectedIndex == _adminIndex,
+                                              onTap: () => _goTo(_adminIndex),
+                                              submenu:
+                                                  _selectedIndex == _adminIndex
+                                                  ? _buildDesktopSubmenu(
+                                                      context,
+                                                      entries: [
+                                                        _SubnavEntry(
+                                                          label: 'Trilhas',
+                                                          selected:
+                                                              _adminSection ==
+                                                              AdminPanelSection
+                                                                  .trails,
+                                                          onTap: () =>
+                                                              _openAdminSection(
+                                                                AdminPanelSection
+                                                                    .trails,
+                                                              ),
+                                                        ),
+                                                        _SubnavEntry(
+                                                          label: 'Notificacoes',
+                                                          selected:
+                                                              _adminSection ==
+                                                              AdminPanelSection
+                                                                  .notifications,
+                                                          onTap: () =>
+                                                              _openAdminSection(
+                                                                AdminPanelSection
+                                                                    .notifications,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -376,12 +444,14 @@ class _DashboardLocation {
     required this.trailSection,
     required this.spaceSection,
     required this.profileSection,
+    required this.adminSection,
   });
 
   final int selectedIndex;
   final ContentModuleSection trailSection;
   final SocialModuleTab spaceSection;
   final ProfileModuleSection profileSection;
+  final AdminPanelSection adminSection;
 
   @override
   bool operator ==(Object other) {
@@ -389,12 +459,18 @@ class _DashboardLocation {
         other.selectedIndex == selectedIndex &&
         other.trailSection == trailSection &&
         other.spaceSection == spaceSection &&
-        other.profileSection == profileSection;
+        other.profileSection == profileSection &&
+        other.adminSection == adminSection;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(selectedIndex, trailSection, spaceSection, profileSection);
+  int get hashCode => Object.hash(
+    selectedIndex,
+    trailSection,
+    spaceSection,
+    profileSection,
+    adminSection,
+  );
 }
 
 class _DashboardContent extends ConsumerWidget {
@@ -404,10 +480,12 @@ class _DashboardContent extends ConsumerWidget {
     required this.spaceSection,
     required this.reflectionScope,
     required this.profileSection,
+    required this.adminSection,
     required this.onNavigate,
     required this.onOpenSpacesSection,
     required this.onOpenMentor,
     required this.onOpenProfileSection,
+    required this.onOpenAdminSection,
     required this.onOpenFutureMessages,
     required this.onLogout,
   });
@@ -417,10 +495,12 @@ class _DashboardContent extends ConsumerWidget {
   final SocialModuleTab spaceSection;
   final SocialFeedScope reflectionScope;
   final ProfileModuleSection profileSection;
+  final AdminPanelSection adminSection;
   final void Function(int index) onNavigate;
   final void Function(SocialModuleTab section) onOpenSpacesSection;
   final VoidCallback onOpenMentor;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final void Function(AdminPanelSection section) onOpenAdminSection;
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onLogout;
 
@@ -500,6 +580,12 @@ class _DashboardContent extends ConsumerWidget {
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
+      session?.isAdmin == true
+          ? AdminPanelView(
+              section: adminSection,
+              onOpenSection: onOpenAdminSection,
+            )
+          : const AdminAccessDeniedPanel(),
     ];
 
     return Column(
@@ -527,6 +613,9 @@ class _DashboardContent extends ConsumerWidget {
                   profile: profile,
                   onOpenCheckIn: () => context.push('/check-in'),
                   onOpenProfileSection: onOpenProfileSection,
+                  onOpenAdminPanel: session?.isAdmin == true
+                      ? () => onOpenAdminSection(AdminPanelSection.overview)
+                      : null,
                   onOpenFutureMessages: onOpenFutureMessages,
                   onLogout: onLogout,
                 ),
@@ -593,6 +682,11 @@ class _DashboardContent extends ConsumerWidget {
       3 => 'Espelho',
       4 => 'Perfil',
       5 => 'Mentor Evolua',
+      6 => switch (adminSection) {
+        AdminPanelSection.overview => 'Painel Admin',
+        AdminPanelSection.trails => 'Admin Trilhas',
+        AdminPanelSection.notifications => 'Admin Notificacoes',
+      },
       _ => 'Evolua',
     };
   }
@@ -604,6 +698,7 @@ class _DashboardContent extends ConsumerWidget {
       3 => 'profile-${ProfileModuleSection.evolutionMirror.name}',
       4 => 'profile-${profileSection.name}',
       5 => 'mentor',
+      6 => 'admin-${adminSection.name}',
       _ => 'main-$selectedIndex',
     };
   }
@@ -789,6 +884,7 @@ class _HeaderActions extends StatelessWidget {
     required this.profile,
     required this.onOpenCheckIn,
     required this.onOpenProfileSection,
+    required this.onOpenAdminPanel,
     required this.onOpenFutureMessages,
     required this.onLogout,
   });
@@ -798,6 +894,7 @@ class _HeaderActions extends StatelessWidget {
   final Profile? profile;
   final VoidCallback onOpenCheckIn;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final VoidCallback? onOpenAdminPanel;
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onLogout;
 
@@ -815,6 +912,7 @@ class _HeaderActions extends StatelessWidget {
           session: session,
           profile: profile,
           onOpenProfileSection: onOpenProfileSection,
+          onOpenAdminPanel: onOpenAdminPanel,
           onOpenFutureMessages: onOpenFutureMessages,
           onLogout: onLogout,
         ),
@@ -869,6 +967,7 @@ class _AccountMenuButton extends StatelessWidget {
     required this.session,
     required this.profile,
     required this.onOpenProfileSection,
+    required this.onOpenAdminPanel,
     required this.onOpenFutureMessages,
     required this.onLogout,
   });
@@ -876,6 +975,7 @@ class _AccountMenuButton extends StatelessWidget {
   final AuthSession? session;
   final Profile? profile;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
+  final VoidCallback? onOpenAdminPanel;
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onLogout;
 
@@ -959,6 +1059,16 @@ class _AccountMenuButton extends StatelessWidget {
             label: 'Mensagens para o futuro',
           ),
         ),
+        if (onOpenAdminPanel != null) ...[
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            value: _AccountMenuAction.adminPanel,
+            child: _MenuLabel(
+              icon: Icons.admin_panel_settings_rounded,
+              label: 'Painel Admin',
+            ),
+          ),
+        ],
         const PopupMenuItem(
           value: _AccountMenuAction.settings,
           child: _MenuLabel(
@@ -1003,6 +1113,8 @@ class _AccountMenuButton extends StatelessWidget {
             onOpenProfileSection(ProfileModuleSection.evolutionMirror);
           case _AccountMenuAction.futureMessages:
             onOpenFutureMessages();
+          case _AccountMenuAction.adminPanel:
+            onOpenAdminPanel?.call();
           case _AccountMenuAction.settings:
             onOpenProfileSection(ProfileModuleSection.settingsPrivacy);
           case _AccountMenuAction.help:
@@ -1029,6 +1141,7 @@ enum _AccountMenuAction {
   plans,
   evolutionMirror,
   futureMessages,
+  adminPanel,
   settings,
   help,
   accessibility,

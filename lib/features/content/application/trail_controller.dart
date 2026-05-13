@@ -5,6 +5,7 @@ import 'package:evolua_frontend/features/content/data/repositories/trail_reposit
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,6 +56,25 @@ class TrailJourneyActions {
     _ref.invalidate(currentJourneyTrailProvider);
     return journey;
   }
+
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) async {
+    final journey = await _ref
+        .read(trailRepositoryProvider)
+        .updateVideoProgress(
+          trailId: trailId,
+          stepIndex: stepIndex,
+          watchedSeconds: watchedSeconds,
+          durationSeconds: durationSeconds,
+        );
+    _ref.invalidate(trailJourneyProvider(trailId));
+    _ref.invalidate(currentJourneyTrailProvider);
+    return journey;
+  }
 }
 
 class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
@@ -99,6 +119,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) async {
     final repository = ref.read(trailRepositoryProvider);
     state = const AsyncLoading();
@@ -110,6 +131,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
         category: category,
         premium: premium,
         mediaLinks: mediaLinks,
+        steps: steps,
       );
 
       return _fetch(page: 0);
@@ -124,6 +146,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) async {
     final repository = ref.read(trailRepositoryProvider);
     final currentPage = state.asData?.value.page ?? 0;
@@ -137,6 +160,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
         category: category,
         premium: premium,
         mediaLinks: mediaLinks,
+        steps: steps,
       );
 
       ref.invalidate(trailJourneyProvider(id));

@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
+
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
@@ -8,7 +9,6 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
-import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
@@ -21,7 +21,9 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 enum ContentModuleSection { journey, catalog }
 
@@ -44,42 +46,15 @@ class ContentModuleView extends ConsumerStatefulWidget {
 }
 
 class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _summaryController = TextEditingController();
-  final _contentController = TextEditingController();
-  final _categoryController = TextEditingController(text: 'ansiedade');
   final _searchController = TextEditingController();
-  final List<_EditableMediaLink> _mediaLinks = [_EditableMediaLink.live()];
-  bool _premium = false;
   bool? _premiumFilter;
   Trail? _selectedCatalogTrail;
-  Trail? _editingTrail;
   late ContentModuleSection _section;
 
   @override
   void initState() {
     super.initState();
     _section = widget.section;
-    ref.listenManual(trailControllerProvider, (previous, next) {
-      if (!next.hasError) {
-        return;
-      }
-
-      final error = next.error;
-      final message = error is DioException
-          ? (error.response?.data is Map<String, dynamic>
-                ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                      error.response?.data['message']?.toString() ??
-                      error.message ??
-                      'Nao foi possivel salvar a trilha.')
-                : error.message ?? 'Nao foi possivel salvar a trilha.')
-          : 'Nao foi possivel salvar a trilha.';
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    });
   }
 
   @override
@@ -92,127 +67,8 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _summaryController.dispose();
-    _contentController.dispose();
-    _categoryController.dispose();
     _searchController.dispose();
-    for (final link in _mediaLinks) {
-      link.dispose();
-    }
     super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final controller = ref.read(trailControllerProvider.notifier);
-    final editingTrail = _editingTrail;
-    if (editingTrail == null) {
-      await controller.create(
-        title: _titleController.text.trim(),
-        summary: _summaryController.text.trim(),
-        content: _contentController.text.trim(),
-        category: _categoryController.text.trim(),
-        premium: _premium,
-        mediaLinks: _buildMediaLinks(),
-      );
-    } else {
-      await controller.updateTrail(
-        id: editingTrail.id,
-        title: _titleController.text.trim(),
-        summary: _summaryController.text.trim(),
-        content: _contentController.text.trim(),
-        category: _categoryController.text.trim(),
-        premium: _premium,
-        mediaLinks: _buildMediaLinks(),
-      );
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    _resetAdminEditor();
-  }
-
-  void _resetAdminEditor() {
-    _titleController.clear();
-    _summaryController.clear();
-    _contentController.clear();
-    _categoryController.text = 'ansiedade';
-    setState(() {
-      _premium = false;
-      _editingTrail = null;
-      for (final link in _mediaLinks) {
-        link.dispose();
-      }
-      _mediaLinks
-        ..clear()
-        ..add(_EditableMediaLink.live());
-    });
-  }
-
-  void _startEditingTrail(Trail trail) {
-    _titleController.text = trail.title;
-    _summaryController.text = trail.summary;
-    _contentController.text = trail.content ?? '';
-    _categoryController.text = trail.category;
-    setState(() {
-      _premium = trail.premium;
-      _editingTrail = trail;
-      for (final link in _mediaLinks) {
-        link.dispose();
-      }
-      _mediaLinks
-        ..clear()
-        ..addAll(
-          trail.mediaLinks.isEmpty
-              ? [_EditableMediaLink.live()]
-              : trail.mediaLinks.map(_EditableMediaLink.fromLink),
-        );
-    });
-  }
-
-  Future<void> _confirmDeleteTrail(Trail trail) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Excluir trilha?'),
-        content: Text(
-          'A trilha "${trail.title}" sera removida, junto com o progresso associado a ela.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Excluir'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) {
-      return;
-    }
-
-    await ref.read(trailControllerProvider.notifier).delete(trail.id);
-    if (!mounted) {
-      return;
-    }
-
-    if (_editingTrail?.id == trail.id) {
-      _resetAdminEditor();
-    }
-    if (_selectedCatalogTrail?.id == trail.id) {
-      setState(() => _selectedCatalogTrail = null);
-    }
   }
 
   Future<void> _applyFilters() {
@@ -236,37 +92,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     });
   }
 
-  List<TrailMediaLink> _buildMediaLinks() {
-    return _mediaLinks
-        .where((item) => item.urlController.text.trim().isNotEmpty)
-        .map(
-          (item) => TrailMediaLink(
-            label: item.labelController.text.trim().isEmpty
-                ? 'Conteudo complementar'
-                : item.labelController.text.trim(),
-            url: item.urlController.text.trim(),
-            type: item.type == 'auto'
-                ? _detectType(item.urlController.text.trim())
-                : item.type,
-          ),
-        )
-        .toList();
-  }
-
-  String _detectType(String url) {
-    final normalized = url.toLowerCase();
-    if (normalized.contains('youtube.com') || normalized.contains('youtu.be')) {
-      return 'youtube';
-    }
-    if (normalized.endsWith('.mp4') || normalized.contains('vimeo.com')) {
-      return 'video';
-    }
-    if (normalized.endsWith('.mp3') || normalized.contains('spotify.com')) {
-      return 'audio';
-    }
-    return 'external';
-  }
-
   @override
   Widget build(BuildContext context) {
     final trailsState = ref.watch(trailControllerProvider);
@@ -278,17 +103,15 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         .asData
         ?.value
         .current;
-    final isAdmin = session?.isAdmin ?? false;
     final hasPremiumAccess =
         (session?.isPremium ?? false) ||
         (profile?.premium ?? false) ||
         (currentSubscription?.premium ?? false);
     final mentorPremiumPassActive =
         currentSubscription?.mentorPremiumPassActive ?? false;
-    final isSaving = trailsState.isLoading && !trailsState.hasValue;
 
     return LayoutBuilder(
-      builder: (context, constraints) {
+      builder: (context, _) {
         final currentTrail = currentJourney.asData?.value;
         final showingActiveJourney =
             currentTrail != null && _section == ContentModuleSection.journey;
@@ -336,7 +159,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                 trailsState.when(
                   data: (result) => _TrailExplorer(
                     result: result,
-                    isAdmin: isAdmin,
                     hasPremiumAccess: hasPremiumAccess,
                     mentorPremiumPassActive: mentorPremiumPassActive,
                     searchController: _searchController,
@@ -353,8 +175,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                       _section = ContentModuleSection.catalog;
                       _selectedCatalogTrail = trail;
                     }),
-                    onEditTrail: isAdmin ? _startEditingTrail : null,
-                    onDeleteTrail: isAdmin ? _confirmDeleteTrail : null,
                     onOpenPremium: widget.onOpenPremium,
                     onPageChanged: (page) {
                       setState(() => _selectedCatalogTrail = null);
@@ -379,44 +199,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                 selected: _section,
                 hasActiveJourney: currentTrail != null,
                 onSelected: _selectSection,
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (isAdmin) ...[
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: constraints.maxHeight * 0.44,
-                ),
-                child: SingleChildScrollView(
-                  child: PrimaryPanel(
-                    child: _AdminTrailEditor(
-                      formKey: _formKey,
-                      titleController: _titleController,
-                      summaryController: _summaryController,
-                      contentController: _contentController,
-                      categoryController: _categoryController,
-                      premium: _premium,
-                      onPremiumChanged: (value) =>
-                          setState(() => _premium = value),
-                      mediaLinks: _mediaLinks,
-                      editingTrail: _editingTrail,
-                      onAddLink: () => setState(
-                        () => _mediaLinks.add(_EditableMediaLink.live()),
-                      ),
-                      onRemoveLink: (index) => setState(() {
-                        _mediaLinks[index].dispose();
-                        _mediaLinks.removeAt(index);
-                        if (_mediaLinks.isEmpty) {
-                          _mediaLinks.add(_EditableMediaLink.live());
-                        }
-                      }),
-                      onCancelEditing: _editingTrail == null
-                          ? null
-                          : _resetAdminEditor,
-                      onSubmit: isSaving ? null : _submit,
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: 16),
             ],
@@ -458,7 +240,7 @@ class _ContentSectionSwitcher extends StatelessWidget {
           Expanded(
             child: _ContentSectionButton(
               icon: Icons.grid_view_rounded,
-              label: 'Catalogo',
+              label: 'Explorar',
               selected: selected == ContentModuleSection.catalog,
               onTap: () => onSelected(ContentModuleSection.catalog),
             ),
@@ -783,6 +565,7 @@ class _VisualJourneyPanel extends StatelessWidget {
                         Expanded(
                           flex: 6,
                           child: _JourneyStepDetailCard(
+                            trailId: journey.trail.id,
                             step: nextStep ?? journey.steps.last,
                             activeColor: activeColor,
                             isCompleted: journey.isCompleted,
@@ -931,11 +714,7 @@ class _JourneyHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isCatalogTrail
-              ? 'Trilha avulsa'
-              : trail.generatedByAi
-              ? 'Sua trilha de ${_categoryLabel(trail.category)}'
-              : 'Trilha guiada',
+          'Trilha de ${_categoryLabel(trail.category)}',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: activeColor,
             fontWeight: FontWeight.w700,
@@ -944,32 +723,13 @@ class _JourneyHeader extends StatelessWidget {
         const SizedBox(height: 6),
         Text(trail.title, style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Text(
-          isCatalogTrail
-              ? 'Conteudo cadastrado para voce fazer no seu ritmo, sem substituir sua jornada principal.'
-              : trail.generatedByAi
-              ? 'Criada com base no seu estado atual. Vamos seguir com passos pequenos e claros.'
-              : trail.summary,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
+        Text(trail.summary, style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _StatusBadge(
-              label: isCatalogTrail
-                  ? 'Conteudo guiado'
-                  : trail.generatedByAi
-                  ? 'Personalizada'
-                  : 'Catalogo',
-              color: activeColor,
-            ),
-            if (trail.generatedByAi)
-              const _StatusBadge(
-                label: 'IA ativa',
-                color: AppColors.accentGold,
-              ),
+            _StatusBadge(label: 'Jornada guiada', color: activeColor),
             _StatusBadge(
               label: '${journey.steps.length} etapas',
               color: context.evoluaColors.textSecondary,
@@ -991,13 +751,13 @@ class _JourneyHeader extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onBackToCatalog,
                 icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Voltar ao catalogo'),
+                label: const Text('Voltar para explorar'),
               ),
             if (!isCatalogTrail && onOpenCatalog != null)
               OutlinedButton.icon(
                 onPressed: onOpenCatalog,
                 icon: const Icon(Icons.grid_view_rounded),
-                label: const Text('Ver catalogo'),
+                label: const Text('Explorar trilhas'),
               ),
             OutlinedButton.icon(
               onPressed: onOpenFullJourney,
@@ -1230,11 +990,13 @@ class _JourneyTimelineNode extends StatelessWidget {
 
 class _JourneyStepDetailCard extends StatelessWidget {
   const _JourneyStepDetailCard({
+    required this.trailId,
     required this.step,
     required this.activeColor,
     required this.isCompleted,
   });
 
+  final int trailId;
   final TrailJourneyStep step;
   final Color activeColor;
   final bool isCompleted;
@@ -1261,7 +1023,29 @@ class _JourneyStepDetailCard extends StatelessWidget {
           Text(step.title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(step.summary, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusBadge(
+                label: _stepTypeLabel(step.type),
+                color: activeColor,
+              ),
+              _StatusBadge(
+                label: '${step.estimatedMinutes} min',
+                color: context.evoluaColors.textSecondary,
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
+          if (step.type.toUpperCase() == 'VIDEO' && step.video != null) ...[
+            _JourneyVideoPlayer(trailId: trailId, step: step),
+            const SizedBox(height: 12),
+          ] else ...[
+            _StepTtsPlayer(step: step),
+            const SizedBox(height: 12),
+          ],
           MarkdownBody(
             data: step.content,
             selectable: true,
@@ -1286,6 +1070,370 @@ class _JourneyStepDetailCard extends StatelessWidget {
   }
 }
 
+class _StepTtsPlayer extends StatefulWidget {
+  const _StepTtsPlayer({required this.step});
+
+  final TrailJourneyStep step;
+
+  @override
+  State<_StepTtsPlayer> createState() => _StepTtsPlayerState();
+}
+
+class _StepTtsPlayerState extends State<_StepTtsPlayer> {
+  late final FlutterTts _tts;
+  double _speed = 1;
+  bool _speaking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tts = FlutterTts();
+    _tts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() => _speaking = false);
+      }
+    });
+    _tts.setErrorHandler((_) {
+      if (mounted) {
+        setState(() => _speaking = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    super.dispose();
+  }
+
+  Future<void> _speak() async {
+    await _tts.setLanguage(_languageForStep());
+    await _tts.setSpeechRate(_speechRateForSpeed(_speed));
+    await _tts.speak(_ttsText());
+    if (mounted) {
+      setState(() => _speaking = true);
+    }
+  }
+
+  Future<void> _pause() async {
+    await _tts.pause();
+    if (mounted) {
+      setState(() => _speaking = false);
+    }
+  }
+
+  Future<void> _stop() async {
+    await _tts.stop();
+    if (mounted) {
+      setState(() => _speaking = false);
+    }
+  }
+
+  String _languageForStep() {
+    final text = _ttsText().toLowerCase();
+    final englishHints = [' the ', ' and ', ' you ', ' your ', ' today '];
+    return englishHints.any(text.contains) ? 'en-US' : 'pt-BR';
+  }
+
+  double _speechRateForSpeed(double speed) {
+    return switch (speed) {
+      0.75 => 0.38,
+      1.25 => 0.58,
+      1.5 => 0.68,
+      _ => 0.48,
+    };
+  }
+
+  String _ttsText() {
+    return '${widget.step.title}. ${widget.step.summary}. ${widget.step.content}'
+        .replaceAll(RegExp(r'[#*_`\[\]\(\)>-]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          FilledButton.icon(
+            onPressed: _speaking ? null : _speak,
+            icon: const Icon(Icons.volume_up_rounded),
+            label: const Text('Ouvir'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _speaking ? _pause : null,
+            icon: const Icon(Icons.pause_rounded),
+            label: const Text('Pausar'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _speaking ? _stop : null,
+            icon: const Icon(Icons.stop_rounded),
+            label: const Text('Parar'),
+          ),
+          SegmentedButton<double>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: 0.75, label: Text('0.75x')),
+              ButtonSegment(value: 1, label: Text('1x')),
+              ButtonSegment(value: 1.25, label: Text('1.25x')),
+              ButtonSegment(value: 1.5, label: Text('1.5x')),
+            ],
+            selected: {_speed},
+            onSelectionChanged: (value) async {
+              final next = value.first;
+              setState(() => _speed = next);
+              if (_speaking) {
+                await _stop();
+                await _speak();
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JourneyVideoPlayer extends ConsumerStatefulWidget {
+  const _JourneyVideoPlayer({required this.trailId, required this.step});
+
+  final int trailId;
+  final TrailJourneyStep step;
+
+  @override
+  ConsumerState<_JourneyVideoPlayer> createState() =>
+      _JourneyVideoPlayerState();
+}
+
+class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
+  YoutubePlayerController? _controller;
+  Timer? _progressTimer;
+  double _speed = 1;
+  bool _started = false;
+  int _lastSentPercent = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    final videoId = _effectiveVideoId();
+    if (videoId != null && videoId.isNotEmpty) {
+      _controller = YoutubePlayerController.fromVideoId(
+        videoId: videoId,
+        autoPlay: false,
+        params: const YoutubePlayerParams(
+          showControls: false,
+          showFullscreenButton: false,
+          playsInline: true,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    _controller?.close();
+    super.dispose();
+  }
+
+  String? _effectiveVideoId() {
+    return widget.step.video?.videoId ?? _extractYoutubeId(widget.step.video?.url);
+  }
+
+  Future<void> _play() async {
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    setState(() => _started = true);
+    await controller.setPlaybackRate(_speed);
+    await controller.playVideo();
+    _startProgressTimer();
+  }
+
+  Future<void> _pause() async {
+    await _controller?.pauseVideo();
+    await _sendProgress(force: true);
+  }
+
+  Future<void> _setSpeed(double speed) async {
+    setState(() => _speed = speed);
+    await _controller?.setPlaybackRate(speed);
+  }
+
+  void _startProgressTimer() {
+    _progressTimer ??= Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => _sendProgress(),
+    );
+  }
+
+  Future<void> _sendProgress({bool force = false}) async {
+    final controller = _controller;
+    final declaredDuration = widget.step.video?.durationSeconds;
+    if (controller == null || declaredDuration == null || declaredDuration <= 0) {
+      return;
+    }
+    final watched = (await controller.currentTime).round().clamp(0, declaredDuration);
+    final percent = ((watched * 100) / declaredDuration).round().clamp(0, 100);
+    if (!force && percent < 90 && percent < _lastSentPercent + 10) {
+      return;
+    }
+    _lastSentPercent = percent;
+    await ref.read(trailJourneyActionProvider).updateVideoProgress(
+          trailId: widget.trailId,
+          stepIndex: widget.step.index,
+          watchedSeconds: watched,
+          durationSeconds: declaredDuration,
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    final video = widget.step.video;
+    if (controller == null || video == null) {
+      return _VideoUnavailableCard(url: video?.url);
+    }
+
+    final progress = widget.step.videoProgress;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                YoutubePlayer(controller: controller, aspectRatio: 16 / 9),
+                if (!_started && video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty)
+                  Positioned.fill(
+                    child: Image.network(video.thumbnailUrl!, fit: BoxFit.cover),
+                  ),
+                if (!_started)
+                  FilledButton.icon(
+                    onPressed: _play,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Assistir etapa'),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _play,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Play'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _pause,
+                icon: const Icon(Icons.pause_rounded),
+                label: const Text('Pause'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => controller.toggleFullScreen(),
+                icon: const Icon(Icons.fullscreen_rounded),
+                label: const Text('Tela cheia'),
+              ),
+              SegmentedButton<double>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: 1, label: Text('1x')),
+                  ButtonSegment(value: 1.25, label: Text('1.25x')),
+                  ButtonSegment(value: 1.5, label: Text('1.5x')),
+                ],
+                selected: {_speed},
+                onSelectionChanged: (value) => _setSpeed(value.first),
+              ),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 10),
+            LinearProgressIndicator(value: progress.watchedPercent / 100),
+            const SizedBox(height: 6),
+            Text(
+              progress.completed
+                  ? 'Video assistido. Continue com a reflexao abaixo.'
+                  : '${progress.watchedPercent}% assistido',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.evoluaColors.textSecondary,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoUnavailableCard extends StatelessWidget {
+  const _VideoUnavailableCard({this.url});
+
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: url == null || url!.isEmpty ? null : () => launchUrlString(url!),
+      icon: const Icon(Icons.ondemand_video_rounded),
+      label: const Text('Abrir video da etapa'),
+    );
+  }
+}
+
+String? _extractYoutubeId(String? url) {
+  if (url == null || url.isEmpty) {
+    return null;
+  }
+  final uri = Uri.tryParse(url);
+  if (uri == null) {
+    return null;
+  }
+  final host = uri.host.toLowerCase();
+  if (host.contains('youtu.be')) {
+    return uri.pathSegments.isEmpty ? null : uri.pathSegments.first;
+  }
+  if (host.contains('youtube.com')) {
+    final queryId = uri.queryParameters['v'];
+    if (queryId != null && queryId.isNotEmpty) {
+      return queryId;
+    }
+    final embedIndex = uri.pathSegments.indexOf('embed');
+    if (embedIndex >= 0 && uri.pathSegments.length > embedIndex + 1) {
+      return uri.pathSegments[embedIndex + 1];
+    }
+  }
+  return null;
+}
+
 String _journeyCtaLabel(TrailJourney journey) {
   if (journey.isCompleted) {
     return 'Revisar jornada';
@@ -1304,6 +1452,19 @@ String _catalogTrailCtaLabel(TrailJourney journey) {
     return 'Continuar trilha';
   }
   return 'Iniciar trilha';
+}
+
+String _stepTypeLabel(String type) {
+  return switch (type.toUpperCase()) {
+    'EXERCISE' => 'Exercicio',
+    'READING' => 'Leitura',
+    'VIDEO' => 'Video',
+    'AUDIO' => 'Audio',
+    'RITUAL' => 'Ritual',
+    'AI' => 'IA guiada',
+    'CHECKPOINT' => 'Checkpoint',
+    _ => 'Reflexao',
+  };
 }
 
 bool _isMentorPremiumTrail(Trail trail) {
@@ -1391,6 +1552,7 @@ class _JourneyStepSheetState extends State<_JourneyStepSheet> {
           padding: const EdgeInsets.all(22),
           child: SingleChildScrollView(
             child: _JourneyStepDetailCard(
+              trailId: widget.journey.trail.id,
               step: step,
               activeColor: widget.activeColor,
               isCompleted: widget.journey.isCompleted,
@@ -1502,288 +1664,9 @@ void _showJourneyDetails(BuildContext context, Trail trail) {
   );
 }
 
-class _AdminTrailEditor extends StatelessWidget {
-  const _AdminTrailEditor({
-    required this.formKey,
-    required this.titleController,
-    required this.summaryController,
-    required this.contentController,
-    required this.categoryController,
-    required this.premium,
-    required this.onPremiumChanged,
-    required this.mediaLinks,
-    required this.editingTrail,
-    required this.onAddLink,
-    required this.onRemoveLink,
-    required this.onCancelEditing,
-    required this.onSubmit,
-  });
-
-  final GlobalKey<FormState> formKey;
-  final TextEditingController titleController;
-  final TextEditingController summaryController;
-  final TextEditingController contentController;
-  final TextEditingController categoryController;
-  final bool premium;
-  final ValueChanged<bool> onPremiumChanged;
-  final List<_EditableMediaLink> mediaLinks;
-  final Trail? editingTrail;
-  final VoidCallback onAddLink;
-  final ValueChanged<int> onRemoveLink;
-  final VoidCallback? onCancelEditing;
-  final VoidCallback? onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    final isEditing = editingTrail != null;
-    return Form(
-      key: formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isEditing ? 'Editar trilha' : 'Criar nova trilha',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: context.evoluaColors.textPrimary,
-            ),
-          ),
-          if (isEditing) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Editando: ${editingTrail!.title}',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-          const SizedBox(height: 24),
-          TextFormField(
-            controller: titleController,
-            decoration: const InputDecoration(
-              labelText: 'Titulo da trilha',
-              prefixIcon: Icon(Icons.auto_stories_rounded),
-            ),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Informe o titulo.'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: summaryController,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Resumo curto',
-              alignLabelWithHint: true,
-              prefixIcon: Icon(Icons.short_text_rounded),
-            ),
-            validator: (value) {
-              final text = value?.trim() ?? '';
-              if (text.isEmpty) return 'Informe um resumo.';
-              if (text.length < 12) return 'Use pelo menos 12 caracteres.';
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: contentController,
-            minLines: 8,
-            maxLines: 14,
-            decoration: const InputDecoration(
-              labelText: 'Conteudo principal em Markdown',
-              alignLabelWithHint: true,
-              helperText:
-                  'Exemplos: # Titulo, ## Secao, - lista, [link](https://...)',
-              prefixIcon: Icon(Icons.edit_note_rounded),
-            ),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Escreva o conteudo principal.'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: categoryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Categoria',
-                    prefixIcon: Icon(Icons.category_rounded),
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Informe a categoria.'
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Trilha premium'),
-                  value: premium,
-                  onChanged: onPremiumChanged,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Links de apoio',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...mediaLinks.asMap().entries.map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _MediaLinkEditor(
-                item: entry.value,
-                onRemove: mediaLinks.length == 1
-                    ? null
-                    : () => onRemoveLink(entry.key),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: onAddLink,
-              icon: const Icon(Icons.add_link_rounded),
-              label: const Text('Adicionar link'),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              ElevatedButton.icon(
-                onPressed: onSubmit,
-                icon: Icon(
-                  isEditing
-                      ? Icons.save_outlined
-                      : Icons.add_circle_outline_rounded,
-                ),
-                label: Text(isEditing ? 'Salvar alteracoes' : 'Criar trilha'),
-              ),
-              if (onCancelEditing != null)
-                OutlinedButton.icon(
-                  onPressed: onCancelEditing,
-                  icon: const Icon(Icons.close_rounded),
-                  label: const Text('Cancelar edicao'),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MediaLinkEditor extends StatelessWidget {
-  const _MediaLinkEditor({required this.item, required this.onRemove});
-
-  final _EditableMediaLink item;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: context.evoluaColors.outline.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: item.labelController,
-                  decoration: const InputDecoration(
-                    labelText: 'Rotulo do link',
-                    prefixIcon: Icon(Icons.label_rounded),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 170,
-                child: DropdownButtonFormField<String>(
-                  initialValue: item.type,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo',
-                    prefixIcon: Icon(Icons.video_library_rounded),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'auto',
-                      child: Text('Auto detectar'),
-                    ),
-                    DropdownMenuItem(value: 'youtube', child: Text('YouTube')),
-                    DropdownMenuItem(value: 'video', child: Text('Video')),
-                    DropdownMenuItem(value: 'article', child: Text('Artigo')),
-                    DropdownMenuItem(value: 'audio', child: Text('Audio')),
-                    DropdownMenuItem(value: 'external', child: Text('Externo')),
-                  ],
-                  onChanged: (value) => item.type = value ?? 'auto',
-                ),
-              ),
-              if (onRemove != null) ...[
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: onRemove,
-                  icon: const Icon(Icons.delete_outline_rounded),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: item.urlController,
-            decoration: const InputDecoration(
-              labelText: 'URL do conteudo',
-              hintText: 'https://youtube.com/... ou outro link seguro',
-              prefixIcon: Icon(Icons.link_rounded),
-            ),
-            validator: (value) {
-              final text = value?.trim() ?? '';
-              if (text.isEmpty) return null;
-              if (!text.startsWith('http://') && !text.startsWith('https://')) {
-                return 'Use uma URL com http ou https.';
-              }
-              return null;
-            },
-          ),
-          if (item.urlController.text.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                item.urlController.text.toLowerCase().contains('youtu')
-                    ? 'Preview detectado: YouTube'
-                    : 'Preview detectado: link externo',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppColors.accentWarm),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _TrailExplorer extends ConsumerWidget {
   const _TrailExplorer({
     required this.result,
-    required this.isAdmin,
     required this.hasPremiumAccess,
     required this.mentorPremiumPassActive,
     required this.searchController,
@@ -1791,14 +1674,11 @@ class _TrailExplorer extends ConsumerWidget {
     required this.onSearchChanged,
     required this.onPremiumFilterChanged,
     required this.onOpenTrail,
-    required this.onEditTrail,
-    required this.onDeleteTrail,
     required this.onOpenPremium,
     required this.onPageChanged,
   });
 
   final PaginatedResponse<Trail> result;
-  final bool isAdmin;
   final bool hasPremiumAccess;
   final bool mentorPremiumPassActive;
   final TextEditingController searchController;
@@ -1806,8 +1686,6 @@ class _TrailExplorer extends ConsumerWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<bool?> onPremiumFilterChanged;
   final ValueChanged<Trail> onOpenTrail;
-  final ValueChanged<Trail>? onEditTrail;
-  final ValueChanged<Trail>? onDeleteTrail;
   final VoidCallback? onOpenPremium;
   final ValueChanged<int> onPageChanged;
 
@@ -1943,9 +1821,7 @@ class _TrailExplorer extends ConsumerWidget {
                                     '${journeyState!.requireValue.progressPercent}% concluido',
                                 color: context.evoluaColors.textSecondary,
                               ),
-                            if (!effectiveAccessible &&
-                                !isAdmin &&
-                                !hasPremiumAccess) ...[
+                            if (!effectiveAccessible && !hasPremiumAccess) ...[
                               _StatusBadge(
                                 label: lockedMentorTrail
                                     ? 'Mentoria premium'
@@ -2020,20 +1896,6 @@ class _TrailExplorer extends ConsumerWidget {
                                       : 'Ver detalhes',
                                 ),
                               ),
-                              if (isAdmin) ...[
-                                OutlinedButton.icon(
-                                  onPressed: () => onEditTrail?.call(trail),
-                                  icon: const Icon(Icons.edit_outlined),
-                                  label: const Text('Editar'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () => onDeleteTrail?.call(trail),
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                  ),
-                                  label: const Text('Excluir'),
-                                ),
-                              ],
                             ],
                           ),
                         ),
@@ -2438,26 +2300,5 @@ class _ContentErrorState extends StatelessWidget {
       actionLabel: 'Tentar novamente',
       onAction: onRetry,
     );
-  }
-}
-
-class _EditableMediaLink {
-  _EditableMediaLink.live()
-    : labelController = TextEditingController(),
-      urlController = TextEditingController(),
-      type = 'auto';
-
-  _EditableMediaLink.fromLink(TrailMediaLink link)
-    : labelController = TextEditingController(text: link.label),
-      urlController = TextEditingController(text: link.url),
-      type = link.type;
-
-  final TextEditingController labelController;
-  final TextEditingController urlController;
-  String type;
-
-  void dispose() {
-    labelController.dispose();
-    urlController.dispose();
   }
 }
