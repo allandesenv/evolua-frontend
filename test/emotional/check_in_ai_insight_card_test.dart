@@ -25,7 +25,8 @@ void main() {
               quotaLimited: true,
               rewardedAdAvailable: true,
               upgradeRecommended: true,
-              limitMessage: 'Voce chegou ao limite de IA do plano gratuito hoje.',
+              limitMessage:
+                  'Sua jornada já está salva. O limite gratuito de IA acabou por hoje. Você pode voltar amanhã, assistir a um anúncio para liberar +1 análise ou assinar Premium.',
             ),
             onWatchRewardedAd: () {},
             onOpenPremium: () {},
@@ -36,11 +37,12 @@ void main() {
 
     expect(find.text('Limite de IA atingido'), findsOneWidget);
     expect(
-      find.text('Voce chegou ao limite de IA do plano gratuito hoje.'),
+      find.text(
+        'Sua jornada já está salva. O limite gratuito de IA acabou por hoje. Você pode voltar amanhã, assistir a um anúncio para liberar +1 análise ou assinar Premium.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Assistir anuncio para +1 analise'), findsOneWidget);
-    expect(find.text('Assinar Premium'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsOneWidget);
+    expect(find.text('Aprofundar com Premium'), findsOneWidget);
   });
 }
-

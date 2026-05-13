@@ -109,7 +109,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsOneWidget);
     expect(find.text('Planos e assinaturas'), findsNothing);
-    expect(find.textContaining('Você está no plano essencial'), findsNothing);
+    expect(find.textContaining('Você está no plano Essencial'), findsNothing);
   });
 
   testWidgets('profile preferences navigation is hidden on mobile', (
@@ -603,7 +603,7 @@ void main() {
     await tester.tap(find.text('Planos e assinaturas'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Você está no plano essencial'), findsOneWidget);
+    expect(find.textContaining('Você está no plano Essencial'), findsOneWidget);
 
     await _openAvatarMenu(tester);
     await tester.pumpAndSettle();
@@ -611,7 +611,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
-    expect(find.textContaining('Você está no plano essencial'), findsNothing);
+    expect(find.textContaining('Você está no plano Essencial'), findsNothing);
   });
 
   testWidgets('avatar menu opens evolution mirror section', (tester) async {
@@ -740,7 +740,7 @@ void main() {
     selectedSection.value = ProfileModuleSection.plansSubscriptions;
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Você está no plano essencial'), findsOneWidget);
+    expect(find.textContaining('Você está no plano Essencial'), findsOneWidget);
     expect(find.text('Compartilhe sua experiência'), findsNothing);
   });
 

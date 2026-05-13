@@ -71,7 +71,8 @@ void main() {
         quotaLimited: true,
         rewardedAdAvailable: true,
         upgradeRecommended: true,
-        limitMessage: 'Voce chegou ao limite de IA do plano gratuito hoje.',
+        limitMessage:
+            'Sua jornada já está salva. O limite gratuito de IA acabou por hoje. Você pode voltar amanhã, assistir a um anúncio para liberar +1 análise ou assinar Premium.',
       ),
     );
 
@@ -96,11 +97,13 @@ void main() {
 
     expect(find.text('Limite de IA atingido'), findsOneWidget);
     expect(
-      find.text('Voce chegou ao limite de IA do plano gratuito hoje.'),
+      find.text(
+        'Sua jornada já está salva. O limite gratuito de IA acabou por hoje. Você pode voltar amanhã, assistir a um anúncio para liberar +1 análise ou assinar Premium.',
+      ),
       findsOneWidget,
     );
-    expect(find.text('Assistir anuncio para +1 analise'), findsOneWidget);
-    expect(find.text('Assinar Premium'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsOneWidget);
+    expect(find.text('Aprofundar com Premium'), findsOneWidget);
   });
 
   testWidgets('Mentor unlocks daily premium pass through rewarded ad', (
@@ -143,15 +146,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Conteudos exclusivos de mentoria'), findsOneWidget);
-    expect(
-      find.text('Assistir anuncio para liberar mentoria por hoje'),
-      findsOneWidget,
-    );
+    expect(find.text('Conteúdos exclusivos de mentoria'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsOneWidget);
 
-    await tester.tap(
-      find.text('Assistir anuncio para liberar mentoria por hoje'),
-    );
+    await tester.ensureVisible(find.text('Assistir anúncio'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Assistir anúncio'));
     await tester.pumpAndSettle();
 
     expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
@@ -197,16 +197,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.text('Assistir anuncio para liberar mentoria por hoje'),
-    );
+    await tester.ensureVisible(find.text('Assistir anúncio'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Assistir anúncio'));
     await tester.pumpAndSettle();
 
     expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
     expect(find.text('Passe de mentoria ativo'), findsNothing);
     expect(
       find.text(
-        'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.',
+        'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.',
       ),
       findsWidgets,
     );
@@ -384,4 +384,3 @@ class _FakeTrailRepository implements TrailRepository {
     throw UnimplementedError();
   }
 }
-

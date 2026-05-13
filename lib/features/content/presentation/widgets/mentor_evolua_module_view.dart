@@ -3,6 +3,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_message.dart';
@@ -171,9 +172,9 @@ class _MentorPremiumPassPanelState
         MentorPremiumPassRewardStatus.confirmed =>
           'Passe de mentoria liberado por hoje.',
         MentorPremiumPassRewardStatus.unavailable =>
-          'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.',
+          'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.',
         MentorPremiumPassRewardStatus.confirmationPending =>
-          'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.',
+          'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.',
       };
       AppSnackBar.show(
         context,
@@ -192,7 +193,7 @@ class _MentorPremiumPassPanelState
       AppSnackBar.show(
         context,
         message:
-            'Nao foi possivel liberar a mentoria agora. Tente novamente em instantes.',
+            'Não foi possível liberar a mentoria agora. Tente novamente em instantes.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -215,12 +216,12 @@ class _MentorPremiumPassPanelState
         ? 'Mentoria premium liberada'
         : passActive
         ? 'Passe de mentoria ativo'
-        : 'Conteudos exclusivos de mentoria';
+        : 'Conteúdos exclusivos de mentoria';
     final subtitle = premium
-        ? 'Seu plano Premium ja libera os conteudos completos de mentoria, sem anuncios.'
+        ? 'Seu plano Premium já libera os conteúdos completos de mentoria, sem anúncios.'
         : passActive
-        ? 'A mentoria premium esta aberta hoje${_formatPassEndsAt(passEndsAt)}.'
-        : 'Assista a um anuncio premiado para liberar por hoje trilhas premium selecionadas de mentoria.';
+        ? 'A mentoria premium está aberta hoje${_formatPassEndsAt(passEndsAt)}.'
+        : 'Assista a um anúncio recompensado para liberar por hoje trilhas premium selecionadas de mentoria.';
 
     return PrimaryPanel(
       semanticLabel: 'Passe diario de mentoria',
@@ -269,32 +270,17 @@ class _MentorPremiumPassPanelState
           ),
           if (!premium && !passActive) ...[
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                if (rewardedAvailable)
-                  FilledButton.icon(
-                    onPressed: _isRewardLoading ? null : _watchMentorPassAd,
-                    icon: _isRewardLoading
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.ondemand_video_rounded),
-                    label: Text(
-                      _isRewardLoading
-                          ? 'Carregando anuncio'
-                          : 'Assistir anuncio para liberar mentoria por hoje',
-                    ),
-                  ),
-                if (widget.onOpenPremium != null)
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenPremium,
-                    icon: const Icon(Icons.workspace_premium_rounded),
-                    label: const Text('Assinar Premium'),
-                  ),
-              ],
+            RewardedAdPrompt(
+              title: 'Liberar com anúncio opcional',
+              message:
+                  'O anúncio recompensado libera a mentoria por hoje. O Premium remove anúncios e mantém o acesso completo.',
+              rewardLabel:
+                  'Recompensa: passe de mentoria premium até o fim do dia.',
+              rewardedAdAvailable: rewardedAvailable,
+              isRewardLoading: _isRewardLoading,
+              onWatchRewardedAd: _watchMentorPassAd,
+              onOpenPremium: widget.onOpenPremium,
+              premiumLabel: 'Aprofundar com Premium',
             ),
             if (_rewardStatusMessage != null) ...[
               const SizedBox(height: 12),
@@ -319,7 +305,7 @@ String _formatPassEndsAt(DateTime? value) {
   final local = value.toLocal();
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
-  return ', ate $hour:$minute';
+  return ', até $hour:$minute';
 }
 
 class MentorEvoluaChatCard extends ConsumerStatefulWidget {
@@ -439,8 +425,8 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
       AppSnackBar.show(
         context,
         message: rewarded
-            ? 'Credito extra de IA liberado. Envie uma nova mensagem ao Mentor.'
-            : 'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.',
+            ? 'Crédito extra de IA liberado. Envie uma nova mensagem ao Mentor.'
+            : 'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.',
         icon: rewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
@@ -452,7 +438,7 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
       AppSnackBar.show(
         context,
         message:
-            'Nao foi possivel carregar o anuncio agora. Tente novamente em instantes.',
+            'Não foi possível carregar o anúncio agora. Tente novamente em instantes.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {

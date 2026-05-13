@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
@@ -386,7 +387,7 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
         await actions.completeStep(journey.trail.id, journey.nextStep!.index);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Voce avancou mais um passo.')),
+            const SnackBar(content: Text('Você avançou mais um passo.')),
           );
         }
       }
@@ -457,7 +458,7 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
         await actions.completeStep(journey.trail.id, journey.nextStep!.index);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Voce avancou mais um passo.')),
+            const SnackBar(content: Text('Você avançou mais um passo.')),
           );
         }
       }
@@ -763,7 +764,7 @@ class _JourneyHeader extends StatelessWidget {
               onPressed: onOpenFullJourney,
               icon: const Icon(Icons.auto_stories_rounded),
               label: Text(
-                isCatalogTrail ? 'Conteudo completo' : 'Jornada completa',
+                isCatalogTrail ? 'Conteúdo completo' : 'Jornada completa',
               ),
             ),
           ],
@@ -1250,7 +1251,8 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
   }
 
   String? _effectiveVideoId() {
-    return widget.step.video?.videoId ?? _extractYoutubeId(widget.step.video?.url);
+    return widget.step.video?.videoId ??
+        _extractYoutubeId(widget.step.video?.url);
   }
 
   Future<void> _play() async {
@@ -1284,16 +1286,23 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
   Future<void> _sendProgress({bool force = false}) async {
     final controller = _controller;
     final declaredDuration = widget.step.video?.durationSeconds;
-    if (controller == null || declaredDuration == null || declaredDuration <= 0) {
+    if (controller == null ||
+        declaredDuration == null ||
+        declaredDuration <= 0) {
       return;
     }
-    final watched = (await controller.currentTime).round().clamp(0, declaredDuration);
+    final watched = (await controller.currentTime).round().clamp(
+      0,
+      declaredDuration,
+    );
     final percent = ((watched * 100) / declaredDuration).round().clamp(0, 100);
     if (!force && percent < 90 && percent < _lastSentPercent + 10) {
       return;
     }
     _lastSentPercent = percent;
-    await ref.read(trailJourneyActionProvider).updateVideoProgress(
+    await ref
+        .read(trailJourneyActionProvider)
+        .updateVideoProgress(
           trailId: widget.trailId,
           stepIndex: widget.step.index,
           watchedSeconds: watched,
@@ -1329,9 +1338,14 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
               alignment: Alignment.center,
               children: [
                 YoutubePlayer(controller: controller, aspectRatio: 16 / 9),
-                if (!_started && video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty)
+                if (!_started &&
+                    video.thumbnailUrl != null &&
+                    video.thumbnailUrl!.isNotEmpty)
                   Positioned.fill(
-                    child: Image.network(video.thumbnailUrl!, fit: BoxFit.cover),
+                    child: Image.network(
+                      video.thumbnailUrl!,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 if (!_started)
                   FilledButton.icon(
@@ -1384,8 +1398,8 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
                   ? 'Video assistido. Continue com a reflexao abaixo.'
                   : '${progress.watchedPercent}% assistido',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.evoluaColors.textSecondary,
-                  ),
+                color: context.evoluaColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -1402,7 +1416,9 @@ class _VideoUnavailableCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
-      onPressed: url == null || url!.isEmpty ? null : () => launchUrlString(url!),
+      onPressed: url == null || url!.isEmpty
+          ? null
+          : () => launchUrlString(url!),
       icon: const Icon(Icons.ondemand_video_rounded),
       label: const Text('Abrir video da etapa'),
     );
@@ -2011,8 +2027,8 @@ class _TrailExplorer extends ConsumerWidget {
                                             result.status ==
                                                 MentorPremiumPassRewardStatus
                                                     .unavailable
-                                            ? 'Anuncio indisponivel neste dispositivo. Voce ainda pode assinar Premium.'
-                                            : 'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.';
+                                            ? 'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.'
+                                            : 'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.';
                                         setDialogState(() {
                                           rewardStatusMessage = message;
                                         });
@@ -2038,14 +2054,24 @@ class _TrailExplorer extends ConsumerWidget {
                                           onOpenPremium?.call();
                                         },
                                 )
-                              : GuidedEmptyState(
-                                  icon: Icons.workspace_premium_rounded,
+                              : SoftPremiumPrompt(
+                                  icon: Icons.auto_stories_rounded,
                                   title:
-                                      'Conteudo completo liberado no premium',
-                                  subtitle:
-                                      'Voce pode visualizar o resumo da trilha agora e desbloquear o conteudo completo com upgrade.',
-                                  actionLabel: 'Entendi',
-                                  onAction: () => Navigator.of(context).pop(),
+                                      'Esta trilha aprofunda sua evolução emocional',
+                                  message:
+                                      'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua jornada com mais contexto, sem anúncios e sem pressão.',
+                                  benefit:
+                                      'Premium libera trilhas premium, Espelho da Evolução completo, histórico completo e insights avançados.',
+                                  primaryLabel: 'Aprofundar com Premium',
+                                  secondaryLabel: 'Continuar vendo o resumo',
+                                  onOpenPremium: onOpenPremium == null
+                                      ? null
+                                      : () {
+                                          Navigator.of(context).pop();
+                                          onOpenPremium?.call();
+                                        },
+                                  onSecondary: () =>
+                                      Navigator.of(context).pop(),
                                 ),
                         ),
                       ),
@@ -2097,7 +2123,7 @@ class _UnlockedTrailDetails extends StatelessWidget {
         if (trail.mediaLinks.isNotEmpty) ...[
           const SizedBox(height: 20),
           Text(
-            'Conteudos de apoio',
+            'Conteúdos de apoio',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: context.evoluaColors.textPrimary,
             ),
@@ -2179,78 +2205,32 @@ class _LockedMentorTrailState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PrimaryPanel(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Align(
-            alignment: Alignment.center,
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.workspace_premium_rounded,
-                color: AppColors.accent,
-                size: 34,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        RewardedAdPrompt(
+          title: 'Libere esta mentoria por hoje',
+          message:
+              'Assista a um anúncio recompensado para acessar trilhas de mentoria até o fim do dia. Se preferir uma jornada sem anúncios, o Premium libera o acesso completo.',
+          rewardLabel:
+              'Recompensa: passe de mentoria premium até o fim do dia.',
+          rewardedAdAvailable: true,
+          isRewardLoading: isRewardLoading,
+          onWatchRewardedAd: onWatchAd,
+          onOpenPremium: onOpenPremium,
+          premiumLabel: 'Aprofundar com Premium',
+        ),
+        if (statusMessage != null) ...[
+          const SizedBox(height: 12),
           Text(
-            'Libere esta mentoria por hoje',
+            statusMessage!,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: context.evoluaColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Assista a um anuncio premiado para acessar trilhas de mentoria ate o fim do dia, ou assine Premium para acesso completo.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: context.evoluaColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: isRewardLoading ? null : onWatchAd,
-            icon: isRewardLoading
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.ondemand_video_rounded),
-            label: Text(
-              isRewardLoading
-                  ? 'Carregando anuncio'
-                  : 'Assistir anuncio para liberar mentoria por hoje',
-            ),
-          ),
-          if (onOpenPremium != null) ...[
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: onOpenPremium,
-              icon: const Icon(Icons.workspace_premium_rounded),
-              label: const Text('Assinar Premium'),
-            ),
-          ],
-          if (statusMessage != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              statusMessage!,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: context.evoluaColors.textSecondary,
-              ),
-            ),
-          ],
         ],
-      ),
+      ],
     );
   }
 }

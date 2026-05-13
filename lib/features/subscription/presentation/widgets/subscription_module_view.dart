@@ -35,9 +35,9 @@ class _SubscriptionModuleViewState
             ? (error.response?.data is Map<String, dynamic>
                   ? ((error.response?.data['details'] as List?)?.join(', ') ??
                         error.message ??
-                        'Nao foi possivel processar a assinatura.')
-                  : error.message ?? 'Nao foi possivel processar a assinatura.')
-            : 'Nao foi possivel processar a assinatura.';
+                        'Não foi possível processar a assinatura.')
+                  : error.message ?? 'Não foi possível processar a assinatura.')
+            : 'Não foi possível processar a assinatura.';
 
         ScaffoldMessenger.of(
           context,
@@ -63,7 +63,7 @@ class _SubscriptionModuleViewState
       loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
       error: (error, stackTrace) => PrimaryPanel(
         child: Text(
-          'Nao foi possivel carregar os planos agora.',
+          'Não foi possível carregar os planos agora.',
           style: Theme.of(context).textTheme.bodyLarge,
         ),
       ),
@@ -75,12 +75,18 @@ class _SubscriptionModuleViewState
           orElse: () => const PlanView(
             planCode: 'essential-free',
             title: 'Essencial',
-            subtitle: 'Base gratuita do app.',
+            subtitle: 'Para começar e manter presença.',
             billingCycle: 'MONTHLY',
             premium: false,
             price: 0,
             currency: 'BRL',
-            benefits: ['Base gratuita'],
+            benefits: [
+              'Check-ins simples ilimitados',
+              'Reflexões básicas e diário',
+              'Trilhas grátis',
+              '1 análise de IA por dia',
+              'Histórico dos últimos 30 dias',
+            ],
             active: true,
           ),
         );
@@ -99,8 +105,8 @@ class _SubscriptionModuleViewState
                   const SizedBox(height: 12),
                   Text(
                     current?.premium == true
-                        ? 'Seu premium esta ativo e a liberacao depende sempre da confirmacao real do pagamento.'
-                        : 'Você está no plano essencial. Quando quiser aprofundar a jornada, o upgrade leva você para o checkout seguro e só libera o premium após confirmação.',
+                        ? 'Seu Premium está ativo. Você aprofunda sua jornada sem anúncios e com mais contexto emocional.'
+                        : 'Você está no plano Essencial. Quando quiser aprofundar a jornada, o Premium amplia suas leituras sem pressionar seu ritmo.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 20),
@@ -112,18 +118,20 @@ class _SubscriptionModuleViewState
               ),
             ),
             const SizedBox(height: 16),
+            const _MonetizationPrinciplesPanel(),
+            const SizedBox(height: 16),
             LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 760;
                 final cards = [
                   _PlanCard(
                     title: essential.title,
-                    subtitle: essential.subtitle,
+                    subtitle: 'Para começar e manter presença.',
                     bullets: essential.benefits,
                     accent: AppColors.accentWarm,
                     highlighted: current?.premium != true,
                     cta: current?.premium == true
-                        ? 'Voltar ao essencial'
+                        ? 'Voltar ao Essencial'
                         : 'Plano atual',
                     disabled: data.isBusy || current?.premium != true,
                     onTap: current?.premium == true
@@ -135,8 +143,10 @@ class _SubscriptionModuleViewState
                   ...premiumPlans.map(
                     (plan) => _PlanCard(
                       title: plan.title,
-                      subtitle:
-                          '${plan.subtitle} ${_formatPrice(plan.price, plan.currency)}/${plan.billingCycle == 'YEARLY' ? 'ano' : 'mes'}',
+                      subtitle: plan.subtitle,
+                      priceLabel: plan.billingCycle == 'YEARLY'
+                          ? '${_formatPrice(plan.price, plan.currency)}/ano'
+                          : '${_formatPrice(plan.price, plan.currency)}/mês',
                       bullets: plan.benefits,
                       accent: AppColors.accentGold,
                       highlighted: current?.planCode == plan.planCode,
@@ -144,7 +154,7 @@ class _SubscriptionModuleViewState
                           current?.planCode == plan.planCode &&
                               current?.premium == true
                           ? 'Plano ativo'
-                          : 'Assinar agora',
+                          : 'Aprofundar jornada',
                       disabled:
                           data.isBusy ||
                           (current?.planCode == plan.planCode &&
@@ -190,9 +200,73 @@ class _SubscriptionModuleViewState
 
   String _formatPrice(double price, String currency) {
     if (price == 0) {
-      return 'Gratis';
+      return 'Grátis';
     }
-    return 'R\$ ${price.toStringAsFixed(2)}';
+    return 'R\$ ${price.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+}
+
+class _MonetizationPrinciplesPanel extends StatelessWidget {
+  const _MonetizationPrinciplesPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: const [
+          _PrinciplePill(
+            icon: Icons.favorite_rounded,
+            label: 'Free útil, sem pressão',
+          ),
+          _PrinciplePill(
+            icon: Icons.visibility_off_rounded,
+            label: 'Premium sem anúncios',
+          ),
+          _PrinciplePill(
+            icon: Icons.ondemand_video_rounded,
+            label: 'Anúncios só em áreas neutras',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrinciplePill extends StatelessWidget {
+  const _PrinciplePill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceStrong,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.outline),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge,
+                softWrap: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -225,7 +299,7 @@ class _CurrentPlanCard extends StatelessWidget {
           if (current?.currentPeriodEndsAt != null) ...[
             const SizedBox(height: 6),
             Text(
-              'Proxima referencia: ${current!.currentPeriodEndsAt!.day.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.month.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.year}',
+              'Próxima referência: ${current!.currentPeriodEndsAt!.day.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.month.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.year}',
             ),
           ],
           if (pending != null) ...[
@@ -250,6 +324,7 @@ class _PlanCard extends StatelessWidget {
     required this.bullets,
     required this.accent,
     required this.cta,
+    this.priceLabel,
     this.highlighted = false,
     this.disabled = false,
     this.onTap,
@@ -260,6 +335,7 @@ class _PlanCard extends StatelessWidget {
   final List<String> bullets;
   final Color accent;
   final String cta;
+  final String? priceLabel;
   final bool highlighted;
   final bool disabled;
   final VoidCallback? onTap;
@@ -281,6 +357,16 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          if (priceLabel != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              priceLabel!,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 16),

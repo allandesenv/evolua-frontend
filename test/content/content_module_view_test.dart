@@ -139,15 +139,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Libere esta mentoria por hoje'), findsOneWidget);
-      expect(
-        find.text('Assistir anuncio para liberar mentoria por hoje'),
-        findsOneWidget,
-      );
-      expect(find.text('Assinar Premium'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsOneWidget);
+      expect(find.text('Aprofundar com Premium'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Assinar Premium'));
+      await tester.ensureVisible(find.text('Aprofundar com Premium'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Assinar Premium'));
+      await tester.tap(find.text('Aprofundar com Premium'));
       await tester.pumpAndSettle();
 
       expect(premiumOpened, isTrue);
@@ -194,13 +191,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ver detalhes'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.text('Assistir anuncio para liberar mentoria por hoje'),
-      );
+      await tester.ensureVisible(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.text('Assistir anuncio para liberar mentoria por hoje'),
-      );
+      await tester.tap(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
 
       expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
@@ -249,19 +242,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Ver detalhes'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.text('Assistir anuncio para liberar mentoria por hoje'),
-      );
+      await tester.ensureVisible(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.text('Assistir anuncio para liberar mentoria por hoje'),
-      );
+      await tester.tap(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
 
       expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
       expect(
         find.text(
-          'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.',
+          'O anúncio foi concluído, mas ainda não recebemos a confirmação. Toque em Atualizar em instantes.',
         ),
         findsWidgets,
       );
@@ -301,13 +290,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Conteudo completo liberado no premium'),
+        find.text('Esta trilha aprofunda sua evolução emocional'),
         findsOneWidget,
       );
-      expect(
-        find.text('Assistir anuncio para liberar mentoria por hoje'),
-        findsNothing,
-      );
+      expect(find.text('Assistir anúncio'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   });
@@ -624,4 +610,3 @@ TrailJourney _journey(Trail trail) {
     nextStep: steps.first,
   );
 }
-
