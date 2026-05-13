@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 
 class TrailRepositoryImpl implements TrailRepository {
@@ -54,6 +55,7 @@ class TrailRepositoryImpl implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) async {
     final response = await _dio.post<dynamic>(
       '/v1/trails',
@@ -64,6 +66,7 @@ class TrailRepositoryImpl implements TrailRepository {
         category: category,
         premium: premium,
         mediaLinks: mediaLinks,
+        steps: steps,
       ),
     );
 
@@ -81,6 +84,7 @@ class TrailRepositoryImpl implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) async {
     final response = await _dio.put<dynamic>(
       '/v1/trails/$id',
@@ -91,6 +95,7 @@ class TrailRepositoryImpl implements TrailRepository {
         category: category,
         premium: premium,
         mediaLinks: mediaLinks,
+        steps: steps,
       ),
     );
 
@@ -111,6 +116,7 @@ class TrailRepositoryImpl implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     return {
       'title': title,
@@ -121,6 +127,31 @@ class TrailRepositoryImpl implements TrailRepository {
       'mediaLinks': mediaLinks
           .map(
             (link) => {'label': link.label, 'url': link.url, 'type': link.type},
+          )
+          .toList(),
+      'steps': steps
+          .map(
+            (step) => {
+              'title': step.title,
+              'type': step.type,
+              'summary': step.summary,
+              'durationMinutes': step.durationMinutes,
+              'content': step.content,
+              'videoProvider': step.video?.provider,
+              'videoId': step.video?.videoId,
+              'videoUrl': step.video?.url,
+              'thumbnailUrl': step.video?.thumbnailUrl,
+              'durationSeconds': step.video?.durationSeconds,
+              'mediaLinks': step.mediaLinks
+                  .map(
+                    (link) => {
+                      'label': link.label,
+                      'url': link.url,
+                      'type': link.type,
+                    },
+                  )
+                  .toList(),
+            },
           )
           .toList(),
     };
@@ -158,6 +189,25 @@ class TrailRepositoryImpl implements TrailRepository {
   Future<TrailJourney> completeStep(int trailId, int stepIndex) async {
     final response = await _dio.post<dynamic>(
       '/v1/trails/$trailId/journey/steps/$stepIndex/complete',
+    );
+    return TrailJourneyDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) async {
+    final response = await _dio.put<dynamic>(
+      '/v1/trails/$trailId/journey/steps/$stepIndex/video-progress',
+      data: {
+        'watchedSeconds': watchedSeconds,
+        'durationSeconds': durationSeconds,
+      },
     );
     return TrailJourneyDto.fromJson(
       ApiPayloadParser.dataMap(response.data),

@@ -3,6 +3,8 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey.d
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_video.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_video_progress.dart';
 
 class TrailJourneyDto {
   const TrailJourneyDto({
@@ -27,7 +29,9 @@ class TrailJourneyDto {
           .map((item) => _stepFromJson(Map<String, dynamic>.from(item)))
           .toList(),
       progress: json['progress'] is Map
-          ? _progressFromJson(Map<String, dynamic>.from(json['progress'] as Map))
+          ? _progressFromJson(
+              Map<String, dynamic>.from(json['progress'] as Map),
+            )
           : null,
       progressPercent: (json['progressPercent'] as num? ?? 0).toInt(),
       nextStep: json['nextStep'] is Map
@@ -50,10 +54,17 @@ class TrailJourneyDto {
     return TrailJourneyStep(
       index: (json['index'] as num? ?? 0).toInt(),
       title: json['title']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'REFLECTION',
       summary: json['summary']?.toString() ?? '',
       content: json['content']?.toString() ?? '',
       status: json['status']?.toString() ?? 'upcoming',
       estimatedMinutes: (json['estimatedMinutes'] as num? ?? 5).toInt(),
+      video: _videoFromJson(json),
+      videoProgress: json['videoProgress'] is Map
+          ? _videoProgressFromJson(
+              Map<String, dynamic>.from(json['videoProgress'] as Map),
+            )
+          : null,
       mediaLinks: (json['mediaLinks'] as List? ?? const [])
           .whereType<Map>()
           .map(
@@ -64,6 +75,32 @@ class TrailJourneyDto {
             ),
           )
           .toList(),
+    );
+  }
+
+  static TrailStepVideo? _videoFromJson(Map<String, dynamic> json) {
+    final provider = json['videoProvider']?.toString();
+    if (provider == null || provider.isEmpty) {
+      return null;
+    }
+    return TrailStepVideo(
+      provider: provider,
+      videoId: json['videoId']?.toString(),
+      url: json['videoUrl']?.toString(),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      durationSeconds: (json['durationSeconds'] as num?)?.toInt(),
+    );
+  }
+
+  static TrailStepVideoProgress _videoProgressFromJson(
+    Map<String, dynamic> json,
+  ) {
+    return TrailStepVideoProgress(
+      watchedSeconds: (json['watchedSeconds'] as num? ?? 0).toInt(),
+      durationSeconds: (json['durationSeconds'] as num? ?? 1).toInt(),
+      watchedPercent: (json['watchedPercent'] as num? ?? 0).toInt(),
+      completed: json['completed'] as bool? ?? false,
+      updatedAt: DateTime.parse(json['updatedAt'].toString()),
     );
   }
 

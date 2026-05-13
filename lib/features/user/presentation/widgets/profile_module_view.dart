@@ -6,7 +6,6 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
-import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
@@ -694,7 +693,6 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         : ref.watch(trailJourneyProvider(activeJourney.id));
     final profile = profileState.asData?.value;
     final isSaving = profileState.isLoading && profileState.hasValue;
-    final isAdmin = session?.isAdmin ?? false;
     final fallbackName =
         session?.displayName ?? session?.email.split('@').first ?? 'Seu perfil';
 
@@ -961,10 +959,6 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           if (profileState.isLoading && !profileState.hasValue) ...[
             const SizedBox(height: 16),
             const FeedSkeleton(cards: 2),
-          ],
-          if (isAdmin) ...[
-            const SizedBox(height: 16),
-            const NotificationAdminConsole(),
           ],
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 
 class Trail {
   const Trail({
@@ -16,6 +17,7 @@ class Trail {
     required this.sourceStyle,
     required this.accessible,
     required this.mediaLinks,
+    required this.steps,
     required this.createdAt,
   });
 
@@ -33,5 +35,6 @@ class Trail {
   final String? sourceStyle;
   final bool accessible;
   final List<TrailMediaLink> mediaLinks;
+  final List<TrailStep> steps;
   final DateTime createdAt;
 }

@@ -12,6 +12,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey.d
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
@@ -37,8 +38,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Minha jornada'), findsOneWidget);
-      expect(find.text('Catalogo'), findsOneWidget);
-      expect(find.text('Ver catalogo'), findsOneWidget);
+      expect(find.text('Explorar'), findsOneWidget);
+      expect(find.text('Explorar trilhas'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -50,7 +51,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Catalogo'));
+      await tester.tap(find.text('Explorar'));
       await tester.pumpAndSettle();
 
       expect(find.text('Encontrar uma trilha certa'), findsOneWidget);
@@ -65,7 +66,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Ver catalogo'));
+      await tester.tap(find.text('Explorar trilhas'));
       await tester.pumpAndSettle();
 
       expect(find.text('Encontrar uma trilha certa'), findsOneWidget);
@@ -427,6 +428,16 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) async {
+    return journey(trailId);
+  }
+
+  @override
   Future<Trail> create({
     required String title,
     required String summary,
@@ -434,6 +445,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -452,6 +464,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -568,6 +581,7 @@ Trail _trail({
     sourceStyle: sourceStyle,
     accessible: accessible,
     mediaLinks: const [],
+    steps: const [],
     createdAt: DateTime(2026, 1, 1),
   );
 }
@@ -579,6 +593,7 @@ TrailJourney _journey(Trail trail) {
       title: 'Respirar',
       summary: 'Dois minutos de presenca.',
       content: 'Respire por quatro ciclos.',
+      type: 'EXERCISE',
       status: 'current',
       estimatedMinutes: 2,
       mediaLinks: [],
@@ -588,6 +603,7 @@ TrailJourney _journey(Trail trail) {
       title: 'Escolher',
       summary: 'Uma proxima acao simples.',
       content: 'Escolha uma acao pequena.',
+      type: 'REFLECTION',
       status: 'pending',
       estimatedMinutes: 4,
       mediaLinks: [],
