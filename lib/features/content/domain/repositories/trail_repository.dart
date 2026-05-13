@@ -2,6 +2,7 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 
 abstract class TrailRepository {
   Future<PaginatedResponse<Trail>> list({
@@ -21,6 +22,7 @@ abstract class TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   });
 
   Future<Trail> update({
@@ -31,6 +33,7 @@ abstract class TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   });
 
   Future<void> delete(int id);
@@ -42,4 +45,11 @@ abstract class TrailRepository {
   Future<TrailJourney> startJourney(int trailId);
 
   Future<TrailJourney> completeStep(int trailId, int stepIndex);
+
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  });
 }

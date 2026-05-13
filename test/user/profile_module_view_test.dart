@@ -14,6 +14,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey.d
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
@@ -244,6 +245,79 @@ void main() {
       find.widgetWithText(NavigationDestination, 'Mentor Evolua'),
       findsNothing,
     );
+  });
+
+  testWidgets('admin sees admin panel in desktop sidebar and opens pages', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(
+        _testSession(roles: const ['ROLE_USER', 'ROLE_ADMIN']).toJson(),
+      ),
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell(size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Painel Admin'), findsOneWidget);
+    expect(find.text('Trilhas'), findsWidgets);
+
+    await tester.tap(find.text('Painel Admin'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Gerencie conteudos e comunicacoes operacionais do Evolua em telas separadas.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Trilhas').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Admin de trilhas'), findsOneWidget);
+    expect(find.text('Criar nova trilha'), findsOneWidget);
+
+    await tester.tap(find.text('Notificacoes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Central admin de notificacoes'), findsOneWidget);
+  });
+
+  testWidgets('non-admin does not see admin panel entry', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell(size: const Size(1280, 900)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Painel Admin'), findsNothing);
+  });
+
+  testWidgets('mobile bottom bar does not include admin item', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(
+        _testSession(roles: const ['ROLE_USER', 'ROLE_ADMIN']).toJson(),
+      ),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    final navigationBar = find.byType(NavigationBar);
+    expect(navigationBar, findsOneWidget);
+    expect(
+      find.descendant(of: navigationBar, matching: find.text('Painel Admin')),
+      findsNothing,
+    );
+
+    await _openAvatarMenu(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('Painel Admin'), findsOneWidget);
   });
 
   testWidgets('dashboard mobile back walks internal history to Inicio', (
@@ -1583,6 +1657,7 @@ Trail _testTrail() {
     sourceStyle: 'briefing',
     accessible: true,
     mediaLinks: const [],
+    steps: const [],
     createdAt: DateTime(2026, 1, 1),
   );
 }
@@ -1594,6 +1669,7 @@ TrailJourney _testJourney(Trail trail) {
       title: 'Respirar',
       summary: 'Dois minutos de presenca.',
       content: 'Respire por quatro ciclos.',
+      type: 'EXERCISE',
       status: 'completed',
       estimatedMinutes: 2,
       mediaLinks: [],
@@ -1603,6 +1679,7 @@ TrailJourney _testJourney(Trail trail) {
       title: 'Escolher',
       summary: 'Uma proxima acao simples.',
       content: 'Escolha uma acao pequena.',
+      type: 'REFLECTION',
       status: 'current',
       estimatedMinutes: 4,
       mediaLinks: [],
@@ -1648,6 +1725,7 @@ TrailJourney _testCompletedJourney(Trail trail) {
       title: 'Respirar',
       summary: 'Dois minutos de presenca.',
       content: 'Respire por quatro ciclos.',
+      type: 'EXERCISE',
       status: 'completed',
       estimatedMinutes: 2,
       mediaLinks: [],
@@ -1657,6 +1735,7 @@ TrailJourney _testCompletedJourney(Trail trail) {
       title: 'Escolher',
       summary: 'Uma proxima acao simples.',
       content: 'Escolha uma acao pequena.',
+      type: 'REFLECTION',
       status: 'completed',
       estimatedMinutes: 4,
       mediaLinks: [],
@@ -2010,6 +2089,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -2039,6 +2119,16 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Trail> update({
     required int id,
     required String title,
@@ -2047,6 +2137,7 @@ class _FakeTrailRepository implements TrailRepository {
     required String category,
     required bool premium,
     required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
   }
@@ -2268,15 +2359,18 @@ class _FakeNotificationRepository implements NotificationRepository {
   Future<int> markAllAsRead() async => 0;
 }
 
-AuthSession _testSession({String email = 'leo@evolua.local'}) {
+AuthSession _testSession({
+  String email = 'leo@evolua.local',
+  List<String> roles = const ['ROLE_USER'],
+}) {
   return AuthSession(
     userId: 'user-123',
     email: email,
-    roles: const ['ROLE_USER'],
+    roles: roles,
     accessToken: _buildJwt(
       sub: 'user-123',
       email: email,
-      roles: const ['ROLE_USER'],
+      roles: roles,
       expiresAt: DateTime.now().add(const Duration(hours: 1)),
     ),
     refreshToken: 'refresh-token',
