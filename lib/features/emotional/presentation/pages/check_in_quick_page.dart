@@ -33,6 +33,13 @@ class CheckInQuickPage extends StatelessWidget {
                 onCompleted: () {
                   context.go('/home');
                 },
+                onCancel: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
               ),
             ),
           ),
@@ -43,16 +50,17 @@ class CheckInQuickPage extends StatelessWidget {
 }
 
 class CheckInQuickView extends ConsumerStatefulWidget {
-  const CheckInQuickView({super.key, this.onCompleted});
+  const CheckInQuickView({super.key, this.onCompleted, this.onCancel});
 
   final VoidCallback? onCompleted;
+  final VoidCallback? onCancel;
 
   @override
   ConsumerState<CheckInQuickView> createState() => _CheckInQuickViewState();
 }
 
 class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
-  static const _quickMoodOptions = ['Calmo', 'Ansioso', 'Cansado', 'Distraido'];
+  static const _quickMoodOptions = ['Calmo', 'Ansioso', 'Cansado', 'Distraído'];
 
   final _reflectionController = TextEditingController();
   String _selectedMood = 'Calmo';
@@ -234,6 +242,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
       onEnergyChanged: (value) => setState(() => _energyLevel = value),
       onSubmit: _submit,
+      onCancel: widget.onCancel ?? () => Navigator.of(context).maybePop(),
     );
   }
 
@@ -246,10 +255,10 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           return details.join(', ');
         }
       }
-      return error.message ?? 'Nao foi possivel salvar o check-in.';
+      return error.message ?? 'Não foi possível salvar o check-in.';
     }
 
-    return 'Nao foi possivel salvar o check-in.';
+    return 'Não foi possível salvar o check-in.';
   }
 }
 
@@ -264,6 +273,7 @@ class _CheckInBriefingCard extends StatelessWidget {
     required this.onOpenMoodPicker,
     required this.onEnergyChanged,
     required this.onSubmit,
+    required this.onCancel,
   });
 
   final String selectedMood;
@@ -275,6 +285,7 @@ class _CheckInBriefingCard extends StatelessWidget {
   final VoidCallback onOpenMoodPicker;
   final ValueChanged<double> onEnergyChanged;
   final VoidCallback onSubmit;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +299,7 @@ class _CheckInBriefingCard extends StatelessWidget {
             eyebrow: 'Como estou?',
             title: 'Comece pelo seu estado agora',
             subtitle:
-                'Um check-in curto ja da contexto para o seu briefing do dia.',
+                'Um check-in curto já dá contexto para o seu briefing do dia.',
             accentColor: AppColors.accent,
           ),
           const SizedBox(height: 18),
@@ -345,15 +356,26 @@ class _CheckInBriefingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: isLoading ? null : onSubmit,
-            icon: isLoading
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.favorite_rounded),
-            label: const Text('Fazer check-in'),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              ElevatedButton.icon(
+                onPressed: isLoading ? null : onSubmit,
+                icon: isLoading
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.favorite_rounded),
+                label: const Text('Fazer check-in'),
+              ),
+              OutlinedButton.icon(
+                onPressed: isLoading ? null : onCancel,
+                icon: const Icon(Icons.close_rounded),
+                label: const Text('Agora não'),
+              ),
+            ],
           ),
         ],
       ),
@@ -614,7 +636,7 @@ const _moodGroups = {
     'Sobrecarregado',
   ],
   'Mentais': [
-    'Distraido',
+    'Distraído',
     'Focado',
     'Confuso',
     'Criativo',

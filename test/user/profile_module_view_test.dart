@@ -1027,8 +1027,8 @@ void main() {
     expect(find.text('Enviar feedback'), findsOneWidget);
 
     await tester.enterText(
-      _feedbackTextField('O que esta funcionando bem?'),
-      'As trilhas estao claras.',
+      _feedbackTextField('O que está funcionando bem?'),
+      'As trilhas estão claras.',
     );
     await tester.ensureVisible(find.text('Boa'));
     await tester.tap(find.text('Boa'));
@@ -1043,7 +1043,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(_lastFeedbackPayload?['workingWell'], 'As trilhas estao claras.');
+    expect(_lastFeedbackPayload?['workingWell'], 'As trilhas estão claras.');
     expect(_lastFeedbackPayload?['rating'], 'BOA');
     expect(tester.takeException(), isNull);
   });

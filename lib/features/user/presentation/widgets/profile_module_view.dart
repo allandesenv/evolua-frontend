@@ -64,6 +64,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   String _gender = 'MALE';
   DateTime? _birthDate;
   bool _didSeedForm = false;
+  bool _isSavingProfile = false;
   late ProfileModuleSection _section;
 
   @override
@@ -81,9 +82,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 ? ((error.response?.data['details'] as List?)?.join(', ') ??
                       error.response?.data['message']?.toString() ??
                       error.message ??
-                      'Não foi possivel salvar o perfil.')
-                : error.message ?? 'Não foi possivel salvar o perfil.')
-          : 'Não foi possivel salvar o perfil.';
+                      'Não foi possível salvar o perfil.')
+                : error.message ?? 'Não foi possível salvar o perfil.')
+          : 'Não foi possível salvar o perfil.';
 
       ScaffoldMessenger.of(
         context,
@@ -141,22 +142,43 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   }
 
   Future<void> _saveProfile() async {
+    if (_isSavingProfile) {
+      return;
+    }
     if (!_formKey.currentState!.validate() || _birthDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe sua data de nascimento.')),
+      );
       return;
     }
 
-    await ref
-        .read(profileControllerProvider.notifier)
-        .upsertMe(
-          displayName: _displayNameController.text.trim(),
-          birthDate: _birthDate!,
-          gender: _gender,
-          customGender: _gender == 'CUSTOM'
-              ? _customGenderController.text.trim()
-              : null,
-          bio: _bioController.text.trim(),
-          journeyLevel: _journeyLevel.round(),
-        );
+    setState(() => _isSavingProfile = true);
+    try {
+      await ref
+          .read(profileControllerProvider.notifier)
+          .upsertMe(
+            displayName: _displayNameController.text.trim(),
+            birthDate: _birthDate!,
+            gender: _gender,
+            customGender: _gender == 'CUSTOM'
+                ? _customGenderController.text.trim()
+                : null,
+            bio: _bioController.text.trim(),
+            journeyLevel: _journeyLevel.round(),
+          );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Perfil salvo')));
+    } catch (_) {
+      // O listener do provider mostra o erro amigável preservando os campos.
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingProfile = false);
+      }
+    }
   }
 
   Future<void> _pickAvatar() async {
@@ -674,7 +696,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         return error.message!;
       }
     }
-    return 'Não foi possivel concluir esta ação agora.';
+    return 'Não foi possível concluir esta ação agora.';
   }
 
   @override
@@ -699,7 +721,8 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         ? null
         : ref.watch(trailJourneyProvider(activeJourney.id));
     final profile = profileState.asData?.value;
-    final isSaving = profileState.isLoading && profileState.hasValue;
+    final isSaving =
+        _isSavingProfile || (profileState.isLoading && profileState.hasValue);
     final fallbackName =
         session?.displayName ?? session?.email.split('@').first ?? 'Seu perfil';
 
@@ -822,7 +845,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Não foi possivel carregar suas preferencias agora.',
+                      'Não foi possível carregar suas preferências agora.',
                     ),
                   ],
                 ),
@@ -941,7 +964,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Não foi possivel carregar suas preferencias visuais agora.',
+                      'Não foi possível carregar suas preferências visuais agora.',
                     ),
                   ],
                 ),
@@ -952,11 +975,11 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
               title: _sectionLabel(_section),
               subtitle: switch (_section) {
                 ProfileModuleSection.settingsPrivacy =>
-                  'Ajuste informacoes pessoais, dados da conta e o que fica visivel para você nesta jornada.',
+                  'Ajuste informações pessoais, dados da conta e o que fica visível para você nesta jornada.',
                 ProfileModuleSection.helpSupport =>
-                  'Use esta area como ponto de apoio para duvidas, orientacoes e próximos passos de suporte.',
+                  'Use esta área como ponto de apoio para dúvidas, orientações e próximos passos de suporte.',
                 ProfileModuleSection.displayAccessibility =>
-                  'Centralize preferencias de leitura, foco visual e conforto de uso nesta tela.',
+                  'Centralize preferências de leitura, foco visual e conforto de uso nesta tela.',
                 ProfileModuleSection.feedback =>
                   'Registre sugestoes e percepcoes sobre a experiência do app sem sair do seu espaco.',
                 ProfileModuleSection.plansSubscriptions =>
@@ -1447,7 +1470,7 @@ class _OverviewSection extends StatelessWidget {
             DropdownButtonFormField<String>(
               initialValue: gender,
               decoration: const InputDecoration(
-                labelText: 'Genero',
+                labelText: 'Gênero',
                 prefixIcon: Icon(Icons.wc_rounded),
               ),
               items: const [
@@ -1487,7 +1510,7 @@ class _OverviewSection extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Nivel da jornada: ${journeyLevel.round()}',
+              'Nível da jornada: ${journeyLevel.round()}',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: context.evoluaColors.textPrimary,
               ),
@@ -1504,7 +1527,12 @@ class _OverviewSection extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: ElevatedButton.icon(
                 onPressed: isSaving ? null : onSubmit,
-                icon: const Icon(Icons.save_rounded),
+                icon: isSaving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_rounded),
                 label: const Text('Salvar perfil'),
               ),
             ),
@@ -1633,7 +1661,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           _EvolutionSectionGroup(
             title: 'Trilhas em andamento',
             description:
-                'Acompanhe a trilha que esta guiando seus próximos passos.',
+                'Acompanhe a trilha que está guiando seus próximos passos.',
             child: _TrailEvolutionPanel(
               currentJourneyState: currentJourneyState,
               journeyState: journeyState,
@@ -2131,7 +2159,7 @@ class _FutureMessageTimelineCard extends StatelessWidget {
         ? 'Você ja leu essa carta.'
         : message.isDelivered
         ? 'Há uma carta sua pronta para ser lida com calma.'
-        : 'Essa carta ainda esta guardada.';
+        : 'Essa carta ainda está guardada.';
 
     return Container(
       width: double.infinity,
@@ -2473,7 +2501,7 @@ class _EvolutionMirrorStats {
       localAiFallback: _mirrorLocalAiFallback(checkIns),
       consistencyMessage: weeklyCheckIns == 0
           ? 'Seu espelho ainda está se formando. Um check-in curto já cria o primeiro ponto de referência.'
-          : 'Você registrou $weeklyCheckIns momento(s) nesta semana. A constancia aqui e voltar com honestidade, não fazer tudo perfeito.',
+          : 'Você registrou $weeklyCheckIns momento(s) nesta semana. A constância aqui é voltar com honestidade, não fazer tudo perfeito.',
       weeklyActivity: weeklyActivity,
       milestones: milestones,
     );
@@ -2648,7 +2676,7 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
   }
 
   return const _MirrorPattern(
-    label: 'constancia em construcao',
+    label: 'constância em construção',
     headline: 'Um padrão emocional já começa a se formar.',
     description:
         'Continue registrando com honestidade. A leitura fica mais precisa quando o histórico ganha ritmo.',
@@ -2854,7 +2882,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
         return error.message!;
       }
     }
-    return 'Não foi possivel enviar seu feedback agora.';
+    return 'Não foi possível enviar seu feedback agora.';
   }
 
   @override
@@ -2862,7 +2890,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
     final feedbackFields = [
       _FeedbackTextField(
         controller: _workingWellController,
-        label: 'O que esta funcionando bem?',
+        label: 'O que está funcionando bem?',
       ),
       _FeedbackTextField(
         controller: _couldImproveController,
@@ -2909,7 +2937,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
               ),
               const SizedBox(height: 12),
               Text(
-                'O Evolua esta em constante evolucao. Sua percepcao ajuda a construir uma experiência melhor para todos.',
+                'O Evolua está em constante evolução. Sua percepção ajuda a construir uma experiência melhor para todos.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
@@ -2934,7 +2962,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
         const SizedBox(height: 16),
         _SettingsGroup(
           title: 'Reportar problema',
-          description: 'Encontrou algo que não esta funcionando como deveria?',
+          description: 'Encontrou algo que não está funcionando como deveria?',
           microcopy:
               'Relatos claros ajudam nosso time a corrigir com mais rapidez e cuidado.',
           children: [
@@ -3062,7 +3090,7 @@ class _ScreenshotPickerRow extends StatelessWidget {
       icon: Icons.image_outlined,
       title: 'Enviar captura de tela',
       subtitle: fileName == null
-          ? 'Opcional, util quando algo visual não esta funcionando.'
+          ? 'Opcional, útil quando algo visual não está funcionando.'
           : fileName!,
       trailing: fileName == null
           ? TextButton(onPressed: onPick, child: const Text('Anexar'))
@@ -3151,7 +3179,7 @@ class _HelpSupportSection extends StatelessWidget {
               subtitle: 'Acesse materiais externos quando configurados.',
               onTap: () => onOpenLink(
                 config?.helpCenterUrl,
-                'A central completa ainda não esta configurada. Use as respostas desta pagina por enquanto.',
+                'A central completa ainda não está configurada. Use as respostas desta página por enquanto.',
               ),
             ),
           ],
@@ -3207,7 +3235,7 @@ class _HelpSupportSection extends StatelessWidget {
                   'Veja orientacoes configuradas para momentos que pedem apoio humano.',
               onTap: () => onOpenLink(
                 config?.professionalHelpUrl,
-                'Esse recurso de apoio profissional ainda não esta configurado.',
+                'Esse recurso de apoio profissional ainda não está configurado.',
               ),
             ),
             _SettingsActionRow(
@@ -3226,7 +3254,7 @@ class _HelpSupportSection extends StatelessWidget {
                   'Entenda onde a IA ajuda e onde o apoio humano importa.',
               onTap: () => onOpenLink(
                 config?.aiLimitsUrl,
-                'A pagina sobre limites da IA ainda não esta configurada.',
+                'A página sobre limites da IA ainda não está configurada.',
               ),
             ),
           ],
@@ -3248,7 +3276,7 @@ class _HelpSupportSection extends StatelessWidget {
               error: (_, _) => const _SettingsInfoRow(
                 icon: Icons.info_outline_rounded,
                 title: 'Status indisponível',
-                subtitle: 'Não foi possivel confirmar a plataforma agora.',
+                subtitle: 'Não foi possível confirmar a plataforma agora.',
               ),
             ),
             _SettingsActionRow(
@@ -3273,7 +3301,7 @@ class _HelpSupportSection extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => onOpenLink(
                   config?.helpCenterUrl,
-                  'A central completa ainda não esta configurada. Use as respostas desta pagina por enquanto.',
+                  'A central completa ainda não está configurada. Use as respostas desta página por enquanto.',
                 ),
                 icon: const Icon(Icons.help_outline_rounded),
                 label: const Text('Abrir central de ajuda'),
@@ -3759,7 +3787,7 @@ class _SettingsPrivacySection extends StatelessWidget {
             _SettingsActionRow(
               icon: Icons.devices_rounded,
               title: 'Dispositivos conectados',
-              subtitle: 'Revise onde sua conta esta ativa.',
+              subtitle: 'Revise onde sua conta está ativa.',
               onTap: onInformationalAction,
             ),
             _SettingsActionRow(
@@ -3891,7 +3919,7 @@ class _SettingsPrivacySection extends StatelessWidget {
             ),
             _SettingsSwitchRow(
               title: 'Lembretes diários',
-              subtitle: 'Receba lembretes gentis para manter constancia.',
+              subtitle: 'Receba lembretes gentis para manter constância.',
               value: dailyReminders,
               onChanged: onDailyRemindersChanged,
             ),

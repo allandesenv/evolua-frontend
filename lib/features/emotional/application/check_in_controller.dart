@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
@@ -22,6 +24,8 @@ class CheckInHistoryState {
     required this.result,
     required this.selectedGrouping,
     this.latestCreatedCheckIn,
+    this.pendingInsightCheckInId,
+    this.unavailableInsightCheckInId,
     this.search,
     this.mood,
     this.energyRange,
@@ -32,15 +36,29 @@ class CheckInHistoryState {
   final PaginatedResponse<CheckIn> result;
   final String selectedGrouping;
   final CheckIn? latestCreatedCheckIn;
+  final int? pendingInsightCheckInId;
+  final int? unavailableInsightCheckInId;
   final String? search;
   final String? mood;
   final String? energyRange;
   final DateTime? from;
   final DateTime? to;
+
+  bool get isLatestInsightPending =>
+      latestCreatedCheckIn != null &&
+      latestCreatedCheckIn!.id == pendingInsightCheckInId &&
+      latestCreatedCheckIn!.aiInsight == null;
+
+  bool get isLatestInsightUnavailable =>
+      latestCreatedCheckIn != null &&
+      latestCreatedCheckIn!.id == unavailableInsightCheckInId &&
+      latestCreatedCheckIn!.aiInsight == null;
 }
 
 class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   static const _pageSize = 6;
+  static const _insightPollingAttempts = 8;
+  static const _insightPollingDelay = Duration(seconds: 2);
 
   String? _search;
   String? _mood;
@@ -148,6 +166,8 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         result: current.result,
         selectedGrouping: grouping,
         latestCreatedCheckIn: current.latestCreatedCheckIn,
+        pendingInsightCheckInId: current.pendingInsightCheckInId,
+        unavailableInsightCheckInId: current.unavailableInsightCheckInId,
         search: current.search,
         mood: current.mood,
         energyRange: current.energyRange,
@@ -163,6 +183,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     required int energyLevel,
   }) async {
     final repository = ref.read(checkInRepositoryProvider);
+    int? pendingInsightId;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final created = await repository.create(
@@ -175,11 +196,18 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       ref.invalidate(trailControllerProvider);
 
       final result = await _fetch(page: 0);
+      final latest = _canonicalLatestCheckIn(result, created);
+      pendingInsightId = latest?.aiInsight == null ? latest?.id : null;
       return _stateFromResult(
         result,
-        latestCreatedCheckIn: _canonicalLatestCheckIn(result, created),
+        latestCreatedCheckIn: latest,
+        pendingInsightCheckInId: pendingInsightId,
+        unavailableInsightCheckInId: null,
       );
     });
+    if (pendingInsightId != null && !state.hasError) {
+      unawaited(_pollForInsight(pendingInsightId!));
+    }
   }
 
   Future<CheckIn?> generateDeepReadingForLatest() async {
@@ -222,12 +250,24 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   CheckInHistoryState _stateFromResult(
     PaginatedResponse<CheckIn> result, {
     CheckIn? latestCreatedCheckIn,
+    int? pendingInsightCheckInId,
+    int? unavailableInsightCheckInId,
   }) {
+    final latest =
+        latestCreatedCheckIn ?? state.asData?.value.latestCreatedCheckIn;
+    final hasInsight = latest?.aiInsight != null;
     return CheckInHistoryState(
       result: result,
       selectedGrouping: _selectedGrouping,
-      latestCreatedCheckIn:
-          latestCreatedCheckIn ?? state.asData?.value.latestCreatedCheckIn,
+      latestCreatedCheckIn: latest,
+      pendingInsightCheckInId: hasInsight
+          ? null
+          : pendingInsightCheckInId ??
+                state.asData?.value.pendingInsightCheckInId,
+      unavailableInsightCheckInId: hasInsight
+          ? null
+          : unavailableInsightCheckInId ??
+                state.asData?.value.unavailableInsightCheckInId,
       search: _search,
       mood: _mood,
       energyRange: _energyRange,
@@ -263,6 +303,55 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     }
 
     return listed.createdAt.isAfter(fallback.createdAt) ? listed : fallback;
+  }
+
+  Future<void> _pollForInsight(int checkInId) async {
+    for (var attempt = 0; attempt < _insightPollingAttempts; attempt++) {
+      await Future<void>.delayed(_insightPollingDelay);
+      if (state.asData?.value.pendingInsightCheckInId != checkInId) {
+        return;
+      }
+      try {
+        final result = await _fetch(page: 0);
+        final listed = result.items
+            .where((item) => item.id == checkInId)
+            .firstOrNull;
+        if (listed?.aiInsight != null) {
+          state = AsyncData(
+            _stateFromResult(
+              result,
+              latestCreatedCheckIn: listed,
+              pendingInsightCheckInId: null,
+              unavailableInsightCheckInId: null,
+            ),
+          );
+          ref.invalidate(currentJourneyTrailProvider);
+          ref.invalidate(trailControllerProvider);
+          return;
+        }
+      } catch (_) {
+        // Keep the current state visible while the backend finishes processing.
+      }
+    }
+
+    final current = state.asData?.value;
+    if (current == null || current.pendingInsightCheckInId != checkInId) {
+      return;
+    }
+    state = AsyncData(
+      CheckInHistoryState(
+        result: current.result,
+        selectedGrouping: current.selectedGrouping,
+        latestCreatedCheckIn: current.latestCreatedCheckIn,
+        pendingInsightCheckInId: null,
+        unavailableInsightCheckInId: checkInId,
+        search: current.search,
+        mood: current.mood,
+        energyRange: current.energyRange,
+        from: current.from,
+        to: current.to,
+      ),
+    );
   }
 
   String? _normalizeText(String? value) {

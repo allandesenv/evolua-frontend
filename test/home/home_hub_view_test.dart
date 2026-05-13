@@ -409,7 +409,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('8 min'), findsOneWidget);
-      expect(find.text('mantem constancia'), findsOneWidget);
+      expect(find.text('mantém constância'), findsOneWidget);
       expect(find.text('jornada ativa'), findsOneWidget);
       expect(find.text('Continuar jornada'), findsAtLeastNWidgets(1));
       expect(find.text('Espaços'), findsOneWidget);
@@ -417,7 +417,7 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, 'Espaços'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '8 min'), findsNothing);
       expect(
-        find.widgetWithText(OutlinedButton, 'mantem constancia'),
+        find.widgetWithText(OutlinedButton, 'mantém constância'),
         findsNothing,
       );
     });

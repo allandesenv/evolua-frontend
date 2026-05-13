@@ -20,7 +20,7 @@ void main() {
       expect(find.text('Calmo'), findsOneWidget);
       expect(find.text('Ansioso'), findsOneWidget);
       expect(find.text('Cansado'), findsOneWidget);
-      expect(find.text('Distraido'), findsOneWidget);
+      expect(find.text('Distraído'), findsOneWidget);
       expect(find.text('Mais estados'), findsOneWidget);
       expect(find.text('Focado'), findsNothing);
 

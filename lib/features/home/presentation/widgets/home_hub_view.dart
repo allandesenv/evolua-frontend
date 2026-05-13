@@ -163,6 +163,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final recentItems = result?.items ?? const <CheckIn>[];
     final latestCreatedCheckIn =
         checkInState.asData?.value.latestCreatedCheckIn;
+    final isInsightPending =
+        checkInState.asData?.value.isLatestInsightPending ?? false;
+    final isInsightUnavailable =
+        checkInState.asData?.value.isLatestInsightUnavailable ?? false;
     final latestInsight =
         latestCreatedCheckIn?.aiInsight ??
         recentItems
@@ -179,7 +183,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       _ when currentJourney != null => currentJourney.title,
       0 => 'Monte sua primeira trilha pessoal',
       _ when widget.checkInsCount == 0 =>
-        'Registre como você esta para receber a direcao do dia',
+        'Registre como você está para receber a direção do dia',
       _ when widget.postsCount == 0 =>
         'Encontre uma reflexao curta para o seu momento',
       _ => 'Respiração guiada',
@@ -247,6 +251,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         _InsightBriefingCard(
           insight: latestInsight,
           checkIn: latestCreatedCheckIn ?? recentItems.firstOrNull,
+          isLoading: isInsightPending,
+          isUnavailable: isInsightUnavailable,
           onOpenFullAnalysis: latestInsight == null
               ? null
               : () => _openInsightSheet(latestInsight),
@@ -258,7 +264,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           description:
               currentJourney?.summary ??
               latestInsight?.suggestedAction ??
-              'Uma unica ação agora vale mais do que abrir muitas frentes ao mesmo tempo.',
+              'Uma única ação agora vale mais do que abrir muitas frentes ao mesmo tempo.',
           meta: paceMeta,
           buttonLabel: paceButtonLabel,
           onPrimaryAction: paceAction,
@@ -686,11 +692,15 @@ class _InsightBriefingCard extends StatelessWidget {
   const _InsightBriefingCard({
     required this.insight,
     required this.checkIn,
+    required this.isLoading,
+    required this.isUnavailable,
     required this.onOpenFullAnalysis,
   });
 
   final CheckInAiInsight? insight;
   final CheckIn? checkIn;
+  final bool isLoading;
+  final bool isUnavailable;
   final VoidCallback? onOpenFullAnalysis;
 
   @override
@@ -710,7 +720,27 @@ class _InsightBriefingCard extends StatelessWidget {
             subtitle: summary,
             accentColor: AppColors.accentWarm,
           ),
-          if (insight != null) ...[
+          if (isLoading) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Preparando sua leitura emocional...',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.evoluaColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (insight != null) ...[
             const SizedBox(height: 14),
             _InsightBullet(
               text: l10n.homeEnergyBullet(
@@ -743,6 +773,12 @@ class _InsightBriefingCard extends StatelessWidget {
   }
 
   String _summaryFromInsight(BuildContext context, CheckInAiInsight? insight) {
+    if (isLoading) {
+      return 'Seu check-in foi salvo. Estamos aguardando a resposta do backend para atualizar esta leitura.';
+    }
+    if (isUnavailable) {
+      return 'Seu check-in foi salvo, mas a leitura ainda não ficou disponível. Tente atualizar em instantes.';
+    }
     if (insight == null) {
       return context.l10n.homeIntelligentReadingEmpty;
     }
@@ -753,7 +789,7 @@ class _InsightBriefingCard extends StatelessWidget {
   String _firstSentence(String value) {
     final text = value.trim();
     if (text.isEmpty) {
-      return 'Seu momento atual pede uma ação simples e possivel.';
+      return 'Seu momento atual pede uma ação simples e possível.';
     }
 
     final stops = [
@@ -1711,7 +1747,7 @@ class _PaceMeta {
     if (hasJourney) {
       return const _PaceMeta(
         duration: '8 min',
-        benefit: 'mantem constancia',
+        benefit: 'mantém constância',
         reason: 'jornada ativa',
       );
     }
