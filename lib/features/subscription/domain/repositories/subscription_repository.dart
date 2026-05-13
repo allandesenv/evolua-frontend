@@ -14,5 +14,13 @@ abstract class SubscriptionRepository {
 
   Future<CurrentSubscription?> cancel();
 
-  Future<AdRewardSession> createRewardSession({required String rewardType});
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+    String? contextId,
+  });
+
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  });
 }

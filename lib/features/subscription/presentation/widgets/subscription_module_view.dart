@@ -35,9 +35,9 @@ class _SubscriptionModuleViewState
             ? (error.response?.data is Map<String, dynamic>
                   ? ((error.response?.data['details'] as List?)?.join(', ') ??
                         error.message ??
-                        'Nao foi possivel processar a assinatura.')
-                  : error.message ?? 'Nao foi possivel processar a assinatura.')
-            : 'Nao foi possivel processar a assinatura.';
+                        'Não foi possível processar a assinatura.')
+                  : error.message ?? 'Não foi possível processar a assinatura.')
+            : 'Não foi possível processar a assinatura.';
 
         ScaffoldMessenger.of(
           context,
@@ -63,7 +63,7 @@ class _SubscriptionModuleViewState
       loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
       error: (error, stackTrace) => PrimaryPanel(
         child: Text(
-          'Nao foi possivel carregar os planos agora.',
+          'Não foi possível carregar os planos agora.',
           style: Theme.of(context).textTheme.bodyLarge,
         ),
       ),
@@ -75,12 +75,21 @@ class _SubscriptionModuleViewState
           orElse: () => const PlanView(
             planCode: 'essential-free',
             title: 'Essencial',
-            subtitle: 'Base gratuita do app.',
+            subtitle:
+                'Comece sua jornada de autoconhecimento com leveza e constância.',
             billingCycle: 'MONTHLY',
             premium: false,
             price: 0,
             currency: 'BRL',
-            benefits: ['Base gratuita'],
+            benefits: [
+              'Check-ins emocionais ilimitados',
+              'Diário e reflexões pessoais',
+              'Trilhas gratuitas de desenvolvimento',
+              'Insights básicos com IA',
+              '1 leitura emocional aprofundada por dia',
+              'Histórico emocional dos últimos 30 dias',
+              'Espelho da Evolução resumido',
+            ],
             active: true,
           ),
         );
@@ -99,15 +108,20 @@ class _SubscriptionModuleViewState
                   const SizedBox(height: 12),
                   Text(
                     current?.premium == true
-                        ? 'Seu premium esta ativo e a liberacao depende sempre da confirmacao real do pagamento.'
-                        : 'Voce esta no plano essencial. Quando quiser aprofundar a jornada, o upgrade leva voce para o checkout seguro e so libera o premium apos confirmacao.',
+                        ? 'Seu Premium está ativo. Você aprofunda sua jornada sem anúncios e com mais contexto emocional.'
+                        : 'Você está no plano Essencial. Comece sua jornada de autoconhecimento com leveza e constância.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 20),
-                  _CurrentPlanCard(current: current, pending: data.pendingCheckout),
+                  _CurrentPlanCard(
+                    current: current,
+                    pending: data.pendingCheckout,
+                  ),
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            const _MonetizationPrinciplesPanel(),
             const SizedBox(height: 16),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -119,29 +133,31 @@ class _SubscriptionModuleViewState
                     bullets: essential.benefits,
                     accent: AppColors.accentWarm,
                     highlighted: current?.premium != true,
-                    cta: current?.premium == true
-                        ? 'Voltar ao essencial'
-                        : 'Plano atual',
-                    disabled: data.isBusy || current?.premium != true,
-                    onTap: current?.premium == true
-                        ? () => ref
-                              .read(subscriptionControllerProvider.notifier)
-                              .cancelPremium()
-                        : null,
+                    cta: 'Plano atual',
+                    disabled: true,
                   ),
                   ...premiumPlans.map(
                     (plan) => _PlanCard(
                       title: plan.title,
-                      subtitle:
-                          '${plan.subtitle} ${_formatPrice(plan.price, plan.currency)}/${plan.billingCycle == 'YEARLY' ? 'ano' : 'mes'}',
+                      subtitle: plan.subtitle,
+                      priceLabel: plan.billingCycle == 'YEARLY'
+                          ? '${_formatPrice(plan.price, plan.currency)}/ano'
+                          : '${_formatPrice(plan.price, plan.currency)}/mês',
                       bullets: plan.benefits,
                       accent: AppColors.accentGold,
+                      badge: plan.billingCycle == 'YEARLY'
+                          ? 'Economize 33%'
+                          : null,
                       highlighted: current?.planCode == plan.planCode,
-                      cta: current?.planCode == plan.planCode &&
+                      cta:
+                          current?.planCode == plan.planCode &&
                               current?.premium == true
                           ? 'Plano ativo'
-                          : 'Assinar agora',
-                      disabled: data.isBusy ||
+                          : plan.billingCycle == 'YEARLY'
+                          ? 'Evoluir continuamente'
+                          : 'Aprofundar jornada',
+                      disabled:
+                          data.isBusy ||
                           (current?.planCode == plan.planCode &&
                               current?.premium == true),
                       onTap: () => _startCheckout(plan.planCode),
@@ -185,9 +201,73 @@ class _SubscriptionModuleViewState
 
   String _formatPrice(double price, String currency) {
     if (price == 0) {
-      return 'Gratis';
+      return 'Grátis';
     }
-    return 'R\$ ${price.toStringAsFixed(2)}';
+    return 'R\$ ${price.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+}
+
+class _MonetizationPrinciplesPanel extends StatelessWidget {
+  const _MonetizationPrinciplesPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: const [
+          _PrinciplePill(
+            icon: Icons.favorite_rounded,
+            label: 'Free útil, sem pressão',
+          ),
+          _PrinciplePill(
+            icon: Icons.visibility_off_rounded,
+            label: 'Premium sem anúncios',
+          ),
+          _PrinciplePill(
+            icon: Icons.ondemand_video_rounded,
+            label: 'Anúncios só em áreas neutras',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrinciplePill extends StatelessWidget {
+  const _PrinciplePill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceStrong,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.outline),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelLarge,
+                softWrap: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -216,14 +296,11 @@ class _CurrentPlanCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(label, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 6),
-          Text(
-            'Status: $status',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+          Text('Status: $status', style: Theme.of(context).textTheme.bodyLarge),
           if (current?.currentPeriodEndsAt != null) ...[
             const SizedBox(height: 6),
             Text(
-              'Proxima referencia: ${current!.currentPeriodEndsAt!.day.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.month.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.year}',
+              'Próxima referência: ${current!.currentPeriodEndsAt!.day.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.month.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.year}',
             ),
           ],
           if (pending != null) ...[
@@ -248,6 +325,8 @@ class _PlanCard extends StatelessWidget {
     required this.bullets,
     required this.accent,
     required this.cta,
+    this.priceLabel,
+    this.badge,
     this.highlighted = false,
     this.disabled = false,
     this.onTap,
@@ -258,6 +337,8 @@ class _PlanCard extends StatelessWidget {
   final List<String> bullets;
   final Color accent;
   final String cta;
+  final String? priceLabel;
+  final String? badge;
   final bool highlighted;
   final bool disabled;
   final VoidCallback? onTap;
@@ -278,7 +359,35 @@ class _PlanCard extends StatelessWidget {
             child: Icon(Icons.workspace_premium_rounded, color: accent),
           ),
           const SizedBox(height: 16),
+          if (badge != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: accent.withValues(alpha: 0.36)),
+              ),
+              child: Text(
+                badge!,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          if (priceLabel != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              priceLabel!,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 16),

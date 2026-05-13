@@ -109,7 +109,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsOneWidget);
     expect(find.text('Planos e assinaturas'), findsNothing);
-    expect(find.textContaining('Voce esta no plano essencial'), findsNothing);
+    expect(find.textContaining('Você está no plano Essencial'), findsNothing);
   });
 
   testWidgets('profile preferences navigation is hidden on mobile', (
@@ -152,7 +152,7 @@ void main() {
     expect(find.text('Conta'), findsNothing);
     expect(find.text('Preferencias'), findsNothing);
     expect(find.text('Apoio'), findsNothing);
-    expect(find.text('Configuracoes e privacidade'), findsNothing);
+    expect(find.text('Configurações e privacidade'), findsNothing);
     expect(find.text('Ajuda e suporte'), findsNothing);
     expect(find.text('Tela e acessibilidade'), findsNothing);
     expect(find.text('Dar feedback'), findsNothing);
@@ -199,7 +199,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Preferencias'), findsNothing);
-    expect(find.text('Configuracoes e privacidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Configurações e privacidade'), findsAtLeastNWidgets(1));
     expect(find.text('Conta e acesso'), findsOneWidget);
   });
 
@@ -218,17 +218,17 @@ void main() {
     await _openAvatarMenu(tester);
     await tester.pumpAndSettle();
 
-    expect(find.text('Ver perfil'), findsAtLeastNWidgets(1));
+    expect(find.text('Perfil'), findsAtLeastNWidgets(1));
     expect(find.text('Planos e assinaturas'), findsOneWidget);
-    expect(find.text('Espelho da Evolucao'), findsOneWidget);
+    expect(find.text('Espelho da Evolução'), findsOneWidget);
     expect(find.text('Mensagens para o futuro'), findsOneWidget);
-    expect(find.text('Configuracoes e privacidade'), findsOneWidget);
+    expect(find.text('Configurações e privacidade'), findsOneWidget);
     expect(find.text('Ajuda e suporte'), findsOneWidget);
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
     expect(find.text('Dar feedback'), findsOneWidget);
   });
 
-  testWidgets('dashboard uses Inicio copy in navigation', (tester) async {
+  testWidgets('dashboard uses Início copy in navigation', (tester) async {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
@@ -238,7 +238,7 @@ void main() {
     await tester.pumpWidget(_dashboardShell(size: const Size(1280, 900)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Inicio'), findsAtLeastNWidgets(1));
+    expect(find.text('Início'), findsAtLeastNWidgets(1));
     expect(find.text('Espelho'), findsOneWidget);
     expect(find.text('Home'), findsNothing);
     expect(
@@ -268,19 +268,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.text(
-        'Gerencie conteudos e comunicacoes operacionais do Evolua em telas separadas.',
+        'Gerencie conteúdos e comunicações operacionais do Evolua em telas separadas.',
       ),
       findsOneWidget,
     );
 
     await tester.tap(find.text('Trilhas').last);
     await tester.pumpAndSettle();
-    expect(find.text('Admin de trilhas'), findsOneWidget);
+    expect(find.text('Admin de trilhas'), findsAtLeastNWidgets(1));
     expect(find.text('Criar nova trilha'), findsOneWidget);
 
-    await tester.tap(find.text('Notificacoes'));
+    await tester.tap(find.text('Notificações'));
     await tester.pumpAndSettle();
-    expect(find.text('Central admin de notificacoes'), findsOneWidget);
+    expect(find.text('Central admin de notificações'), findsOneWidget);
   });
 
   testWidgets('non-admin does not see admin panel entry', (tester) async {
@@ -320,7 +320,7 @@ void main() {
     expect(find.text('Painel Admin'), findsOneWidget);
   });
 
-  testWidgets('dashboard mobile back walks internal history to Inicio', (
+  testWidgets('dashboard mobile back walks internal history to Início', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -340,7 +340,7 @@ void main() {
     expect(find.byType(ContentModuleView), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
     expect(find.text('Em destaque'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -404,7 +404,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
     expect(find.text('Em destaque'), findsOneWidget);
 
@@ -439,7 +439,7 @@ void main() {
 
     await _openAvatarMenu(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ver perfil').last);
+    await tester.tap(find.text('Perfil').last);
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
@@ -511,7 +511,7 @@ void main() {
     await tester.pumpWidget(_dashboardShellWithFutureMessagesRoute());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
     expect(find.byType(TabBar), findsNothing);
     expect(find.text('Em destaque'), findsOneWidget);
@@ -542,7 +542,7 @@ void main() {
     await tester.pumpWidget(_dashboardShell());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Espacos'));
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
 
     expect(find.byType(TabBar), findsNothing);
@@ -603,15 +603,15 @@ void main() {
     await tester.tap(find.text('Planos e assinaturas'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Voce esta no plano essencial'), findsOneWidget);
+    expect(find.textContaining('Você está no plano Essencial'), findsOneWidget);
 
     await _openAvatarMenu(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ver perfil').last);
+    await tester.tap(find.text('Perfil').last);
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsOneWidget);
-    expect(find.textContaining('Voce esta no plano essencial'), findsNothing);
+    expect(find.textContaining('Você está no plano Essencial'), findsNothing);
   });
 
   testWidgets('avatar menu opens evolution mirror section', (tester) async {
@@ -626,10 +626,10 @@ void main() {
 
     await _openAvatarMenu(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Espelho da Evolucao'));
+    await tester.tap(find.text('Espelho da Evolução'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
+    expect(find.text('Espelho da Evolução'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
@@ -690,7 +690,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Leo Respiro'), findsOneWidget);
-    expect(find.text('Configuracoes e privacidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Configurações e privacidade'), findsAtLeastNWidgets(1));
     expect(find.text('Conta e acesso'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -735,13 +735,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Compartilhe sua experiencia'), findsOneWidget);
+    expect(find.text('Compartilhe sua experiência'), findsOneWidget);
 
     selectedSection.value = ProfileModuleSection.plansSubscriptions;
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Voce esta no plano essencial'), findsOneWidget);
-    expect(find.text('Compartilhe sua experiencia'), findsNothing);
+    expect(find.textContaining('Você está no plano Essencial'), findsOneWidget);
+    expect(find.text('Compartilhe sua experiência'), findsNothing);
   });
 
   testWidgets('renders settings and privacy controls on compact width', (
@@ -782,11 +782,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Configuracoes e privacidade'), findsAtLeastNWidgets(1));
+    expect(find.text('Configurações e privacidade'), findsAtLeastNWidgets(1));
     expect(find.text('Conta e acesso'), findsOneWidget);
     expect(find.text('Privacidade emocional'), findsOneWidget);
-    expect(find.text('Dados e seguranca'), findsOneWidget);
-    expect(find.text('Personalizacao da experiencia'), findsOneWidget);
+    expect(find.text('Dados e segurança'), findsOneWidget);
+    expect(find.text('Personalização da experiência'), findsOneWidget);
     expect(find.text('E-mail de acesso'), findsOneWidget);
     expect(find.text('leo@evolua.local'), findsAtLeastNWidgets(1));
     expect(find.text('Tornar diario privado'), findsOneWidget);
@@ -797,7 +797,7 @@ void main() {
     await tester.tap(find.text('Salvar preferencias'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Preferencias salvas com seguranca.'), findsOneWidget);
+    expect(find.text('Preferências salvas com segurança.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -808,9 +808,9 @@ void main() {
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
 
-    await _pumpEvolutionMirror(tester);
+    await _pumpEvolutionMirror(tester, premium: true);
 
-    expect(find.text('Espelho da Evolucao'), findsAtLeastNWidgets(1));
+    expect(find.text('Espelho da Evolução'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
     expect(find.text('Resumo da semana'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
@@ -820,9 +820,9 @@ void main() {
     expect(find.text('Mensagens do seu eu anterior'), findsNothing);
     expect(find.text('Trilhas em andamento'), findsOneWidget);
     expect(find.text('Marcos da jornada'), findsOneWidget);
-    expect(find.text('Consistencia'), findsAtLeastNWidgets(1));
-    expect(find.text('sem padrao ainda'), findsOneWidget);
-    expect(find.text('em formacao'), findsOneWidget);
+    expect(find.text('Consistência'), findsAtLeastNWidgets(1));
+    expect(find.text('sem padrão ainda'), findsOneWidget);
+    expect(find.text('em formação'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -836,6 +836,7 @@ void main() {
 
     await _pumpEvolutionMirror(
       tester,
+      premium: true,
       trailRepository: _FakeTrailRepository(
         currentJourney: trail,
         journey: _testJourney(trail),
@@ -844,17 +845,17 @@ void main() {
     );
 
     expect(find.text('Clareza pratica'), findsAtLeastNWidgets(1));
-    expect(find.textContaining('50% concluido'), findsOneWidget);
-    expect(find.text('Proximo passo: Escolher'), findsOneWidget);
+    expect(find.textContaining('50% concluído'), findsOneWidget);
+    expect(find.text('Próximo passo: Escolher'), findsOneWidget);
     expect(find.text('Mensagem da IA'), findsOneWidget);
     expect(
-      find.text('Voce tende a registrar mais ansiedade a noite.'),
+      find.text('Você tende a registrar mais ansiedade à noite.'),
       findsAtLeastNWidgets(1),
     );
-    expect(find.text('1 padrao emocional identificado'), findsOneWidget);
+    expect(find.text('1 padrão emocional identificado'), findsOneWidget);
     expect(find.text('3 dias de check-in'), findsOneWidget);
     expect(
-      find.text('Proximo passo: Escolha uma proxima acao simples.'),
+      find.text('Próximo passo: Escolha uma proxima acao simples.'),
       findsOneWidget,
     );
     expect(find.text('Ansioso'), findsOneWidget);
@@ -869,6 +870,7 @@ void main() {
 
     await _pumpEvolutionMirror(
       tester,
+      premium: true,
       checkInRepository: _FakeCheckInRepository(items: _evolutionCheckIns()),
       futureMessageRepository: _FakeFutureMessageRepository(
         deliveredItems: [_deliveredFutureMessage()],
@@ -877,7 +879,7 @@ void main() {
 
     expect(find.text('Mensagens do seu eu anterior'), findsOneWidget);
     expect(
-      find.text('Ha uma carta sua pronta para ser lida com calma.'),
+      find.text('Há uma carta sua pronta para ser lida com calma.'),
       findsOneWidget,
     );
     expect(find.text('Quero ler'), findsOneWidget);
@@ -893,6 +895,7 @@ void main() {
 
     await _pumpEvolutionMirror(
       tester,
+      premium: true,
       trailRepository: _FakeTrailRepository(
         currentJourney: trail,
         journey: _testCompletedJourney(trail),
@@ -902,10 +905,10 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('100% concluido'), findsOneWidget);
-    expect(find.text('Primeira trilha concluida'), findsOneWidget);
-    expect(find.text('7 reflexoes registradas'), findsOneWidget);
-    expect(find.text('1 padrao emocional identificado'), findsOneWidget);
+    expect(find.textContaining('100% concluído'), findsOneWidget);
+    expect(find.text('Primeira trilha concluída'), findsOneWidget);
+    expect(find.text('7 reflexões registradas'), findsOneWidget);
+    expect(find.text('1 padrão emocional identificado'), findsOneWidget);
     expect(
       find.text('Seus melhores dias aparecem quando faz check-in pela manha.'),
       findsAtLeastNWidgets(1),
@@ -1017,15 +1020,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Dar feedback'), findsAtLeastNWidgets(1));
-    expect(find.text('Compartilhe sua experiencia'), findsOneWidget);
+    expect(find.text('Compartilhe sua experiência'), findsOneWidget);
     expect(find.text('Sugerir melhoria'), findsOneWidget);
     expect(find.text('Reportar problema'), findsOneWidget);
-    expect(find.text('Avaliacao rapida'), findsOneWidget);
+    expect(find.text('Avaliação rápida'), findsOneWidget);
     expect(find.text('Enviar feedback'), findsOneWidget);
 
     await tester.enterText(
-      _feedbackTextField('O que esta funcionando bem?'),
-      'As trilhas estao claras.',
+      _feedbackTextField('O que está funcionando bem?'),
+      'As trilhas estão claras.',
     );
     await tester.ensureVisible(find.text('Boa'));
     await tester.tap(find.text('Boa'));
@@ -1040,7 +1043,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(_lastFeedbackPayload?['workingWell'], 'As trilhas estao claras.');
+    expect(_lastFeedbackPayload?['workingWell'], 'As trilhas estão claras.');
     expect(_lastFeedbackPayload?['rating'], 'BOA');
     expect(tester.takeException(), isNull);
   });
@@ -1106,7 +1109,7 @@ void main() {
     expect(find.text('Tela e acessibilidade'), findsAtLeastNWidgets(1));
     expect(find.text('Aparencia'), findsOneWidget);
     expect(find.text('Leitura e legibilidade'), findsOneWidget);
-    expect(find.text('Navegacao e interacao'), findsOneWidget);
+    expect(find.text('Navegação e interação'), findsOneWidget);
     expect(find.text('Acessibilidade emocional'), findsOneWidget);
     expect(find.text('Tema'), findsOneWidget);
     expect(find.text('Contraste elevado'), findsOneWidget);
@@ -1138,7 +1141,7 @@ void main() {
     expect(saved['highContrast'], isTrue);
     expect(saved['textSize'], 'large');
     expect(
-      find.text('Preferencias visuais salvas com conforto.'),
+      find.text('Preferências visuais salvas com conforto.'),
       findsOneWidget,
     );
   });
@@ -1318,6 +1321,7 @@ Future<void> _pumpEvolutionMirror(
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
   FutureMessageRepository? futureMessageRepository,
+  bool premium = false,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 1100));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -1331,7 +1335,7 @@ Future<void> _pumpEvolutionMirror(
         ),
         profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
         subscriptionRepositoryProvider.overrideWithValue(
-          _FakeSubscriptionRepository(),
+          _FakeSubscriptionRepository(premium: premium),
         ),
         trailRepositoryProvider.overrideWithValue(
           trailRepository ?? _FakeTrailRepository(),
@@ -1546,7 +1550,7 @@ class _FakeUserAdapter implements HttpClientAdapter {
           },
           {
             'key': 'notifications',
-            'label': 'Notificacoes',
+            'label': 'Notificações',
             'state': 'OPERATIONAL',
             'detail': 'Funcionando normalmente.',
           },
@@ -1969,6 +1973,10 @@ class _FakeProfileRepository implements ProfileRepository {
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
+  _FakeSubscriptionRepository({this.premium = false});
+
+  final bool premium;
+
   @override
   Future<List<PlanView>> listPlans() async {
     return const [
@@ -1999,15 +2007,15 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<CurrentSubscription?> current() async {
-    return const CurrentSubscription(
-      planCode: 'essential-free',
+    return CurrentSubscription(
+      planCode: premium ? 'premium-monthly' : 'essential-free',
       status: 'ACTIVE',
       billingCycle: 'MONTHLY',
-      premium: false,
-      adsEnabled: true,
-      aiQuotaRemainingToday: 1,
+      premium: premium,
+      adsEnabled: !premium,
+      aiQuotaRemainingToday: premium ? 20 : 1,
       mentorPremiumPassActive: false,
-      mentorRewardedAdAvailable: true,
+      mentorRewardedAdAvailable: false,
     );
   }
 
@@ -2026,7 +2034,10 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
-  Future<AdRewardSession> createRewardSession({required String rewardType}) {
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+    String? contextId,
+  }) {
     throw UnimplementedError();
   }
 
@@ -2041,6 +2052,22 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       billingCycle: 'MONTHLY',
       status: 'PENDING',
       premium: true,
+    );
+  }
+
+  @override
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  }) async {
+    return MonetizationAccessStatus(
+      resource: resource,
+      contextId: contextId,
+      allowed: false,
+      premium: false,
+      rewardedAdAvailable: true,
+      upgradeRecommended: true,
+      limitMessage: null,
     );
   }
 }
@@ -2189,6 +2216,23 @@ class _FakeCheckInRepository implements CheckInRepository {
       recommendedPractice: 'Respire por alguns minutos.',
       aiInsight: null,
       createdAt: DateTime(2026, 1, 1),
+    );
+  }
+
+  @override
+  Future<CheckIn> generateDeepReading(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por alguns minutos.',
+        aiInsight: null,
+        createdAt: DateTime(2026, 1, 1),
+      ),
     );
   }
 }

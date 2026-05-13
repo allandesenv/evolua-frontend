@@ -35,7 +35,9 @@ void main() {
           .login(email: 'a@evolua.test', password: '123456');
       await Future<void>.delayed(Duration.zero);
 
-      final firstProfile = await container.read(profileControllerProvider.future);
+      final firstProfile = await container.read(
+        profileControllerProvider.future,
+      );
       expect(firstProfile?.userId, 'user-a');
 
       await container.read(authControllerProvider.notifier).logout();

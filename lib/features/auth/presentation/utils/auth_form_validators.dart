@@ -26,15 +26,15 @@ String? validateEmail(String? value) {
   final email = normalizeEmail(value ?? '');
 
   if (email.isEmpty) {
-    return 'Informe seu email.';
+    return 'Informe seu e-mail.';
   }
 
   if (email.length > maxEmailLength) {
-    return 'Use um email com ate $maxEmailLength caracteres.';
+    return 'Use um e-mail com até $maxEmailLength caracteres.';
   }
 
   if ('@'.allMatches(email).length != 1) {
-    return 'Use um email valido.';
+    return 'Use um e-mail válido.';
   }
 
   final parts = email.split('@');
@@ -42,14 +42,14 @@ String? validateEmail(String? value) {
   final domain = parts.last;
 
   if (local.isEmpty || domain.isEmpty || !domain.contains('.')) {
-    return 'Use um email valido.';
+    return 'Use um e-mail válido.';
   }
 
   final localPattern = RegExp(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$");
   final domainPattern = RegExp(r'^(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$');
 
   if (!localPattern.hasMatch(local) || !domainPattern.hasMatch(domain)) {
-    return 'Use um email valido.';
+    return 'Use um e-mail válido.';
   }
 
   return null;
@@ -81,12 +81,12 @@ String? validateDisplayName(String? value) {
   }
 
   if (name.length > maxDisplayNameLength) {
-    return 'Informe um nome com ate $maxDisplayNameLength caracteres.';
+    return 'Informe um nome com até $maxDisplayNameLength caracteres.';
   }
 
   final namePattern = RegExp(r"^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$");
   if (!namePattern.hasMatch(name)) {
-    return 'Use apenas letras, espacos, hifen ou apostrofo no nome.';
+    return 'Use apenas letras, espaços, hífen ou apóstrofo no nome.';
   }
 
   return null;
@@ -101,7 +101,7 @@ String? validateBirthDate(DateTime? value, {DateTime? now}) {
   final birthDate = _dateOnly(value);
 
   if (birthDate.isAfter(today)) {
-    return 'Informe uma data de nascimento valida.';
+    return 'Informe uma data de nascimento válida.';
   }
 
   final minimumDate = DateTime(
@@ -110,7 +110,7 @@ String? validateBirthDate(DateTime? value, {DateTime? now}) {
     today.day,
   );
   if (birthDate.isAfter(minimumDate)) {
-    return 'Voce precisa ter pelo menos $minimumSignupAge anos para criar conta.';
+    return 'Você precisa ter pelo menos $minimumSignupAge anos para criar conta.';
   }
 
   return null;
@@ -118,7 +118,7 @@ String? validateBirthDate(DateTime? value, {DateTime? now}) {
 
 String? validateGender(String? value) {
   if (value == null || value.isEmpty || !validGenderValues.contains(value)) {
-    return 'Selecione uma opcao de genero.';
+    return 'Selecione uma opção de gênero.';
   }
 
   return null;
@@ -133,7 +133,7 @@ String? validateCustomGender({
   }
 
   if ((customGender ?? '').trim().isEmpty) {
-    return 'Informe como voce se identifica.';
+    return 'Informe como você se identifica.';
   }
 
   return null;

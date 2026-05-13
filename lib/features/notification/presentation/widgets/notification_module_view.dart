@@ -136,7 +136,7 @@ class _NotificationAdminConsoleState
     _messageController.clear();
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Notificacao enviada.')));
+    ).showSnackBar(const SnackBar(content: Text('Notificação enviada.')));
   }
 
   @override
@@ -148,12 +148,12 @@ class _NotificationAdminConsoleState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Central admin de notificacoes',
+            'Central admin de notificações',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            'Envie notificacoes manuais para um usuario especifico usando o userId. Exemplos locais: `leo-respiro` e `clara-rocha`.',
+            'Envie notificações manuais para um usuário específico usando o userId. Exemplos locais: `leo-respiro` e `clara-rocha`.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 18),
@@ -168,7 +168,7 @@ class _NotificationAdminConsoleState
                     prefixIcon: Icon(Icons.person_search_rounded),
                   ),
                   validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Informe o userId do usuario.'
+                      ? 'Informe o userId do usuário.'
                       : null,
                 ),
                 const SizedBox(height: 16),
@@ -384,7 +384,7 @@ class _NotificationInboxDialog extends ConsumerWidget {
                     );
                   },
                   error: (error, stackTrace) => const Center(
-                    child: Text('Nao foi possivel carregar notificacoes.'),
+                    child: Text('Não foi possível carregar notificações.'),
                   ),
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),

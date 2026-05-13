@@ -49,7 +49,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["adMobApplicationId"] =
-            dartDefine("EVOLUA_ADMOB_ANDROID_APP_ID", "ca-app-pub-3940256099942544~3347511713")
+            dartDefine("EVOLUA_ADMOB_ANDROID_APP_ID", "ca-app-pub-1136517314419681~3445046280")
     }
 
     buildTypes {

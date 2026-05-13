@@ -1,4 +1,3 @@
 abstract class RewardedAdService {
-  Future<bool> showRewardedAd({required String rewardType});
+  Future<bool> showRewardedAd({required String rewardType, String? contextId});
 }
-

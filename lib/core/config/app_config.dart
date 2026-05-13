@@ -3,7 +3,7 @@ class AppConfig {
 
   static const apiBaseUrl = String.fromEnvironment(
     'EVOLUA_API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'http://192.168.0.40:8080',
   );
 
   static const authBaseUrl = String.fromEnvironment(
@@ -53,12 +53,32 @@ class AppConfig {
 
   static const adMobAndroidRewardedAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_ANDROID_REWARDED_AD_UNIT_ID',
-    defaultValue: 'ca-app-pub-3940256099942544/5224354917',
+    defaultValue: 'ca-app-pub-1136517314419681/4183412880',
+  );
+
+  static const adMobAndroidRewardedAiExtraAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_ANDROID_REWARDED_AI_EXTRA_AD_UNIT_ID',
+    defaultValue: 'ca-app-pub-1136517314419681/4183412880',
+  );
+
+  static const adMobAndroidRewardedPremiumPassAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_ANDROID_REWARDED_PREMIUM_PASS_AD_UNIT_ID',
+    defaultValue: 'ca-app-pub-1136517314419681/7734426496',
   );
 
   static const adMobIosRewardedAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_IOS_REWARDED_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-3940256099942544/1712485313',
+  );
+
+  static const adMobIosRewardedAiExtraAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_IOS_REWARDED_AI_EXTRA_AD_UNIT_ID',
+    defaultValue: adMobIosRewardedAdUnitId,
+  );
+
+  static const adMobIosRewardedPremiumPassAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_IOS_REWARDED_PREMIUM_PASS_AD_UNIT_ID',
+    defaultValue: adMobIosRewardedAdUnitId,
   );
 
   static String get chatSocketUrl {

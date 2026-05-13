@@ -49,3 +49,4 @@ CheckIn _checkIn(DateTime createdAt) {
     createdAt: createdAt,
   );
 }
+

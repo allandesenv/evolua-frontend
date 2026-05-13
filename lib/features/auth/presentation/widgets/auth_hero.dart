@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
 import 'package:flutter/material.dart';
 
@@ -8,6 +9,7 @@ class AuthHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -23,7 +25,7 @@ class AuthHero extends StatelessWidget {
             ),
             SizedBox(height: isMobile ? 14 : 24),
             Text(
-              'Continue sua jornada',
+              l10n.authHeroTitle,
               style: isMobile
                   ? theme.textTheme.headlineMedium
                   : theme.textTheme.displayMedium,
@@ -32,7 +34,7 @@ class AuthHero extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: Text(
-                'Acesse seu espaco de autoconhecimento em poucos segundos.',
+                l10n.authHeroSubtitle,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -43,18 +45,18 @@ class AuthHero extends StatelessWidget {
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: const [
+                children: [
                   _SignalChip(
                     icon: Icons.favorite_border_rounded,
-                    label: 'Check-in rapido',
+                    label: l10n.authHeroQuickCheckIn,
                   ),
                   _SignalChip(
                     icon: Icons.auto_stories_rounded,
-                    label: 'Trilhas curtas',
+                    label: l10n.authHeroShortTrails,
                   ),
                   _SignalChip(
                     icon: Icons.dynamic_feed_rounded,
-                    label: 'Reflexoes do momento',
+                    label: l10n.authHeroReflections,
                   ),
                 ],
               ),

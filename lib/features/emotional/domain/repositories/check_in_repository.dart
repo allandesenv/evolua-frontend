@@ -19,4 +19,6 @@ abstract class CheckInRepository {
     String? reflection,
     required int energyLevel,
   });
+
+  Future<CheckIn> generateDeepReading(int checkInId);
 }

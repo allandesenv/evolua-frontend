@@ -89,7 +89,7 @@ void main() {
       await _tapSubmit(tester, 'Entrar');
       await tester.pump();
 
-      expect(find.text('Informe seu email.'), findsOneWidget);
+      expect(find.text('Informe seu e-mail.'), findsOneWidget);
       expect(find.text('Informe sua senha.'), findsOneWidget);
       expect(repository.loginCalls, 0);
       expect(FocusManager.instance.primaryFocus?.debugLabel, isNot(''));
@@ -102,7 +102,7 @@ void main() {
       await _tapSubmit(tester, 'Entrar');
       await tester.pump();
 
-      expect(find.text('Use um email valido.'), findsOneWidget);
+      expect(find.text('Use um e-mail válido.'), findsOneWidget);
       expect(
         find.text('A senha deve ter ao menos 6 caracteres.'),
         findsOneWidget,
@@ -143,42 +143,41 @@ void main() {
       },
     );
 
-    testWidgets(
-      'toggles password visibility and sends forgot password email',
-      (tester) async {
-        SharedPreferences.setMockInitialValues({});
-        final repository = _FakeAuthRepository();
-        await tester.pumpWidget(_testApp(repository: repository));
+    testWidgets('toggles password visibility and sends forgot password email', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = _FakeAuthRepository();
+      await tester.pumpWidget(_testApp(repository: repository));
 
-        final passwordField = find.byType(EditableText).last;
-        expect(tester.widget<EditableText>(passwordField).obscureText, isTrue);
+      final passwordField = find.byType(EditableText).last;
+      expect(tester.widget<EditableText>(passwordField).obscureText, isTrue);
 
-        await tester.tap(find.byTooltip('Mostrar senha'));
-        await tester.pump();
-        expect(tester.widget<EditableText>(passwordField).obscureText, isFalse);
+      await tester.tap(find.byTooltip('Mostrar senha'));
+      await tester.pump();
+      expect(tester.widget<EditableText>(passwordField).obscureText, isFalse);
 
-        await tester.enterText(
-          find.widgetWithText(TextFormField, 'Email'),
-          ' USER@Evolua.App ',
-        );
-        await tester.tap(find.text('Esqueci minha senha'));
-        await tester.pumpAndSettle();
-        expect(find.text('Recuperar senha'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'E-mail'),
+        ' USER@Evolua.App ',
+      );
+      await tester.tap(find.text('Esqueci minha senha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Recuperar senha'), findsOneWidget);
 
-        await tester.tap(find.text('Enviar link'));
-        await tester.pumpAndSettle();
-        expect(repository.lastForgotPasswordEmail, 'user@evolua.app');
-        expect(find.textContaining('instrucoes de recuperacao'), findsOneWidget);
+      await tester.tap(find.text('Enviar link'));
+      await tester.pumpAndSettle();
+      expect(repository.lastForgotPasswordEmail, 'user@evolua.app');
+      expect(find.textContaining('instruções de recuperação'), findsOneWidget);
 
-        final forgotButton = tester.widget<TextButton>(
-          find.widgetWithText(TextButton, 'Esqueci minha senha'),
-        );
-        expect(
-          forgotButton.style?.tapTargetSize,
-          MaterialTapTargetSize.shrinkWrap,
-        );
-      },
-    );
+      final forgotButton = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Esqueci minha senha'),
+      );
+      expect(
+        forgotButton.style?.tapTargetSize,
+        MaterialTapTargetSize.shrinkWrap,
+      );
+    });
 
     testWidgets('starts Google OAuth once and disables duplicate click', (
       tester,
@@ -222,7 +221,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(
-        find.textContaining('Nao foi possivel iniciar o login com Google'),
+        find.textContaining('Não foi possível iniciar o login com Google'),
         findsOneWidget,
       );
     });
@@ -307,7 +306,7 @@ void main() {
         await _tapSubmit(tester, 'Criar conta');
         await tester.pump();
 
-        expect(find.text('Informe como voce se identifica.'), findsOneWidget);
+        expect(find.text('Informe como você se identifica.'), findsOneWidget);
       },
     );
 
@@ -333,7 +332,7 @@ void main() {
         find.widgetWithText(OutlinedButton, 'Continuar com Google'),
         findsOneWidget,
       );
-      expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'E-mail'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Senha'), findsOneWidget);
       expect(find.byKey(const Key('auth-submit-button')), findsOneWidget);
     });

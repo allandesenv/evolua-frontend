@@ -23,7 +23,7 @@ class SocialFeedState {
       result: result,
       isFromCache: true,
       offlineMessage:
-          'Voce esta vendo reflexoes salvas deste recorte enquanto a conexao volta.',
+          'Você está vendo reflexões salvas deste recorte enquanto a conexão volta.',
     );
   }
 
@@ -44,7 +44,7 @@ class SocialFeedState {
       ),
       isFromCache: true,
       offlineMessage:
-          'Nao encontramos reflexoes salvas neste recorte. Quando a conexao voltar, atualize para carregar o feed.',
+          'Não encontramos reflexões salvas neste recorte. Quando a conexão voltar, atualize para carregar o feed.',
     );
   }
 }

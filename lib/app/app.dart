@@ -1,8 +1,9 @@
 import 'package:evolua_frontend/app/router/app_router.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
+import 'package:evolua_frontend/l10n/generated/app_localizations.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class EvoluaApp extends ConsumerWidget {
@@ -14,6 +15,8 @@ class EvoluaApp extends ConsumerWidget {
     final preferences =
         ref.watch(accessibilityPreferencesControllerProvider).value ??
         AccessibilityPreferences.defaults();
+    final localePreference =
+        ref.watch(localeControllerProvider).value ?? LocalePreference.ptBr;
     final animationDuration = preferences.shouldDisableAnimations
         ? Duration.zero
         : preferences.shouldReduceMotion
@@ -21,7 +24,7 @@ class EvoluaApp extends ConsumerWidget {
         : kThemeAnimationDuration;
 
     return MaterialApp.router(
-      title: 'Evolua',
+      title: AppLocalizations.supportedLocales.isEmpty ? 'Evolua' : 'Evolua',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(
         highContrast: preferences.highContrast,
@@ -45,13 +48,27 @@ class EvoluaApp extends ConsumerWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [Locale('pt', 'BR'), Locale('en', 'US')],
-      locale: const Locale('pt', 'BR'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: localePreference.locale,
+      localeListResolutionCallback: (locales, supportedLocales) {
+        if (locales == null || locales.isEmpty) {
+          return const Locale('pt', 'BR');
+        }
+        final preferred = locales.first;
+        for (final supported in supportedLocales) {
+          if (supported.languageCode == preferred.languageCode &&
+              supported.countryCode == preferred.countryCode) {
+            return supported;
+          }
+        }
+        for (final supported in supportedLocales) {
+          if (supported.languageCode == preferred.languageCode) {
+            return supported;
+          }
+        }
+        return const Locale('pt', 'BR');
+      },
       routerConfig: router,
     );
   }

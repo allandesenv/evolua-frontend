@@ -1,6 +1,4 @@
 import 'package:evolua_frontend/core/network/paginated_response.dart';
-import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
-import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_message.dart';
@@ -12,7 +10,6 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart
 import 'package:evolua_frontend/features/content/domain/repositories/journey_chat_repository.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
-import 'package:evolua_frontend/features/subscription/application/mentor_premium_pass_reward_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
@@ -71,7 +68,8 @@ void main() {
         quotaLimited: true,
         rewardedAdAvailable: true,
         upgradeRecommended: true,
-        limitMessage: 'Voce chegou ao limite de IA do plano gratuito hoje.',
+        limitMessage:
+            'Sua jornada já está salva. O limite gratuito de IA acabou por hoje. Você pode voltar amanhã, assistir a um anúncio para liberar +1 análise ou assinar Premium.',
       ),
     );
 
@@ -96,74 +94,19 @@ void main() {
 
     expect(find.text('Limite de IA atingido'), findsOneWidget);
     expect(
-      find.text('Voce chegou ao limite de IA do plano gratuito hoje.'),
-      findsOneWidget,
-    );
-    expect(find.text('Assistir anuncio para +1 analise'), findsOneWidget);
-    expect(find.text('Assinar Premium'), findsOneWidget);
-  });
-
-  testWidgets('Mentor unlocks daily premium pass through rewarded ad', (
-    tester,
-  ) async {
-    final subscriptionRepository = _FakeSubscriptionRepository(
-      mentorPassActiveFromCall: 4,
-    );
-    final rewardedService = _FakeRewardedAdService();
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          journeyChatRepositoryProvider.overrideWithValue(
-            _FakeJourneyChatRepository(),
-          ),
-          trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
-          subscriptionRepositoryProvider.overrideWithValue(
-            subscriptionRepository,
-          ),
-          rewardedAdServiceProvider.overrideWithValue(rewardedService),
-          mentorPremiumPassPollingConfigProvider.overrideWithValue(
-            const MentorPremiumPassPollingConfig(
-              timeout: Duration(milliseconds: 80),
-              interval: Duration(milliseconds: 1),
-            ),
-          ),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: MentorEvoluaModuleView(
-                onOpenTrails: () {},
-                onOpenPremium: () {},
-              ),
-            ),
-          ),
-        ),
+      find.text(
+        'Sua jornada já está salva. O limite gratuito de IA acabou por hoje. Você pode voltar amanhã, assistir a um anúncio para liberar +1 análise ou assinar Premium.',
       ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Conteudos exclusivos de mentoria'), findsOneWidget);
-    expect(
-      find.text('Assistir anuncio para liberar mentoria por hoje'),
       findsOneWidget,
     );
-
-    await tester.tap(
-      find.text('Assistir anuncio para liberar mentoria por hoje'),
-    );
-    await tester.pumpAndSettle();
-
-    expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
-    expect(subscriptionRepository.currentCallCount, greaterThanOrEqualTo(4));
-    expect(find.text('Passe de mentoria ativo'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsOneWidget);
+    expect(find.text('Aprofundar com Premium'), findsOneWidget);
   });
 
-  testWidgets('Mentor keeps pass locked when SSV confirmation does not arrive', (
+  testWidgets('Mentor module is premium-only and does not offer rewarded ad', (
     tester,
   ) async {
     final subscriptionRepository = _FakeSubscriptionRepository();
-    final rewardedService = _FakeRewardedAdService();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -174,13 +117,6 @@ void main() {
           trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
           subscriptionRepositoryProvider.overrideWithValue(
             subscriptionRepository,
-          ),
-          rewardedAdServiceProvider.overrideWithValue(rewardedService),
-          mentorPremiumPassPollingConfigProvider.overrideWithValue(
-            const MentorPremiumPassPollingConfig(
-              timeout: Duration(milliseconds: 20),
-              interval: Duration(milliseconds: 5),
-            ),
           ),
         ],
         child: MaterialApp(
@@ -197,19 +133,44 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.text('Assistir anuncio para liberar mentoria por hoje'),
+    expect(find.text('Mentor disponível no Premium'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsNothing);
+    expect(find.text('Conversa guiada'), findsNothing);
+  });
+
+  testWidgets('Mentor free state keeps chat locked behind Premium', (
+    tester,
+  ) async {
+    final subscriptionRepository = _FakeSubscriptionRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          journeyChatRepositoryProvider.overrideWithValue(
+            _FakeJourneyChatRepository(),
+          ),
+          trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            subscriptionRepository,
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MentorEvoluaModuleView(
+                onOpenTrails: () {},
+                onOpenPremium: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
-    expect(rewardedService.lastRewardType, 'MENTOR_PREMIUM_PASS');
-    expect(find.text('Passe de mentoria ativo'), findsNothing);
-    expect(
-      find.text(
-        'O anuncio foi concluido, mas ainda nao recebemos a confirmacao. Toque em Atualizar em instantes.',
-      ),
-      findsWidgets,
-    );
+    expect(find.text('Mentor disponível no Premium'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsNothing);
+    expect(find.text('Conversa guiada'), findsNothing);
   });
 }
 
@@ -239,38 +200,21 @@ class _FakeJourneyChatRepository implements JourneyChatRepository {
   }
 }
 
-class _FakeRewardedAdService implements RewardedAdService {
-  String? lastRewardType;
-
-  @override
-  Future<bool> showRewardedAd({required String rewardType}) async {
-    lastRewardType = rewardType;
-    return true;
-  }
-}
-
 class _FakeSubscriptionRepository implements SubscriptionRepository {
-  _FakeSubscriptionRepository({this.mentorPassActiveFromCall});
-
-  final int? mentorPassActiveFromCall;
   int currentCallCount = 0;
 
   @override
   Future<CurrentSubscription?> current() async {
     currentCallCount++;
-    final mentorPassActive =
-        mentorPassActiveFromCall != null &&
-        currentCallCount >= mentorPassActiveFromCall!;
-    return CurrentSubscription(
+    return const CurrentSubscription(
       planCode: 'essential-free',
       status: 'ACTIVE',
       billingCycle: 'MONTHLY',
       premium: false,
       adsEnabled: true,
       aiQuotaRemainingToday: 1,
-      mentorPremiumPassActive: mentorPassActive,
-      mentorRewardedAdAvailable: !mentorPassActive,
-      mentorPremiumPassEndsAt: mentorPassActive ? DateTime(2026, 5, 7) : null,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: false,
     );
   }
 
@@ -278,7 +222,10 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   Future<List<PlanView>> listPlans() async => const [];
 
   @override
-  Future<AdRewardSession> createRewardSession({required String rewardType}) {
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+    String? contextId,
+  }) {
     throw UnimplementedError();
   }
 
@@ -296,6 +243,21 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
     required String frontendBaseUrl,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  }) async {
+    return MonetizationAccessStatus(
+      resource: resource,
+      contextId: contextId,
+      allowed: false,
+      premium: false,
+      rewardedAdAvailable: true,
+      upgradeRecommended: true,
+    );
   }
 }
 
