@@ -176,3 +176,4 @@ CheckInAiInsight _insight() {
     fallbackUsed: false,
   );
 }
+

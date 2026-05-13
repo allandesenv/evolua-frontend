@@ -384,3 +384,4 @@ class _FakeTrailRepository implements TrailRepository {
     throw UnimplementedError();
   }
 }
+

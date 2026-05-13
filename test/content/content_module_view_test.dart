@@ -624,3 +624,4 @@ TrailJourney _journey(Trail trail) {
     nextStep: steps.first,
   );
 }
+

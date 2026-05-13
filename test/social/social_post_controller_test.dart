@@ -50,58 +50,61 @@ void main() {
 
         expect(offlineState.isFromCache, isTrue);
         expect(offlineState.result.items, hasLength(2));
-        expect(offlineState.offlineMessage, contains('reflexoes salvas'));
+        expect(offlineState.offlineMessage, contains('reflexões salvas'));
       },
     );
 
-    test('does not reuse cached posts from another authenticated user', () async {
-      SharedPreferences.setMockInitialValues({
-        _sessionStorageKey: jsonEncode(
-          _session(userId: 'user-a', email: 'a@evolua.test').toJson(),
-        ),
-      });
-      final onlineContainer = ProviderContainer(
-        overrides: [
-          socialPostRepositoryProvider.overrideWithValue(
-            _FakeSocialPostRepository(result: _response(_posts())),
+    test(
+      'does not reuse cached posts from another authenticated user',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          _sessionStorageKey: jsonEncode(
+            _session(userId: 'user-a', email: 'a@evolua.test').toJson(),
           ),
-        ],
-      );
-      addTearDown(onlineContainer.dispose);
-      await onlineContainer.read(authControllerProvider.future);
-      final onlineState = await onlineContainer.read(
-        socialPostControllerProvider.future,
-      );
-      expect(onlineState.result.items, hasLength(2));
+        });
+        final onlineContainer = ProviderContainer(
+          overrides: [
+            socialPostRepositoryProvider.overrideWithValue(
+              _FakeSocialPostRepository(result: _response(_posts())),
+            ),
+          ],
+        );
+        addTearDown(onlineContainer.dispose);
+        await onlineContainer.read(authControllerProvider.future);
+        final onlineState = await onlineContainer.read(
+          socialPostControllerProvider.future,
+        );
+        expect(onlineState.result.items, hasLength(2));
 
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.setString(
-        _sessionStorageKey,
-        jsonEncode(
-          _session(userId: 'user-b', email: 'b@evolua.test').toJson(),
-        ),
-      );
-      final offlineContainer = ProviderContainer(
-        overrides: [
-          socialPostRepositoryProvider.overrideWithValue(
-            _FakeSocialPostRepository(error: _networkError()),
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setString(
+          _sessionStorageKey,
+          jsonEncode(
+            _session(userId: 'user-b', email: 'b@evolua.test').toJson(),
           ),
-        ],
-      );
-      addTearDown(offlineContainer.dispose);
-      await offlineContainer.read(authControllerProvider.future);
+        );
+        final offlineContainer = ProviderContainer(
+          overrides: [
+            socialPostRepositoryProvider.overrideWithValue(
+              _FakeSocialPostRepository(error: _networkError()),
+            ),
+          ],
+        );
+        addTearDown(offlineContainer.dispose);
+        await offlineContainer.read(authControllerProvider.future);
 
-      final offlineState = await offlineContainer.read(
-        socialPostControllerProvider.future,
-      );
+        final offlineState = await offlineContainer.read(
+          socialPostControllerProvider.future,
+        );
 
-      expect(offlineState.isFromCache, isTrue);
-      expect(offlineState.result.items, isEmpty);
-      expect(
-        offlineState.offlineMessage,
-        contains('Nao encontramos reflexoes salvas'),
-      );
-    });
+        expect(offlineState.isFromCache, isTrue);
+        expect(offlineState.result.items, isEmpty);
+        expect(
+          offlineState.offlineMessage,
+          contains('Não encontramos reflexões salvas'),
+        );
+      },
+    );
 
     test('clears legacy and user-scoped offline cache keys', () async {
       SharedPreferences.setMockInitialValues({
@@ -138,7 +141,7 @@ void main() {
       expect(state.result.items, isEmpty);
       expect(
         state.offlineMessage,
-        contains('Nao encontramos reflexoes salvas'),
+        contains('Não encontramos reflexões salvas'),
       );
     });
   });

@@ -109,3 +109,4 @@ class _FailingAdapter implements HttpClientAdapter {
     throw DioException(requestOptions: options);
   }
 }
+

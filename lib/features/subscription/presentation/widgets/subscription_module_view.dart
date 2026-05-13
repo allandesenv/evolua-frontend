@@ -100,11 +100,14 @@ class _SubscriptionModuleViewState
                   Text(
                     current?.premium == true
                         ? 'Seu premium esta ativo e a liberacao depende sempre da confirmacao real do pagamento.'
-                        : 'Voce esta no plano essencial. Quando quiser aprofundar a jornada, o upgrade leva voce para o checkout seguro e so libera o premium apos confirmacao.',
+                        : 'Você está no plano essencial. Quando quiser aprofundar a jornada, o upgrade leva você para o checkout seguro e só libera o premium após confirmação.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 20),
-                  _CurrentPlanCard(current: current, pending: data.pendingCheckout),
+                  _CurrentPlanCard(
+                    current: current,
+                    pending: data.pendingCheckout,
+                  ),
                 ],
               ),
             ),
@@ -137,11 +140,13 @@ class _SubscriptionModuleViewState
                       bullets: plan.benefits,
                       accent: AppColors.accentGold,
                       highlighted: current?.planCode == plan.planCode,
-                      cta: current?.planCode == plan.planCode &&
+                      cta:
+                          current?.planCode == plan.planCode &&
                               current?.premium == true
                           ? 'Plano ativo'
                           : 'Assinar agora',
-                      disabled: data.isBusy ||
+                      disabled:
+                          data.isBusy ||
                           (current?.planCode == plan.planCode &&
                               current?.premium == true),
                       onTap: () => _startCheckout(plan.planCode),
@@ -216,10 +221,7 @@ class _CurrentPlanCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(label, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 6),
-          Text(
-            'Status: $status',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+          Text('Status: $status', style: Theme.of(context).textTheme.bodyLarge),
           if (current?.currentPeriodEndsAt != null) ...[
             const SizedBox(height: 6),
             Text(

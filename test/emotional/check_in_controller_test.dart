@@ -233,3 +233,4 @@ CheckInAiInsight _insight({String insight = 'Leitura salva.'}) {
     fallbackUsed: false,
   );
 }
+

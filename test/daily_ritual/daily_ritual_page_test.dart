@@ -121,3 +121,4 @@ DailyRitual _ritual(String type) {
     createdAt: DateTime(2026, 5, 7, 8),
   );
 }
+

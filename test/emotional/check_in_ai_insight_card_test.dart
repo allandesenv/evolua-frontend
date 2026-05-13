@@ -43,3 +43,4 @@ void main() {
     expect(find.text('Assinar Premium'), findsOneWidget);
   });
 }
+

@@ -35,13 +35,13 @@ void main() {
 
       expect(find.textContaining('Leo'), findsOneWidget);
       expect(find.text('O que isso significa?'), findsOneWidget);
-      expect(find.text('O que faco agora?'), findsOneWidget);
+      expect(find.text('O que faço agora?'), findsOneWidget);
       expect(find.text('Como anda meu ritmo?'), findsOneWidget);
 
       final insightTop = tester
           .getTopLeft(find.text('O que isso significa?'))
           .dy;
-      final nextStepTop = tester.getTopLeft(find.text('O que faco agora?')).dy;
+      final nextStepTop = tester.getTopLeft(find.text('O que faço agora?')).dy;
       final rhythmTop = tester.getTopLeft(find.text('Como anda meu ritmo?')).dy;
 
       expect(insightTop, lessThan(nextStepTop));
@@ -76,7 +76,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Como esta seu dia ate aqui?'), findsOneWidget);
+        expect(find.text('Como está seu dia até aqui?'), findsOneWidget);
         expect(find.text('Fazer check-in'), findsOneWidget);
 
         await tester.tap(find.text('Fazer check-in'));
@@ -117,7 +117,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('Depois do proximo check-in'), findsNothing);
+      expect(find.textContaining('Depois do próximo check-in'), findsNothing);
     });
 
     testWidgets('shows compact intelligent reading bullets on Home', (
@@ -159,8 +159,8 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.ensureVisible(find.text('Ver analise completa'));
-      await tester.tap(find.text('Ver analise completa'));
+      await tester.ensureVisible(find.text('Ver análise completa'));
+      await tester.tap(find.text('Ver análise completa'));
       await tester.pumpAndSettle();
 
       expect(find.text(longInsight), findsOneWidget);
@@ -201,7 +201,7 @@ void main() {
         _testApp(checkInRepository: repository, now: DateTime(2026, 5, 7, 13)),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Depois do proximo check-in'), findsOneWidget);
+      expect(find.textContaining('Depois do próximo check-in'), findsOneWidget);
 
       final context = tester.element(find.byType(HomeHubView));
       final container = ProviderScope.containerOf(context);
@@ -241,13 +241,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Carta para o futuro'), findsOneWidget);
-      expect(find.text('Reflexao recente'), findsOneWidget);
-      expect(find.text('Insight rapido'), findsOneWidget);
-      expect(find.text('Marco de evolucao'), findsOneWidget);
+      expect(find.text('Reflexão recente'), findsOneWidget);
+      expect(find.text('Insight rápido'), findsOneWidget);
+      expect(find.text('Marco de evolução'), findsOneWidget);
 
       await tester.tap(find.text('Carta para o futuro'));
-      await tester.tap(find.text('Reflexao recente'));
-      await tester.tap(find.text('Marco de evolucao'));
+      await tester.tap(find.text('Reflexão recente'));
+      await tester.tap(find.text('Marco de evolução'));
       await tester.pumpAndSettle();
 
       expect(openedFutureMessages, isTrue);
@@ -261,9 +261,9 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Insight rapido'));
+      await tester.tap(find.text('Insight rápido'));
       await tester.pumpAndSettle();
-      expect(find.text('Analise completa'), findsOneWidget);
+      expect(find.text('Análise completa'), findsOneWidget);
     });
 
     testWidgets('insight mini card opens check-in when insight is missing', (
@@ -291,7 +291,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Insight rapido'));
+      await tester.tap(find.text('Insight rápido'));
       await tester.pumpAndSettle();
       expect(openedCheckIn, isTrue);
     });
@@ -332,13 +332,13 @@ void main() {
 
       expect(find.text('Vamos fechar o dia?'), findsOneWidget);
       expect(find.text('Fazer Fechamento do Dia'), findsOneWidget);
-      expect(find.text('Escrever reflexao'), findsOneWidget);
+      expect(find.text('Escrever reflexão'), findsOneWidget);
 
       await tester.tap(find.text('Fazer Fechamento do Dia'));
       await tester.pumpAndSettle();
       expect(openedType, DailyRitualType.evening);
 
-      await tester.tap(find.text('Escrever reflexao'));
+      await tester.tap(find.text('Escrever reflexão'));
       await tester.pumpAndSettle();
       expect(openedReflections, isTrue);
     });
@@ -354,7 +354,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Ritual do Dia concluido'), findsOneWidget);
+      expect(find.text('Ritual do Dia concluído'), findsOneWidget);
       expect(find.text('Intencao de hoje: agir com calma'), findsOneWidget);
       expect(
         find.text('Pequeno passo: pausar antes de reagir'),
@@ -369,12 +369,12 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Ver analise completa'), findsOneWidget);
-      await tester.ensureVisible(find.text('Ver analise completa'));
-      await tester.tap(find.text('Ver analise completa'));
+      expect(find.text('Ver análise completa'), findsOneWidget);
+      await tester.ensureVisible(find.text('Ver análise completa'));
+      await tester.tap(find.text('Ver análise completa'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Analise completa'), findsOneWidget);
+      expect(find.text('Análise completa'), findsOneWidget);
       expect(find.text('Risco low'), findsAtLeastNWidgets(1));
       expect(find.text('Abrir trilha sugerida'), findsOneWidget);
     });
@@ -388,17 +388,17 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        await tester.ensureVisible(find.text('Ver analise completa'));
-        await tester.tap(find.text('Ver analise completa'));
+        await tester.ensureVisible(find.text('Ver análise completa'));
+        await tester.tap(find.text('Ver análise completa'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Analise completa'), findsOneWidget);
+        expect(find.text('Análise completa'), findsOneWidget);
 
         await tester.tap(find.text('Abrir trilha sugerida'));
         await tester.pumpAndSettle();
 
         expect(openedTrails, isTrue);
-        expect(find.text('Analise completa'), findsNothing);
+        expect(find.text('Análise completa'), findsNothing);
       },
     );
 
@@ -412,9 +412,9 @@ void main() {
       expect(find.text('mantem constancia'), findsOneWidget);
       expect(find.text('jornada ativa'), findsOneWidget);
       expect(find.text('Continuar jornada'), findsAtLeastNWidgets(1));
-      expect(find.text('Espacos'), findsOneWidget);
+      expect(find.text('Espaços'), findsOneWidget);
 
-      expect(find.widgetWithText(OutlinedButton, 'Espacos'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Espaços'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '8 min'), findsNothing);
       expect(
         find.widgetWithText(OutlinedButton, 'mantem constancia'),
@@ -463,8 +463,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Ver analise completa'));
-      await tester.tap(find.text('Ver analise completa'));
+      await tester.ensureVisible(find.text('Ver análise completa'));
+      await tester.tap(find.text('Ver análise completa'));
       await tester.pumpAndSettle();
 
       expect(find.text('Modo seguro'), findsAtLeastNWidgets(1));
@@ -480,8 +480,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Ver Espelho da Evolucao'));
-      await tester.tap(find.text('Ver Espelho da Evolucao'));
+      await tester.ensureVisible(find.text('Ver Espelho da Evolução'));
+      await tester.tap(find.text('Ver Espelho da Evolução'));
       await tester.pumpAndSettle();
 
       expect(openedMirror, isTrue);
@@ -497,21 +497,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Ver ultimos check-ins'));
-      await tester.tap(find.text('Ver ultimos check-ins'));
+      await tester.ensureVisible(find.text('Ver últimos check-ins'));
+      await tester.tap(find.text('Ver últimos check-ins'));
       await tester.pumpAndSettle();
 
       expect(find.text('Seu ritmo hoje'), findsOneWidget);
-      expect(find.text('Energia media'), findsOneWidget);
+      expect(find.text('Energia média'), findsOneWidget);
       expect(find.text('Estado dominante'), findsOneWidget);
       expect(find.text('Check-ins na semana'), findsOneWidget);
       expect(find.text('Streak'), findsOneWidget);
-      expect(find.text('Consistencia da semana'), findsOneWidget);
-      expect(find.text('Ultimos check-ins'), findsOneWidget);
-      expect(find.text('Abrir Espelho da Evolucao'), findsOneWidget);
+      expect(find.text('Consistência da semana'), findsOneWidget);
+      expect(find.text('Últimos check-ins'), findsOneWidget);
+      expect(find.text('Abrir Espelho da Evolução'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Abrir Espelho da Evolucao'));
-      await tester.tap(find.text('Abrir Espelho da Evolucao'));
+      await tester.ensureVisible(find.text('Abrir Espelho da Evolução'));
+      await tester.tap(find.text('Abrir Espelho da Evolução'));
       await tester.pumpAndSettle();
 
       expect(openedMirror, isTrue);
@@ -526,7 +526,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Leitura inteligente'), findsOneWidget);
-      expect(find.text('Proximo passo'), findsOneWidget);
+      expect(find.text('Próximo passo'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

@@ -18,6 +18,7 @@ import 'package:evolua_frontend/features/user/application/accessibility_preferen
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -40,13 +41,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   AdminPanelSection _adminSection = AdminPanelSection.overview;
   final List<_DashboardLocation> _history = [];
   bool _handledBillingReturn = false;
-
-  static const _destinations = [
-    _NavItem(label: 'Inicio', icon: Icons.home_rounded),
-    _NavItem(label: 'Trilhas', icon: Icons.auto_stories_rounded),
-    _NavItem(label: 'Espacos', icon: Icons.groups_rounded),
-    _NavItem(label: 'Espelho', icon: Icons.auto_graph_rounded),
-  ];
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -189,6 +183,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
     final session = ref.watch(authControllerProvider).asData?.value;
     final isAdmin = session?.isAdmin ?? false;
+    final l10n = context.l10n;
+    final destinations = [
+      _NavItem(label: l10n.navHome, icon: Icons.home_rounded),
+      _NavItem(label: l10n.navTrails, icon: Icons.auto_stories_rounded),
+      _NavItem(label: l10n.navSpaces, icon: Icons.groups_rounded),
+      _NavItem(label: l10n.navMirror, icon: Icons.auto_graph_rounded),
+    ];
 
     final content = _DashboardContent(
       selectedIndex: _selectedIndex,
@@ -231,16 +232,16 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                       horizontal: 6,
                       vertical: 4,
                     ),
-                    semanticLabel: 'Navegacao principal',
+                    semanticLabel: 'Navegação principal',
                     child: NavigationBar(
-                      selectedIndex: _selectedIndex >= _destinations.length
+                      selectedIndex: _selectedIndex >= destinations.length
                           ? 0
                           : _selectedIndex,
                       height: 72,
                       labelBehavior:
                           NavigationDestinationLabelBehavior.alwaysShow,
                       onDestinationSelected: _goTo,
-                      destinations: _destinations
+                      destinations: destinations
                           .map(
                             (item) => NavigationDestination(
                               icon: Tooltip(
@@ -278,10 +279,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                   child: SingleChildScrollView(
                                     child: Column(
                                       children: [
-                                        ...List.generate(_destinations.length, (
+                                        ...List.generate(destinations.length, (
                                           index,
                                         ) {
-                                          final item = _destinations[index];
+                                          final item = destinations[index];
                                           final isSelected =
                                               index == _selectedIndex;
                                           return Padding(
@@ -298,7 +299,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                     context,
                                                     entries: [
                                                       _SubnavEntry(
-                                                        label: 'Minha jornada',
+                                                        label:
+                                                            l10n.trailMyJourney,
                                                         selected:
                                                             _trailSection ==
                                                             ContentModuleSection
@@ -310,7 +312,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                             ),
                                                       ),
                                                       _SubnavEntry(
-                                                        label: 'Catalogo',
+                                                        label:
+                                                            l10n.trailCatalog,
                                                         selected:
                                                             _trailSection ==
                                                             ContentModuleSection
@@ -328,7 +331,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                     context,
                                                     entries: [
                                                       _SubnavEntry(
-                                                        label: 'Em destaque',
+                                                        label:
+                                                            l10n.spacesFeatured,
                                                         selected:
                                                             _spaceSection ==
                                                             SocialModuleTab
@@ -340,7 +344,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                             ),
                                                       ),
                                                       _SubnavEntry(
-                                                        label: 'Reflexoes',
+                                                        label: l10n
+                                                            .spacesReflections,
                                                         selected:
                                                             _spaceSection ==
                                                             SocialModuleTab
@@ -352,7 +357,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                             ),
                                                       ),
                                                       _SubnavEntry(
-                                                        label: 'Meus espacos',
+                                                        label: l10n.spacesMine,
                                                         selected:
                                                             _spaceSection ==
                                                             SocialModuleTab
@@ -376,8 +381,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                               bottom: 10,
                                             ),
                                             child: _NavEntry(
-                                              item: const _NavItem(
-                                                label: 'Painel Admin',
+                                              item: _NavItem(
+                                                label: l10n.navAdminPanel,
                                                 icon: Icons
                                                     .admin_panel_settings_rounded,
                                               ),
@@ -390,7 +395,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                       context,
                                                       entries: [
                                                         _SubnavEntry(
-                                                          label: 'Trilhas',
+                                                          label: l10n.navTrails,
                                                           selected:
                                                               _adminSection ==
                                                               AdminPanelSection
@@ -402,7 +407,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                                               ),
                                                         ),
                                                         _SubnavEntry(
-                                                          label: 'Notificacoes',
+                                                          label: l10n
+                                                              .notificationsTitle,
                                                           selected:
                                                               _adminSection ==
                                                               AdminPanelSection
@@ -523,7 +529,7 @@ class _DashboardContent extends ConsumerWidget {
     final communitiesCount =
         ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
     final compact = ResponsiveBreakpoints.isCompact(context);
-    final pageTitle = _pageTitleFor(selectedIndex);
+    final pageTitle = _pageTitleFor(context, selectedIndex);
     final preferences =
         ref.watch(accessibilityPreferencesControllerProvider).value ??
         AccessibilityPreferences.defaults();
@@ -597,7 +603,7 @@ class _DashboardContent extends ConsumerWidget {
               horizontal: compact ? 16 : 18,
               vertical: 10,
             ),
-            semanticLabel: 'Cabecalho da area autenticada',
+            semanticLabel: 'Cabeçalho da área autenticada',
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -674,20 +680,21 @@ class _DashboardContent extends ConsumerWidget {
     );
   }
 
-  String _pageTitleFor(int index) {
+  String _pageTitleFor(BuildContext context, int index) {
+    final l10n = context.l10n;
     return switch (index) {
-      0 => 'Inicio',
-      1 => 'Trilhas',
-      2 => 'Espacos',
-      3 => 'Espelho',
-      4 => 'Perfil',
+      0 => l10n.navHome,
+      1 => l10n.navTrails,
+      2 => l10n.navSpaces,
+      3 => l10n.navMirror,
+      4 => l10n.navProfile,
       5 => 'Mentor Evolua',
       6 => switch (adminSection) {
-        AdminPanelSection.overview => 'Painel Admin',
-        AdminPanelSection.trails => 'Admin Trilhas',
-        AdminPanelSection.notifications => 'Admin Notificacoes',
+        AdminPanelSection.overview => l10n.navAdminPanel,
+        AdminPanelSection.trails => l10n.adminTrailsTitle,
+        AdminPanelSection.notifications => l10n.adminNotificationsTitle,
       },
-      _ => 'Evolua',
+      _ => l10n.appTitle,
     };
   }
 
@@ -928,8 +935,9 @@ class _CheckInHeaderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return IconButton(
-      tooltip: 'Fazer check-in',
+      tooltip: l10n.homeDailyDayPrimary,
       onPressed: onPressed,
       icon: Stack(
         clipBehavior: Clip.none,
@@ -981,13 +989,14 @@ class _AccountMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final displayName =
         profile?.displayName ??
         session?.displayName ??
         session?.email.split('@').first ??
-        'Seu perfil';
+        l10n.navProfile;
     final avatarUrl = profile?.avatarUrl ?? session?.avatarUrl;
-    final email = session?.email ?? 'voce@evolua.app';
+    final email = session?.email ?? 'você@evolua.app';
 
     return PopupMenuButton<_AccountMenuAction>(
       tooltip: 'Abrir menu da conta',
@@ -1034,46 +1043,46 @@ class _AccountMenuButton extends StatelessWidget {
           ),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.overview,
-          child: _MenuLabel(icon: Icons.person_rounded, label: 'Ver perfil'),
+          child: _MenuLabel(icon: Icons.person_rounded, label: l10n.navProfile),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.plans,
           child: _MenuLabel(
             icon: Icons.workspace_premium_rounded,
-            label: 'Planos e assinaturas',
+            label: l10n.avatarPlans,
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.evolutionMirror,
           child: _MenuLabel(
             icon: Icons.auto_graph_rounded,
-            label: 'Espelho da Evolucao',
+            label: l10n.avatarEvolutionMirror,
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.futureMessages,
           child: _MenuLabel(
             icon: Icons.forward_to_inbox_rounded,
-            label: 'Mensagens para o futuro',
+            label: l10n.avatarFutureMessages,
           ),
         ),
         if (onOpenAdminPanel != null) ...[
           const PopupMenuDivider(),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: _AccountMenuAction.adminPanel,
             child: _MenuLabel(
               icon: Icons.admin_panel_settings_rounded,
-              label: 'Painel Admin',
+              label: l10n.navAdminPanel,
             ),
           ),
         ],
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.settings,
           child: _MenuLabel(
             icon: Icons.settings_rounded,
-            label: 'Configuracoes e privacidade',
+            label: l10n.settingsPrivacyTitle,
           ),
         ),
         const PopupMenuItem(
@@ -1098,9 +1107,12 @@ class _AccountMenuButton extends StatelessWidget {
           ),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.logout,
-          child: _MenuLabel(icon: Icons.logout_rounded, label: 'Sair'),
+          child: _MenuLabel(
+            icon: Icons.logout_rounded,
+            label: l10n.avatarLogout,
+          ),
         ),
       ],
       onSelected: (value) {

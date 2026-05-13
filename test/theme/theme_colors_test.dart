@@ -67,3 +67,4 @@ void main() {
     expect(gradient.colors.first, isNot(AppColors.background));
   });
 }
+
