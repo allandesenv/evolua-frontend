@@ -117,7 +117,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('Depois do próximo check-in'), findsNothing);
+      expect(find.textContaining('Depois do'), findsNothing);
     });
 
     testWidgets('shows compact intelligent reading bullets on Home', (
@@ -201,7 +201,7 @@ void main() {
         _testApp(checkInRepository: repository, now: DateTime(2026, 5, 7, 13)),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Depois do próximo check-in'), findsOneWidget);
+      expect(find.textContaining('Depois do'), findsOneWidget);
 
       final context = tester.element(find.byType(HomeHubView));
       final container = ProviderScope.containerOf(context);
@@ -222,6 +222,90 @@ void main() {
         find.textContaining('Estado: Ansioso', findRichText: true),
         findsOneWidget,
       );
+    });
+
+    testWidgets('keeps reading pending and updates when insight arrives later', (
+      tester,
+    ) async {
+      final repository = _EventuallyConsistentCheckInRepository(
+        created: CheckIn(
+          id: 88,
+          userId: 'user-123',
+          mood: 'energizado',
+          reflection: '',
+          energyLevel: 7,
+          recommendedPractice: '',
+          aiInsight: null,
+          createdAt: DateTime(2026, 5, 7, 9),
+        ),
+        lists: [
+          const <CheckIn>[],
+          const <CheckIn>[],
+          [
+            CheckIn(
+              id: 88,
+              userId: 'user-123',
+              mood: 'energizado',
+              reflection: '',
+              energyLevel: 7,
+              recommendedPractice: 'Continue com constancia',
+              aiInsight: _insight(
+                insight:
+                    'Seu check-in indica uma base favoravel para clareza e continuidade.',
+                fallbackUsed: false,
+              ),
+              createdAt: DateTime(2026, 5, 7, 9),
+            ),
+          ],
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          pollingConfig: const CheckInInsightPollingConfig(
+            attempts: 2,
+            delay: Duration(milliseconds: 50),
+          ),
+          now: DateTime(2026, 5, 7, 13),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Depois do'), findsOneWidget);
+
+      final context = tester.element(find.byType(HomeHubView));
+      final container = ProviderScope.containerOf(context);
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'energizado', reflection: null, energyLevel: 7);
+      await tester.pump();
+
+      expect(find.textContaining('Depois do'), findsNothing);
+      expect(
+        find.text('Preparando sua leitura inteligente...'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Estamos atualizando a leitura'),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Seu check-in indica uma base favoravel'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Energia: 7/10', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Estado: Energizado', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Ver an'), findsOneWidget);
     });
 
     testWidgets('shows contextual mini cards and opens direct actions', (
@@ -561,6 +645,10 @@ void main() {
 
 Widget _testApp({
   CheckInRepository? checkInRepository,
+  CheckInInsightPollingConfig pollingConfig = const CheckInInsightPollingConfig(
+    attempts: 0,
+    delay: Duration.zero,
+  ),
   TrailRepository? trailRepository,
   DailyRitualRepository? dailyRitualRepository,
   ThemeData? theme,
@@ -578,6 +666,7 @@ Widget _testApp({
       checkInRepositoryProvider.overrideWithValue(
         checkInRepository ?? _FakeCheckInRepository(),
       ),
+      checkInInsightPollingConfigProvider.overrideWithValue(pollingConfig),
       trailRepositoryProvider.overrideWithValue(
         trailRepository ?? _FakeTrailRepository(currentJourney: _testTrail()),
       ),
@@ -739,6 +828,57 @@ class _MutableCheckInRepository implements CheckInRepository {
     );
     _items = [refreshed, ..._items.where((item) => item.id != refreshed.id)];
     return refreshed;
+  }
+}
+
+class _EventuallyConsistentCheckInRepository implements CheckInRepository {
+  _EventuallyConsistentCheckInRepository({
+    required this.created,
+    required List<List<CheckIn>> lists,
+  }) : _lists = List<List<CheckIn>>.from(lists);
+
+  final CheckIn created;
+  final List<List<CheckIn>> _lists;
+
+  @override
+  Future<PaginatedResponse<CheckIn>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final items = _lists.isEmpty ? const <CheckIn>[] : _lists.removeAt(0);
+    return PaginatedResponse(
+      items: items,
+      page: page,
+      size: size,
+      totalItems: items.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      filters: const {},
+    );
+  }
+
+  @override
+  Future<CheckIn> create({
+    required String mood,
+    String? reflection,
+    required int energyLevel,
+  }) async {
+    return created;
+  }
+
+  @override
+  Future<CheckIn> generateDeepReading(int checkInId) async {
+    return created;
   }
 }
 

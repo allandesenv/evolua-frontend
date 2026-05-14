@@ -226,6 +226,20 @@ void main() {
     expect(find.text('Ajuda e suporte'), findsOneWidget);
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
     expect(find.text('Dar feedback'), findsOneWidget);
+
+    final settingsTop = tester.getTopLeft(find.textContaining('privacidade')).dy;
+    final plansTop = tester.getTopLeft(find.text('Planos e assinaturas')).dy;
+    final mirrorTop = tester
+        .getTopLeft(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Text && (widget.data?.startsWith('Espelho da ') ?? false),
+          ),
+        )
+        .dy;
+
+    expect(plansTop, greaterThan(settingsTop));
+    expect(mirrorTop, greaterThan(plansTop));
   });
 
   testWidgets('dashboard uses Início copy in navigation', (tester) async {

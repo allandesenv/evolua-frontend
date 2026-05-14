@@ -70,6 +70,57 @@ void main() {
   });
 
   test(
+    'polling updates latest created check-in when insight arrives later',
+    () async {
+      final createdWithoutInsight = _checkIn(
+        id: 40,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: null,
+      );
+      final listedWithInsight = _checkIn(
+        id: 40,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura chegou depois.'),
+      );
+      final repository = _FakeCheckInRepository(
+        createResult: createdWithoutInsight,
+        lists: [
+          const <CheckIn>[],
+          const <CheckIn>[],
+          [listedWithInsight],
+        ],
+      );
+      final container = _container(
+        repository,
+        pollingConfig: const CheckInInsightPollingConfig(
+          attempts: 2,
+          delay: Duration(milliseconds: 1),
+        ),
+      );
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
+
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 7);
+
+      var state = container.read(checkInControllerProvider).asData?.value;
+      expect(state?.latestCreatedCheckIn?.id, 40);
+      expect(state?.latestCreatedCheckIn?.aiInsight, isNull);
+      expect(state?.isLatestInsightPending, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      state = container.read(checkInControllerProvider).asData?.value;
+      expect(
+        state?.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura chegou depois.',
+      );
+      expect(state?.isLatestInsightPending, isFalse);
+    },
+  );
+
+  test(
     'refresh replaces partial latest check-in with listed full version',
     () async {
       final partial = _checkIn(
@@ -145,10 +196,17 @@ void main() {
   );
 }
 
-ProviderContainer _container(CheckInRepository repository) {
+ProviderContainer _container(
+  CheckInRepository repository, {
+  CheckInInsightPollingConfig pollingConfig = const CheckInInsightPollingConfig(
+    attempts: 0,
+    delay: Duration.zero,
+  ),
+}) {
   return ProviderContainer(
     overrides: [
       checkInRepositoryProvider.overrideWithValue(repository),
+      checkInInsightPollingConfigProvider.overrideWithValue(pollingConfig),
       trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
     ],
   );
