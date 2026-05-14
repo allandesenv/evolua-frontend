@@ -173,6 +173,12 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
             .where((item) => item.aiInsight != null)
             .map((item) => item.aiInsight!)
             .firstOrNull;
+    final latestReadingCheckIn =
+        latestCreatedCheckIn ?? recentItems.firstOrNull;
+    final isWaitingForInsight =
+        latestInsight == null &&
+        latestReadingCheckIn != null &&
+        !isInsightUnavailable;
     final rhythmSummary = _RhythmSummary.fromItems(
       recentItems,
       fallbackEnergy: 7,
@@ -233,6 +239,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         const SizedBox(height: 14),
         _ContextMiniCardsCarousel(
           insight: latestInsight,
+          isInsightPreparing: isWaitingForInsight || isInsightPending,
           onOpenFutureMessages: widget.onOpenFutureMessages,
           onOpenReflection: widget.onOpenFeed,
           onOpenInsight: latestInsight == null
@@ -250,8 +257,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         const SizedBox(height: 18),
         _InsightBriefingCard(
           insight: latestInsight,
-          checkIn: latestCreatedCheckIn ?? recentItems.firstOrNull,
-          isLoading: isInsightPending,
+          checkIn: latestReadingCheckIn,
+          isLoading: isInsightPending || isWaitingForInsight,
           isUnavailable: isInsightUnavailable,
           onOpenFullAnalysis: latestInsight == null
               ? null
@@ -707,6 +714,7 @@ class _InsightBriefingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final summary = _summaryFromInsight(context, insight);
+    final showPreparingState = isLoading;
 
     return PrimaryPanel(
       semanticLabel: l10n.homeIntelligentReadingTitle,
@@ -720,7 +728,7 @@ class _InsightBriefingCard extends StatelessWidget {
             subtitle: summary,
             accentColor: AppColors.accentWarm,
           ),
-          if (isLoading) ...[
+          if (showPreparingState) ...[
             const SizedBox(height: 16),
             Row(
               children: [
@@ -731,7 +739,7 @@ class _InsightBriefingCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Preparando sua leitura emocional...',
+                    'Preparando sua leitura inteligente...',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: context.evoluaColors.textSecondary,
                       fontWeight: FontWeight.w700,
@@ -774,10 +782,13 @@ class _InsightBriefingCard extends StatelessWidget {
 
   String _summaryFromInsight(BuildContext context, CheckInAiInsight? insight) {
     if (isLoading) {
-      return 'Seu check-in foi salvo. Estamos aguardando a resposta do backend para atualizar esta leitura.';
+      return 'Seu check-in foi salvo. Estamos atualizando a leitura para este momento.';
     }
     if (isUnavailable) {
       return 'Seu check-in foi salvo, mas a leitura ainda não ficou disponível. Tente atualizar em instantes.';
+    }
+    if (insight == null && checkIn != null) {
+      return 'Seu check-in foi salvo. A leitura inteligente aparece aqui assim que estiver pronta.';
     }
     if (insight == null) {
       return context.l10n.homeIntelligentReadingEmpty;
@@ -846,6 +857,7 @@ class _InsightBullet extends StatelessWidget {
 class _ContextMiniCardsCarousel extends StatelessWidget {
   const _ContextMiniCardsCarousel({
     required this.insight,
+    required this.isInsightPreparing,
     required this.onOpenFutureMessages,
     required this.onOpenReflection,
     required this.onOpenInsight,
@@ -853,6 +865,7 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
   });
 
   final CheckInAiInsight? insight;
+  final bool isInsightPreparing;
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onOpenReflection;
   final VoidCallback onOpenInsight;
@@ -884,9 +897,11 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
         width: cardWidth,
         icon: Icons.bolt_rounded,
         title: l10n.homeQuickInsight,
-        subtitle: insight == null
-            ? 'Faça um check-in para liberar.'
-            : 'Veja a leitura do momento.',
+        subtitle: insight != null
+            ? 'Veja a leitura do momento.'
+            : isInsightPreparing
+            ? 'Preparando sua leitura.'
+            : 'Faça um check-in para liberar.',
         color: AppColors.accentGold,
         onTap: onOpenInsight,
       ),

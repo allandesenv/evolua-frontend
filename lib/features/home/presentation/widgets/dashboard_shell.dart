@@ -1048,6 +1048,13 @@ class _AccountMenuButton extends StatelessWidget {
           child: _MenuLabel(icon: Icons.person_rounded, label: l10n.navProfile),
         ),
         PopupMenuItem(
+          value: _AccountMenuAction.settings,
+          child: _MenuLabel(
+            icon: Icons.settings_rounded,
+            label: l10n.settingsPrivacyTitle,
+          ),
+        ),
+        PopupMenuItem(
           value: _AccountMenuAction.plans,
           child: _MenuLabel(
             icon: Icons.workspace_premium_rounded,
@@ -1078,13 +1085,6 @@ class _AccountMenuButton extends StatelessWidget {
             ),
           ),
         ],
-        PopupMenuItem(
-          value: _AccountMenuAction.settings,
-          child: _MenuLabel(
-            icon: Icons.settings_rounded,
-            label: l10n.settingsPrivacyTitle,
-          ),
-        ),
         const PopupMenuItem(
           value: _AccountMenuAction.help,
           child: _MenuLabel(

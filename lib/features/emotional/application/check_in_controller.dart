@@ -19,6 +19,24 @@ final checkInControllerProvider =
       CheckInController.new,
     );
 
+final checkInInsightPollingConfigProvider =
+    Provider<CheckInInsightPollingConfig>(
+      (ref) => const CheckInInsightPollingConfig(
+        attempts: 8,
+        delay: Duration(seconds: 2),
+      ),
+    );
+
+class CheckInInsightPollingConfig {
+  const CheckInInsightPollingConfig({
+    required this.attempts,
+    required this.delay,
+  });
+
+  final int attempts;
+  final Duration delay;
+}
+
 class CheckInHistoryState {
   const CheckInHistoryState({
     required this.result,
@@ -57,8 +75,6 @@ class CheckInHistoryState {
 
 class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   static const _pageSize = 6;
-  static const _insightPollingAttempts = 8;
-  static const _insightPollingDelay = Duration(seconds: 2);
 
   String? _search;
   String? _mood;
@@ -66,14 +82,21 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   DateTime? _from;
   DateTime? _to;
   String _selectedGrouping = 'monthly';
+  CheckIn? _latestKnownCheckIn;
+  int? _activeInsightPollId;
 
   @override
   Future<CheckInHistoryState> build() async {
     final result = await _fetch(page: 0);
-    return _stateFromResult(
+    final nextState = _stateFromResult(
       result,
-      latestCreatedCheckIn: result.items.firstOrNull,
+      latestCreatedCheckIn: _canonicalLatestCheckIn(
+        result,
+        _latestKnownCheckIn ?? result.items.firstOrNull,
+      ),
     );
+    scheduleMicrotask(() => _ensureInsightPolling(nextState));
+    return nextState;
   }
 
   Future<void> refresh() async {
@@ -89,6 +112,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         ),
       );
     });
+    _resumeInsightPollingFromState();
   }
 
   Future<void> applyFilters({
@@ -116,6 +140,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         ),
       );
     });
+    _resumeInsightPollingFromState();
   }
 
   Future<void> clearFilters() async {
@@ -137,6 +162,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         ),
       );
     });
+    _resumeInsightPollingFromState();
   }
 
   Future<void> goToPage(int page) async {
@@ -152,6 +178,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         ),
       );
     });
+    _resumeInsightPollingFromState();
   }
 
   void setGrouping(String grouping) {
@@ -191,6 +218,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         reflection: reflection,
         energyLevel: energyLevel,
       );
+      _latestKnownCheckIn = created;
 
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(trailControllerProvider);
@@ -205,9 +233,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         unavailableInsightCheckInId: null,
       );
     });
-    if (pendingInsightId != null && !state.hasError) {
-      unawaited(_pollForInsight(pendingInsightId!));
-    }
+    _resumeInsightPollingFromState();
   }
 
   Future<CheckIn?> generateDeepReadingForLatest() async {
@@ -230,6 +256,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         latestCreatedCheckIn: _canonicalLatestCheckIn(result, refreshed),
       );
     });
+    _resumeInsightPollingFromState();
     return refreshed;
   }
 
@@ -254,8 +281,27 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     int? unavailableInsightCheckInId,
   }) {
     final latest =
-        latestCreatedCheckIn ?? state.asData?.value.latestCreatedCheckIn;
+        _canonicalLatestCheckIn(
+          result,
+          latestCreatedCheckIn ??
+              state.asData?.value.latestCreatedCheckIn ??
+              _latestKnownCheckIn,
+        ) ??
+        result.items.firstOrNull;
     final hasInsight = latest?.aiInsight != null;
+    if (latest != null) {
+      _latestKnownCheckIn = latest;
+    }
+    final nextUnavailableInsightCheckInId = hasInsight
+        ? null
+        : unavailableInsightCheckInId ??
+              state.asData?.value.unavailableInsightCheckInId;
+    final currentPendingInsightCheckInId =
+        state.asData?.value.pendingInsightCheckInId;
+    final shouldTrackPending =
+        latest != null &&
+        !hasInsight &&
+        nextUnavailableInsightCheckInId != latest.id;
     return CheckInHistoryState(
       result: result,
       selectedGrouping: _selectedGrouping,
@@ -263,11 +309,13 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       pendingInsightCheckInId: hasInsight
           ? null
           : pendingInsightCheckInId ??
-                state.asData?.value.pendingInsightCheckInId,
+                (currentPendingInsightCheckInId == latest?.id
+                    ? currentPendingInsightCheckInId
+                    : null) ??
+                (shouldTrackPending ? latest.id : null),
       unavailableInsightCheckInId: hasInsight
           ? null
-          : unavailableInsightCheckInId ??
-                state.asData?.value.unavailableInsightCheckInId,
+          : nextUnavailableInsightCheckInId,
       search: _search,
       mood: _mood,
       energyRange: _energyRange,
@@ -297,6 +345,10 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       return listed;
     }
 
+    if (fallback.aiInsight != null && listed.aiInsight == null) {
+      return fallback;
+    }
+
     if (listed.recommendedPractice.trim().isNotEmpty &&
         fallback.recommendedPractice.trim().isEmpty) {
       return listed;
@@ -305,9 +357,38 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     return listed.createdAt.isAfter(fallback.createdAt) ? listed : fallback;
   }
 
+  void _resumeInsightPollingFromState() {
+    final current = state.asData?.value;
+    if (current != null) {
+      _ensureInsightPolling(current);
+    }
+  }
+
+  void _ensureInsightPolling(CheckInHistoryState current) {
+    final latest = current.latestCreatedCheckIn;
+    if (latest == null ||
+        latest.aiInsight != null ||
+        current.unavailableInsightCheckInId == latest.id) {
+      return;
+    }
+    if (_activeInsightPollId == latest.id) {
+      return;
+    }
+
+    _activeInsightPollId = latest.id;
+    unawaited(
+      _pollForInsight(latest.id).whenComplete(() {
+        if (_activeInsightPollId == latest.id) {
+          _activeInsightPollId = null;
+        }
+      }),
+    );
+  }
+
   Future<void> _pollForInsight(int checkInId) async {
-    for (var attempt = 0; attempt < _insightPollingAttempts; attempt++) {
-      await Future<void>.delayed(_insightPollingDelay);
+    final pollingConfig = ref.read(checkInInsightPollingConfigProvider);
+    for (var attempt = 0; attempt < pollingConfig.attempts; attempt++) {
+      await Future<void>.delayed(pollingConfig.delay);
       if (state.asData?.value.pendingInsightCheckInId != checkInId) {
         return;
       }
