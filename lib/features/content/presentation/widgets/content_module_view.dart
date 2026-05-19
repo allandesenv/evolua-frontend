@@ -10,6 +10,7 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_video_progress.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
@@ -17,12 +18,14 @@ import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.d
 import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/panel_skeleton.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart' as ytm;
+import 'package:youtube_player_iframe/youtube_player_iframe.dart' as ytw;
 
 enum ContentModuleSection { journey, catalog }
 
@@ -1203,40 +1206,39 @@ class _StepTtsPlayerState extends State<_StepTtsPlayer> {
   }
 }
 
-class _JourneyVideoPlayer extends ConsumerStatefulWidget {
+
+class _JourneyVideoPlayer extends StatelessWidget {
   const _JourneyVideoPlayer({required this.trailId, required this.step});
 
   final int trailId;
   final TrailJourneyStep step;
 
   @override
-  ConsumerState<_JourneyVideoPlayer> createState() =>
-      _JourneyVideoPlayerState();
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return _JourneyIframeVideoPlayer(trailId: trailId, step: step);
+    }
+    return _JourneyMobileVideoPlayer(trailId: trailId, step: step);
+  }
 }
 
-class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
-  YoutubePlayerController? _controller;
-  Timer? _progressTimer;
-  double _speed = 1;
-  bool _started = false;
-  int _lastSentPercent = -1;
+class _JourneyIframeVideoPlayer extends ConsumerStatefulWidget {
+  const _JourneyIframeVideoPlayer({required this.trailId, required this.step});
+
+  final int trailId;
+  final TrailJourneyStep step;
 
   @override
-  void initState() {
-    super.initState();
-    final videoId = _effectiveVideoId();
-    if (videoId != null && videoId.isNotEmpty) {
-      _controller = YoutubePlayerController.fromVideoId(
-        videoId: videoId,
-        autoPlay: false,
-        params: const YoutubePlayerParams(
-          showControls: false,
-          showFullscreenButton: false,
-          playsInline: true,
-        ),
-      );
-    }
-  }
+  ConsumerState<_JourneyIframeVideoPlayer> createState() =>
+      _JourneyIframeVideoPlayerState();
+}
+
+class _JourneyIframeVideoPlayerState
+    extends ConsumerState<_JourneyIframeVideoPlayer> {
+  ytw.YoutubePlayerController? _controller;
+  Timer? _progressTimer;
+  double _speed = 1;
+  int _lastSentPercent = -1;
 
   @override
   void dispose() {
@@ -1246,16 +1248,43 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
   }
 
   String? _effectiveVideoId() {
-    return widget.step.video?.videoId ??
-        _extractYoutubeId(widget.step.video?.url);
+    return widget.step.video?.videoId ?? _extractYoutubeId(widget.step.video?.url);
+  }
+
+  ytw.YoutubePlayerController _createController(String videoId) {
+    return ytw.YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: false,
+      params: const ytw.YoutubePlayerParams(
+        showControls: false,
+        showFullscreenButton: false,
+        playsInline: true,
+      ),
+    );
+  }
+
+  Future<void> _startInlinePlayback() async {
+    final videoId = _effectiveVideoId();
+    if (videoId == null || videoId.isEmpty) {
+      return;
+    }
+    final controller = _controller ?? _createController(videoId);
+    setState(() => _controller = controller);
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) {
+      return;
+    }
+    await controller.setPlaybackRate(_speed);
+    await controller.playVideo();
+    _startProgressTimer();
   }
 
   Future<void> _play() async {
     final controller = _controller;
     if (controller == null) {
+      await _startInlinePlayback();
       return;
     }
-    setState(() => _started = true);
     await controller.setPlaybackRate(_speed);
     await controller.playVideo();
     _startProgressTimer();
@@ -1281,39 +1310,351 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
   Future<void> _sendProgress({bool force = false}) async {
     final controller = _controller;
     final declaredDuration = widget.step.video?.durationSeconds;
-    if (controller == null ||
-        declaredDuration == null ||
-        declaredDuration <= 0) {
+    if (controller == null || declaredDuration == null || declaredDuration <= 0) {
       return;
     }
-    final watched = (await controller.currentTime).round().clamp(
-      0,
-      declaredDuration,
+    final watched = (await controller.currentTime).round().clamp(0, declaredDuration);
+    await _sendVideoProgress(
+      ref: ref,
+      trailId: widget.trailId,
+      stepIndex: widget.step.index,
+      watchedSeconds: watched,
+      durationSeconds: declaredDuration,
+      lastSentPercent: _lastSentPercent,
+      force: force,
+      onPercentSent: (percent) => _lastSentPercent = percent,
     );
-    final percent = ((watched * 100) / declaredDuration).round().clamp(0, 100);
-    if (!force && percent < 90 && percent < _lastSentPercent + 10) {
-      return;
-    }
-    _lastSentPercent = percent;
-    await ref
-        .read(trailJourneyActionProvider)
-        .updateVideoProgress(
-          trailId: widget.trailId,
-          stepIndex: widget.step.index,
-          watchedSeconds: watched,
-          durationSeconds: declaredDuration,
-        );
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
     final video = widget.step.video;
-    if (controller == null || video == null) {
-      return _VideoUnavailableCard(url: video?.url);
+    if (video == null || _effectiveVideoId() == null) {
+      return _VideoUnavailableCard(thumbnailUrl: video?.thumbnailUrl);
+    }
+    if (controller == null) {
+      return _VideoStartCard(
+        thumbnailUrl: video.thumbnailUrl,
+        onStart: _startInlinePlayback,
+      );
     }
 
-    final progress = widget.step.videoProgress;
+    return _VideoShell(
+      progress: widget.step.videoProgress,
+      controls: _VideoControls(
+        speed: _speed,
+        onPlay: _play,
+        onPause: _pause,
+        onFullscreen: () => controller.toggleFullScreen(),
+        onSpeedChanged: _setSpeed,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ytw.YoutubePlayer(controller: controller, aspectRatio: 16 / 9),
+      ),
+    );
+  }
+}
+
+class _JourneyMobileVideoPlayer extends ConsumerStatefulWidget {
+  const _JourneyMobileVideoPlayer({required this.trailId, required this.step});
+
+  final int trailId;
+  final TrailJourneyStep step;
+
+  @override
+  ConsumerState<_JourneyMobileVideoPlayer> createState() =>
+      _JourneyMobileVideoPlayerState();
+}
+
+class _JourneyMobileVideoPlayerState
+    extends ConsumerState<_JourneyMobileVideoPlayer> {
+  ytm.YoutubePlayerController? _controller;
+  Timer? _progressTimer;
+  double _speed = 1;
+  int _lastSentPercent = -1;
+  bool _hasPlayerError = false;
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    _controller?.pause();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  String? _effectiveVideoId() {
+    return widget.step.video?.videoId ?? _extractYoutubeId(widget.step.video?.url);
+  }
+
+  ytm.YoutubePlayerController _createController(String videoId) {
+    return ytm.YoutubePlayerController(
+      initialVideoId: videoId,
+      flags: const ytm.YoutubePlayerFlags(
+        autoPlay: false,
+        hideControls: false,
+        controlsVisibleAtStart: true,
+        enableCaption: true,
+        useHybridComposition: true,
+      ),
+    )..addListener(_handleControllerValue);
+  }
+
+  void _handleControllerValue() {
+    final controller = _controller;
+    if (controller == null || !mounted) {
+      return;
+    }
+    final hasError = controller.value.hasError;
+    if (hasError != _hasPlayerError) {
+      setState(() => _hasPlayerError = hasError);
+    }
+  }
+
+  Future<void> _startInlinePlayback() async {
+    final videoId = _effectiveVideoId();
+    if (videoId == null || videoId.isEmpty) {
+      return;
+    }
+    final controller = _controller ?? _createController(videoId);
+    setState(() => _controller = controller);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted || !controller.value.isReady) {
+      return;
+    }
+    controller.setPlaybackRate(_speed);
+    controller.play();
+    _startProgressTimer();
+  }
+
+  Future<void> _play() async {
+    final controller = _controller;
+    if (controller == null) {
+      await _startInlinePlayback();
+      return;
+    }
+    if (!controller.value.isReady) {
+      return;
+    }
+    controller.setPlaybackRate(_speed);
+    controller.play();
+    _startProgressTimer();
+  }
+
+  Future<void> _pause() async {
+    _controller?.pause();
+    await _sendProgress(force: true);
+  }
+
+  Future<void> _setSpeed(double speed) async {
+    setState(() => _speed = speed);
+    final controller = _controller;
+    if (controller != null && controller.value.isReady) {
+      controller.setPlaybackRate(speed);
+    }
+  }
+
+  void _startProgressTimer() {
+    _progressTimer ??= Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => _sendProgress(),
+    );
+  }
+
+  Future<void> _sendProgress({bool force = false}) async {
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    final declaredDuration = widget.step.video?.durationSeconds;
+    final duration = declaredDuration != null && declaredDuration > 0
+        ? declaredDuration
+        : controller.metadata.duration.inSeconds;
+    if (duration <= 0) {
+      return;
+    }
+    final watched = controller.value.position.inSeconds.clamp(0, duration);
+    await _sendVideoProgress(
+      ref: ref,
+      trailId: widget.trailId,
+      stepIndex: widget.step.index,
+      watchedSeconds: watched,
+      durationSeconds: duration,
+      lastSentPercent: _lastSentPercent,
+      force: force,
+      onPercentSent: (percent) => _lastSentPercent = percent,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    final video = widget.step.video;
+    if (video == null || _effectiveVideoId() == null) {
+      return _VideoUnavailableCard(thumbnailUrl: video?.thumbnailUrl);
+    }
+    if (controller == null) {
+      return _VideoStartCard(
+        thumbnailUrl: video.thumbnailUrl,
+        onStart: _startInlinePlayback,
+      );
+    }
+    if (_hasPlayerError) {
+      return _VideoErrorCard(thumbnailUrl: video.thumbnailUrl);
+    }
+
+    return _VideoShell(
+      progress: widget.step.videoProgress,
+      controls: _VideoControls(
+        speed: _speed,
+        onPlay: _play,
+        onPause: _pause,
+        onFullscreen: () => controller.toggleFullScreenMode(),
+        onSpeedChanged: _setSpeed,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ytm.YoutubePlayer(
+          controller: controller,
+          aspectRatio: 16 / 9,
+          showVideoProgressIndicator: true,
+          bottomActions: const [
+            ytm.CurrentPosition(),
+            ytm.ProgressBar(isExpanded: true),
+            ytm.RemainingDuration(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoControls extends StatelessWidget {
+  const _VideoControls({
+    required this.speed,
+    required this.onPlay,
+    required this.onPause,
+    required this.onFullscreen,
+    required this.onSpeedChanged,
+  });
+
+  final double speed;
+  final VoidCallback onPlay;
+  final VoidCallback onPause;
+  final VoidCallback onFullscreen;
+  final ValueChanged<double> onSpeedChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: onPlay,
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Play'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onPause,
+          icon: const Icon(Icons.pause_rounded),
+          label: const Text('Pause'),
+        ),
+        OutlinedButton.icon(
+          onPressed: onFullscreen,
+          icon: const Icon(Icons.fullscreen_rounded),
+          label: const Text('Tela cheia'),
+        ),
+        SegmentedButton<double>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: 1, label: Text('1x')),
+            ButtonSegment(value: 1.25, label: Text('1.25x')),
+            ButtonSegment(value: 1.5, label: Text('1.5x')),
+          ],
+          selected: {speed},
+          onSelectionChanged: (value) => onSpeedChanged(value.first),
+        ),
+      ],
+    );
+  }
+}
+
+class _VideoStartCard extends StatelessWidget {
+  const _VideoStartCard({this.thumbnailUrl, required this.onStart});
+
+  final String? thumbnailUrl;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return _VideoPlaceholderCard(
+      thumbnailUrl: thumbnailUrl,
+      overlay: FilledButton.icon(
+        onPressed: onStart,
+        icon: const Icon(Icons.play_arrow_rounded),
+        label: const Text('Assistir etapa'),
+      ),
+      message: 'O vídeo será reproduzido dentro desta etapa.',
+    );
+  }
+}
+
+class _VideoUnavailableCard extends StatelessWidget {
+  const _VideoUnavailableCard({this.thumbnailUrl});
+
+  final String? thumbnailUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return _VideoPlaceholderCard(
+      thumbnailUrl: thumbnailUrl,
+      overlay: Icon(
+        Icons.videocam_off_rounded,
+        size: 42,
+        color: context.evoluaColors.textPrimary,
+      ),
+      message: 'Vídeo indisponível nesta etapa.',
+    );
+  }
+}
+
+class _VideoErrorCard extends StatelessWidget {
+  const _VideoErrorCard({this.thumbnailUrl});
+
+  final String? thumbnailUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return _VideoPlaceholderCard(
+      thumbnailUrl: thumbnailUrl,
+      overlay: Icon(
+        Icons.error_outline_rounded,
+        size: 42,
+        color: context.evoluaColors.textPrimary,
+      ),
+      message:
+          'Não foi possível reproduzir este vídeo dentro do app. Verifique se o vídeo permite incorporação no YouTube.',
+    );
+  }
+}
+
+class _VideoPlaceholderCard extends StatelessWidget {
+  const _VideoPlaceholderCard({
+    required this.thumbnailUrl,
+    required this.overlay,
+    required this.message,
+  });
+
+  final String? thumbnailUrl;
+  final Widget overlay;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasThumbnail = thumbnailUrl != null && thumbnailUrl!.isNotEmpty;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1327,70 +1668,83 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                YoutubePlayer(controller: controller, aspectRatio: 16 / 9),
-                if (!_started &&
-                    video.thumbnailUrl != null &&
-                    video.thumbnailUrl!.isNotEmpty)
-                  Positioned.fill(
-                    child: Image.network(
-                      video.thumbnailUrl!,
-                      fit: BoxFit.cover,
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                fit: StackFit.expand,
+                alignment: Alignment.center,
+                children: [
+                  if (hasThumbnail)
+                    Image.network(thumbnailUrl!, fit: BoxFit.cover)
+                  else
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: context.evoluaColors.surfaceStrong,
+                      ),
+                      child: Icon(
+                        Icons.ondemand_video_rounded,
+                        size: 52,
+                        color: context.evoluaColors.textSecondary,
+                      ),
                     ),
-                  ),
-                if (!_started)
-                  FilledButton.icon(
-                    onPressed: _play,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('Assistir etapa'),
-                  ),
-              ],
+                  ColoredBox(color: Colors.black.withValues(alpha: 0.22)),
+                  overlay,
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _play,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Play'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _pause,
-                icon: const Icon(Icons.pause_rounded),
-                label: const Text('Pause'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => controller.toggleFullScreen(),
-                icon: const Icon(Icons.fullscreen_rounded),
-                label: const Text('Tela cheia'),
-              ),
-              SegmentedButton<double>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 1, label: Text('1x')),
-                  ButtonSegment(value: 1.25, label: Text('1.25x')),
-                  ButtonSegment(value: 1.5, label: Text('1.5x')),
-                ],
-                selected: {_speed},
-                onSelectionChanged: (value) => _setSpeed(value.first),
-              ),
-            ],
+          const SizedBox(height: 10),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoShell extends StatelessWidget {
+  const _VideoShell({
+    required this.child,
+    required this.controls,
+    required this.progress,
+  });
+
+  final Widget child;
+  final Widget controls;
+  final TrailStepVideoProgress? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = this.progress;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          child,
+          const SizedBox(height: 12),
+          controls,
           if (progress != null) ...[
             const SizedBox(height: 10),
             LinearProgressIndicator(value: progress.watchedPercent / 100),
             const SizedBox(height: 6),
             Text(
               progress.completed
-                  ? 'Video assistido. Continue com a reflexao abaixo.'
+                  ? 'V?deo assistido. Continue com a reflex?o abaixo.'
                   : '${progress.watchedPercent}% assistido',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: context.evoluaColors.textSecondary,
@@ -1403,21 +1757,27 @@ class _JourneyVideoPlayerState extends ConsumerState<_JourneyVideoPlayer> {
   }
 }
 
-class _VideoUnavailableCard extends StatelessWidget {
-  const _VideoUnavailableCard({this.url});
-
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: url == null || url!.isEmpty
-          ? null
-          : () => launchUrlString(url!),
-      icon: const Icon(Icons.ondemand_video_rounded),
-      label: const Text('Abrir video da etapa'),
-    );
+Future<void> _sendVideoProgress({
+  required WidgetRef ref,
+  required int trailId,
+  required int stepIndex,
+  required int watchedSeconds,
+  required int durationSeconds,
+  required int lastSentPercent,
+  required bool force,
+  required ValueChanged<int> onPercentSent,
+}) async {
+  final percent = ((watchedSeconds * 100) / durationSeconds).round().clamp(0, 100);
+  if (!force && percent < 90 && percent < lastSentPercent + 10) {
+    return;
   }
+  onPercentSent(percent);
+  await ref.read(trailJourneyActionProvider).updateVideoProgress(
+        trailId: trailId,
+        stepIndex: stepIndex,
+        watchedSeconds: watchedSeconds,
+        durationSeconds: durationSeconds,
+      );
 }
 
 String? _extractYoutubeId(String? url) {
@@ -1469,7 +1829,7 @@ String _stepTypeLabel(String type) {
   return switch (type.toUpperCase()) {
     'EXERCISE' => 'Exercicio',
     'READING' => 'Leitura',
-    'VIDEO' => 'Video',
+    'VIDEO' => 'Vídeo',
     'AUDIO' => 'Audio',
     'RITUAL' => 'Ritual',
     'AI' => 'IA guiada',
