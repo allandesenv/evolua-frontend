@@ -2048,10 +2048,31 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
+  Future<CheckoutSession> verifyGooglePlayPurchase({
+    required String productId,
+    required String purchaseToken,
+    required String packageName,
+    required String planCode,
+  }) async {
+    return CheckoutSession(
+      id: 'checkout-google-play',
+      planCode: planCode,
+      billingCycle: 'MONTHLY',
+      status: 'APPROVED',
+      premium: true,
+    );
+  }
+
+  @override
   Future<AdRewardSession> createRewardSession({
     required String rewardType,
     String? contextId,
   }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantTestReward(String sessionId) {
     throw UnimplementedError();
   }
 
