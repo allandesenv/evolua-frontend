@@ -186,10 +186,10 @@ void main() {
       final launchedUrls = <String>[];
 
       await tester.pumpWidget(
-        _testApp(
-          repository: _FakeAuthRepository(),
-          googleLauncher: launchedUrls.add,
-        ),
+          _testApp(
+            repository: _FakeAuthRepository(),
+            googleLauncher: (url) async => launchedUrls.add(url),
+          ),
       );
 
       await _startGoogleOAuth(tester);
@@ -212,7 +212,7 @@ void main() {
       await tester.pumpWidget(
         _testApp(
           repository: _FakeAuthRepository(),
-          googleLauncher: (_) => throw UnsupportedError('blocked'),
+          googleLauncher: (_) async => throw UnsupportedError('blocked'),
         ),
       );
 

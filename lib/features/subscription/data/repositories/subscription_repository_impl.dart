@@ -25,6 +25,12 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
                 .map((item) => item.toString())
                 .toList(),
             active: json['active'] as bool? ?? true,
+            planFamily: json['planFamily']?.toString() ?? 'STANDARD',
+            badge: json['badge']?.toString(),
+            highlighted: json['highlighted'] as bool? ?? false,
+            availabilityNote: json['availabilityNote']?.toString(),
+            providerProductId: json['providerProductId']?.toString(),
+            sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
           ),
         )
         .toList();

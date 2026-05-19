@@ -5,6 +5,7 @@ import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/features/subscription/data/repositories/subscription_repository_impl.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
@@ -51,7 +52,9 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
     state = AsyncData(currentState.copyWith(isBusy: true, clearMessage: true));
     final checkout = await repository.startCheckout(
       planCode: planCode,
-      frontendBaseUrl: Uri.base.origin,
+      frontendBaseUrl: kIsWeb
+          ? Uri.parse(Uri.base.origin).resolve('/home').toString()
+          : '${AppConfig.appDeepLinkBaseUrl}/billing/return',
     );
     final refreshedCurrent = await repository.current();
     state = AsyncData(
