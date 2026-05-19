@@ -3,7 +3,8 @@ class AppConfig {
 
   static const apiBaseUrl = String.fromEnvironment(
     'EVOLUA_API_BASE_URL',
-    defaultValue: 'http://192.168.0.40:8080',
+    defaultValue: 'https://evolua-api-production.up.railway.app',
+    //defaultValue: 'http://192.168.0.50:8080',
   );
 
   static const authBaseUrl = String.fromEnvironment(
@@ -49,6 +50,11 @@ class AppConfig {
   static const notificationBaseUrl = String.fromEnvironment(
     'EVOLUA_NOTIFICATION_BASE_URL',
     defaultValue: apiBaseUrl,
+  );
+
+  static const appDeepLinkBaseUrl = String.fromEnvironment(
+    'EVOLUA_APP_DEEP_LINK_BASE_URL',
+    defaultValue: 'evolua://app',
   );
 
   static const adMobAndroidRewardedAdUnitId = String.fromEnvironment(

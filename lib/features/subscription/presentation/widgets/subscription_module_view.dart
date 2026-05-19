@@ -52,7 +52,11 @@ class _SubscriptionModuleViewState
         .startCheckout(planCode);
     final url = checkout.checkoutUrl;
     if (url != null && url.isNotEmpty) {
-      await launchUrl(Uri.parse(url), webOnlyWindowName: '_self');
+      await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_self',
+      );
     }
   }
 
@@ -69,8 +73,9 @@ class _SubscriptionModuleViewState
       ),
       data: (data) {
         final current = data.current;
-        final premiumPlans = data.plans.where((plan) => plan.premium).toList();
-        final essential = data.plans.firstWhere(
+        final plans = [...data.plans]
+          ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+        final essential = plans.firstWhere(
           (plan) => !plan.premium,
           orElse: () => const PlanView(
             planCode: 'essential-free',
@@ -93,6 +98,41 @@ class _SubscriptionModuleViewState
             active: true,
           ),
         );
+        final premiumPlans = plans.where((plan) => plan.premium).toList();
+        final cards = [
+          _PlanCard(
+            title: essential.title,
+            subtitle: essential.subtitle,
+            bullets: essential.benefits,
+            accent: AppColors.accentWarm,
+            highlighted: current?.premium != true,
+            cta: 'Plano atual',
+            disabled: true,
+          ),
+          ...premiumPlans.map(
+            (plan) => _PlanCard(
+              title: plan.title,
+              subtitle: plan.subtitle,
+              priceLabel: plan.billingCycle == 'YEARLY'
+                  ? '${_formatPrice(plan.price, plan.currency)}/ano'
+                  : '${_formatPrice(plan.price, plan.currency)}/mes',
+              bullets: plan.benefits,
+              accent: _accentForPlan(plan),
+              badge:
+                  plan.badge ??
+                  (plan.billingCycle == 'YEARLY' ? 'Economize 33%' : null),
+              availabilityNote: plan.availabilityNote,
+              featured: plan.highlighted || plan.isFounder,
+              highlighted: current?.planCode == plan.planCode,
+              cta: _ctaForPlan(plan, current),
+              disabled:
+                  data.isBusy ||
+                  (current?.planCode == plan.planCode &&
+                      current?.premium == true),
+              onTap: () => _startCheckout(plan.planCode),
+            ),
+          ),
+        ];
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,7 +148,7 @@ class _SubscriptionModuleViewState
                   const SizedBox(height: 12),
                   Text(
                     current?.premium == true
-                        ? 'Seu Premium está ativo. Você aprofunda sua jornada sem anúncios e com mais contexto emocional.'
+                        ? 'Seu ${_currentPlanLabel(current!, plans)} está ativo. Você aprofunda sua jornada sem anúncios e com mais contexto emocional.'
                         : 'Você está no plano Essencial. Comece sua jornada de autoconhecimento com leveza e constância.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
@@ -116,6 +156,7 @@ class _SubscriptionModuleViewState
                   _CurrentPlanCard(
                     current: current,
                     pending: data.pendingCheckout,
+                    plans: plans,
                   ),
                 ],
               ),
@@ -123,76 +164,7 @@ class _SubscriptionModuleViewState
             const SizedBox(height: 16),
             const _MonetizationPrinciplesPanel(),
             const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 760;
-                final cards = [
-                  _PlanCard(
-                    title: essential.title,
-                    subtitle: essential.subtitle,
-                    bullets: essential.benefits,
-                    accent: AppColors.accentWarm,
-                    highlighted: current?.premium != true,
-                    cta: 'Plano atual',
-                    disabled: true,
-                  ),
-                  ...premiumPlans.map(
-                    (plan) => _PlanCard(
-                      title: plan.title,
-                      subtitle: plan.subtitle,
-                      priceLabel: plan.billingCycle == 'YEARLY'
-                          ? '${_formatPrice(plan.price, plan.currency)}/ano'
-                          : '${_formatPrice(plan.price, plan.currency)}/mês',
-                      bullets: plan.benefits,
-                      accent: AppColors.accentGold,
-                      badge: plan.billingCycle == 'YEARLY'
-                          ? 'Economize 33%'
-                          : null,
-                      highlighted: current?.planCode == plan.planCode,
-                      cta:
-                          current?.planCode == plan.planCode &&
-                              current?.premium == true
-                          ? 'Plano ativo'
-                          : plan.billingCycle == 'YEARLY'
-                          ? 'Evoluir continuamente'
-                          : 'Aprofundar jornada',
-                      disabled:
-                          data.isBusy ||
-                          (current?.planCode == plan.planCode &&
-                              current?.premium == true),
-                      onTap: () => _startCheckout(plan.planCode),
-                    ),
-                  ),
-                ];
-
-                if (compact) {
-                  return Column(
-                    children: cards
-                        .map(
-                          (card) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: card,
-                          ),
-                        )
-                        .toList(),
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: cards
-                      .map(
-                        (card) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: card,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                );
-              },
-            ),
+            _PlanCardsLayout(cards: cards),
           ],
         );
       },
@@ -204,6 +176,69 @@ class _SubscriptionModuleViewState
       return 'Grátis';
     }
     return 'R\$ ${price.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  Color _accentForPlan(PlanView plan) {
+    return plan.isFounder ? AppColors.accent : AppColors.accentGold;
+  }
+
+  String _ctaForPlan(PlanView plan, CurrentSubscription? current) {
+    if (current?.planCode == plan.planCode && current?.premium == true) {
+      return 'Plano ativo';
+    }
+    if (plan.isFounder) {
+      return 'Apoiar como fundador';
+    }
+    return plan.billingCycle == 'YEARLY'
+        ? 'Evoluir continuamente'
+        : 'Aprofundar jornada';
+  }
+
+  String _currentPlanLabel(CurrentSubscription current, List<PlanView> plans) {
+    for (final plan in plans) {
+      if (plan.planCode == current.planCode) {
+        return plan.title;
+      }
+    }
+    return current.premium ? 'Premium' : 'Essencial';
+  }
+}
+
+class _PlanCardsLayout extends StatelessWidget {
+  const _PlanCardsLayout({required this.cards});
+
+  final List<Widget> cards;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 760) {
+          return Column(
+            children: cards
+                .map(
+                  (card) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: card,
+                  ),
+                )
+                .toList(),
+          );
+        }
+
+        final columns = constraints.maxWidth >= 1120 ? 3 : 2;
+        final spacing = 12.0;
+        final cardWidth =
+            (constraints.maxWidth - (spacing * (columns - 1))) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final card in cards) SizedBox(width: cardWidth, child: card),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -272,14 +307,19 @@ class _PrinciplePill extends StatelessWidget {
 }
 
 class _CurrentPlanCard extends StatelessWidget {
-  const _CurrentPlanCard({required this.current, required this.pending});
+  const _CurrentPlanCard({
+    required this.current,
+    required this.pending,
+    required this.plans,
+  });
 
   final CurrentSubscription? current;
   final CheckoutSession? pending;
+  final List<PlanView> plans;
 
   @override
   Widget build(BuildContext context) {
-    final label = current?.premium == true ? 'Premium' : 'Essencial';
+    final label = _labelForCurrent();
     final status = current?.status ?? 'NONE';
     return Container(
       width: double.infinity,
@@ -316,6 +356,15 @@ class _CurrentPlanCard extends StatelessWidget {
       ),
     );
   }
+
+  String _labelForCurrent() {
+    for (final plan in plans) {
+      if (plan.planCode == current?.planCode) {
+        return plan.title;
+      }
+    }
+    return current?.premium == true ? 'Premium' : 'Essencial';
+  }
 }
 
 class _PlanCard extends StatelessWidget {
@@ -327,6 +376,8 @@ class _PlanCard extends StatelessWidget {
     required this.cta,
     this.priceLabel,
     this.badge,
+    this.availabilityNote,
+    this.featured = false,
     this.highlighted = false,
     this.disabled = false,
     this.onTap,
@@ -339,6 +390,8 @@ class _PlanCard extends StatelessWidget {
   final String cta;
   final String? priceLabel;
   final String? badge;
+  final String? availabilityNote;
+  final bool featured;
   final bool highlighted;
   final bool disabled;
   final VoidCallback? onTap;
@@ -353,8 +406,11 @@ class _PlanCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.16),
+              color: accent.withValues(alpha: featured ? 0.22 : 0.16),
               borderRadius: BorderRadius.circular(14),
+              border: featured
+                  ? Border.all(color: accent.withValues(alpha: 0.38))
+                  : null,
             ),
             child: Icon(Icons.workspace_premium_rounded, color: accent),
           ),
@@ -404,6 +460,15 @@ class _PlanCard extends StatelessWidget {
               ),
             ),
           ),
+          if (availabilityNote != null && availabilityNote!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              availabilityNote!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,

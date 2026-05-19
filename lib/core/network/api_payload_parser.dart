@@ -26,8 +26,11 @@ class ApiPayloadParser {
             .toList();
       }
 
-      if (payload is Map<String, dynamic> && payload['items'] is List) {
-        return (payload['items'] as List)
+      final payloadItems = payload is Map<String, dynamic>
+          ? payload['items'] ?? payload['content']
+          : null;
+      if (payloadItems is List) {
+        return payloadItems
             .whereType<Map>()
             .map((item) => Map<String, dynamic>.from(item))
             .toList();
@@ -42,7 +45,8 @@ class ApiPayloadParser {
     T Function(Map<String, dynamic> item) decoder,
   ) {
     final payload = dataMap(raw);
-    final items = (payload['items'] as List? ?? const [])
+    final rawItems = payload['items'] ?? payload['content'];
+    final items = (rawItems as List? ?? const [])
         .whereType<Map>()
         .map((item) => decoder(Map<String, dynamic>.from(item)))
         .toList();
@@ -51,7 +55,9 @@ class ApiPayloadParser {
       items: items,
       page: (payload['page'] as num?)?.toInt() ?? 0,
       size: (payload['size'] as num?)?.toInt() ?? items.length,
-      totalItems: (payload['totalItems'] as num?)?.toInt() ?? items.length,
+      totalItems: (payload['totalItems'] as num?)?.toInt() ??
+          (payload['totalElements'] as num?)?.toInt() ??
+          items.length,
       totalPages: (payload['totalPages'] as num?)?.toInt() ?? 1,
       hasNext: payload['hasNext'] as bool? ?? false,
       hasPrevious: payload['hasPrevious'] as bool? ?? false,

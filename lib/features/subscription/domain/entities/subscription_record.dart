@@ -9,6 +9,12 @@ class PlanView {
     required this.currency,
     required this.benefits,
     required this.active,
+    this.planFamily = 'STANDARD',
+    this.badge,
+    this.highlighted = false,
+    this.availabilityNote,
+    this.providerProductId,
+    this.sortOrder = 0,
   });
 
   final String planCode;
@@ -20,6 +26,14 @@ class PlanView {
   final String currency;
   final List<String> benefits;
   final bool active;
+  final String planFamily;
+  final String? badge;
+  final bool highlighted;
+  final String? availabilityNote;
+  final String? providerProductId;
+  final int sortOrder;
+
+  bool get isFounder => planFamily.toUpperCase() == 'FOUNDER';
 }
 
 class CurrentSubscription {

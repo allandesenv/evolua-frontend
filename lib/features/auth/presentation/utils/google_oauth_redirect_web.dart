@@ -2,6 +2,6 @@
 
 import 'dart:html' as html;
 
-void openGoogleOAuthRedirect(String url) {
+Future<void> openGoogleOAuthRedirect(String url) async {
   html.window.location.assign(url);
 }
