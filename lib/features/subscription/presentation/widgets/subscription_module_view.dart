@@ -46,10 +46,10 @@ class _SubscriptionModuleViewState
     });
   }
 
-  Future<void> _startCheckout(String planCode) async {
+  Future<void> _startCheckout(PlanView plan) async {
     final checkout = await ref
         .read(subscriptionControllerProvider.notifier)
-        .startCheckout(planCode);
+        .startPremiumCheckout(plan);
     final url = checkout.checkoutUrl;
     if (url != null && url.isNotEmpty) {
       await launchUrl(
@@ -129,7 +129,7 @@ class _SubscriptionModuleViewState
                   data.isBusy ||
                   (current?.planCode == plan.planCode &&
                       current?.premium == true),
-              onTap: () => _startCheckout(plan.planCode),
+              onTap: () => _startCheckout(plan),
             ),
           ),
         ];

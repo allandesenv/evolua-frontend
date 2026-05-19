@@ -479,10 +479,25 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
+  Future<CheckoutSession> verifyGooglePlayPurchase({
+    required String productId,
+    required String purchaseToken,
+    required String packageName,
+    required String planCode,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AdRewardSession> createRewardSession({
     required String rewardType,
     String? contextId,
   }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantTestReward(String sessionId) {
     throw UnimplementedError();
   }
 
