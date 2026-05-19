@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/features/subscription/data/repositories/subscription_repository_impl.dart';
+import 'package:evolua_frontend/features/subscription/application/google_play_billing_service.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:flutter/foundation.dart';
@@ -65,6 +66,35 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
         message: checkout.isApproved
             ? 'Plano atualizado com sucesso.'
             : 'Checkout iniciado. Estamos aguardando a confirmacao do pagamento.',
+      ),
+    );
+    return checkout;
+  }
+
+  Future<CheckoutSession> startPremiumCheckout(PlanView plan) async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return _startGooglePlayCheckout(plan);
+    }
+    return startCheckout(plan.planCode);
+  }
+
+  Future<CheckoutSession> _startGooglePlayCheckout(PlanView plan) async {
+    final repository = ref.read(subscriptionRepositoryProvider);
+    final currentState =
+        state.asData?.value ?? const SubscriptionScreenState(plans: [], current: null);
+    state = AsyncData(currentState.copyWith(isBusy: true, clearMessage: true));
+    final checkout = await ref
+        .read(googlePlayBillingServiceProvider)
+        .buyPremium(plan: plan, repository: repository);
+    final current = await repository.current();
+    state = AsyncData(
+      currentState.copyWith(
+        current: current,
+        pendingCheckout: checkout,
+        isBusy: false,
+        message: checkout.isApproved
+            ? 'Pagamento confirmado e plano liberado.'
+            : 'Compra recebida, mas ainda não confirmada.',
       ),
     );
     return checkout;

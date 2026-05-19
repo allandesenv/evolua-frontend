@@ -71,6 +71,25 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
   }
 
   @override
+  Future<CheckoutSession> verifyGooglePlayPurchase({
+    required String productId,
+    required String purchaseToken,
+    required String packageName,
+    required String planCode,
+  }) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/billing/google-play/verify',
+      data: {
+        'productId': productId,
+        'purchaseToken': purchaseToken,
+        'packageName': packageName,
+        'planCode': planCode,
+      },
+    );
+    return _checkoutFromJson(ApiPayloadParser.dataMap(response.data));
+  }
+
+  @override
   Future<CurrentSubscription?> cancel() async {
     final response = await _dio.post<dynamic>('/v1/subscription/cancel');
     return _currentFromJson(ApiPayloadParser.dataMap(response.data));
@@ -98,6 +117,29 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       status: json['status']?.toString() ?? 'CREATED',
       customData:
           json['customData']?.toString() ?? json['id']?.toString() ?? '',
+      expiresAt:
+          DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(minutes: 15)),
+      grantedAt: json['grantedAt'] == null
+          ? null
+          : DateTime.tryParse(json['grantedAt'].toString()),
+    );
+  }
+
+  @override
+  Future<AdRewardSession> grantTestReward(String sessionId) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/ads/reward-session/$sessionId/test-grant',
+    );
+    final json = ApiPayloadParser.dataMap(response.data);
+    return AdRewardSession(
+      id: json['id']?.toString() ?? sessionId,
+      provider: json['provider']?.toString() ?? 'ADMOB',
+      rewardType: json['rewardType']?.toString() ?? '',
+      contextId: json['contextId']?.toString(),
+      status: json['status']?.toString() ?? 'GRANTED',
+      customData:
+          json['customData']?.toString() ?? json['id']?.toString() ?? sessionId,
       expiresAt:
           DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
           DateTime.now().add(const Duration(minutes: 15)),

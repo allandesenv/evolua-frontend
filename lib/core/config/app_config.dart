@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AppConfig {
   const AppConfig._();
 
@@ -72,6 +74,9 @@ class AppConfig {
     defaultValue: 'ca-app-pub-1136517314419681/7734426496',
   );
 
+  static const adMobAndroidRewardedTestAdUnitId =
+      'ca-app-pub-3940256099942544/5224354917';
+
   static const adMobIosRewardedAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_IOS_REWARDED_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-3940256099942544/1712485313',
@@ -86,6 +91,16 @@ class AppConfig {
     'EVOLUA_ADMOB_IOS_REWARDED_PREMIUM_PASS_AD_UNIT_ID',
     defaultValue: adMobIosRewardedAdUnitId,
   );
+
+  static const adMobIosRewardedTestAdUnitId =
+      'ca-app-pub-3940256099942544/1712485313';
+
+  static bool get adMobUseTestAds {
+    if (const bool.hasEnvironment('EVOLUA_ADMOB_USE_TEST_ADS')) {
+      return const bool.fromEnvironment('EVOLUA_ADMOB_USE_TEST_ADS');
+    }
+    return !kReleaseMode;
+  }
 
   static String get chatSocketUrl {
     return chatBaseUrl

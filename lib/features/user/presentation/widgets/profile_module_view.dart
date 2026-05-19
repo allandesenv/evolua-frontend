@@ -24,6 +24,7 @@ import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1709,11 +1710,18 @@ class _AdvancedMirrorPromptState extends ConsumerState<_AdvancedMirrorPrompt> {
       return;
     }
     setState(() => _isLoading = true);
-    await ref
+    final unlocked = await ref
         .read(monetizationAccessControllerProvider.notifier)
         .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR');
     if (mounted) {
       setState(() => _isLoading = false);
+      AppSnackBar.show(
+        context,
+        message: unlocked
+            ? 'Espelho avançado liberado por hoje.'
+            : 'Não foi possível carregar o anúncio agora. Tente novamente em instantes.',
+        icon: unlocked ? Icons.check_circle_rounded : Icons.info_rounded,
+      );
     }
   }
 

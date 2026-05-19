@@ -12,12 +12,21 @@ abstract class SubscriptionRepository {
 
   Future<CheckoutSession> checkoutStatus(String checkoutId);
 
+  Future<CheckoutSession> verifyGooglePlayPurchase({
+    required String productId,
+    required String purchaseToken,
+    required String packageName,
+    required String planCode,
+  });
+
   Future<CurrentSubscription?> cancel();
 
   Future<AdRewardSession> createRewardSession({
     required String rewardType,
     String? contextId,
   });
+
+  Future<AdRewardSession> grantTestReward(String sessionId);
 
   Future<MonetizationAccessStatus> monetizationAccess({
     required String resource,
