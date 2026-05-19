@@ -101,6 +101,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível solicitar a recuperação agora.';
 
   @override
+  String get authForgotPasswordTimeout =>
+      'Não conseguimos confirmar o envio agora. Tente novamente em instantes.';
+
+  @override
   String get commonCancel => 'Cancelar';
 
   @override
@@ -132,6 +136,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get authSendLink => 'Enviar link';
+
+  @override
+  String get authResendLink => 'Reenviar link';
+
+  @override
+  String get authSendingLink => 'Enviando...';
 
   @override
   String get resetPasswordSemanticLabel => 'Redefinir senha';
@@ -516,6 +526,10 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'Não foi possível solicitar a recuperação agora.';
 
   @override
+  String get authForgotPasswordTimeout =>
+      'Não conseguimos confirmar o envio agora. Tente novamente em instantes.';
+
+  @override
   String get commonCancel => 'Cancelar';
 
   @override
@@ -547,6 +561,12 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get authSendLink => 'Enviar link';
+
+  @override
+  String get authResendLink => 'Reenviar link';
+
+  @override
+  String get authSendingLink => 'Enviando...';
 
   @override
   String get resetPasswordSemanticLabel => 'Redefinir senha';

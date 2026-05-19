@@ -64,6 +64,10 @@ class AuthRepositoryImpl implements AuthRepository {
     await _dio.post<void>(
       '/v1/public/auth/password/forgot',
       data: {'email': email},
+      options: Options(
+        sendTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ),
     );
   }
 
