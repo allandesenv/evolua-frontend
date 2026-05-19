@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
@@ -89,6 +90,45 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         _profileSection = ProfileModuleSection.evolutionMirror;
       }
     });
+  }
+
+  Future<void> _openCheckIn({required bool compact}) async {
+    if (!compact) {
+      await context.push('/check-in');
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+          ),
+          child: SingleChildScrollView(
+            child: CheckInQuickView(
+              onCompleted: () {
+                if (sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
+              },
+              onCancel: () {
+                if (sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _setTrailSection(ContentModuleSection section) {
@@ -204,6 +244,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenProfileSection: _openProfileSection,
       onOpenAdminSection: _openAdminSection,
       onOpenFutureMessages: () => context.push('/future-messages'),
+      onOpenCheckIn: () => _openCheckIn(compact: isCompact),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
     );
 
@@ -493,6 +534,7 @@ class _DashboardContent extends ConsumerWidget {
     required this.onOpenProfileSection,
     required this.onOpenAdminSection,
     required this.onOpenFutureMessages,
+    required this.onOpenCheckIn,
     required this.onLogout,
   });
 
@@ -508,6 +550,7 @@ class _DashboardContent extends ConsumerWidget {
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final void Function(AdminPanelSection section) onOpenAdminSection;
   final VoidCallback onOpenFutureMessages;
+  final VoidCallback onOpenCheckIn;
   final VoidCallback onLogout;
 
   @override
@@ -558,7 +601,7 @@ class _DashboardContent extends ConsumerWidget {
         onOpenDailyRitual: (type) => context.push(
           '/daily-ritual?type=${type == 'EVENING' ? 'evening' : 'morning'}',
         ),
-        onOpenCheckIn: () => context.push('/check-in'),
+        onOpenCheckIn: onOpenCheckIn,
         onOpenPremium: () =>
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
@@ -617,7 +660,7 @@ class _DashboardContent extends ConsumerWidget {
                   notificationBell: const NotificationBellButton(),
                   session: session,
                   profile: profile,
-                  onOpenCheckIn: () => context.push('/check-in'),
+                  onOpenCheckIn: onOpenCheckIn,
                   onOpenProfileSection: onOpenProfileSection,
                   onOpenAdminPanel: session?.isAdmin == true
                       ? () => onOpenAdminSection(AdminPanelSection.overview)

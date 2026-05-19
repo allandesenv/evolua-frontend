@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_generated_trail.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_generated_trail_link.dart';
@@ -33,7 +35,7 @@ class CheckInDto {
       mood: json['mood'].toString(),
       reflection: json['reflection'].toString(),
       energyLevel: (json['energyLevel'] as num).toInt(),
-      recommendedPractice: json['recommendedPractice'].toString(),
+      recommendedPractice: json['recommendedPractice']?.toString() ?? '',
       aiInsight: _parseInsight(json['aiInsight']),
       createdAt: DateTime.parse(json['createdAt'].toString()),
     );
@@ -53,6 +55,20 @@ class CheckInDto {
   }
 
   static CheckInAiInsight? _parseInsight(dynamic value) {
+    if (value is String) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is Map<String, dynamic>) {
+          return _parseInsight(decoded);
+        }
+        if (decoded is Map) {
+          return _parseInsight(Map<String, dynamic>.from(decoded));
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+
     if (value is! Map<String, dynamic>) {
       return null;
     }

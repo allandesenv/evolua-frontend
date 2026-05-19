@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/auth/presentation/utils/google_oauth_la
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -163,27 +164,21 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     }
   }
 
-  void _handleGoogleLogin() {
+  Future<void> _handleGoogleLogin() async {
     if (_isSubmitting || _isOAuthStarting) {
       return;
     }
 
-    final baseUri = Uri.base;
-    final frontendOrigin =
-        baseUri.hasScheme &&
-            (baseUri.scheme == 'http' || baseUri.scheme == 'https')
-        ? baseUri.origin
-        : 'http://localhost';
-    final frontendRedirectUri = Uri.parse(
-      frontendOrigin,
-    ).resolve('/auth/google/callback').toString();
+    final frontendRedirectUri = kIsWeb
+        ? Uri.parse(Uri.base.origin).resolve('/auth/google/callback').toString()
+        : 'evolua://app/auth/google/callback';
     final startUri = Uri.parse(
       '${AppConfig.apiBaseUrl}/v1/public/auth/google/start',
     ).replace(queryParameters: {'frontendRedirectUri': frontendRedirectUri});
 
     setState(() => _isOAuthStarting = true);
     try {
-      ref.read(googleOAuthLauncherProvider)(startUri.toString());
+      await ref.read(googleOAuthLauncherProvider)(startUri.toString());
     } catch (_) {
       if (!mounted) {
         return;

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
@@ -347,7 +348,14 @@ class _AdminTrailManagementViewState
           'stepCount': int.tryParse(_draftStepCountController.text.trim()) ?? 5,
         },
       );
-      final data = Map<String, dynamic>.from(response.data as Map);
+      final data = ApiPayloadParser.dataMap(response.data);
+      final draftSteps = (data['steps'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => _EditableTrailStep.fromDraft(Map<String, dynamic>.from(item)))
+          .toList();
+      if (draftSteps.isEmpty) {
+        throw const FormatException('Rascunho sem etapas.');
+      }
       setState(() {
         _titleController.text = data['title']?.toString() ?? theme;
         _summaryController.text = data['summary']?.toString() ?? goal;
@@ -357,15 +365,7 @@ class _AdminTrailManagementViewState
         }
         _steps
           ..clear()
-          ..addAll(
-            (data['steps'] as List? ?? const []).whereType<Map>().map(
-              (item) =>
-                  _EditableTrailStep.fromDraft(Map<String, dynamic>.from(item)),
-            ),
-          );
-        if (_steps.isEmpty) {
-          _steps.add(_EditableTrailStep.live(0));
-        }
+          ..addAll(draftSteps);
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
