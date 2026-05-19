@@ -168,6 +168,7 @@ void main() {
       await tester.tap(find.text('Enviar link'));
       await tester.pumpAndSettle();
       expect(repository.lastForgotPasswordEmail, 'user@evolua.app');
+      expect(find.text('Reenviar link'), findsOneWidget);
       expect(find.textContaining('instruções de recuperação'), findsOneWidget);
 
       final forgotButton = tester.widget<TextButton>(
@@ -179,6 +180,73 @@ void main() {
       );
     });
 
+    testWidgets('shows forgot password loading and blocks duplicate resend', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final forgotCompleter = Completer<void>();
+      final repository = _FakeAuthRepository(
+        forgotPasswordHandler: ({required email}) => forgotCompleter.future,
+      );
+      await tester.pumpWidget(_testApp(repository: repository));
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'E-mail'),
+        'user@evolua.app',
+      );
+      await tester.tap(find.text('Esqueci minha senha'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Enviar link'));
+      await tester.pump();
+
+      expect(repository.forgotPasswordCalls, 1);
+      expect(find.text('Enviando...'), findsOneWidget);
+
+      await tester.tap(find.text('Enviando...'), warnIfMissed: false);
+      await tester.pump();
+      expect(repository.forgotPasswordCalls, 1);
+
+      forgotCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reenviar link'), findsOneWidget);
+      expect(find.text('Fechar'), findsOneWidget);
+    });
+
+    testWidgets('keeps forgot password dialog open on timeout', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = _FakeAuthRepository(
+        forgotPasswordHandler: ({required email}) async {
+          throw DioException(
+            type: DioExceptionType.receiveTimeout,
+            requestOptions: RequestOptions(
+              path: '/v1/public/auth/password/forgot',
+            ),
+          );
+        },
+      );
+      await tester.pumpWidget(_testApp(repository: repository));
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'E-mail'),
+        'user@evolua.app',
+      );
+      await tester.tap(find.text('Esqueci minha senha'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Enviar link'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recuperar senha'), findsOneWidget);
+      expect(
+        find.textContaining('Não conseguimos confirmar o envio agora'),
+        findsOneWidget,
+      );
+      expect(find.text('user@evolua.app'), findsWidgets);
+      expect(repository.forgotPasswordCalls, 1);
+    });
+
     testWidgets('starts Google OAuth once and disables duplicate click', (
       tester,
     ) async {
@@ -186,10 +254,10 @@ void main() {
       final launchedUrls = <String>[];
 
       await tester.pumpWidget(
-          _testApp(
-            repository: _FakeAuthRepository(),
-            googleLauncher: (url) async => launchedUrls.add(url),
-          ),
+        _testApp(
+          repository: _FakeAuthRepository(),
+          googleLauncher: (url) async => launchedUrls.add(url),
+        ),
       );
 
       await _startGoogleOAuth(tester);
@@ -484,13 +552,21 @@ typedef _RegisterHandler =
       required String password,
     });
 
+typedef _ForgotPasswordHandler = Future<void> Function({required String email});
+
 class _FakeAuthRepository implements AuthRepository {
-  _FakeAuthRepository({this.loginHandler, this.registerHandler});
+  _FakeAuthRepository({
+    this.loginHandler,
+    this.registerHandler,
+    this.forgotPasswordHandler,
+  });
 
   final _LoginHandler? loginHandler;
   final _RegisterHandler? registerHandler;
+  final _ForgotPasswordHandler? forgotPasswordHandler;
   int loginCalls = 0;
   int registerCalls = 0;
+  int forgotPasswordCalls = 0;
   String? lastLoginEmail;
   String? lastLoginPassword;
   String? lastRegisterName;
@@ -527,7 +603,12 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> forgotPassword({required String email}) async {
+    forgotPasswordCalls += 1;
     lastForgotPasswordEmail = email;
+    final handler = forgotPasswordHandler;
+    if (handler != null) {
+      return handler(email: email);
+    }
   }
 
   @override

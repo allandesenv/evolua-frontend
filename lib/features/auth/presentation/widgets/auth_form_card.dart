@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
@@ -193,41 +194,12 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   }
 
   Future<void> _handleForgotPassword() async {
-    final email = await showDialog<String>(
+    await showDialog<void>(
       context: context,
       builder: (context) => _ForgotPasswordDialog(
         initialEmail: normalizeEmail(_emailController.text),
       ),
     );
-    if (email == null || email.isEmpty || !mounted) {
-      return;
-    }
-
-    try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .forgotPassword(email: email);
-      if (!mounted) {
-        return;
-      }
-      AppSnackBar.show(
-        context,
-        message: context.l10n.authForgotPasswordSuccess,
-        icon: Icons.mark_email_unread_rounded,
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      AppSnackBar.show(
-        context,
-        message: extractApiErrorMessage(
-          error,
-          fallback: context.l10n.authForgotPasswordError,
-        ),
-        icon: Icons.info_outline_rounded,
-      );
-    }
   }
 
   Future<void> _pickBirthDate() async {
@@ -499,18 +471,22 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   }
 }
 
-class _ForgotPasswordDialog extends StatefulWidget {
+class _ForgotPasswordDialog extends ConsumerStatefulWidget {
   const _ForgotPasswordDialog({required this.initialEmail});
 
   final String initialEmail;
 
   @override
-  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+  ConsumerState<_ForgotPasswordDialog> createState() =>
+      _ForgotPasswordDialogState();
 }
 
-class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+class _ForgotPasswordDialogState extends ConsumerState<_ForgotPasswordDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
+  bool _isSending = false;
+  bool _sent = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -524,17 +500,59 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_isSending) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    Navigator.of(context).pop(normalizeEmail(_emailController.text));
+
+    setState(() {
+      _isSending = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .forgotPassword(email: normalizeEmail(_emailController.text));
+      if (!mounted) {
+        return;
+      }
+      setState(() => _sent = true);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _errorMessage = _forgotPasswordErrorMessage(error));
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  String _forgotPasswordErrorMessage(Object error) {
+    if (error is DioException &&
+        (error.type == DioExceptionType.connectionTimeout ||
+            error.type == DioExceptionType.sendTimeout ||
+            error.type == DioExceptionType.receiveTimeout)) {
+      return context.l10n.authForgotPasswordTimeout;
+    }
+
+    return extractApiErrorMessage(
+      error,
+      fallback: context.l10n.authForgotPasswordError,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return AlertDialog(
-      title: Text(context.l10n.authForgotPasswordTitle),
+      title: Text(l10n.authForgotPasswordTitle),
       content: Form(
         key: _formKey,
         child: Column(
@@ -542,36 +560,103 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              context.l10n.authForgotPasswordBody,
+              l10n.authForgotPasswordBody,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _emailController,
               autofocus: true,
+              enabled: !_isSending,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
-                labelText: context.l10n.authEmailLabel,
+                labelText: l10n.authEmailLabel,
                 prefixIcon: const Icon(Icons.alternate_email_rounded),
               ),
               validator: validateEmail,
-              onFieldSubmitted: (_) => _submit(),
+              onFieldSubmitted: _isSending ? null : (_) => _submit(),
             ),
+            if (_sent) ...[
+              const SizedBox(height: 16),
+              _ForgotPasswordStatusMessage(
+                icon: Icons.mark_email_unread_rounded,
+                message: l10n.authForgotPasswordSuccess,
+                color: AppColors.accent,
+              ),
+            ],
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              _ForgotPasswordStatusMessage(
+                icon: Icons.info_outline_rounded,
+                message: _errorMessage!,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ],
           ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(context.l10n.commonCancel),
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(),
+          child: Text(_sent ? l10n.commonClose : l10n.commonCancel),
         ),
         FilledButton.icon(
-          onPressed: _submit,
-          icon: const Icon(Icons.mark_email_unread_rounded),
-          label: Text(context.l10n.authSendLink),
+          onPressed: _isSending ? null : _submit,
+          icon: _isSending
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.mark_email_unread_rounded),
+          label: Text(
+            _isSending
+                ? l10n.authSendingLink
+                : _sent
+                ? l10n.authResendLink
+                : l10n.authSendLink,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _ForgotPasswordStatusMessage extends StatelessWidget {
+  const _ForgotPasswordStatusMessage({
+    required this.icon,
+    required this.message,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String message;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

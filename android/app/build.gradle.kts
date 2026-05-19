@@ -1,4 +1,5 @@
 import java.util.Base64
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -23,6 +24,12 @@ fun dartDefine(name: String, defaultValue: String): String {
         ?.substringAfter('=')
         ?.takeIf { it.isNotBlank() }
         ?: defaultValue
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
 android {
@@ -51,11 +58,24 @@ android {
             dartDefine("EVOLUA_ADMOB_ANDROID_APP_ID", "ca-app-pub-1136517314419681~3445046280")
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keystoreProperties["storeFile"] as String?
+            if (storeFilePath.isNullOrBlank()) {
+                throw GradleException(
+                    "Release signing requires android/key.properties with storeFile configured."
+                )
+            }
+            storeFile = rootProject.file(storeFilePath)
+            storePassword = keystoreProperties["storePassword"] as String?
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

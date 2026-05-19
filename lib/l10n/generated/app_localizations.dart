@@ -274,6 +274,12 @@ abstract class AppLocalizations {
   /// **'Não foi possível solicitar a recuperação agora.'**
   String get authForgotPasswordError;
 
+  /// No description provided for @authForgotPasswordTimeout.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos confirmar o envio agora. Tente novamente em instantes.'**
+  String get authForgotPasswordTimeout;
+
   /// No description provided for @commonCancel.
   ///
   /// In pt_BR, this message translates to:
@@ -339,6 +345,18 @@ abstract class AppLocalizations {
   /// In pt_BR, this message translates to:
   /// **'Enviar link'**
   String get authSendLink;
+
+  /// No description provided for @authResendLink.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Reenviar link'**
+  String get authResendLink;
+
+  /// No description provided for @authSendingLink.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Enviando...'**
+  String get authSendingLink;
 
   /// No description provided for @resetPasswordSemanticLabel.
   ///
