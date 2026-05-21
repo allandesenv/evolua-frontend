@@ -17,11 +17,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final authenticatedSessionResetObserverProvider = Provider<void>((ref) {
   var lastUserId = ref.read(authControllerProvider).asData?.value?.userId;
+  var resetScheduledForLoadingSession = false;
   ref.listen(authControllerProvider, (previous, next) {
+    if (next.isLoading) {
+      if (lastUserId != null && !resetScheduledForLoadingSession) {
+        scheduleAuthenticatedSessionReset(ref);
+        resetScheduledForLoadingSession = true;
+      }
+      return;
+    }
+
     if (!next.hasValue) {
       return;
     }
 
+    resetScheduledForLoadingSession = false;
     final nextUserId = next.value?.userId;
     if (lastUserId != nextUserId &&
         (lastUserId != null || nextUserId != null)) {

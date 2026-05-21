@@ -208,6 +208,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
     final history = checkInState.asData?.value;
     if (history == null ||
+        !history.belongsToUser(session.userId) ||
         hasCheckInToday(
           history.result.items,
           latestCreatedCheckIn: history.latestCreatedCheckIn,

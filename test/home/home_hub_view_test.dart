@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -20,6 +24,7 @@ import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
+import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -118,6 +123,61 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('Depois do'), findsNothing);
+    });
+
+    testWidgets('does not render stale intelligent reading from another user', (
+      tester,
+    ) async {
+      final staleState = CheckInHistoryState(
+        ownerUserId: 'user-a',
+        result: PaginatedResponse(
+          items: [
+            CheckIn(
+              id: 301,
+              userId: 'user-a',
+              mood: 'calma',
+              reflection: '',
+              energyLevel: 7,
+              recommendedPractice: 'Respirar por dois minutos.',
+              aiInsight: _insight(insight: 'Leitura sensível do usuário A'),
+              createdAt: DateTime(2026, 5, 7, 9),
+            ),
+          ],
+          page: 0,
+          size: 6,
+          totalItems: 1,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false,
+          sortBy: 'createdAt',
+          sortDir: 'desc',
+          filters: const {},
+        ),
+        selectedGrouping: 'monthly',
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authSessionStorageProvider.overrideWithValue(
+              _MemoryAuthSessionStorage(
+                _authSession(userId: 'user-b', email: 'b@evolua.test'),
+              ),
+            ),
+            checkInControllerProvider.overrideWith(
+              () => _StaticCheckInController(staleState),
+            ),
+          ],
+          child: MaterialApp(theme: AppTheme.dark(), home: const HomePage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Leitura sensível do usuário A'),
+        findsNothing,
+      );
+      expect(find.byType(HomePage), findsOneWidget);
     });
 
     testWidgets('shows compact intelligent reading bullets on Home', (
@@ -1075,6 +1135,35 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
   }
 }
 
+class _StaticCheckInController extends CheckInController {
+  _StaticCheckInController(this.value);
+
+  final CheckInHistoryState value;
+
+  @override
+  Future<CheckInHistoryState> build() async => value;
+}
+
+class _MemoryAuthSessionStorage implements AuthSessionStorage {
+  _MemoryAuthSessionStorage(AuthSession session)
+    : _value = jsonEncode(session.toJson());
+
+  String? _value;
+
+  @override
+  Future<String?> read() async => _value;
+
+  @override
+  Future<void> write(String value) async {
+    _value = value;
+  }
+
+  @override
+  Future<void> clear() async {
+    _value = null;
+  }
+}
+
 List<CheckIn> _checkIns() {
   final now = DateTime.now();
   return [
@@ -1109,6 +1198,34 @@ List<CheckIn> _checkIns() {
       createdAt: now.subtract(const Duration(days: 2, hours: 2)),
     ),
   ];
+}
+
+AuthSession _authSession({required String userId, required String email}) {
+  return AuthSession(
+    userId: userId,
+    email: email,
+    roles: const ['ROLE_USER'],
+    accessToken: _jwt(userId: userId, email: email),
+    refreshToken: 'refresh-$userId',
+    expiresAt: DateTime.now().add(const Duration(hours: 1)),
+  );
+}
+
+String _jwt({required String userId, required String email}) {
+  String encode(Map<String, Object> value) {
+    return base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
+  }
+
+  final header = encode({'alg': 'none', 'typ': 'JWT'});
+  final payload = encode({
+    'sub': userId,
+    'email': email,
+    'roles': const ['ROLE_USER'],
+    'exp':
+        DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
+        1000,
+  });
+  return '$header.$payload.signature';
 }
 
 CheckInAiInsight _insight({
