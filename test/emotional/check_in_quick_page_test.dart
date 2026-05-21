@@ -17,27 +17,56 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Calmo'), findsOneWidget);
-      expect(find.text('Ansioso'), findsOneWidget);
-      expect(find.text('Cansado'), findsOneWidget);
-      expect(find.text('Distraído'), findsOneWidget);
+      expect(find.text('briefing'), findsNothing);
+      expect(find.text('Calma'), findsOneWidget);
+      expect(find.text('Ansiedade'), findsOneWidget);
+      expect(find.text('Cansaço'), findsOneWidget);
+      expect(find.text('Distração'), findsOneWidget);
       expect(find.text('Mais estados'), findsOneWidget);
-      expect(find.text('Focado'), findsNothing);
+      expect(find.text('Foco'), findsNothing);
 
       await tester.tap(find.text('Mais estados'));
       await tester.pumpAndSettle();
 
+      expect(find.byTooltip('Voltar'), findsOneWidget);
       expect(find.text('Buscar estado'), findsOneWidget);
       expect(find.text('Emocionais'), findsOneWidget);
       expect(find.text('Mentais'), findsOneWidget);
-      expect(find.text('Fisicos'), findsOneWidget);
+      expect(find.text('Físicos'), findsOneWidget);
       expect(find.text('Comportamentais'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Focado'));
-      await tester.tap(find.text('Focado'), warnIfMissed: false);
+      await tester.ensureVisible(find.text('Foco'));
+      await tester.tap(find.text('Foco'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.text('Estado selecionado: Focado'), findsOneWidget);
+      expect(find.text('Estado selecionado: Foco'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Foco'), findsOneWidget);
+    });
+
+    testWidgets('supports other mood with optional free text', (tester) async {
+      final repository = _FakeCheckInRepository();
+
+      await tester.pumpWidget(_testApp(checkInRepository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Mais estados'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Outro estado'));
+      await tester.tap(find.text('Outro estado'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Estado selecionado: Outro estado'), findsOneWidget);
+      expect(find.text('Descreva com suas palavras'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Descreva com suas palavras'),
+        'saudade tranquila',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      expect(repository.createdMood, 'saudade tranquila');
     });
 
     testWidgets('creates check-in and calls completion callback', (
@@ -61,7 +90,7 @@ void main() {
       await tester.tap(find.text('Fazer check-in'));
       await tester.pumpAndSettle();
 
-      expect(repository.createdMood, 'calmo');
+      expect(repository.createdMood, 'calma');
       expect(repository.createdReflection, 'preciso organizar o dia');
       expect(repository.createdEnergy, 7);
       expect(completed, isTrue);

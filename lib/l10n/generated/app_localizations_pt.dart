@@ -439,6 +439,189 @@ class AppLocalizationsPt extends AppLocalizations {
   String get checkInTitle => 'Check-in';
 
   @override
+  String get checkInSemanticLabel => 'Check-in do dia';
+
+  @override
+  String get checkInEyebrow => 'Como estou?';
+
+  @override
+  String get checkInPromptTitle => 'Comece pelo seu estado agora';
+
+  @override
+  String get checkInPromptSubtitle =>
+      'Um check-in curto já dá contexto para o seu registro breve do dia.';
+
+  @override
+  String get checkInMoreStatesTooltip => 'Ver mais estados';
+
+  @override
+  String get checkInMoreStates => 'Mais estados';
+
+  @override
+  String checkInSelectedState(Object state) {
+    return 'Estado selecionado: $state';
+  }
+
+  @override
+  String get checkInOtherMoodLabel => 'Descreva com suas palavras';
+
+  @override
+  String get checkInOtherMoodHint =>
+      'Opcional: escreva como você está se sentindo';
+
+  @override
+  String checkInEnergyLabel(Object value) {
+    return 'Energia percebida: $value/10';
+  }
+
+  @override
+  String get checkInReflectionLabel => 'Se quiser, conte o motivo';
+
+  @override
+  String get checkInReflectionHint =>
+      'Uma frase simples ajuda a leitura ficar mais precisa.';
+
+  @override
+  String get checkInSubmit => 'Fazer check-in';
+
+  @override
+  String get checkInNotNow => 'Agora não';
+
+  @override
+  String get checkInSavedSnack => 'Check-in registrado. Continue no seu ritmo.';
+
+  @override
+  String get checkInSaveError => 'Não foi possível salvar o check-in.';
+
+  @override
+  String get checkInDeepReadingTitle =>
+      'Deseja desbloquear mais uma leitura emocional?';
+
+  @override
+  String get checkInDeepReadingMessage =>
+      'Seu check-in foi salvo. A leitura básica continua disponível, e você pode liberar uma leitura aprofundada assistindo a um anúncio ou assinando Premium.';
+
+  @override
+  String get checkInDeepReadingReward =>
+      'Recompensa: +1 leitura emocional aprofundada hoje.';
+
+  @override
+  String get checkInDeepReadingUnlocked =>
+      'Leitura aprofundada liberada para hoje.';
+
+  @override
+  String get checkInRewardAdNotConfirmed =>
+      'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.';
+
+  @override
+  String get checkInPremiumAction => 'Assinar Premium';
+
+  @override
+  String get checkInChooseStateTitle => 'Escolha um estado';
+
+  @override
+  String get checkInSearchState => 'Buscar estado';
+
+  @override
+  String get checkInRecentStates => 'Recentes';
+
+  @override
+  String get checkInAiSuggestedStates => 'Sugeridos pela IA';
+
+  @override
+  String get checkInMoodGroupEmotional => 'Emocionais';
+
+  @override
+  String get checkInMoodGroupMental => 'Mentais';
+
+  @override
+  String get checkInMoodGroupPhysical => 'Físicos';
+
+  @override
+  String get checkInMoodGroupBehavioral => 'Comportamentais';
+
+  @override
+  String get checkInMoodGroupOther => 'Outros';
+
+  @override
+  String get checkInMoodCalm => 'Calma';
+
+  @override
+  String get checkInMoodAnxiety => 'Ansiedade';
+
+  @override
+  String get checkInMoodTiredness => 'Cansaço';
+
+  @override
+  String get checkInMoodDistraction => 'Distração';
+
+  @override
+  String get checkInMoodSadness => 'Tristeza';
+
+  @override
+  String get checkInMoodEnthusiasm => 'Ânimo';
+
+  @override
+  String get checkInMoodIrritation => 'Irritação';
+
+  @override
+  String get checkInMoodHope => 'Esperança';
+
+  @override
+  String get checkInMoodOverload => 'Sobrecarga';
+
+  @override
+  String get checkInMoodFocus => 'Foco';
+
+  @override
+  String get checkInMoodConfusion => 'Confusão';
+
+  @override
+  String get checkInMoodCreativity => 'Criatividade';
+
+  @override
+  String get checkInMoodAcceleration => 'Aceleração';
+
+  @override
+  String get checkInMoodBlock => 'Bloqueio';
+
+  @override
+  String get checkInMoodEnergy => 'Energia';
+
+  @override
+  String get checkInMoodTension => 'Tensão';
+
+  @override
+  String get checkInMoodLightness => 'Leveza';
+
+  @override
+  String get checkInMoodSleepiness => 'Sonolência';
+
+  @override
+  String get checkInMoodAgitation => 'Agitação';
+
+  @override
+  String get checkInMoodAvoidance => 'Evitação';
+
+  @override
+  String get checkInMoodProductivity => 'Produtividade';
+
+  @override
+  String get checkInMoodIsolation => 'Isolamento';
+
+  @override
+  String get checkInMoodConnection => 'Conexão';
+
+  @override
+  String get checkInMoodProcrastination => 'Procrastinação';
+
+  @override
+  String get checkInMoodConsistency => 'Constância';
+
+  @override
+  String get checkInMoodOther => 'Outro estado';
+
+  @override
   String get dailyRitualCarryMorning => 'Leve isso com você hoje';
 
   @override
@@ -878,6 +1061,189 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get checkInTitle => 'Check-in';
+
+  @override
+  String get checkInSemanticLabel => 'Check-in do dia';
+
+  @override
+  String get checkInEyebrow => 'Como estou?';
+
+  @override
+  String get checkInPromptTitle => 'Comece pelo seu estado agora';
+
+  @override
+  String get checkInPromptSubtitle =>
+      'Um check-in curto já dá contexto para o seu registro breve do dia.';
+
+  @override
+  String get checkInMoreStatesTooltip => 'Ver mais estados';
+
+  @override
+  String get checkInMoreStates => 'Mais estados';
+
+  @override
+  String checkInSelectedState(Object state) {
+    return 'Estado selecionado: $state';
+  }
+
+  @override
+  String get checkInOtherMoodLabel => 'Descreva com suas palavras';
+
+  @override
+  String get checkInOtherMoodHint =>
+      'Opcional: escreva como você está se sentindo';
+
+  @override
+  String checkInEnergyLabel(Object value) {
+    return 'Energia percebida: $value/10';
+  }
+
+  @override
+  String get checkInReflectionLabel => 'Se quiser, conte o motivo';
+
+  @override
+  String get checkInReflectionHint =>
+      'Uma frase simples ajuda a leitura ficar mais precisa.';
+
+  @override
+  String get checkInSubmit => 'Fazer check-in';
+
+  @override
+  String get checkInNotNow => 'Agora não';
+
+  @override
+  String get checkInSavedSnack => 'Check-in registrado. Continue no seu ritmo.';
+
+  @override
+  String get checkInSaveError => 'Não foi possível salvar o check-in.';
+
+  @override
+  String get checkInDeepReadingTitle =>
+      'Deseja desbloquear mais uma leitura emocional?';
+
+  @override
+  String get checkInDeepReadingMessage =>
+      'Seu check-in foi salvo. A leitura básica continua disponível, e você pode liberar uma leitura aprofundada assistindo a um anúncio ou assinando Premium.';
+
+  @override
+  String get checkInDeepReadingReward =>
+      'Recompensa: +1 leitura emocional aprofundada hoje.';
+
+  @override
+  String get checkInDeepReadingUnlocked =>
+      'Leitura aprofundada liberada para hoje.';
+
+  @override
+  String get checkInRewardAdNotConfirmed =>
+      'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.';
+
+  @override
+  String get checkInPremiumAction => 'Assinar Premium';
+
+  @override
+  String get checkInChooseStateTitle => 'Escolha um estado';
+
+  @override
+  String get checkInSearchState => 'Buscar estado';
+
+  @override
+  String get checkInRecentStates => 'Recentes';
+
+  @override
+  String get checkInAiSuggestedStates => 'Sugeridos pela IA';
+
+  @override
+  String get checkInMoodGroupEmotional => 'Emocionais';
+
+  @override
+  String get checkInMoodGroupMental => 'Mentais';
+
+  @override
+  String get checkInMoodGroupPhysical => 'Físicos';
+
+  @override
+  String get checkInMoodGroupBehavioral => 'Comportamentais';
+
+  @override
+  String get checkInMoodGroupOther => 'Outros';
+
+  @override
+  String get checkInMoodCalm => 'Calma';
+
+  @override
+  String get checkInMoodAnxiety => 'Ansiedade';
+
+  @override
+  String get checkInMoodTiredness => 'Cansaço';
+
+  @override
+  String get checkInMoodDistraction => 'Distração';
+
+  @override
+  String get checkInMoodSadness => 'Tristeza';
+
+  @override
+  String get checkInMoodEnthusiasm => 'Ânimo';
+
+  @override
+  String get checkInMoodIrritation => 'Irritação';
+
+  @override
+  String get checkInMoodHope => 'Esperança';
+
+  @override
+  String get checkInMoodOverload => 'Sobrecarga';
+
+  @override
+  String get checkInMoodFocus => 'Foco';
+
+  @override
+  String get checkInMoodConfusion => 'Confusão';
+
+  @override
+  String get checkInMoodCreativity => 'Criatividade';
+
+  @override
+  String get checkInMoodAcceleration => 'Aceleração';
+
+  @override
+  String get checkInMoodBlock => 'Bloqueio';
+
+  @override
+  String get checkInMoodEnergy => 'Energia';
+
+  @override
+  String get checkInMoodTension => 'Tensão';
+
+  @override
+  String get checkInMoodLightness => 'Leveza';
+
+  @override
+  String get checkInMoodSleepiness => 'Sonolência';
+
+  @override
+  String get checkInMoodAgitation => 'Agitação';
+
+  @override
+  String get checkInMoodAvoidance => 'Evitação';
+
+  @override
+  String get checkInMoodProductivity => 'Produtividade';
+
+  @override
+  String get checkInMoodIsolation => 'Isolamento';
+
+  @override
+  String get checkInMoodConnection => 'Conexão';
+
+  @override
+  String get checkInMoodProcrastination => 'Procrastinação';
+
+  @override
+  String get checkInMoodConsistency => 'Constância';
+
+  @override
+  String get checkInMoodOther => 'Outro estado';
 
   @override
   String get dailyRitualCarryMorning => 'Leve isso com você hoje';
