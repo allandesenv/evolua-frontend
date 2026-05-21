@@ -22,6 +22,14 @@ void main() {
       expect(validatePassword('   '), 'Informe sua senha.');
       expect(validatePassword('12345'), isNotNull);
       expect(validatePassword(' 1234 '), isNull);
+      expect(validatePassword('a' * 72), isNull);
+      expect(validatePassword('a' * 73), isNotNull);
+      expect(validateConfirmPassword('', '123456'), 'Confirme sua senha.');
+      expect(
+        validateConfirmPassword('1234567', '123456'),
+        'As senhas não conferem.',
+      );
+      expect(validateConfirmPassword('123456', '123456'), isNull);
     });
 
     test('validates display name and preserves human names', () {
@@ -31,6 +39,8 @@ void main() {
       expect(validateDisplayName('José da Silva'), isNull);
       expect(validateDisplayName('Ana123'), isNotNull);
       expect(validateDisplayName('Ana @ Silva'), isNotNull);
+      expect(validateDisplayName('Ana-Maria'), isNotNull);
+      expect(validateDisplayName("Ana D'Ávila"), isNotNull);
       expect(normalizeDisplayName('  Ana   Maria  '), 'Ana Maria');
     });
 
@@ -42,6 +52,12 @@ void main() {
       expect(validateBirthDate(DateTime(2014, 4, 28), now: now), isNotNull);
       expect(validateBirthDate(DateTime(2013, 4, 28), now: now), isNull);
       expect(validateBirthDate(DateTime(1990, 1, 1), now: now), isNull);
+      expect(parseBirthDateText('01011990'), DateTime(1990, 1, 1));
+      expect(parseBirthDateText('01/01/1990'), DateTime(1990, 1, 1));
+      expect(parseBirthDateText('31/02/1990'), isNull);
+      expect(formatBirthDate(DateTime(1990, 1, 1)), '01/01/1990');
+      expect(validateBirthDateText('', now: now), isNotNull);
+      expect(validateBirthDateText('31/02/1990', now: now), isNotNull);
     });
 
     test('validates inclusive gender options', () {

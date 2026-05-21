@@ -44,6 +44,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get authBirthDateEmpty => 'Selecione sua data';
 
   @override
+  String get authBirthDateHint => 'dd/mm/aaaa';
+
+  @override
+  String get authBirthDateOpenPicker => 'Abrir calendário';
+
+  @override
   String get authGenderLabel => 'Gênero';
 
   @override
@@ -74,7 +80,17 @@ class AppLocalizationsPt extends AppLocalizations {
   String get authPasswordLabel => 'Senha';
 
   @override
-  String get authPasswordHint => 'Mínimo de 6 caracteres';
+  String get authPasswordHint => 'De 6 a 72 caracteres';
+
+  @override
+  String get authConfirmPasswordLabel => 'Confirmar senha';
+
+  @override
+  String get authConfirmPasswordHint => 'Digite a senha novamente';
+
+  @override
+  String get authPasswordRules =>
+      'Use de 6 a 72 caracteres. Você pode usar letras, números e símbolos.';
 
   @override
   String get authHidePassword => 'Ocultar senha';
@@ -469,6 +485,12 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get authBirthDateEmpty => 'Selecione sua data';
 
   @override
+  String get authBirthDateHint => 'dd/mm/aaaa';
+
+  @override
+  String get authBirthDateOpenPicker => 'Abrir calendário';
+
+  @override
   String get authGenderLabel => 'Gênero';
 
   @override
@@ -499,7 +521,17 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get authPasswordLabel => 'Senha';
 
   @override
-  String get authPasswordHint => 'Mínimo de 6 caracteres';
+  String get authPasswordHint => 'De 6 a 72 caracteres';
+
+  @override
+  String get authConfirmPasswordLabel => 'Confirmar senha';
+
+  @override
+  String get authConfirmPasswordHint => 'Digite a senha novamente';
+
+  @override
+  String get authPasswordRules =>
+      'Use de 6 a 72 caracteres. Você pode usar letras, números e símbolos.';
 
   @override
   String get authHidePassword => 'Ocultar senha';

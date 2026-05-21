@@ -166,6 +166,18 @@ abstract class AppLocalizations {
   /// **'Selecione sua data'**
   String get authBirthDateEmpty;
 
+  /// No description provided for @authBirthDateHint.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'dd/mm/aaaa'**
+  String get authBirthDateHint;
+
+  /// No description provided for @authBirthDateOpenPicker.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Abrir calendário'**
+  String get authBirthDateOpenPicker;
+
   /// No description provided for @authGenderLabel.
   ///
   /// In pt_BR, this message translates to:
@@ -229,8 +241,26 @@ abstract class AppLocalizations {
   /// No description provided for @authPasswordHint.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Mínimo de 6 caracteres'**
+  /// **'De 6 a 72 caracteres'**
   String get authPasswordHint;
+
+  /// No description provided for @authConfirmPasswordLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirmar senha'**
+  String get authConfirmPasswordLabel;
+
+  /// No description provided for @authConfirmPasswordHint.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Digite a senha novamente'**
+  String get authConfirmPasswordHint;
+
+  /// No description provided for @authPasswordRules.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use de 6 a 72 caracteres. Você pode usar letras, números e símbolos.'**
+  String get authPasswordRules;
 
   /// No description provided for @authHidePassword.
   ///
