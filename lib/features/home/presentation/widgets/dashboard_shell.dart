@@ -6,6 +6,7 @@ import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart'
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_day.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
@@ -42,6 +43,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   AdminPanelSection _adminSection = AdminPanelSection.overview;
   final List<_DashboardLocation> _history = [];
   bool _handledBillingReturn = false;
+  bool _initialCheckInPromptOpening = false;
+  String? _initialCheckInPromptKey;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -194,6 +197,61 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
+  void _scheduleInitialCheckInPrompt({
+    required bool isCompact,
+    required AuthSession? session,
+    required AsyncValue<CheckInHistoryState> checkInState,
+  }) {
+    if (!isCompact || session == null || _initialCheckInPromptOpening) {
+      return;
+    }
+
+    final history = checkInState.asData?.value;
+    if (history == null ||
+        hasCheckInToday(
+          history.result.items,
+          latestCreatedCheckIn: history.latestCreatedCheckIn,
+        )) {
+      return;
+    }
+
+    final key = _initialCheckInPromptStorageKey(session.userId);
+    if (_initialCheckInPromptKey == key) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openInitialCheckInPromptIfNeeded(key);
+    });
+  }
+
+  Future<void> _openInitialCheckInPromptIfNeeded(String key) async {
+    if (!mounted || _initialCheckInPromptOpening) {
+      return;
+    }
+
+    _initialCheckInPromptOpening = true;
+    try {
+      final preferences = await ref.read(sharedPreferencesProvider.future);
+      if (preferences.getBool(key) == true || !mounted) {
+        return;
+      }
+
+      await preferences.setBool(key, true);
+      _initialCheckInPromptKey = key;
+      await _openCheckIn(compact: true);
+    } finally {
+      _initialCheckInPromptOpening = false;
+    }
+  }
+
+  String _initialCheckInPromptStorageKey(String userId) {
+    final now = DateTime.now().toLocal();
+    final date =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return 'evolua.initial_checkin_prompt.$userId.$date';
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -222,6 +280,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final isCompact = ResponsiveBreakpoints.isCompact(context);
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
     final session = ref.watch(authControllerProvider).asData?.value;
+    final checkInState = ref.watch(checkInControllerProvider);
+    _scheduleInitialCheckInPrompt(
+      isCompact: isCompact,
+      session: session,
+      checkInState: checkInState,
+    );
     final isAdmin = session?.isAdmin ?? false;
     final l10n = context.l10n;
     final destinations = [

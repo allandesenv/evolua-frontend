@@ -227,13 +227,16 @@ void main() {
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
     expect(find.text('Dar feedback'), findsOneWidget);
 
-    final settingsTop = tester.getTopLeft(find.textContaining('privacidade')).dy;
+    final settingsTop = tester
+        .getTopLeft(find.textContaining('privacidade'))
+        .dy;
     final plansTop = tester.getTopLeft(find.text('Planos e assinaturas')).dy;
     final mirrorTop = tester
         .getTopLeft(
           find.byWidgetPredicate(
             (widget) =>
-                widget is Text && (widget.data?.startsWith('Espelho da ') ?? false),
+                widget is Text &&
+                (widget.data?.startsWith('Espelho da ') ?? false),
           ),
         )
         .dy;
@@ -241,6 +244,34 @@ void main() {
     expect(plansTop, greaterThan(settingsTop));
     expect(mirrorTop, greaterThan(plansTop));
   });
+
+  testWidgets(
+    'dashboard opens initial check-in prompt once per day on mobile',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Agora não'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
+
+      await tester.pumpWidget(
+        _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
+    },
+  );
 
   testWidgets('dashboard uses Início copy in navigation', (tester) async {
     SharedPreferences.setMockInitialValues({
@@ -1382,6 +1413,7 @@ Future<void> _pumpEvolutionMirror(
 Widget _dashboardShell({
   Size size = const Size(390, 900),
   TrailRepository? trailRepository,
+  CheckInRepository? checkInRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -1396,7 +1428,9 @@ Widget _dashboardShell({
       trailRepositoryProvider.overrideWithValue(
         trailRepository ?? _FakeTrailRepository(),
       ),
-      checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
+      checkInRepositoryProvider.overrideWithValue(
+        checkInRepository ?? _FakeCheckInRepository(items: [_todayCheckIn()]),
+      ),
       socialPostRepositoryProvider.overrideWithValue(
         _FakeSocialPostRepository(),
       ),
@@ -1453,7 +1487,9 @@ Widget _dashboardShellWithFutureMessagesRoute() {
         _FakeSubscriptionRepository(),
       ),
       trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
-      checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
+      checkInRepositoryProvider.overrideWithValue(
+        _FakeCheckInRepository(items: [_todayCheckIn()]),
+      ),
       socialPostRepositoryProvider.overrideWithValue(
         _FakeSocialPostRepository(),
       ),
@@ -1824,6 +1860,19 @@ List<CheckIn> _evolutionCheckIns() {
           .add(const Duration(hours: 8)),
     ),
   ];
+}
+
+CheckIn _todayCheckIn() {
+  return CheckIn(
+    id: 999,
+    userId: 'user-123',
+    mood: 'calmo',
+    reflection: '',
+    energyLevel: 7,
+    recommendedPractice: 'Respire por alguns minutos.',
+    aiInsight: null,
+    createdAt: DateTime.now(),
+  );
 }
 
 List<CheckIn> _evolutionRichCheckIns() {

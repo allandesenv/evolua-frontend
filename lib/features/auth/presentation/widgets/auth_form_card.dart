@@ -179,12 +179,21 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
     setState(() => _isOAuthStarting = true);
     try {
+      if (kDebugMode) {
+        debugPrint('Google OAuth start requested.');
+      }
       await ref.read(googleOAuthLauncherProvider)(startUri.toString());
-    } catch (_) {
+      if (!kIsWeb && mounted) {
+        setState(() => _isOAuthStarting = false);
+      }
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() => _isOAuthStarting = false);
+      if (kDebugMode) {
+        debugPrint('Google OAuth start failed: ${error.runtimeType}.');
+      }
       AppSnackBar.show(
         context,
         message: context.l10n.authGoogleStartError,

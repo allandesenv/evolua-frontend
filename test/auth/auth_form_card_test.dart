@@ -138,7 +138,12 @@ void main() {
         await _tapSubmit(tester, 'Entrar');
         await tester.pumpAndSettle();
 
-        expect(find.text('Credenciais invalidas.'), findsOneWidget);
+        expect(
+          find.text(
+            'Não foi possível autenticar. Revise os dados e tente novamente.',
+          ),
+          findsOneWidget,
+        );
         expect(find.textContaining('existe'), findsNothing);
       },
     );
@@ -252,11 +257,15 @@ void main() {
     ) async {
       SharedPreferences.setMockInitialValues({});
       final launchedUrls = <String>[];
+      final launcherCompleter = Completer<void>();
 
       await tester.pumpWidget(
         _testApp(
           repository: _FakeAuthRepository(),
-          googleLauncher: (url) async => launchedUrls.add(url),
+          googleLauncher: (url) {
+            launchedUrls.add(url);
+            return launcherCompleter.future;
+          },
         ),
       );
 
@@ -272,6 +281,10 @@ void main() {
       expect(launchedUrls.single, contains('/v1/public/auth/google/start'));
       expect(launchedUrls.single, contains('frontendRedirectUri='));
       expect(find.byType(CircularProgressIndicator), findsWidgets);
+
+      launcherCompleter.complete();
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('shows friendly OAuth launcher failure', (tester) async {
