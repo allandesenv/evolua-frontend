@@ -11,6 +11,7 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
@@ -45,12 +46,39 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   bool _handledBillingReturn = false;
   bool _initialCheckInPromptOpening = false;
   String? _initialCheckInPromptKey;
+  bool _openingReminderCheckIn = false;
+  ProviderSubscription<AsyncValue<String>>? _reminderTapSubscription;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
   static const _profileIndex = 4;
   static const _mentorIndex = 5;
   static const _adminIndex = 6;
+
+  @override
+  void initState() {
+    super.initState();
+    _reminderTapSubscription = ref.listenManual(
+      dailyCheckInReminderTapProvider,
+      (previous, next) {
+        if (next.asData?.value != dailyCheckInReminderPayload) {
+          return;
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          _openCheckIn(compact: ResponsiveBreakpoints.isCompact(context));
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _reminderTapSubscription?.close();
+    super.dispose();
+  }
 
   _DashboardLocation _currentLocation() {
     return _DashboardLocation(
@@ -232,6 +260,29 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
+  void _consumePendingReminderCheckInIfNeeded({
+    required bool isCompact,
+    required AuthSession? session,
+  }) {
+    if (session == null || _openingReminderCheckIn) {
+      return;
+    }
+    _openingReminderCheckIn = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final shouldOpen = await ref
+            .read(dailyCheckInReminderControllerProvider.notifier)
+            .consumePendingCheckInPayload();
+        if (!mounted || !shouldOpen) {
+          return;
+        }
+        await _openCheckIn(compact: isCompact);
+      } finally {
+        _openingReminderCheckIn = false;
+      }
+    });
+  }
+
   Future<void> _openInitialCheckInPromptIfNeeded(String key) async {
     if (!mounted || _initialCheckInPromptOpening) {
       return;
@@ -292,6 +343,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       isCompact: isCompact,
       session: session,
       checkInState: checkInState,
+    );
+    _consumePendingReminderCheckInIfNeeded(
+      isCompact: isCompact,
+      session: session,
     );
     final isAdmin = session?.isAdmin ?? false;
     final l10n = context.l10n;

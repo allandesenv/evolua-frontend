@@ -3,17 +3,20 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('CheckInQuickView', () {
@@ -88,19 +91,94 @@ void main() {
           onCompleted: () => completed = true,
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       await tester.enterText(
         find.byType(TextFormField),
         'preciso organizar o dia',
       );
       await tester.tap(find.text('Fazer check-in'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
       expect(repository.createdMood, 'calma');
       expect(repository.createdReflection, 'preciso organizar o dia');
       expect(repository.createdEnergy, 7);
       expect(completed, isTrue);
+    });
+
+    testWidgets('invites daily reminder after first compact check-in', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeDailyReminderScheduler();
+      var completed = false;
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        _testApp(
+          sharedPreferences: preferences,
+          reminderScheduler: scheduler,
+          onCompleted: () => completed = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(
+        find.text(
+          'Quer receber um lembrete leve pela manhã para cuidar do seu momento?',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Ativar lembrete'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(scheduler.permissionRequests, 1);
+      expect(scheduler.scheduledTimes, ['08:00']);
+      expect(completed, isTrue);
+    });
+
+    testWidgets('dismisses daily reminder invite only once', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeDailyReminderScheduler();
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        _testApp(sharedPreferences: preferences, reminderScheduler: scheduler),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('Agora não').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(scheduler.scheduledTimes, isEmpty);
+      expect(
+        preferences.getString(dailyCheckInReminderStorageKey),
+        contains('"promptAnswered":true'),
+      );
     });
 
     testWidgets(
@@ -239,10 +317,16 @@ Widget _testApp({
   CheckInRepository? checkInRepository,
   RewardedAdService? rewardedAdService,
   SubscriptionRepository? subscriptionRepository,
+  DailyCheckInReminderScheduler? reminderScheduler,
+  SharedPreferences? sharedPreferences,
   VoidCallback? onCompleted,
 }) {
   return ProviderScope(
     overrides: [
+      if (sharedPreferences != null)
+        sharedPreferencesProvider.overrideWith(
+          (ref) async => sharedPreferences,
+        ),
       checkInRepositoryProvider.overrideWithValue(
         checkInRepository ?? _FakeCheckInRepository(),
       ),
@@ -251,6 +335,10 @@ Widget _testApp({
       if (subscriptionRepository != null)
         subscriptionRepositoryProvider.overrideWithValue(
           subscriptionRepository,
+        ),
+      if (reminderScheduler != null)
+        dailyCheckInReminderSchedulerProvider.overrideWithValue(
+          reminderScheduler,
         ),
     ],
     child: MaterialApp(
@@ -262,6 +350,36 @@ Widget _testApp({
       ),
     ),
   );
+}
+
+class _FakeDailyReminderScheduler implements DailyCheckInReminderScheduler {
+  int permissionRequests = 0;
+  final List<String> scheduledTimes = [];
+
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<bool> consumePendingCheckInPayload() async => false;
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return true;
+  }
+
+  @override
+  Future<void> scheduleDaily({
+    required int hour,
+    required int minute,
+    required String title,
+    required String body,
+    required String payload,
+  }) async {
+    scheduledTimes.add(
+      '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+    );
+  }
 }
 
 class _FakeCheckInRepository implements CheckInRepository {
