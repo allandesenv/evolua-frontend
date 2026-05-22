@@ -86,18 +86,9 @@ class _NotificationAdminConsoleState
     super.initState();
     ref.listenManual(notificationInboxControllerProvider, (previous, next) {
       if (next.hasError) {
-        final error = next.error;
-        final message = error is DioException
-            ? (error.response?.data is Map<String, dynamic>
-                  ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                        error.message ??
-                        'Não foi possível enviar a notificação.')
-                  : error.message ?? 'Não foi possível enviar a notificação.')
-            : 'Não foi possível enviar a notificação.';
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_notificationErrorMessage(next.error))),
+        );
       }
     });
   }
@@ -245,6 +236,39 @@ class _NotificationAdminConsoleState
       ),
     );
   }
+}
+
+String _notificationErrorMessage(Object? error) {
+  const fallback = 'Não foi possível enviar a notificação agora.';
+  if (error is! DioException) {
+    return fallback;
+  }
+  final data = error.response?.data;
+  if (data is Map<String, dynamic>) {
+    final details = data['details'];
+    if (details is List && details.isNotEmpty) {
+      final first = details.first.toString();
+      return _isTechnicalNotificationMessage(first) ? fallback : first;
+    }
+    final message = data['message'];
+    if (message != null) {
+      final text = message.toString();
+      return _isTechnicalNotificationMessage(text) ? fallback : text;
+    }
+  }
+  return fallback;
+}
+
+bool _isTechnicalNotificationMessage(String message) {
+  final normalized = message.toLowerCase();
+  return normalized.contains('dioexception') ||
+      normalized.contains('forbidden') ||
+      normalized.contains('stacktrace') ||
+      normalized.contains('exception') ||
+      normalized.contains('bad request') ||
+      normalized.contains('401') ||
+      normalized.contains('403') ||
+      normalized.contains('500');
 }
 
 class _NotificationInboxDialog extends ConsumerWidget {

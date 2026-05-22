@@ -1239,13 +1239,19 @@ void main() {
     await _pumpDisplayAccessibility(tester);
 
     expect(find.text('Tela e acessibilidade'), findsAtLeastNWidgets(1));
-    expect(find.text('Aparencia'), findsOneWidget);
+    expect(find.text('Aparência'), findsOneWidget);
     expect(find.text('Leitura e legibilidade'), findsOneWidget);
     expect(find.text('Navegação e interação'), findsOneWidget);
     expect(find.text('Acessibilidade emocional'), findsOneWidget);
     expect(find.text('Tema'), findsOneWidget);
     expect(find.text('Contraste elevado'), findsOneWidget);
     expect(find.text('Tamanho do texto'), findsOneWidget);
+    expect(
+      find.text(
+        'Reduz distrações visuais e deixa a interface mais limpa e calma.',
+      ),
+      findsOneWidget,
+    );
 
     await tester.ensureVisible(find.text('Claro'));
     await tester.tap(find.text('Claro'));
@@ -1258,8 +1264,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Grande').last);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Salvar preferências visuais'));
-    await tester.tap(find.text('Salvar preferências visuais'));
+    expect(find.text('Salvar preferências visuais'), findsNothing);
+    await tester.ensureVisible(find.text('Modo acolhimento'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Salvar').last);
+    await tester.tap(find.text('Salvar').last);
     await tester.pumpAndSettle();
 
     final sharedPreferences = await SharedPreferences.getInstance();
@@ -1313,6 +1322,56 @@ void main() {
 
     expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
     expect(find.text('Mais direto'), findsOneWidget);
+  });
+
+  testWidgets('opens privacy policy and terms with configured legal URLs', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    final launched = <Uri>[];
+
+    await _pumpSettingsPrivacy(
+      tester,
+      legalUrlLauncher: (url) async {
+        launched.add(url);
+        return true;
+      },
+    );
+
+    await tester.ensureVisible(find.text('Política de privacidade'));
+    await tester.tap(find.text('Política de privacidade'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Termos de uso'));
+    await tester.tap(find.text('Termos de uso'));
+    await tester.pumpAndSettle();
+
+    expect(launched, [
+      Uri.parse(AppConfig.privacyPolicyUrl),
+      Uri.parse(AppConfig.termsOfUseUrl),
+    ]);
+  });
+
+  testWidgets('shows friendly message when legal document cannot be opened', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpSettingsPrivacy(tester, legalUrlLauncher: (_) async => false);
+
+    await tester.ensureVisible(find.text('Política de privacidade'));
+    await tester.tap(find.text('Política de privacidade'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('exports local settings data as json', (tester) async {
@@ -1386,7 +1445,10 @@ void main() {
   });
 }
 
-Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
+Future<void> _pumpSettingsPrivacy(
+  WidgetTester tester, {
+  LegalUrlLauncher? legalUrlLauncher,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -1401,6 +1463,8 @@ Future<void> _pumpSettingsPrivacy(WidgetTester tester) async {
         authenticatedDioProvider(
           AppConfig.userBaseUrl,
         ).overrideWithValue(_fakeUserDio()),
+        if (legalUrlLauncher != null)
+          legalUrlLauncherProvider.overrideWithValue(legalUrlLauncher),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),

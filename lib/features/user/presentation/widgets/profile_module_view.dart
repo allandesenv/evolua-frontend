@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
@@ -33,6 +34,12 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+typedef LegalUrlLauncher = Future<bool> Function(Uri url);
+
+final legalUrlLauncherProvider = Provider<LegalUrlLauncher>((ref) {
+  return (url) => launchUrl(url, mode: LaunchMode.externalApplication);
+});
 
 enum ProfileModuleSection {
   overview,
@@ -85,19 +92,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         return;
       }
 
-      final error = next.error;
-      final message = error is DioException
-          ? (error.response?.data is Map<String, dynamic>
-                ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                      error.response?.data['message']?.toString() ??
-                      error.message ??
-                      'Não foi possível salvar o perfil.')
-                : error.message ?? 'Não foi possível salvar o perfil.')
-          : 'Não foi possível salvar o perfil.';
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlySettingsError(next.error!))),
+      );
     });
   }
 
@@ -225,6 +222,32 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         return;
       }
       _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _openLegalLink(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      _showSettingsMessage(
+        'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+      );
+      return;
+    }
+
+    try {
+      final opened = await ref.read(legalUrlLauncherProvider)(uri);
+      if (!opened && mounted) {
+        _showSettingsMessage(
+          'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(
+        'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+      );
     }
   }
 
@@ -689,23 +712,38 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   }
 
   String _friendlySettingsError(Object error) {
+    const fallback = 'Não foi possível concluir esta ação agora.';
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
         final details = data['details'];
         if (details is List && details.isNotEmpty) {
-          return details.first.toString();
+          final first = details.first.toString();
+          return _isTechnicalMessage(first) ? fallback : first;
         }
         final message = data['message'];
         if (message != null) {
-          return message.toString();
+          final text = message.toString();
+          return _isTechnicalMessage(text) ? fallback : text;
         }
       }
       if (error.message != null && error.message!.isNotEmpty) {
-        return error.message!;
+        return _isTechnicalMessage(error.message!) ? fallback : error.message!;
       }
     }
-    return 'Não foi possível concluir esta ação agora.';
+    return fallback;
+  }
+
+  bool _isTechnicalMessage(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('dioexception') ||
+        normalized.contains('forbidden') ||
+        normalized.contains('stacktrace') ||
+        normalized.contains('exception') ||
+        normalized.contains('bad request') ||
+        normalized.contains('401') ||
+        normalized.contains('403') ||
+        normalized.contains('500');
   }
 
   @override
@@ -836,6 +874,10 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                   onInformationalAction: () => _showSettingsMessage(
                     'Esta informação será aberta em uma área dedicada em breve.',
                   ),
+                  onOpenPrivacyPolicy: () =>
+                      _openLegalLink(AppConfig.privacyPolicyUrl),
+                  onOpenTermsOfUse: () =>
+                      _openLegalLink(AppConfig.termsOfUseUrl),
                   localePreference: localePreference,
                   onLocalePreferenceChanged: (value) => ref
                       .read(localeControllerProvider.notifier)
@@ -2675,7 +2717,7 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
       label: 'ansiedade a noite',
       headline: 'Você tende a registrar mais ansiedade à noite.',
       description:
-          'Esse pode ser um bom horario para reduzir estimulos, fazer uma pausa curta e escolher uma ação simples antes de dormir.',
+          'Esse pode ser um bom horario para reduzir estímulos, fazer uma pausa curta e escolher uma ação simples antes de dormir.',
       identified: true,
     );
   }
@@ -3258,7 +3300,7 @@ class _HelpSupportSection extends StatelessWidget {
           description:
               'O Evolua apoia processos de autoconhecimento, mas não substitui acompanhamento profissional.',
           microcopy:
-              'O Evolua pode apoiar sua jornada, mas cuidado emocional profundo tambem merece apoio humano qualificado.',
+              'O Evolua pode apoiar sua jornada, mas cuidado emocional profundo também merece apoio humano qualificado.',
           children: [
             _SettingsActionRow(
               icon: Icons.health_and_safety_outlined,
@@ -3461,7 +3503,7 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Ajuste a interface para uma experiência mais confortavel, acessivel e alinhada ao seu ritmo.',
+                'Ajuste a interface para uma experiência mais confortável, acessível e alinhada ao seu ritmo.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
@@ -3469,14 +3511,14 @@ class _DisplayAccessibilitySection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _SettingsGroup(
-          title: 'Aparencia',
+          title: 'Aparência',
           description:
-              'Adapte a interface ao seu ambiente e preferencia visual.',
-          microcopy: 'Conforto visual tambem faz parte do cuidado.',
+              'Adapte a interface ao seu ambiente e preferência visual.',
+          microcopy: 'Conforto visual também faz parte do cuidado.',
           children: [
             _AccessibilitySegmentedRow(
               title: 'Tema',
-              subtitle: 'Escolha entre escuro, claro ou automatico.',
+              subtitle: 'Escolha entre escuro, claro ou automático.',
               value: preferences.themeMode,
               options: const {
                 'dark': 'Escuro',
@@ -3487,25 +3529,25 @@ class _DisplayAccessibilitySection extends StatelessWidget {
             ),
             _SettingsSwitchRow(
               title: 'Contraste elevado',
-              subtitle: 'Aumenta a diferenca entre texto, fundo e bordas.',
+              subtitle: 'Aumenta a diferença entre texto, fundo e bordas.',
               value: preferences.highContrast,
               onChanged: onHighContrastChanged,
             ),
             _SettingsSwitchRow(
               title: 'Redução de transparência',
               subtitle:
-                  'Prefere superficies mais solidas e menos translucidas.',
+                  'Prefere superfícies mais sólidas e menos translúcidas.',
               value: preferences.reduceTransparency,
               onChanged: onReduceTransparencyChanged,
             ),
             _SettingsDropdownRow(
-              title: 'Ajuste de animacoes',
-              subtitle: 'Controle a intensidade das transicoes.',
+              title: 'Ajuste de animações',
+              subtitle: 'Controle a intensidade das transições.',
               value: preferences.animationLevel,
               items: const {
                 'normal': 'Normal',
                 'reduced': 'Reduzida',
-                'none': 'Sem animacoes',
+                'none': 'Sem animações',
               },
               onChanged: onAnimationLevelChanged,
             ),
@@ -3514,9 +3556,9 @@ class _DisplayAccessibilitySection extends StatelessWidget {
         const SizedBox(height: 16),
         _SettingsGroup(
           title: 'Leitura e legibilidade',
-          description: 'Melhore a leitura e reduza o esforco visual.',
+          description: 'Melhore a leitura e reduza o esforço visual.',
           microcopy:
-              'Uma interface mais confortavel torna a experiência mais leve e presente.',
+              'Uma interface mais confortável torna a experiência mais leve e presente.',
           children: [
             _SettingsDropdownRow(
               title: 'Tamanho do texto',
@@ -3531,25 +3573,26 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               onChanged: onTextSizeChanged,
             ),
             _SettingsDropdownRow(
-              title: 'Espacamento de leitura',
+              title: 'Espaçamento de leitura',
               subtitle: 'Defina o respiro entre as linhas.',
               value: preferences.readingSpacing,
               items: const {
                 'compact': 'Compacto',
-                'comfortable': 'Confortavel',
+                'comfortable': 'Confortável',
                 'wide': 'Amplo',
               },
               onChanged: onReadingSpacingChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Fonte acessivel',
+              title: 'Fonte acessível',
               subtitle: 'Usa a fonte do sistema para leitura mais familiar.',
               value: preferences.accessibleFont,
               onChanged: onAccessibleFontChanged,
             ),
             _SettingsSwitchRow(
               title: 'Modo foco',
-              subtitle: 'Guarda a preferencia para telas com menos distração.',
+              subtitle:
+                  'Reduz distrações visuais e deixa a interface mais limpa e calma.',
               value: preferences.focusMode,
               onChanged: onFocusModeChanged,
             ),
@@ -3564,19 +3607,20 @@ class _DisplayAccessibilitySection extends StatelessWidget {
           children: [
             _SettingsSwitchRow(
               title: 'Reduzir movimento',
-              subtitle: 'Diminui transicoes e efeitos animados no app.',
+              subtitle: 'Diminui transições e efeitos animados no app.',
               value: preferences.reduceMotion,
               onChanged: onReduceMotionChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Feedback tatil',
-              subtitle: 'Permite respostas tateis em acoes importantes.',
+              title: 'Feedback tátil',
+              subtitle: 'Permite respostas táteis em ações importantes.',
               value: preferences.hapticFeedback,
               onChanged: onHapticFeedbackChanged,
             ),
             _SettingsSwitchRow(
               title: 'Tempo de resposta estendido',
-              subtitle: 'Guarda mais tempo para interacoes futuras.',
+              subtitle:
+                  'Oferece mais tempo para concluir interações importantes.',
               value: preferences.extendedResponseTime,
               onChanged: onExtendedResponseTimeChanged,
             ),
@@ -3592,13 +3636,14 @@ class _DisplayAccessibilitySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Acessibilidade emocional',
           description:
-              'Ajuste estimulos e linguagem para uma experiência mais segura emocionalmente.',
+              'Ajuste estímulos e linguagem para uma experiência mais segura emocionalmente.',
           microcopy:
-              'Seu estado emocional importa. A interface tambem pode respeitar isso.',
+              'Seu estado emocional importa. A interface também pode respeitar isso.',
           children: [
             _SettingsSwitchRow(
-              title: 'Reduzir estimulos visuais',
-              subtitle: 'Registra preferencia por telas menos carregadas.',
+              title: 'Reduzir estímulos visuais',
+              subtitle:
+                  'Prioriza telas mais limpas e com menos elementos ao mesmo tempo.',
               value: preferences.reduceVisualStimuli,
               onChanged: onReduceVisualStimuliChanged,
             ),
@@ -3609,15 +3654,15 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               onChanged: onSofterLanguageChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Ocultar conteúdos sensiveis',
-              subtitle: 'Guarda preferencia para filtros de cuidado emocional.',
+              title: 'Ocultar conteúdos sensíveis',
+              subtitle:
+                  'Evita exibir conteúdos que possam ser sensíveis sem aviso.',
               value: preferences.hideSensitiveContent,
               onChanged: onHideSensitiveContentChanged,
             ),
             _SettingsSwitchRow(
               title: 'Modo acolhimento',
-              subtitle:
-                  'Sinaliza que você prefere uma experiência mais gentil.',
+              subtitle: 'Prioriza uma experiência mais gentil e acolhedora.',
               value: preferences.comfortMode,
               onChanged: onComfortModeChanged,
             ),
@@ -3630,7 +3675,7 @@ class _DisplayAccessibilitySection extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onSavePreferences,
               icon: const Icon(Icons.save_rounded),
-              label: const Text('Salvar preferências visuais'),
+              label: const Text('Salvar'),
             ),
           ),
         ),
@@ -3715,6 +3760,8 @@ class _SettingsPrivacySection extends StatelessWidget {
     required this.onDeactivateAccount,
     required this.onDeleteAccount,
     required this.onInformationalAction,
+    required this.onOpenPrivacyPolicy,
+    required this.onOpenTermsOfUse,
     required this.localePreference,
     required this.onLocalePreferenceChanged,
   });
@@ -3745,6 +3792,8 @@ class _SettingsPrivacySection extends StatelessWidget {
   final VoidCallback onDeactivateAccount;
   final VoidCallback onDeleteAccount;
   final VoidCallback onInformationalAction;
+  final VoidCallback onOpenPrivacyPolicy;
+  final VoidCallback onOpenTermsOfUse;
   final LocalePreference localePreference;
   final ValueChanged<LocalePreference> onLocalePreferenceChanged;
 
@@ -3908,13 +3957,13 @@ class _SettingsPrivacySection extends StatelessWidget {
               icon: Icons.privacy_tip_outlined,
               title: 'Política de privacidade',
               subtitle: 'Entenda como seus dados são tratados.',
-              onTap: onInformationalAction,
+              onTap: onOpenPrivacyPolicy,
             ),
             _SettingsActionRow(
               icon: Icons.article_outlined,
               title: 'Termos de uso',
               subtitle: 'Leia os termos que orientam o uso do Evolua.',
-              onTap: onInformationalAction,
+              onTap: onOpenTermsOfUse,
             ),
           ],
         ),
