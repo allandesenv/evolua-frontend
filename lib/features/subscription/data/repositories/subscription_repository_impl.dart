@@ -150,6 +150,29 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
   }
 
   @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/ads/reward-session/$sessionId/client-opened-grant',
+    );
+    final json = ApiPayloadParser.dataMap(response.data);
+    return AdRewardSession(
+      id: json['id']?.toString() ?? sessionId,
+      provider: json['provider']?.toString() ?? 'ADMOB',
+      rewardType: json['rewardType']?.toString() ?? '',
+      contextId: json['contextId']?.toString(),
+      status: json['status']?.toString() ?? 'GRANTED',
+      customData:
+          json['customData']?.toString() ?? json['id']?.toString() ?? sessionId,
+      expiresAt:
+          DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(minutes: 15)),
+      grantedAt: json['grantedAt'] == null
+          ? null
+          : DateTime.tryParse(json['grantedAt'].toString()),
+    );
+  }
+
+  @override
   Future<MonetizationAccessStatus> monetizationAccess({
     required String resource,
     String? contextId,

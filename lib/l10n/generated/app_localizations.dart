@@ -769,7 +769,7 @@ abstract class AppLocalizations {
   /// No description provided for @trailMyJourney.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Minha jornada'**
+  /// **'Jornada atual'**
   String get trailMyJourney;
 
   /// No description provided for @trailStart.

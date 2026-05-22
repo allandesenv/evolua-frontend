@@ -367,7 +367,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trailCatalog => 'Catalog';
 
   @override
-  String get trailMyJourney => 'My journey';
+  String get trailMyJourney => 'Current journey';
 
   @override
   String get trailStart => 'Start trail';
@@ -989,7 +989,7 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   String get trailCatalog => 'Catalog';
 
   @override
-  String get trailMyJourney => 'My journey';
+  String get trailMyJourney => 'Current journey';
 
   @override
   String get trailStart => 'Start trail';

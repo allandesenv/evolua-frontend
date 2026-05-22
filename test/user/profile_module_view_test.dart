@@ -467,7 +467,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
-    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Espaços'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Espelho'));
@@ -477,7 +477,7 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Espaços'), findsAtLeastNWidgets(1));
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -531,7 +531,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
-    expect(find.text('Em destaque'), findsOneWidget);
+    expect(find.text('Espaços'), findsAtLeastNWidgets(1));
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -624,7 +624,7 @@ void main() {
     expect(find.text('Future messages route'), findsOneWidget);
   });
 
-  testWidgets('reflections card opens future messages route with new title', (
+  testWidgets('spaces does not render future messages or internal tabs', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -639,25 +639,19 @@ void main() {
     await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
     await tester.pumpAndSettle();
     expect(find.byType(TabBar), findsNothing);
-    expect(find.text('Em destaque'), findsOneWidget);
-    expect(find.text('Reflexoes'), findsOneWidget);
-    expect(find.text('Meus'), findsOneWidget);
+    expect(find.text('Espaços'), findsAtLeastNWidgets(1));
+    expect(find.text('Em destaque'), findsNothing);
+    expect(find.text('Reflexoes'), findsNothing);
+    expect(find.text('Meus'), findsNothing);
     expect(find.widgetWithText(Tab, 'Meus espacos'), findsNothing);
 
-    await tester.tap(find.text('Reflexoes'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Mensagens para o futuro'), findsOneWidget);
+    expect(find.text('Mensagens para o futuro'), findsNothing);
     expect(find.text('Mensagens do seu eu anterior'), findsNothing);
-
-    await tester.ensureVisible(find.text('Abrir mensagens'));
-    await tester.tap(find.text('Abrir mensagens'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Future messages route'), findsOneWidget);
   });
 
-  testWidgets('spaces button switcher opens Meus area', (tester) async {
+  testWidgets('spaces uses unified catalog without Meus switcher', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
@@ -671,13 +665,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TabBar), findsNothing);
-    await tester.tap(find.text('Meus'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Meus espacos'), findsOneWidget);
-    expect(find.text('0 participando'), findsAtLeastNWidgets(1));
-    expect(find.text('Em destaque'), findsOneWidget);
-    expect(find.text('Reflexoes'), findsOneWidget);
+    expect(find.text('Espaços'), findsAtLeastNWidgets(1));
+    expect(find.text('Meus'), findsNothing);
+    expect(find.text('Meus espacos'), findsNothing);
+    expect(find.text('Em destaque'), findsNothing);
+    expect(find.text('Reflexoes'), findsNothing);
   });
 
   testWidgets('journey CTA still opens mentor after removing nav item', (
@@ -2274,6 +2266,11 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<AdRewardSession> grantTestReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) {
     throw UnimplementedError();
   }
 

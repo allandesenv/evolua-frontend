@@ -144,6 +144,7 @@ class SubscriptionScreenState {
     required this.current,
     this.pendingCheckout,
     this.isBusy = false,
+    this.busyPlanCode,
     this.message,
   });
 
@@ -151,6 +152,7 @@ class SubscriptionScreenState {
   final CurrentSubscription? current;
   final CheckoutSession? pendingCheckout;
   final bool isBusy;
+  final String? busyPlanCode;
   final String? message;
 
   SubscriptionScreenState copyWith({
@@ -159,6 +161,8 @@ class SubscriptionScreenState {
     CheckoutSession? pendingCheckout,
     bool clearPendingCheckout = false,
     bool? isBusy,
+    String? busyPlanCode,
+    bool clearBusyPlanCode = false,
     String? message,
     bool clearMessage = false,
   }) {
@@ -169,6 +173,9 @@ class SubscriptionScreenState {
           ? null
           : (pendingCheckout ?? this.pendingCheckout),
       isBusy: isBusy ?? this.isBusy,
+      busyPlanCode: clearBusyPlanCode
+          ? null
+          : (busyPlanCode ?? this.busyPlanCode),
       message: clearMessage ? null : (message ?? this.message),
     );
   }

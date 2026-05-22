@@ -1,14 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
-import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_feed_state.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_communities_area.dart';
-import 'package:evolua_frontend/features/social/presentation/widgets/social_feed_area.dart';
-import 'package:evolua_frontend/features/social/presentation/widgets/social_post_composer.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_shared_widgets.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
@@ -47,41 +44,26 @@ class SocialModuleView extends ConsumerStatefulWidget {
   ConsumerState<SocialModuleView> createState() => _SocialModuleViewState();
 }
 
-class _SocialModuleViewState extends ConsumerState<SocialModuleView>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-  final _postFormKey = GlobalKey<FormState>();
-  final _communityPostFormKey = GlobalKey<FormState>();
-  final _postContentController = TextEditingController();
-  final _communityPostContentController = TextEditingController();
-  final _feedSearchController = TextEditingController();
+class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
   final _communitySearchController = TextEditingController();
-  String _postVisibility = 'PUBLIC';
-  String _communityPostVisibility = 'PUBLIC';
-  String _feedVisibilityFilter = 'TODAS';
-  String _feedCommunityFilter = 'TODAS';
+  final _communityPostFormKey = GlobalKey<FormState>();
+  final _communityPostContentController = TextEditingController();
+
   String _communityVisibilityFilter = 'TODAS';
   String _communityCategoryFilter = 'TODAS';
   String _communityMembershipFilter = 'TODAS';
-  String? _postCommunitySlug;
+  String _communityPostVisibility = 'PUBLIC';
   Community? _selectedCommunity;
-  late SocialFeedScope _feedScope;
-  late SocialCommunityScope _communityScope;
 
   @override
   void initState() {
     super.initState();
-    _feedScope = widget.feedScope;
-    _communityScope = widget.communityScope;
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.index = _indexForTab(widget.initialTab);
-    _tabController.addListener(_handleTabChanged);
 
     ref.listenManual(socialPostControllerProvider, (previous, next) {
       if (next.hasError) {
         _showError(
           next.error,
-          fallback: 'Nao foi possivel atualizar as reflexoes.',
+          fallback: 'Não foi possível atualizar as reflexões.',
         );
       }
     });
@@ -90,134 +72,21 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       if (next.hasError) {
         _showError(
           next.error,
-          fallback: 'Nao foi possivel atualizar os espacos.',
+          fallback: 'Não foi possível atualizar os espaços.',
         );
       }
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _syncScopes(force: true);
+      _applyCommunityFilters();
     });
-  }
-
-  @override
-  void didUpdateWidget(covariant SocialModuleView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.feedScope != widget.feedScope ||
-        oldWidget.communityScope != widget.communityScope ||
-        oldWidget.initialTab != widget.initialTab) {
-      _feedScope = widget.feedScope;
-      _communityScope = widget.communityScope;
-      _tabController.index = _indexForTab(widget.initialTab);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _syncScopes(force: true);
-      });
-    }
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_handleTabChanged);
-    _tabController.dispose();
-    _postContentController.dispose();
-    _communityPostContentController.dispose();
-    _feedSearchController.dispose();
     _communitySearchController.dispose();
+    _communityPostContentController.dispose();
     super.dispose();
-  }
-
-  Future<void> _submitPost() async {
-    if (!_postFormKey.currentState!.validate()) {
-      return;
-    }
-
-    final selectedCommunity = _postCommunitySlug;
-    if (selectedCommunity == null || selectedCommunity.isEmpty) {
-      AppSnackBar.show(
-        context,
-        message: 'Escolha um espaco para compartilhar sua reflexao.',
-        icon: Icons.groups_rounded,
-      );
-      return;
-    }
-
-    await ref
-        .read(socialPostControllerProvider.notifier)
-        .create(
-          content: _postContentController.text.trim(),
-          community: selectedCommunity,
-          visibility: _postVisibility,
-        );
-
-    if (!mounted) {
-      return;
-    }
-
-    _postContentController.clear();
-    AppSnackBar.show(
-      context,
-      message: 'Reflexao publicada com sucesso.',
-      icon: Icons.check_circle_outline_rounded,
-    );
-  }
-
-  Future<void> _submitCommunityPost() async {
-    final community = _selectedCommunity;
-    if (community == null || !_communityPostFormKey.currentState!.validate()) {
-      return;
-    }
-
-    await ref
-        .read(socialPostControllerProvider.notifier)
-        .create(
-          content: _communityPostContentController.text.trim(),
-          community: community.slug,
-          visibility: _communityPostVisibility,
-        );
-
-    if (!mounted) {
-      return;
-    }
-
-    _communityPostContentController.clear();
-    AppSnackBar.show(
-      context,
-      message: 'Reflexão publicada em ${community.name}.',
-      icon: Icons.check_circle_outline_rounded,
-    );
-  }
-
-  Future<void> _openCommunityDetail(Community community) async {
-    setState(() {
-      _selectedCommunity = community;
-      _communityPostVisibility = 'PUBLIC';
-      _communityPostContentController.clear();
-    });
-    await ref
-        .read(socialPostControllerProvider.notifier)
-        .applyFilters(community: community.slug, visibility: null, mine: null);
-  }
-
-  Future<void> _closeCommunityDetail() async {
-    setState(() => _selectedCommunity = null);
-    await _syncScopes(force: true);
-  }
-
-  Future<void> _applyFeedFilters() {
-    return ref
-        .read(socialPostControllerProvider.notifier)
-        .applyFilters(
-          search: _feedSearchController.text.trim().isEmpty
-              ? null
-              : _feedSearchController.text.trim(),
-          community: _feedCommunityFilter == 'TODAS'
-              ? null
-              : _feedCommunityFilter,
-          visibility: _feedVisibilityFilter == 'TODAS'
-              ? null
-              : _feedVisibilityFilter,
-          mine: _feedScope == SocialFeedScope.mine,
-        );
   }
 
   Future<void> _applyCommunityFilters() {
@@ -241,56 +110,116 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
         );
   }
 
-  Future<void> _syncScopes({bool force = false}) async {
-    final currentTab = _tabForIndex(_tabController.index);
-    if (currentTab == SocialModuleTab.reflections) {
-      if (force) {
-        await _applyFeedFilters();
-      }
-      return;
-    }
+  Future<void> _openCommunityDetail(Community community) async {
+    setState(() {
+      _selectedCommunity = community;
+      _communityPostContentController.clear();
+      _communityPostVisibility = 'PUBLIC';
+    });
+    await ref
+        .read(socialPostControllerProvider.notifier)
+        .applyFilters(community: community.slug, visibility: null, mine: null);
+  }
 
-    if (currentTab == SocialModuleTab.mySpaces ||
-        _communityScope == SocialCommunityScope.mine) {
-      _communityMembershipFilter = 'INGRESSADAS';
-    } else if (force || _communityMembershipFilter == 'INGRESSADAS') {
-      _communityMembershipFilter = 'TODAS';
-    }
+  Future<void> _closeCommunityDetail() async {
+    setState(() => _selectedCommunity = null);
     await _applyCommunityFilters();
   }
 
-  void _handleTabChanged() {
-    if (_tabController.indexIsChanging) {
+  Future<void> _openCommunityPostSheet() async {
+    _communityPostVisibility = 'PUBLIC';
+    _communityPostContentController.clear();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) {
+        return _CommunityReflectionSheet(
+          formKey: _communityPostFormKey,
+          contentController: _communityPostContentController,
+          initialVisibility: _communityPostVisibility,
+          onSubmit: (visibility) async {
+            _communityPostVisibility = visibility;
+            final success = await _submitCommunityPost();
+            if (success && sheetContext.mounted) {
+              Navigator.of(sheetContext).pop();
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _submitCommunityPost() async {
+    final community = _selectedCommunity;
+    if (community == null || !_communityPostFormKey.currentState!.validate()) {
+      return false;
+    }
+
+    await ref
+        .read(socialPostControllerProvider.notifier)
+        .create(
+          content: _communityPostContentController.text.trim(),
+          community: community.slug,
+          visibility: _communityPostVisibility,
+        );
+
+    if (!mounted || ref.read(socialPostControllerProvider).hasError) {
+      return false;
+    }
+
+    _communityPostContentController.clear();
+    AppSnackBar.show(
+      context,
+      message: 'Reflexão publicada em ${community.name}.',
+      icon: Icons.check_circle_outline_rounded,
+    );
+    return true;
+  }
+
+  Future<void> _leaveSelectedCommunity() async {
+    final community = _selectedCommunity;
+    if (community == null) {
       return;
     }
 
-    final tab = _tabForIndex(_tabController.index);
-    widget.onTabChanged?.call(tab);
-    _syncScopes(force: true);
-  }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Sair do espaço?'),
+          content: Text(
+            'Você deixará de participar de ${community.name}, mas poderá entrar novamente depois.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Sair'),
+            ),
+          ],
+        );
+      },
+    );
 
-  int _indexForTab(SocialModuleTab tab) {
-    return switch (tab) {
-      SocialModuleTab.featured => 0,
-      SocialModuleTab.reflections => 1,
-      SocialModuleTab.mySpaces => 2,
-    };
-  }
-
-  SocialModuleTab _tabForIndex(int index) {
-    return switch (index) {
-      1 => SocialModuleTab.reflections,
-      2 => SocialModuleTab.mySpaces,
-      _ => SocialModuleTab.featured,
-    };
-  }
-
-  void _selectTab(SocialModuleTab tab) {
-    final index = _indexForTab(tab);
-    if (_tabController.index == index) {
+    if (confirmed != true) {
       return;
     }
-    _tabController.animateTo(index);
+
+    await ref.read(communityControllerProvider.notifier).leave(community.id);
+    if (!mounted) {
+      return;
+    }
+    AppSnackBar.show(
+      context,
+      message: 'Você saiu de ${community.name}.',
+      icon: Icons.logout_rounded,
+    );
+    await _closeCommunityDetail();
   }
 
   Future<void> _openCreateCommunityModal() async {
@@ -332,10 +261,9 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                   }
 
                   Navigator.of(this.context).pop();
-                  _tabController.animateTo(0);
                   AppSnackBar.show(
                     this.context,
-                    message: 'Espaco criado com sucesso.',
+                    message: 'Espaço criado com sucesso.',
                     icon: Icons.groups_rounded,
                   );
                 },
@@ -379,48 +307,21 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     final communitiesState = ref.watch(communityControllerProvider);
     final session = ref.watch(authControllerProvider).asData?.value;
     final canCreateCommunity = session?.isAdmin ?? false;
-    final latestCheckIn = ref
-        .watch(checkInControllerProvider)
-        .asData
-        ?.value
-        .latestCreatedCheckIn;
-    final contextualHint = _contextualHint(latestCheckIn?.mood);
-    final joinedCommunities =
-        communitiesState.asData?.value.items
-            .where((item) => item.joined)
-            .toList() ??
-        const <Community>[];
-    final allCommunities =
-        communitiesState.asData?.value.items ?? const <Community>[];
-
-    _postCommunitySlug ??= joinedCommunities.isNotEmpty
-        ? joinedCommunities.first.slug
-        : null;
-
-    final communityFilterOptions = <String>{
-      'TODAS',
-      ...allCommunities.map((item) => item.slug),
-    }.toList();
     final categories = <String>{
       'TODAS',
-      ...allCommunities.map((item) => item.category),
+      ...?communitiesState.asData?.value.items.map((item) => item.category),
     }.toList();
-    final postsCount = postsState.asData?.value.result.totalItems ?? 0;
 
     final selectedCommunity = _selectedCommunity;
     if (selectedCommunity != null) {
       return _CommunityDetailView(
         community: selectedCommunity,
         postsState: postsState,
-        formKey: _communityPostFormKey,
-        contentController: _communityPostContentController,
-        visibility: _communityPostVisibility,
-        onVisibilityChanged: (value) =>
-            setState(() => _communityPostVisibility = value),
-        onSubmit: postsState.isLoading && !postsState.hasValue
-            ? null
-            : _submitCommunityPost,
         onBack: _closeCommunityDetail,
+        onWriteReflection: postsState.isLoading && !postsState.hasValue
+            ? null
+            : _openCommunityPostSheet,
+        onLeave: _leaveSelectedCommunity,
         onRefresh: () => ref
             .read(socialPostControllerProvider.notifier)
             .applyFilters(community: selectedCommunity.slug),
@@ -429,208 +330,58 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       );
     }
 
-    return Column(
-      children: [
-        if (widget.showTabs)
-          AnimatedBuilder(
-            animation: _tabController,
-            builder: (context, _) {
-              return _SocialModuleHeader(
-                selected: _tabForIndex(_tabController.index),
-                spacesCount: communitiesState.asData?.value.totalItems ?? 0,
-                joinedCount: joinedCommunities.length,
-                reflectionsCount: postsCount,
-                onSelected: _selectTab,
-              );
-            },
-          ),
-        if (widget.showTabs) const SizedBox(height: 16),
-        AnimatedBuilder(
-          animation: _tabController,
-          builder: (context, _) {
-            final currentTab = _tabForIndex(_tabController.index);
-            if (currentTab == SocialModuleTab.reflections) {
-              return Column(
-                children: [
-                  _FutureMessageReflectionCard(
-                    onOpen: widget.onOpenFutureMessages,
-                  ),
-                  const SizedBox(height: 16),
-                  SocialPostComposer(
-                    formKey: _postFormKey,
-                    contentController: _postContentController,
-                    visibility: _postVisibility,
-                    selectedCommunitySlug: _postCommunitySlug,
-                    joinedCommunities: joinedCommunities,
-                    onVisibilityChanged: (value) =>
-                        setState(() => _postVisibility = value),
-                    onCommunityChanged: (value) =>
-                        setState(() => _postCommunitySlug = value),
-                    onSubmit: postsState.isLoading && !postsState.hasValue
-                        ? null
-                        : _submitPost,
-                  ),
-                  const SizedBox(height: 16),
-                  postsState.when(
-                    data: (feedState) => SocialFeedArea(
-                      result: feedState.result,
-                      isFromCache: feedState.isFromCache,
-                      offlineMessage: feedState.offlineMessage,
-                      searchController: _feedSearchController,
-                      visibilityFilter: _feedVisibilityFilter,
-                      communityFilter: _feedCommunityFilter,
-                      communityOptions: communityFilterOptions,
-                      contextualHint: _feedScope == SocialFeedScope.mine
-                          ? 'Revise o que voce mesmo compartilhou, encontre padroes no seu jeito de refletir e recupere aprendizados que ainda fazem sentido.'
-                          : contextualHint,
-                      sectionLabel: _feedScope == SocialFeedScope.mine
-                          ? 'Minhas reflexoes'
-                          : 'Reflexoes do momento',
-                      showScopeChips: true,
-                      currentScope: _feedScope.name,
-                      onMomentSelected: () async {
-                        setState(() => _feedScope = SocialFeedScope.moment);
-                        await _applyFeedFilters();
-                      },
-                      onMineSelected: () async {
-                        setState(() => _feedScope = SocialFeedScope.mine);
-                        await _applyFeedFilters();
-                      },
-                      onRefresh: () => ref
-                          .read(socialPostControllerProvider.notifier)
-                          .refresh(),
-                      onSearchChanged: (_) => _applyFeedFilters(),
-                      onVisibilityFilterChanged: (value) {
-                        setState(() => _feedVisibilityFilter = value);
-                        _applyFeedFilters();
-                      },
-                      onCommunityFilterChanged: (value) {
-                        setState(() => _feedCommunityFilter = value);
-                        _applyFeedFilters();
-                      },
-                      onPageChanged: (page) => ref
-                          .read(socialPostControllerProvider.notifier)
-                          .goToPage(page),
-                    ),
-                    error: (error, stackTrace) => SocialActionableErrorState(
-                      title: 'Nao conseguimos abrir as reflexoes agora.',
-                      onRetry: () => ref
-                          .read(socialPostControllerProvider.notifier)
-                          .refresh(),
-                    ),
-                    loading: () => const SocialLoadingState(
-                      label: 'Carregando reflexoes...',
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return communitiesState.when(
-              data: (result) => SocialCommunitiesArea(
-                result: result,
-                searchController: _communitySearchController,
-                visibilityFilter: _communityVisibilityFilter,
-                categoryFilter: _communityCategoryFilter,
-                membershipFilter: _communityMembershipFilter,
-                categories: categories,
-                onSearchChanged: (_) => _applyCommunityFilters(),
-                onVisibilityChanged: (value) {
-                  setState(() => _communityVisibilityFilter = value);
-                  _applyCommunityFilters();
-                },
-                onCategoryChanged: (value) {
-                  setState(() => _communityCategoryFilter = value);
-                  _applyCommunityFilters();
-                },
-                onMembershipChanged: (value) {
-                  setState(() => _communityMembershipFilter = value);
-                  _applyCommunityFilters();
-                },
-                onPageChanged: (page) => ref
-                    .read(communityControllerProvider.notifier)
-                    .goToPage(page),
-                onView: _openCommunityDetail,
-                onJoin: (community) async {
-                  await ref
-                      .read(communityControllerProvider.notifier)
-                      .join(community.id);
-                  if (mounted) {
-                    AppSnackBar.show(
-                      this.context,
-                      message: 'Voce entrou em ${community.name}.',
-                      icon: Icons.check_circle_outline_rounded,
-                    );
-                  }
-                },
-                onLeave: (community) async {
-                  await ref
-                      .read(communityControllerProvider.notifier)
-                      .leave(community.id);
-                  if (mounted) {
-                    AppSnackBar.show(
-                      this.context,
-                      message: 'Voce saiu de ${community.name}.',
-                      icon: Icons.logout_rounded,
-                    );
-                  }
-                },
-                canCreate: canCreateCommunity,
-                onCreate: _openCreateCommunityModal,
-                headline:
-                    currentTab == SocialModuleTab.mySpaces ||
-                        _communityScope == SocialCommunityScope.mine
-                    ? 'Meus espacos'
-                    : 'Espacos em destaque',
-                description:
-                    currentTab == SocialModuleTab.mySpaces ||
-                        _communityScope == SocialCommunityScope.mine
-                    ? 'Acompanhe os ambientes em que voce ja entrou e retome as reflexoes desse contexto.'
-                    : 'Explore ambientes de troca antes de compartilhar uma reflexao. Cada espaco organiza pessoas, temas e conversas com mais contexto.',
-                showMembershipFilter: currentTab != SocialModuleTab.mySpaces,
-                showScopeChips: widget.showScopeChips,
-                currentScope: currentTab == SocialModuleTab.mySpaces
-                    ? SocialCommunityScope.mine.name
-                    : _communityScope.name,
-                onExploreSelected: () async {
-                  setState(
-                    () => _communityScope = SocialCommunityScope.explore,
-                  );
-                  await _syncScopes(force: true);
-                },
-                onMineSelected: () async {
-                  setState(() => _communityScope = SocialCommunityScope.mine);
-                  await _syncScopes(force: true);
-                },
-                onRefresh: () =>
-                    ref.read(communityControllerProvider.notifier).refresh(),
-              ),
-              error: (error, stackTrace) => SocialActionableErrorState(
-                title: 'Nao conseguimos abrir os espacos agora.',
-                onRetry: () =>
-                    ref.read(communityControllerProvider.notifier).refresh(),
-              ),
-              loading: () =>
-                  const SocialLoadingState(label: 'Carregando espacos...'),
-            );
-          },
-        ),
-      ],
+    return communitiesState.when(
+      data: (result) => SocialCommunitiesArea(
+        result: result,
+        searchController: _communitySearchController,
+        visibilityFilter: _communityVisibilityFilter,
+        categoryFilter: _communityCategoryFilter,
+        membershipFilter: _communityMembershipFilter,
+        categories: categories,
+        onSearchChanged: (_) => _applyCommunityFilters(),
+        onVisibilityChanged: (value) {
+          setState(() => _communityVisibilityFilter = value);
+          _applyCommunityFilters();
+        },
+        onCategoryChanged: (value) {
+          setState(() => _communityCategoryFilter = value);
+          _applyCommunityFilters();
+        },
+        onMembershipChanged: (value) {
+          setState(() => _communityMembershipFilter = value);
+          _applyCommunityFilters();
+        },
+        onPageChanged: (page) =>
+            ref.read(communityControllerProvider.notifier).goToPage(page),
+        onView: _openCommunityDetail,
+        onJoin: (community) async {
+          final currentContext = context;
+          await ref
+              .read(communityControllerProvider.notifier)
+              .join(community.id);
+          if (!currentContext.mounted) {
+            return;
+          }
+          AppSnackBar.show(
+            currentContext,
+            message: 'Você entrou em ${community.name}.',
+            icon: Icons.check_circle_outline_rounded,
+          );
+        },
+        canCreate: canCreateCommunity,
+        onCreate: _openCreateCommunityModal,
+        headline: 'Espaços',
+        description:
+            'Encontre ambientes de troca para entrar, ler e compartilhar reflexões com mais contexto.',
+        onRefresh: () =>
+            ref.read(communityControllerProvider.notifier).refresh(),
+      ),
+      error: (error, stackTrace) => SocialActionableErrorState(
+        title: 'Não conseguimos abrir os espaços agora.',
+        onRetry: () => ref.read(communityControllerProvider.notifier).refresh(),
+      ),
+      loading: () => const SocialLoadingState(label: 'Carregando espaços...'),
     );
-  }
-
-  String _contextualHint(String? mood) {
-    final normalized = mood?.toLowerCase() ?? '';
-    if (normalized.contains('ans')) {
-      return 'Seu momento recente pede mais regulacao. Estas reflexoes priorizam ansiedade, acolhimento e pequenas praticas aplicaveis agora.';
-    }
-    if (normalized.contains('cans')) {
-      return 'Seu momento recente pede mais leveza. Estas reflexoes puxam recuperacao, ritmo sustentavel e menos cobranca.';
-    }
-    if (normalized.contains('calm') || normalized.contains('presen')) {
-      return 'Seu momento recente abre espaco para clareza. Estas reflexoes priorizam presenca, constancia e aplicacao pratica.';
-    }
-    return 'Leia reflexoes curtas, aprendizados e relatos leves sem entrar no ritmo de uma rede social.';
   }
 }
 
@@ -638,24 +389,18 @@ class _CommunityDetailView extends StatelessWidget {
   const _CommunityDetailView({
     required this.community,
     required this.postsState,
-    required this.formKey,
-    required this.contentController,
-    required this.visibility,
-    required this.onVisibilityChanged,
-    required this.onSubmit,
     required this.onBack,
+    required this.onWriteReflection,
+    required this.onLeave,
     required this.onRefresh,
     required this.onPageChanged,
   });
 
   final Community community;
   final AsyncValue<SocialFeedState> postsState;
-  final GlobalKey<FormState> formKey;
-  final TextEditingController contentController;
-  final String visibility;
-  final ValueChanged<String> onVisibilityChanged;
-  final VoidCallback? onSubmit;
   final VoidCallback onBack;
+  final VoidCallback? onWriteReflection;
+  final VoidCallback onLeave;
   final VoidCallback onRefresh;
   final ValueChanged<int> onPageChanged;
 
@@ -733,67 +478,24 @@ class _CommunityDetailView extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onWriteReflection,
+                    icon: const Icon(Icons.edit_note_rounded),
+                    label: const Text('Escrever reflexão'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onLeave,
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Sair do espaço'),
+                  ),
+                ],
+              ),
             ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        PrimaryPanel(
-          child: Form(
-            key: formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Criar reflexão neste espaço',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Compartilhe um registro curto conectado ao tema deste espaço.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: contentController,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Sua reflexão',
-                    hintText: 'Escreva com calma, no seu ritmo.',
-                    alignLabelWithHint: true,
-                    prefixIcon: Icon(Icons.edit_note_rounded),
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Escreva sua reflexão.'
-                      : null,
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: visibility,
-                  decoration: const InputDecoration(
-                    labelText: 'Visibilidade',
-                    prefixIcon: Icon(Icons.visibility_rounded),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'PUBLIC', child: Text('Pública')),
-                    DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      onVisibilityChanged(value);
-                    }
-                  },
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: onSubmit,
-                  icon: const Icon(Icons.send_rounded),
-                  label: const Text('Publicar reflexão'),
-                ),
-              ],
-            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -826,7 +528,11 @@ class _CommunityDetailView extends StatelessWidget {
                                 color: AppColors.accentWarm,
                               ),
                               const SizedBox(width: 8),
-                              SocialMetaPill(label: post.visibility),
+                              SocialMetaPill(
+                                label: post.visibility == 'PUBLIC'
+                                    ? 'Aberta'
+                                    : 'Privada',
+                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -859,289 +565,124 @@ class _CommunityDetailView extends StatelessWidget {
   }
 }
 
-class _SocialModuleHeader extends StatelessWidget {
-  const _SocialModuleHeader({
-    required this.selected,
-    required this.spacesCount,
-    required this.joinedCount,
-    required this.reflectionsCount,
-    required this.onSelected,
+class _CommunityReflectionSheet extends StatefulWidget {
+  const _CommunityReflectionSheet({
+    required this.formKey,
+    required this.contentController,
+    required this.initialVisibility,
+    required this.onSubmit,
   });
 
-  final SocialModuleTab selected;
-  final int spacesCount;
-  final int joinedCount;
-  final int reflectionsCount;
-  final ValueChanged<SocialModuleTab> onSelected;
+  final GlobalKey<FormState> formKey;
+  final TextEditingController contentController;
+  final String initialVisibility;
+  final Future<void> Function(String visibility) onSubmit;
 
   @override
-  Widget build(BuildContext context) {
-    return PrimaryPanel(
-      semanticLabel: 'Alternar area de espacos',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  color: AppColors.accent.withValues(alpha: 0.14),
-                  border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.24),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.groups_rounded,
-                  color: AppColors.accent,
-                ),
-              ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Espacos',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ambientes de troca, reflexao e pertencimento para entrar com contexto e sair com clareza.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _SocialMetricPill(
-                icon: Icons.explore_rounded,
-                label: '$spacesCount espacos',
-              ),
-              _SocialMetricPill(
-                icon: Icons.check_circle_rounded,
-                label: '$joinedCount participando',
-              ),
-              _SocialMetricPill(
-                icon: Icons.edit_note_rounded,
-                label: '$reflectionsCount reflexoes',
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _SocialSectionSwitcher(selected: selected, onSelected: onSelected),
-        ],
-      ),
-    );
-  }
+  State<_CommunityReflectionSheet> createState() =>
+      _CommunityReflectionSheetState();
 }
 
-class _SocialSectionSwitcher extends StatelessWidget {
-  const _SocialSectionSwitcher({
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final SocialModuleTab selected;
-  final ValueChanged<SocialModuleTab> onSelected;
+class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
+  late String _visibility = widget.initialVisibility;
+  bool _submitting = false;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: AppColors.surfaceStrong.withValues(alpha: 0.34),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.24)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      constraints: const BoxConstraints(minHeight: 58),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SocialSectionButton(
-              icon: Icons.auto_awesome_rounded,
-              label: 'Em destaque',
-              selected: selected == SocialModuleTab.featured,
-              onTap: () => onSelected(SocialModuleTab.featured),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _SocialSectionButton(
-              icon: Icons.edit_note_rounded,
-              label: 'Reflexoes',
-              selected: selected == SocialModuleTab.reflections,
-              onTap: () => onSelected(SocialModuleTab.reflections),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _SocialSectionButton(
-              icon: Icons.groups_2_rounded,
-              label: 'Meus',
-              selected: selected == SocialModuleTab.mySpaces,
-              onTap: () => onSelected(SocialModuleTab.mySpaces),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SocialSectionButton extends StatelessWidget {
-  const _SocialSectionButton({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppColors.background : AppColors.textSecondary;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected
-                ? AppColors.accent
-                : AppColors.outline.withValues(alpha: 0.4),
-          ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 20,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 17, color: color),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SocialMetricPill extends StatelessWidget {
-  const _SocialMetricPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: AppColors.surfaceStrong.withValues(alpha: 0.48),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.26)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppColors.accent),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FutureMessageReflectionCard extends StatelessWidget {
-  const _FutureMessageReflectionCard({required this.onOpen});
-
-  final VoidCallback? onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return PrimaryPanel(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              color: AppColors.accent.withValues(alpha: 0.14),
-            ),
-            child: const Icon(
-              Icons.forward_to_inbox_rounded,
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
+        child: Form(
+          key: widget.formKey,
+          child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Mensagens para o futuro',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  'Escrever reflexão',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
-                  'Abra sua tela privada de cartas: escreva para o futuro e leia quando uma versao sua voltar no momento certo.',
+                  'Compartilhe um registro curto no espaço atual.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: onOpen,
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('Abrir mensagens'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: widget.contentController,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Sua reflexão',
+                    hintText: 'Hoje percebi que...',
+                    alignLabelWithHint: true,
+                    prefixIcon: Icon(Icons.edit_note_rounded),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Escreva sua reflexão.'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: _visibility,
+                  decoration: const InputDecoration(
+                    labelText: 'Visibilidade',
+                    prefixIcon: Icon(Icons.visibility_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'PUBLIC', child: Text('Aberta')),
+                    DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
+                  ],
+                  onChanged: _submitting
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            setState(() => _visibility = value);
+                          }
+                        },
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _submitting
+                        ? null
+                        : () async {
+                            if (!widget.formKey.currentState!.validate()) {
+                              return;
+                            }
+                            setState(() => _submitting = true);
+                            try {
+                              await widget.onSubmit(_visibility);
+                            } finally {
+                              if (mounted) {
+                                setState(() => _submitting = false);
+                              }
+                            }
+                          },
+                    icon: _submitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send_rounded),
+                    label: const Text('Compartilhar reflexão'),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1199,19 +740,19 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Criar novo espaco',
+                'Criar novo espaço',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 10),
               Text(
-                'Defina um nome claro, uma descricao curta e a abertura desse espaco.',
+                'Defina um nome claro, uma descrição curta e a abertura desse espaço.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 18),
               TextFormField(
                 controller: widget.nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Nome do espaco',
+                  labelText: 'Nome do espaço',
                   prefixIcon: Icon(Icons.groups_rounded),
                 ),
                 onChanged: (_) => setState(() {}),
@@ -1239,7 +780,7 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                 controller: widget.descriptionController,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                  labelText: 'Descricao do espaco',
+                  labelText: 'Descrição do espaço',
                   alignLabelWithHint: true,
                   prefixIcon: Icon(Icons.edit_note_rounded),
                 ),
@@ -1264,9 +805,9 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                     value: 'bem-estar',
                     child: Text('Bem-estar'),
                   ),
-                  DropdownMenuItem(value: 'habitos', child: Text('Habitos')),
-                  DropdownMenuItem(value: 'presenca', child: Text('Presenca')),
-                  DropdownMenuItem(value: 'reflexao', child: Text('Reflexao')),
+                  DropdownMenuItem(value: 'habitos', child: Text('Hábitos')),
+                  DropdownMenuItem(value: 'presenca', child: Text('Presença')),
+                  DropdownMenuItem(value: 'reflexao', child: Text('Reflexão')),
                   DropdownMenuItem(value: 'foco', child: Text('Foco')),
                 ],
                 onChanged: (value) {
@@ -1280,8 +821,8 @@ class _CreateCommunitySheetState extends State<_CreateCommunitySheet> {
                 initialValue: _visibility,
                 decoration: const InputDecoration(labelText: 'Visibilidade'),
                 items: const [
-                  DropdownMenuItem(value: 'PUBLIC', child: Text('Publica')),
-                  DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
+                  DropdownMenuItem(value: 'PUBLIC', child: Text('Aberto')),
+                  DropdownMenuItem(value: 'PRIVATE', child: Text('Privado')),
                 ],
                 onChanged: (value) {
                   if (value != null) {

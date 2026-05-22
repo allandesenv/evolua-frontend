@@ -23,16 +23,10 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.onPageChanged,
     required this.onView,
     required this.onJoin,
-    required this.onLeave,
     required this.canCreate,
     required this.onCreate,
     required this.headline,
     required this.description,
-    this.showMembershipFilter = true,
-    this.showScopeChips = false,
-    this.currentScope,
-    this.onExploreSelected,
-    this.onMineSelected,
     this.onRefresh,
   });
 
@@ -49,28 +43,20 @@ class SocialCommunitiesArea extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<Community> onView;
   final Future<void> Function(Community community) onJoin;
-  final Future<void> Function(Community community) onLeave;
   final bool canCreate;
   final VoidCallback onCreate;
   final String headline;
   final String description;
-  final bool showMembershipFilter;
-  final bool showScopeChips;
-  final String? currentScope;
-  final VoidCallback? onExploreSelected;
-  final VoidCallback? onMineSelected;
   final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final isMine = headline == 'Meus espacos';
     return Column(
       children: [
         PrimaryPanel(
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 560;
-              final fieldWidth = compact ? constraints.maxWidth : 220.0;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -89,10 +75,8 @@ class SocialCommunitiesArea extends StatelessWidget {
                             color: AppColors.accent.withValues(alpha: 0.22),
                           ),
                         ),
-                        child: Icon(
-                          isMine
-                              ? Icons.verified_user_rounded
-                              : Icons.explore_rounded,
+                        child: const Icon(
+                          Icons.groups_rounded,
                           color: AppColors.accent,
                         ),
                       ),
@@ -125,7 +109,7 @@ class SocialCommunitiesArea extends StatelessWidget {
                         OutlinedButton.icon(
                           onPressed: onCreate,
                           icon: const Icon(Icons.add_circle_outline_rounded),
-                          label: const Text('Criar espaco'),
+                          label: const Text('Criar espaço'),
                         ),
                       if (onRefresh != null)
                         OutlinedButton.icon(
@@ -136,127 +120,16 @@ class SocialCommunitiesArea extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      SocialMetaPill(
-                        label: isMine
-                            ? '${result.totalItems} participando'
-                            : '${result.totalItems} para explorar',
-                      ),
-                      if (showScopeChips) ...[
-                        ChoiceChip(
-                          label: const Text('Explorar'),
-                          selected: currentScope == 'explore',
-                          onSelected: (_) => onExploreSelected?.call(),
-                        ),
-                        ChoiceChip(
-                          label: const Text('Meus espacos'),
-                          selected: currentScope == 'mine',
-                          onSelected: (_) => onMineSelected?.call(),
-                        ),
-                      ],
-                    ],
-                  ),
+                  SocialMetaPill(label: _resultCountLabel(result.totalItems)),
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: searchController,
                     onChanged: onSearchChanged,
                     decoration: const InputDecoration(
-                      labelText: 'Buscar por espaco, descricao ou tema',
+                      labelText: 'Buscar espaço',
+                      hintText: 'Nome, descrição ou tema',
                       prefixIcon: Icon(Icons.search_rounded),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      if (showMembershipFilter)
-                        SizedBox(
-                          width: fieldWidth,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: membershipFilter,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Recorte',
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'TODAS',
-                                child: Text('Todas'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'INGRESSADAS',
-                                child: Text('Participando'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'DESCOBRIR',
-                                child: Text('Descobrir'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                onMembershipChanged(value);
-                              }
-                            },
-                          ),
-                        ),
-                      SizedBox(
-                        width: fieldWidth,
-                        child: DropdownButtonFormField<String>(
-                          initialValue: visibilityFilter,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Visibilidade',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'TODAS',
-                              child: Text('Todas'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'PUBLIC',
-                              child: Text('Publicas'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'PRIVATE',
-                              child: Text('Privadas'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              onVisibilityChanged(value);
-                            }
-                          },
-                        ),
-                      ),
-                      SizedBox(
-                        width: fieldWidth,
-                        child: DropdownButtonFormField<String>(
-                          initialValue: categoryFilter,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Categoria',
-                          ),
-                          items: categories
-                              .map(
-                                (item) => DropdownMenuItem<String>(
-                                  value: item,
-                                  child: Text(item == 'TODAS' ? 'Todas' : item),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              onCategoryChanged(value);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               );
@@ -267,20 +140,17 @@ class SocialCommunitiesArea extends StatelessWidget {
         if (result.items.isEmpty)
           GuidedEmptyState(
             icon: Icons.groups_rounded,
-            title: 'Nenhum espaco apareceu com esse recorte.',
-            subtitle: canCreate
-                ? 'Amplie a busca, troque os filtros ou crie o primeiro espaco para esse contexto.'
-                : 'Amplie a busca ou troque os filtros para encontrar um espaco com mais aderencia ao seu momento.',
-            actionLabel: canCreate ? 'Criar espaco' : 'Ver todos',
-            onAction: canCreate
-                ? onCreate
-                : () {
-                    searchController.clear();
-                    onSearchChanged('');
-                    onMembershipChanged('TODAS');
-                    onVisibilityChanged('TODAS');
-                    onCategoryChanged('TODAS');
-                  },
+            title: 'Nenhum espaço encontrado.',
+            subtitle:
+                'Tente buscar por outro tema ou volte mais tarde para descobrir novos espaços.',
+            actionLabel: 'Ver todos',
+            onAction: () {
+              searchController.clear();
+              onSearchChanged('');
+              onMembershipChanged('TODAS');
+              onVisibilityChanged('TODAS');
+              onCategoryChanged('TODAS');
+            },
           )
         else
           Column(
@@ -288,114 +158,10 @@ class SocialCommunitiesArea extends StatelessWidget {
               ...result.items.map(
                 (community) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: PrimaryPanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                color: community.joined
-                                    ? AppColors.accent.withValues(alpha: 0.14)
-                                    : AppColors.surfaceStrong.withValues(
-                                        alpha: 0.58,
-                                      ),
-                                border: Border.all(
-                                  color: community.joined
-                                      ? AppColors.accent.withValues(alpha: 0.24)
-                                      : AppColors.outline.withValues(
-                                          alpha: 0.24,
-                                        ),
-                                ),
-                              ),
-                              child: Icon(
-                                community.joined
-                                    ? Icons.check_rounded
-                                    : Icons.groups_rounded,
-                                color: community.joined
-                                    ? AppColors.accent
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    community.name,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      SocialMetaPill(label: community.category),
-                                      SocialMetaPill(
-                                        label:
-                                            '${community.memberCount} pessoas',
-                                      ),
-                                      SocialMetaPill(
-                                        label: community.joined
-                                            ? 'Participando'
-                                            : 'Explorar',
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            SocialMetaPill(label: community.visibility),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          community.description,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 14),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: community.joined
-                              ? Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: [
-                                    FilledButton.icon(
-                                      onPressed: () => onView(community),
-                                      icon: const Icon(
-                                        Icons.visibility_rounded,
-                                      ),
-                                      label: const Text('Visualizar'),
-                                    ),
-                                    OutlinedButton.icon(
-                                      onPressed: () => onLeave(community),
-                                      icon: const Icon(Icons.logout_rounded),
-                                      label: const Text('Sair do espaço'),
-                                    ),
-                                  ],
-                                )
-                              : FilledButton.icon(
-                                  onPressed: () => onJoin(community),
-                                  icon: const Icon(Icons.group_add_rounded),
-                                  label: const Text('Entrar no espaco'),
-                                ),
-                        ),
-                      ],
-                    ),
+                  child: _CommunityCard(
+                    community: community,
+                    onView: () => onView(community),
+                    onJoin: () => onJoin(community),
                   ),
                 ),
               ),
@@ -407,6 +173,111 @@ class SocialCommunitiesArea extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+
+  String _resultCountLabel(int total) {
+    if (total == 1) {
+      return '1 espaço disponível';
+    }
+    return '$total espaços disponíveis';
+  }
+}
+
+class _CommunityCard extends StatelessWidget {
+  const _CommunityCard({
+    required this.community,
+    required this.onView,
+    required this.onJoin,
+  });
+
+  final Community community;
+  final VoidCallback onView;
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: community.joined
+                      ? AppColors.accent.withValues(alpha: 0.14)
+                      : AppColors.surfaceStrong.withValues(alpha: 0.58),
+                  border: Border.all(
+                    color: community.joined
+                        ? AppColors.accent.withValues(alpha: 0.24)
+                        : AppColors.outline.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: Icon(
+                  community.joined ? Icons.check_rounded : Icons.groups_rounded,
+                  color: community.joined
+                      ? AppColors.accent
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      community.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        SocialMetaPill(label: community.category),
+                        SocialMetaPill(
+                          label: '${community.memberCount} pessoas',
+                        ),
+                        const SocialMetaPill(label: 'Aberto'),
+                        if (community.joined)
+                          const SocialMetaPill(label: 'Participando'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            community.description,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: community.joined
+                ? FilledButton.icon(
+                    onPressed: onView,
+                    icon: const Icon(Icons.visibility_rounded),
+                    label: const Text('Ver espaço'),
+                  )
+                : FilledButton.icon(
+                    onPressed: onJoin,
+                    icon: const Icon(Icons.group_add_rounded),
+                    label: const Text('Entrar'),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

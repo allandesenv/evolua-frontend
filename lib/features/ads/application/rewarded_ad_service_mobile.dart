@@ -32,6 +32,7 @@ class MobileRewardedAdService implements RewardedAdService {
   Future<bool> showRewardedAd({
     required String rewardType,
     String? contextId,
+    bool allowClientOpenedFallback = false,
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return false;
@@ -45,9 +46,11 @@ class MobileRewardedAdService implements RewardedAdService {
 
     await MobileAds.instance.initialize();
 
-    final completer = Completer<bool>();
+    final completer = Completer<_RewardedAdOutcome>();
     RewardedAd? rewardedAd;
     var earnedReward = false;
+    var openedFullScreen = false;
+    DateTime? openedAt;
 
     await RewardedAd.load(
       adUnitId: adUnitId,
@@ -59,16 +62,32 @@ class MobileRewardedAdService implements RewardedAdService {
             ServerSideVerificationOptions(customData: session.customData),
           );
           ad.fullScreenContentCallback = FullScreenContentCallback(
+            onAdShowedFullScreenContent: (ad) {
+              openedFullScreen = true;
+              openedAt = DateTime.now();
+            },
             onAdDismissedFullScreenContent: (ad) {
               ad.dispose();
               if (!completer.isCompleted) {
-                completer.complete(earnedReward);
+                completer.complete(
+                  _RewardedAdOutcome(
+                    openedFullScreen: openedFullScreen,
+                    earnedReward: earnedReward,
+                    openedAt: openedAt,
+                  ),
+                );
               }
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
               ad.dispose();
               if (!completer.isCompleted) {
-                completer.complete(false);
+                completer.complete(
+                  _RewardedAdOutcome(
+                    openedFullScreen: openedFullScreen,
+                    earnedReward: false,
+                    openedAt: openedAt,
+                  ),
+                );
               }
             },
           );
@@ -81,20 +100,24 @@ class MobileRewardedAdService implements RewardedAdService {
         onAdFailedToLoad: (error) {
           debugPrint(_describeLoadError(error, rewardType, adUnitId));
           if (!completer.isCompleted) {
-            completer.complete(false);
+            completer.complete(const _RewardedAdOutcome());
           }
         },
       ),
     );
 
-    final earned = await completer.future.timeout(
+    final outcome = await completer.future.timeout(
       const Duration(seconds: 75),
       onTimeout: () {
         rewardedAd?.dispose();
-        return earnedReward;
+        return _RewardedAdOutcome(
+          openedFullScreen: openedFullScreen,
+          earnedReward: earnedReward,
+          openedAt: openedAt,
+        );
       },
     );
-    if (!earned) {
+    if (!outcome.openedFullScreen) {
       return false;
     }
     if (AppConfig.adMobUseTestAds) {
@@ -105,9 +128,31 @@ class MobileRewardedAdService implements RewardedAdService {
         return false;
       }
     }
+    final remainingClientOpenedWindow = _remainingClientOpenedWindow(
+      outcome.openedAt,
+    );
+    final confirmed = await _waitForServerSideReward(
+      rewardType: rewardType,
+      contextId: contextId,
+      maxWait: allowClientOpenedFallback ? remainingClientOpenedWindow : null,
+    );
+    if (confirmed) {
+      return true;
+    }
+    if (!allowClientOpenedFallback ||
+        rewardType.trim().toUpperCase() != 'DEEP_EMOTIONAL_READING') {
+      return false;
+    }
+    try {
+      await _repository.grantClientOpenedReward(session.id);
+    } catch (error) {
+      debugPrint('AdMob client-opened reward grant failed: $error');
+      return false;
+    }
     return _waitForServerSideReward(
       rewardType: rewardType,
       contextId: contextId,
+      maxWait: const Duration(seconds: 4),
     );
   }
 
@@ -170,11 +215,11 @@ class MobileRewardedAdService implements RewardedAdService {
   Future<bool> _waitForServerSideReward({
     required String rewardType,
     String? contextId,
+    Duration? maxWait,
   }) async {
-    for (var attempt = 0; attempt < _ssvConfirmationAttempts; attempt++) {
-      if (attempt > 0) {
-        await Future<void>.delayed(_ssvConfirmationDelay);
-      }
+    final deadline = maxWait == null ? null : DateTime.now().add(maxWait);
+    var attempt = 0;
+    while (true) {
       try {
         final access = await _repository.monetizationAccess(
           resource: rewardType,
@@ -184,11 +229,39 @@ class MobileRewardedAdService implements RewardedAdService {
           return true;
         }
       } catch (_) {
-        if (attempt == _ssvConfirmationAttempts - 1) {
+        if (deadline == null && attempt >= _ssvConfirmationAttempts - 1) {
           rethrow;
         }
       }
+      attempt++;
+      if (deadline == null && attempt >= _ssvConfirmationAttempts) {
+        return false;
+      }
+      if (deadline != null && DateTime.now().isAfter(deadline)) {
+        return false;
+      }
+      await Future<void>.delayed(_ssvConfirmationDelay);
     }
-    return false;
   }
+
+  Duration _remainingClientOpenedWindow(DateTime? openedAt) {
+    if (openedAt == null) {
+      return Duration.zero;
+    }
+    final elapsed = DateTime.now().difference(openedAt);
+    final remaining = const Duration(seconds: 80) - elapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+}
+
+class _RewardedAdOutcome {
+  const _RewardedAdOutcome({
+    this.openedFullScreen = false,
+    this.earnedReward = false,
+    this.openedAt,
+  });
+
+  final bool openedFullScreen;
+  final bool earnedReward;
+  final DateTime? openedAt;
 }

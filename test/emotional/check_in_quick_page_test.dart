@@ -230,6 +230,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(rewarded.rewardType, 'DEEP_EMOTIONAL_READING');
+        expect(rewarded.allowClientOpenedFallback, isTrue);
         expect(repository.createCalls, 2);
         expect(repository.createdReflection, 'preciso registrar outro momento');
         expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
@@ -485,13 +486,16 @@ class _FakeRewardedAdService implements RewardedAdService {
   final bool result;
   final Duration delay;
   String? rewardType;
+  bool? allowClientOpenedFallback;
 
   @override
   Future<bool> showRewardedAd({
     required String rewardType,
     String? contextId,
+    bool allowClientOpenedFallback = false,
   }) async {
     this.rewardType = rewardType;
+    this.allowClientOpenedFallback = allowClientOpenedFallback;
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
     }
@@ -525,6 +529,11 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<AdRewardSession> grantTestReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) {
     throw UnimplementedError();
   }
 

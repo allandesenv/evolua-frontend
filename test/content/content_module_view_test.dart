@@ -36,7 +36,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Minha jornada'), findsOneWidget);
+      expect(find.text('Jornada atual'), findsOneWidget);
       expect(find.text('Explorar'), findsOneWidget);
       expect(find.text('Explorar trilhas'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -232,7 +232,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final context = tester.element(find.text('Minha jornada'));
+      final context = tester.element(find.text('Jornada atual'));
       final colors = context.evoluaColors;
       final panel = tester.widget<AnimatedContainer>(
         find.byType(AnimatedContainer).first,
@@ -612,6 +612,7 @@ class _FakeRewardedAdService implements RewardedAdService {
   Future<bool> showRewardedAd({
     required String rewardType,
     String? contextId,
+    bool allowClientOpenedFallback = false,
   }) async {
     lastRewardType = rewardType;
     return true;
@@ -674,6 +675,11 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<AdRewardSession> grantTestReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) {
     throw UnimplementedError();
   }
 
