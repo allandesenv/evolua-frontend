@@ -367,7 +367,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get trailCatalog => 'Catálogo';
 
   @override
-  String get trailMyJourney => 'Minha jornada';
+  String get trailMyJourney => 'Jornada atual';
 
   @override
   String get trailStart => 'Iniciar trilha';
@@ -992,7 +992,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get trailCatalog => 'Catálogo';
 
   @override
-  String get trailMyJourney => 'Minha jornada';
+  String get trailMyJourney => 'Jornada atual';
 
   @override
   String get trailStart => 'Iniciar trilha';

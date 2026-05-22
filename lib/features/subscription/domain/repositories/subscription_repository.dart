@@ -28,6 +28,8 @@ abstract class SubscriptionRepository {
 
   Future<AdRewardSession> grantTestReward(String sessionId);
 
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId);
+
   Future<MonetizationAccessStatus> monetizationAccess({
     required String resource,
     String? contextId,

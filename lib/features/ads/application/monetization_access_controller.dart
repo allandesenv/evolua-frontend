@@ -24,13 +24,18 @@ class MonetizationAccessController extends AsyncNotifier<void> {
   Future<bool> unlockWithRewardedAd({
     required String resource,
     String? contextId,
+    bool allowClientOpenedFallback = false,
   }) async {
     var rewardConfirmedByBackend = false;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       rewardConfirmedByBackend = await ref
           .read(rewardedAdServiceProvider)
-          .showRewardedAd(rewardType: resource, contextId: contextId);
+          .showRewardedAd(
+            rewardType: resource,
+            contextId: contextId,
+            allowClientOpenedFallback: allowClientOpenedFallback,
+          );
       if (rewardConfirmedByBackend) {
         await ref.read(subscriptionControllerProvider.notifier).refresh();
       }

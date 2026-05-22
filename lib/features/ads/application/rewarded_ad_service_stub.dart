@@ -12,6 +12,7 @@ class WebRewardedAdService implements RewardedAdService {
   Future<bool> showRewardedAd({
     required String rewardType,
     String? contextId,
+    bool allowClientOpenedFallback = false,
   }) async {
     return false;
   }

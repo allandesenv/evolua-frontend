@@ -110,6 +110,7 @@ class _SubscriptionModuleViewState
           ...premiumPlans.map((plan) {
             final active =
                 current?.planCode == plan.planCode && current?.premium == true;
+            final planBusy = data.busyPlanCode == plan.planCode;
             return _PlanCard(
               title: plan.title,
               subtitle: plan.subtitle,
@@ -124,7 +125,7 @@ class _SubscriptionModuleViewState
               availabilityNote: plan.availabilityNote,
               featured: plan.highlighted || plan.isFounder,
               highlighted: active,
-              cta: data.isBusy ? 'Processando...' : _ctaForPlan(plan, current),
+              cta: planBusy ? 'Processando...' : _ctaForPlan(plan, current),
               disabled: data.isBusy || active,
               onTap: () => _startCheckout(plan),
             );

@@ -55,6 +55,7 @@ class GooglePlayBillingService implements GooglePlayBillingGateway {
     if (!started) {
       throw StateError('Não foi possível iniciar o checkout do Google Play.');
     }
+
     final details = await purchase;
     if (details.status == PurchaseStatus.error) {
       throw StateError(details.error?.message ?? 'Compra não concluída.');
@@ -62,6 +63,12 @@ class GooglePlayBillingService implements GooglePlayBillingGateway {
     if (details.status == PurchaseStatus.canceled) {
       throw StateError('Compra cancelada.');
     }
+    if (details.status == PurchaseStatus.pending) {
+      throw StateError(
+        'Compra pendente. Vamos atualizar seu plano quando o Google Play confirmar.',
+      );
+    }
+
     final checkout = await repository.verifyGooglePlayPurchase(
       productId: productId,
       purchaseToken: details.verificationData.serverVerificationData,
@@ -82,6 +89,7 @@ class GooglePlayBillingService implements GooglePlayBillingGateway {
         if (item.productID == productId &&
             (item.status == PurchaseStatus.purchased ||
                 item.status == PurchaseStatus.restored ||
+                item.status == PurchaseStatus.pending ||
                 item.status == PurchaseStatus.error ||
                 item.status == PurchaseStatus.canceled)) {
           if (!completer.isCompleted) {
@@ -91,7 +99,12 @@ class GooglePlayBillingService implements GooglePlayBillingGateway {
       }
     });
     return completer.future
-        .timeout(const Duration(minutes: 5))
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw TimeoutException(
+            'Compra não concluída. Você pode tentar novamente quando quiser.',
+          ),
+        )
         .whenComplete(subscription.cancel);
   }
 }

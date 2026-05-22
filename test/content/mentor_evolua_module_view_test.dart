@@ -261,6 +261,11 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<MonetizationAccessStatus> monetizationAccess({
     required String resource,
     String? contextId,
