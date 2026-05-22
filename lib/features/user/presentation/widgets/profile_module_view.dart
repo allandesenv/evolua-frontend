@@ -267,7 +267,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 Clipboard.setData(ClipboardData(text: exportJson));
                 Navigator.of(context).pop();
                 _showSettingsMessage(
-                  'Exportação cópiada para a area de transferencia.',
+                  'Exportação copiada para a área de transferência.',
                 );
               },
               child: const Text('Copiar JSON'),
@@ -310,7 +310,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final confirmed = await _showConfirmDialog(
       title: 'Encerrar sessões ativas',
       message:
-          'As outras sessões da sua conta serao encerradas. Você continuara usando este app ate precisar entrar novamente.',
+          'As outras sessões da sua conta serão encerradas. Você continuará usando este app até precisar entrar novamente.',
       confirmLabel: 'Encerrar sessões',
     );
     if (!confirmed) {
@@ -321,7 +321,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       if (!mounted) {
         return;
       }
-      _showSettingsMessage('Sessoes ativas encerradas.');
+      _showSettingsMessage('Sessões ativas encerradas.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -834,7 +834,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                   onDeleteAccount: () =>
                       _deleteAccount(session?.email ?? 'você@evolua.app'),
                   onInformationalAction: () => _showSettingsMessage(
-                    'Esta informação sera aberta em uma area dedicada em breve.',
+                    'Esta informação será aberta em uma área dedicada em breve.',
                   ),
                   localePreference: localePreference,
                   onLocalePreferenceChanged: (value) => ref
@@ -990,13 +990,13 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 ProfileModuleSection.displayAccessibility =>
                   'Centralize preferências de leitura, foco visual e conforto de uso nesta tela.',
                 ProfileModuleSection.feedback =>
-                  'Registre sugestoes e percepcoes sobre a experiência do app sem sair do seu espaco.',
+                  'Registre sugestões e percepções sobre a experiência do app sem sair do seu espaço.',
                 ProfileModuleSection.plansSubscriptions =>
                   'Gerencie seu plano atual e as opcoes de assinatura.',
                 ProfileModuleSection.evolutionMirror =>
-                  'Acompanhe progresso, padroes e conquistas da sua jornada.',
+                  'Acompanhe progresso, padrões e conquistas da sua jornada.',
                 ProfileModuleSection.overview =>
-                  'Visao geral do seu perfil e dos dados principais da sua conta.',
+                  'Visão geral do seu perfil e dos dados principais da sua conta.',
               },
             ),
           if (profileState.isLoading && !profileState.hasValue) ...[
@@ -1087,7 +1087,7 @@ class _ProfileSectionNavigation extends StatelessWidget {
         Text('Preferências', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          'Escolha uma area para ajustar sua experiência no Evolua.',
+          'Escolha uma área para ajustar sua experiência no Evolua.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
@@ -1257,26 +1257,26 @@ _ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
     ProfileModuleSection.overview => const _ProfileSectionMeta(
       section: ProfileModuleSection.overview,
       icon: Icons.person_rounded,
-      title: 'Visao geral',
+      title: 'Visão geral',
       description: 'Dados principais e identidade da conta.',
     ),
     ProfileModuleSection.plansSubscriptions => const _ProfileSectionMeta(
       section: ProfileModuleSection.plansSubscriptions,
       icon: Icons.workspace_premium_rounded,
       title: 'Planos e assinaturas',
-      description: 'Plano atual, beneficios e upgrade.',
+      description: 'Plano atual, benefícios e upgrade.',
     ),
     ProfileModuleSection.evolutionMirror => const _ProfileSectionMeta(
       section: ProfileModuleSection.evolutionMirror,
       icon: Icons.auto_graph_rounded,
       title: 'Espelho da Evolução',
-      description: 'Progresso, padroes, IA e conquistas.',
+      description: 'Progresso, padrões, IA e conquistas.',
     ),
     ProfileModuleSection.settingsPrivacy => const _ProfileSectionMeta(
       section: ProfileModuleSection.settingsPrivacy,
       icon: Icons.shield_rounded,
       title: 'Configurações e privacidade',
-      description: 'Conta, dados, segurança e preferencias.',
+      description: 'Conta, dados, segurança e preferências.',
     ),
     ProfileModuleSection.displayAccessibility => const _ProfileSectionMeta(
       section: ProfileModuleSection.displayAccessibility,
@@ -1294,7 +1294,7 @@ _ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
       section: ProfileModuleSection.feedback,
       icon: Icons.feedback_outlined,
       title: 'Dar feedback',
-      description: 'Compartilhe percepcoes e sugestoes.',
+      description: 'Compartilhe percepções e sugestões.',
     ),
   };
 }
@@ -1440,12 +1440,12 @@ class _OverviewSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Visao geral',
+              'Visão geral',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 12),
             Text(
-              'Essas informacoes passam a sustentar seu perfil principal e a experiência personalizada no app.',
+              'Essas informações passam a sustentar seu perfil principal e a experiência personalizada no app.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 22),
@@ -3186,19 +3186,19 @@ class _HelpSupportSection extends StatelessWidget {
                   'As trilhas organizam praticas, reflexoes e próximos passos em uma sequencia privada para apoiar seu momento atual.',
             ),
             const _HelpFaqTile(
-              title: 'O que sao check-ins?',
+              title: 'O que são check-ins?',
               answer:
-                  'Check-ins sao registros rapidos do seu estado emocional. Eles ajudam o Evolua a entender seu ritmo e sugerir um cuidado mais coerente.',
+                  'Check-ins são registros rápidos do seu estado emocional. Eles ajudam o Evolua a entender seu ritmo e sugerir um cuidado mais coerente.',
             ),
             const _HelpFaqTile(
-              title: 'Como a IA gera sugestoes?',
+              title: 'Como a IA gera sugestões?',
               answer:
                   'A IA usa seu check-in e, quando permitido, seu histórico para criar orientacoes de autocuidado. Ela não substitui apoio profissional.',
             ),
             const _HelpFaqTile(
               title: 'Como editar meu perfil?',
               answer:
-                  'Abra seu perfil, fique em Visao geral, ajuste os dados desejados e toque em Salvar perfil.',
+                  'Abra seu perfil, fique em Visão geral, ajuste os dados desejados e toque em Salvar perfil.',
             ),
             const _HelpFaqTile(
               title: 'Como funciona o plano premium?',
@@ -3492,7 +3492,7 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               onChanged: onHighContrastChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Reducao de transparencia',
+              title: 'Redução de transparência',
               subtitle:
                   'Prefere superficies mais solidas e menos translucidas.',
               value: preferences.reduceTransparency,
@@ -3630,7 +3630,7 @@ class _DisplayAccessibilitySection extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onSavePreferences,
               icon: const Icon(Icons.save_rounded),
-              label: const Text('Salvar preferencias visuais'),
+              label: const Text('Salvar preferências visuais'),
             ),
           ),
         ),
@@ -3796,9 +3796,8 @@ class _SettingsPrivacySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Conta e acesso',
           description:
-              'Controle as informacoes basicas da sua conta e como você acessa o Evolua.',
-          microcopy:
-              'Sua conta e a base da sua jornada. Mantenha seus acessos seguros e atualizados.',
+              'Controle as informações básicas da sua conta e mantenha seus acessos seguros.',
+          microcopy: '',
           children: [
             _SettingsInfoRow(
               icon: Icons.alternate_email_rounded,
@@ -3814,7 +3813,7 @@ class _SettingsPrivacySection extends StatelessWidget {
             _SettingsInfoRow(
               icon: Icons.g_mobiledata_rounded,
               title: 'Login com Google',
-              subtitle: 'Conexao disponível para entrada rápida.',
+              subtitle: 'Conexão disponível para entrada rápida.',
             ),
             _SettingsActionRow(
               icon: Icons.devices_rounded,
@@ -3835,19 +3834,18 @@ class _SettingsPrivacySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Privacidade emocional',
           description:
-              'Escolha como seus registros emocionais e reflexoes sao tratados dentro da plataforma.',
-          microcopy:
-              'Seu processo e pessoal. Você decide o que fica privado e o que pode ser usado para tornar sua experiência mais precisa.',
+              'Controle como seus registros emocionais aparecem dentro do Evolua. Essas informações são privadas e não são compartilhadas com outras pessoas.',
+          microcopy: '',
           children: [
             _SettingsSwitchRow(
-              title: 'Tornar diario privado',
-              subtitle: 'Mantenha seus registros apenas no seu espaco.',
+              title: 'Tornar diário privado',
+              subtitle: 'Mantenha seus registros apenas no seu espaço.',
               value: privateJournal,
               onChanged: onPrivateJournalChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Ocultar check-ins da visao social',
-              subtitle: 'Evite que check-ins aparecam em areas sociais.',
+              title: 'Ocultar check-ins da visão social',
+              subtitle: 'Evite que check-ins apareçam em áreas sociais.',
               value: hideSocialCheckIns,
               onChanged: onHideSocialCheckInsChanged,
             ),
@@ -3874,14 +3872,14 @@ class _SettingsPrivacySection extends StatelessWidget {
         const SizedBox(height: 16),
         _SettingsGroup(
           title: 'Dados e segurança',
-          description: 'Tenha total transparencia sobre seus dados.',
+          description: 'Tenha transparência sobre seus dados e ações da conta.',
           microcopy:
-              'Seus dados pertencem a você. O Evolua existe para apoiar sua jornada, não para invadir sua privacidade.',
+              'Seus dados pertencem a você. O Evolua existe para apoiar sua jornada com privacidade.',
           children: [
             _SettingsActionRow(
               icon: Icons.download_rounded,
               title: 'Baixar meus dados',
-              subtitle: 'Solicite uma cópia completa das suas informacoes.',
+              subtitle: 'Solicite uma cópia completa das suas informações.',
               onTap: onExportData,
             ),
             _SettingsActionRow(
@@ -3902,14 +3900,14 @@ class _SettingsPrivacySection extends StatelessWidget {
             ),
             _SettingsActionRow(
               icon: Icons.history_rounded,
-              title: 'Historico de atividade',
+              title: 'Histórico de atividade',
               subtitle: 'Veja eventos importantes da sua conta.',
               onTap: onInformationalAction,
             ),
             _SettingsActionRow(
               icon: Icons.privacy_tip_outlined,
               title: 'Política de privacidade',
-              subtitle: 'Entenda como seus dados sao tratados.',
+              subtitle: 'Entenda como seus dados são tratados.',
               onTap: onInformationalAction,
             ),
             _SettingsActionRow(
@@ -3924,8 +3922,7 @@ class _SettingsPrivacySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Personalização da experiência',
           description: 'Ajuste como o Evolua se adapta ao seu momento.',
-          microcopy:
-              'O Evolua pode se adaptar ao seu ritmo. Ajuste a experiência para que ela faca sentido no seu momento atual.',
+          microcopy: '',
           children: [
             _SettingsDropdownRow(
               title: 'Tom da IA',
@@ -3939,7 +3936,7 @@ class _SettingsPrivacySection extends StatelessWidget {
               onChanged: onAiToneChanged,
             ),
             _SettingsDropdownRow(
-              title: 'Frequencia de sugestoes',
+              title: 'Frequência de sugestões',
               subtitle: 'Defina o ritmo das recomendações.',
               value: suggestionFrequency,
               items: const {
@@ -4008,13 +4005,15 @@ class _SettingsGroup extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(description, style: Theme.of(context).textTheme.bodyLarge),
-          const SizedBox(height: 10),
-          Text(
-            microcopy,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: context.evoluaColors.textSecondary,
+          if (microcopy.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              microcopy,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 18),
           ...children,
         ],
@@ -4239,7 +4238,7 @@ class _SettingsFooterActions extends StatelessWidget {
           FilledButton.icon(
             onPressed: onSavePreferences,
             icon: const Icon(Icons.save_rounded),
-            label: const Text('Salvar preferencias'),
+            label: const Text('Salvar preferências'),
           ),
           OutlinedButton.icon(
             onPressed: onExportData,
@@ -4369,7 +4368,7 @@ class _AvatarCircle extends StatelessWidget {
 
 String _sectionLabel(ProfileModuleSection section) {
   return switch (section) {
-    ProfileModuleSection.overview => 'Visao geral',
+    ProfileModuleSection.overview => 'Visão geral',
     ProfileModuleSection.settingsPrivacy => 'Configurações e privacidade',
     ProfileModuleSection.helpSupport => 'Ajuda e suporte',
     ProfileModuleSection.displayAccessibility => 'Tela e acessibilidade',

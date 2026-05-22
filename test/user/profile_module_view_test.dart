@@ -365,6 +365,86 @@ void main() {
     expect(find.text('Painel Admin'), findsOneWidget);
   });
 
+  testWidgets('notification dialog is readable on mobile', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        notificationRepository: _FakeNotificationRepository(
+          items: [
+            NotificationJob(
+              id: 'n-1',
+              userId: 'user-123',
+              type: 'CHECKIN_REMINDER',
+              title: 'Hora de cuidar do seu registro',
+              message:
+                  'Faça um check-in breve quando tiver um momento tranquilo.',
+              actionTarget: '/home',
+              source: 'SYSTEM',
+              createdBy: null,
+              createdAt: DateTime(2026, 5, 20, 9, 30),
+              readAt: null,
+            ),
+            NotificationJob(
+              id: 'n-2',
+              userId: 'user-123',
+              type: 'ADMIN_MESSAGE',
+              title: 'Atualização do Evolua',
+              message: 'Sua experiência continua sendo ajustada com cuidado.',
+              actionTarget: null,
+              source: 'ADMIN',
+              createdBy: 'admin',
+              createdAt: DateTime(2026, 5, 20, 10),
+              readAt: DateTime(2026, 5, 20, 11),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Notificações'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Notificações'), findsOneWidget);
+    expect(find.text('Marcar todas como lidas'), findsOneWidget);
+    expect(find.text('Hora de cuidar do seu registro'), findsOneWidget);
+    expect(find.text('Lembrete de check-in'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
+    await tester.pumpAndSettle();
+    expect(find.text('Atualização do Evolua'), findsOneWidget);
+    expect(find.text('Enviada pelo admin'), findsOneWidget);
+    expect(find.textContaining('Notificacoes'), findsNothing);
+  });
+
+  testWidgets('notification dialog shows empty state on mobile', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Notificações'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nenhuma notificação por enquanto'), findsOneWidget);
+    expect(
+      find.text(
+        'Quando houver lembretes ou avisos importantes, eles aparecerão aqui.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('dashboard mobile back walks internal history to Início', (
     tester,
   ) async {
@@ -834,12 +914,19 @@ void main() {
     expect(find.text('Personalização da experiência'), findsOneWidget);
     expect(find.text('E-mail de acesso'), findsOneWidget);
     expect(find.text('leo@evolua.local'), findsAtLeastNWidgets(1));
-    expect(find.text('Tornar diario privado'), findsOneWidget);
+    expect(
+      find.text(
+        'Controle como seus registros emocionais aparecem dentro do Evolua. Essas informações são privadas e não são compartilhadas com outras pessoas.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Tornar diário privado'), findsOneWidget);
+    expect(find.text('Encerrar sessões ativas'), findsOneWidget);
     expect(find.text('Baixar meus dados'), findsAtLeastNWidgets(1));
     expect(find.text('Tom da IA'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Salvar preferencias'));
-    await tester.tap(find.text('Salvar preferencias'));
+    await tester.ensureVisible(find.text('Salvar preferências'));
+    await tester.tap(find.text('Salvar preferências'));
     await tester.pumpAndSettle();
 
     expect(find.text('Preferências salvas com segurança.'), findsOneWidget);
@@ -1171,8 +1258,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Grande').last);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Salvar preferencias visuais'));
-    await tester.tap(find.text('Salvar preferencias visuais'));
+    await tester.ensureVisible(find.text('Salvar preferências visuais'));
+    await tester.tap(find.text('Salvar preferências visuais'));
     await tester.pumpAndSettle();
 
     final sharedPreferences = await SharedPreferences.getInstance();
@@ -1198,7 +1285,7 @@ void main() {
 
     await _pumpSettingsPrivacy(tester);
 
-    await tester.ensureVisible(find.text('Tornar diario privado'));
+    await tester.ensureVisible(find.text('Tornar diário privado'));
     await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Tom da IA'));
@@ -1206,8 +1293,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mais direto').last);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Salvar preferencias'));
-    await tester.tap(find.text('Salvar preferencias'));
+    await tester.ensureVisible(find.text('Salvar preferências'));
+    await tester.tap(find.text('Salvar preferências'));
     await tester.pumpAndSettle();
 
     final sharedPreferences = await SharedPreferences.getInstance();
@@ -1414,6 +1501,7 @@ Widget _dashboardShell({
   Size size = const Size(390, 900),
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
+  NotificationRepository? notificationRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -1436,7 +1524,7 @@ Widget _dashboardShell({
       ),
       communityRepositoryProvider.overrideWithValue(_FakeCommunityRepository()),
       notificationRepositoryProvider.overrideWithValue(
-        _FakeNotificationRepository(),
+        notificationRepository ?? _FakeNotificationRepository(),
       ),
       futureMessageRepositoryProvider.overrideWithValue(
         _FakeFutureMessageRepository(),
@@ -2460,12 +2548,16 @@ class _FakeCommunityRepository implements CommunityRepository {
 }
 
 class _FakeNotificationRepository implements NotificationRepository {
-  @override
-  Future<List<NotificationJob>> list({bool unreadOnly = false}) async =>
-      const [];
+  const _FakeNotificationRepository({this.items = const []});
+
+  final List<NotificationJob> items;
 
   @override
-  Future<int> unreadCount() async => 0;
+  Future<List<NotificationJob>> list({bool unreadOnly = false}) async =>
+      unreadOnly ? items.where((item) => !item.isRead).toList() : items;
+
+  @override
+  Future<int> unreadCount() async => items.where((item) => !item.isRead).length;
 
   @override
   Future<NotificationJob> createAdmin({
