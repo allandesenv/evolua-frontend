@@ -262,9 +262,10 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                           .read(monetizationAccessControllerProvider.notifier)
                           .unlockWithRewardedAd(
                             resource: 'DEEP_EMOTIONAL_READING',
+                            allowClientOpenedFallback: true,
                           )
                           .timeout(
-                            const Duration(seconds: 90),
+                            const Duration(seconds: 100),
                             onTimeout: () => false,
                           );
                     } finally {

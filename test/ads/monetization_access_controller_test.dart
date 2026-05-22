@@ -59,6 +59,7 @@ class _FakeRewardedAdService implements RewardedAdService {
   Future<bool> showRewardedAd({
     required String rewardType,
     String? contextId,
+    bool allowClientOpenedFallback = false,
   }) async {
     this.rewardType = rewardType;
     return result;
@@ -92,6 +93,11 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 
   @override
   Future<AdRewardSession> grantTestReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) {
     throw UnimplementedError();
   }
 

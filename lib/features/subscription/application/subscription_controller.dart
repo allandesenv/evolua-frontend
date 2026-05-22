@@ -53,7 +53,13 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
     final currentState =
         state.asData?.value ??
         const SubscriptionScreenState(plans: [], current: null);
-    state = AsyncData(currentState.copyWith(isBusy: true, clearMessage: true));
+    state = AsyncData(
+      currentState.copyWith(
+        isBusy: true,
+        busyPlanCode: planCode,
+        clearMessage: true,
+      ),
+    );
     try {
       final checkout = await repository.startCheckout(
         planCode: planCode,
@@ -67,6 +73,7 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
           current: refreshedCurrent,
           pendingCheckout: checkout,
           isBusy: false,
+          clearBusyPlanCode: true,
           message: checkout.isApproved
               ? 'Plano atualizado com sucesso.'
               : 'Checkout iniciado. Estamos aguardando a confirmação do pagamento.',
@@ -75,7 +82,13 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
       return checkout;
     } catch (error) {
       final message = _friendlyCheckoutError(error);
-      state = AsyncData(currentState.copyWith(isBusy: false, message: message));
+      state = AsyncData(
+        currentState.copyWith(
+          isBusy: false,
+          clearBusyPlanCode: true,
+          message: message,
+        ),
+      );
       throw SubscriptionCheckoutException(message);
     }
   }
@@ -92,7 +105,13 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
     final currentState =
         state.asData?.value ??
         const SubscriptionScreenState(plans: [], current: null);
-    state = AsyncData(currentState.copyWith(isBusy: true, clearMessage: true));
+    state = AsyncData(
+      currentState.copyWith(
+        isBusy: true,
+        busyPlanCode: plan.planCode,
+        clearMessage: true,
+      ),
+    );
     try {
       final checkout = await ref
           .read(googlePlayBillingServiceProvider)
@@ -103,6 +122,7 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
           current: current,
           pendingCheckout: checkout,
           isBusy: false,
+          clearBusyPlanCode: true,
           message: checkout.isApproved
               ? 'Pagamento confirmado e plano liberado.'
               : 'Compra recebida, mas ainda não confirmada.',
@@ -111,7 +131,13 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
       return checkout;
     } catch (error) {
       final message = _friendlyCheckoutError(error);
-      state = AsyncData(currentState.copyWith(isBusy: false, message: message));
+      state = AsyncData(
+        currentState.copyWith(
+          isBusy: false,
+          clearBusyPlanCode: true,
+          message: message,
+        ),
+      );
       throw SubscriptionCheckoutException(message);
     }
   }
@@ -140,6 +166,7 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
         current: current,
         pendingCheckout: checkout,
         isBusy: false,
+        clearBusyPlanCode: true,
         message: checkout.isApproved
             ? 'Pagamento confirmado e plano liberado.'
             : checkout.failureReason == null
@@ -161,6 +188,7 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
         current: current,
         clearPendingCheckout: true,
         isBusy: false,
+        clearBusyPlanCode: true,
         message: 'Assinatura premium cancelada. O plano essencial segue ativo.',
       ),
     );

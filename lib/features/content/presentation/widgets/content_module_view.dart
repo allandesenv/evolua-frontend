@@ -283,7 +283,7 @@ class _ContentSectionSwitcher extends StatelessWidget {
           Expanded(
             child: _ContentSectionButton(
               icon: Icons.route_rounded,
-              label: hasActiveJourney ? 'Minha jornada' : 'Jornada',
+              label: hasActiveJourney ? 'Jornada atual' : 'Jornada',
               selected: selected == ContentModuleSection.journey,
               onTap: () => onSelected(ContentModuleSection.journey),
             ),

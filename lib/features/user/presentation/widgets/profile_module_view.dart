@@ -86,6 +86,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   bool _didSeedForm = false;
   bool _isSavingProfile = false;
   bool _isUploadingAvatar = false;
+  Uint8List? _avatarPreviewBytes;
   int _avatarRefreshNonce = 0;
   late ProfileModuleSection _section;
 
@@ -225,7 +226,10 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     }
 
     final bytes = await image.readAsBytes();
-    setState(() => _isUploadingAvatar = true);
+    setState(() {
+      _avatarPreviewBytes = bytes;
+      _isUploadingAvatar = true;
+    });
     try {
       await ref
           .read(profileControllerProvider.notifier)
@@ -239,10 +243,16 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       if (!mounted) {
         return;
       }
+      setState(() => _avatarPreviewBytes = null);
       _showSettingsMessage(_friendlySettingsError(error));
     } finally {
       if (mounted) {
-        setState(() => _isUploadingAvatar = false);
+        setState(() {
+          _isUploadingAvatar = false;
+          if (_avatarPreviewBytes != null) {
+            _avatarPreviewBytes = null;
+          }
+        });
       }
     }
   }
@@ -892,6 +902,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           profile?.avatarUrl ?? session?.avatarUrl,
           _avatarRefreshNonce,
         ),
+        avatarPreviewBytes: _avatarPreviewBytes,
         isUploadingAvatar: _isUploadingAvatar,
         onRefresh: () => ref.read(profileControllerProvider.notifier).refresh(),
         onChangeAvatar: _pickAvatar,
@@ -1459,6 +1470,7 @@ class _ProfileHero extends StatelessWidget {
     required this.displayName,
     required this.email,
     required this.avatarUrl,
+    required this.avatarPreviewBytes,
     required this.isUploadingAvatar,
     required this.onRefresh,
     required this.onChangeAvatar,
@@ -1467,6 +1479,7 @@ class _ProfileHero extends StatelessWidget {
   final String displayName;
   final String email;
   final String? avatarUrl;
+  final Uint8List? avatarPreviewBytes;
   final bool isUploadingAvatar;
   final VoidCallback onRefresh;
   final VoidCallback onChangeAvatar;
@@ -1483,6 +1496,7 @@ class _ProfileHero extends StatelessWidget {
           children: [
             _AvatarCircle(
               imageUrl: avatarUrl,
+              imageBytes: avatarPreviewBytes,
               radius: 34,
               fallbackText: displayName,
             ),
@@ -4514,11 +4528,13 @@ class _SectionPanel extends StatelessWidget {
 class _AvatarCircle extends StatelessWidget {
   const _AvatarCircle({
     required this.imageUrl,
+    this.imageBytes,
     required this.radius,
     required this.fallbackText,
   });
 
   final String? imageUrl;
+  final Uint8List? imageBytes;
   final double radius;
   final String fallbackText;
 
@@ -4527,13 +4543,14 @@ class _AvatarCircle extends StatelessWidget {
     final normalizedUrl = imageUrl == null || imageUrl!.isEmpty
         ? null
         : imageUrl!;
+    final ImageProvider? avatarImage = imageBytes != null
+        ? MemoryImage(imageBytes!)
+        : (normalizedUrl != null ? NetworkImage(normalizedUrl) : null);
     return CircleAvatar(
       radius: radius,
       backgroundColor: context.evoluaColors.surfaceStrong,
-      backgroundImage: normalizedUrl != null
-          ? NetworkImage(normalizedUrl)
-          : null,
-      child: normalizedUrl == null
+      backgroundImage: avatarImage,
+      child: avatarImage == null
           ? Text(
               _initials(fallbackText),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
