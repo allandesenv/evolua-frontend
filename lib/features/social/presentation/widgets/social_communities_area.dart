@@ -21,6 +21,7 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.onCategoryChanged,
     required this.onMembershipChanged,
     required this.onPageChanged,
+    required this.onView,
     required this.onJoin,
     required this.onLeave,
     required this.canCreate,
@@ -46,6 +47,7 @@ class SocialCommunitiesArea extends StatelessWidget {
   final ValueChanged<String> onCategoryChanged;
   final ValueChanged<String> onMembershipChanged;
   final ValueChanged<int> onPageChanged;
+  final ValueChanged<Community> onView;
   final Future<void> Function(Community community) onJoin;
   final Future<void> Function(Community community) onLeave;
   final bool canCreate;
@@ -368,10 +370,23 @@ class SocialCommunitiesArea extends StatelessWidget {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: community.joined
-                              ? OutlinedButton.icon(
-                                  onPressed: () => onLeave(community),
-                                  icon: const Icon(Icons.logout_rounded),
-                                  label: const Text('Sair do espaco'),
+                              ? Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    FilledButton.icon(
+                                      onPressed: () => onView(community),
+                                      icon: const Icon(
+                                        Icons.visibility_rounded,
+                                      ),
+                                      label: const Text('Visualizar'),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () => onLeave(community),
+                                      icon: const Icon(Icons.logout_rounded),
+                                      label: const Text('Sair do espaço'),
+                                    ),
+                                  ],
                                 )
                               : FilledButton.icon(
                                   onPressed: () => onJoin(community),

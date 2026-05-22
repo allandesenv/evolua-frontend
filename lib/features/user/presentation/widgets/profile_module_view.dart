@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/presentation/utils/auth_form_validators.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -73,14 +74,18 @@ class ProfileModuleView extends ConsumerStatefulWidget {
 class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
+  final _birthDateController = TextEditingController();
   final _bioController = TextEditingController();
   final _customGenderController = TextEditingController();
   final _picker = ImagePicker();
   double _journeyLevel = 1;
   String _gender = 'MALE';
   DateTime? _birthDate;
+  String? _birthDateError;
   bool _didSeedForm = false;
   bool _isSavingProfile = false;
+  bool _isUploadingAvatar = false;
+  int _avatarRefreshNonce = 0;
   late ProfileModuleSection _section;
 
   @override
@@ -109,6 +114,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   @override
   void dispose() {
     _displayNameController.dispose();
+    _birthDateController.dispose();
     _bioController.dispose();
     _customGenderController.dispose();
     super.dispose();
@@ -130,6 +136,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     _gender = profile?.gender ?? 'MALE';
     _customGenderController.text = profile?.customGender ?? '';
     _birthDate = profile?.birthDate;
+    _birthDateController.text = _birthDate == null
+        ? ''
+        : formatBirthDate(_birthDate!);
     _didSeedForm = true;
   }
 
@@ -143,17 +152,32 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       locale: const Locale('pt', 'BR'),
     );
     if (selected != null) {
-      setState(() => _birthDate = selected);
+      setState(() {
+        _birthDate = selected;
+        _birthDateController.text = formatBirthDate(selected);
+        _birthDateError = validateBirthDateText(_birthDateController.text);
+      });
     }
+  }
+
+  void _handleProfileBirthDateChanged(String value) {
+    setState(() {
+      _birthDate = parseBirthDateText(value);
+      _birthDateError = validateBirthDateText(value);
+    });
   }
 
   Future<void> _saveProfile() async {
     if (_isSavingProfile) {
       return;
     }
+    _birthDate = parseBirthDateText(_birthDateController.text);
+    _birthDateError = validateBirthDateText(_birthDateController.text);
     if (!_formKey.currentState!.validate() || _birthDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe sua data de nascimento.')),
+        SnackBar(
+          content: Text(_birthDateError ?? 'Informe sua data de nascimento.'),
+        ),
       );
       return;
     }
@@ -188,6 +212,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   }
 
   Future<void> _pickAvatar() async {
+    if (_isUploadingAvatar) {
+      return;
+    }
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 88,
@@ -197,9 +224,26 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     }
 
     final bytes = await image.readAsBytes();
-    await ref
-        .read(profileControllerProvider.notifier)
-        .uploadAvatar(bytes: bytes, fileName: image.name);
+    setState(() => _isUploadingAvatar = true);
+    try {
+      await ref
+          .read(profileControllerProvider.notifier)
+          .uploadAvatar(bytes: bytes, fileName: image.name);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _avatarRefreshNonce++);
+      _showSettingsMessage('Foto atualizada.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingAvatar = false);
+      }
+    }
   }
 
   void _showSettingsMessage(String message) {
@@ -746,6 +790,14 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         normalized.contains('500');
   }
 
+  String? _cacheBustedAvatarUrl(String? url, int nonce) {
+    if (url == null || url.isEmpty || nonce <= 0) {
+      return url;
+    }
+    final separator = url.contains('?') ? '&' : '?';
+    return '$url${separator}v=$nonce';
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(profileControllerProvider);
@@ -779,7 +831,11 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       hero: _ProfileHero(
         displayName: profile?.displayName ?? fallbackName,
         email: session?.email ?? 'você@evolua.app',
-        avatarUrl: profile?.avatarUrl ?? session?.avatarUrl,
+        avatarUrl: _cacheBustedAvatarUrl(
+          profile?.avatarUrl ?? session?.avatarUrl,
+          _avatarRefreshNonce,
+        ),
+        isUploadingAvatar: _isUploadingAvatar,
         onRefresh: () => ref.read(profileControllerProvider.notifier).refresh(),
         onChangeAvatar: _pickAvatar,
       ),
@@ -793,16 +849,15 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
             _OverviewSection(
               formKey: _formKey,
               displayNameController: _displayNameController,
+              birthDateController: _birthDateController,
               bioController: _bioController,
               customGenderController: _customGenderController,
               gender: _gender,
-              birthDate: _birthDate,
-              journeyLevel: _journeyLevel,
+              birthDateError: _birthDateError,
               isSaving: isSaving,
               onGenderChanged: (value) => setState(() => _gender = value),
-              onJourneyLevelChanged: (value) =>
-                  setState(() => _journeyLevel = value),
               onPickBirthDate: _pickBirthDate,
+              onBirthDateChanged: _handleProfileBirthDateChanged,
               onSubmit: _saveProfile,
             )
           else if (_section == ProfileModuleSection.settingsPrivacy)
@@ -1346,6 +1401,7 @@ class _ProfileHero extends StatelessWidget {
     required this.displayName,
     required this.email,
     required this.avatarUrl,
+    required this.isUploadingAvatar,
     required this.onRefresh,
     required this.onChangeAvatar,
   });
@@ -1353,6 +1409,7 @@ class _ProfileHero extends StatelessWidget {
   final String displayName;
   final String email;
   final String? avatarUrl;
+  final bool isUploadingAvatar;
   final VoidCallback onRefresh;
   final VoidCallback onChangeAvatar;
 
@@ -1401,8 +1458,13 @@ class _ProfileHero extends StatelessWidget {
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: constraints.maxWidth),
               child: OutlinedButton.icon(
-                onPressed: onChangeAvatar,
-                icon: const Icon(Icons.photo_camera_back_rounded),
+                onPressed: isUploadingAvatar ? null : onChangeAvatar,
+                icon: isUploadingAvatar
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.photo_camera_back_rounded),
                 label: const Text(
                   'Trocar foto',
                   maxLines: 1,
@@ -1448,29 +1510,29 @@ class _OverviewSection extends StatelessWidget {
   const _OverviewSection({
     required this.formKey,
     required this.displayNameController,
+    required this.birthDateController,
     required this.bioController,
     required this.customGenderController,
     required this.gender,
-    required this.birthDate,
-    required this.journeyLevel,
+    required this.birthDateError,
     required this.isSaving,
     required this.onGenderChanged,
-    required this.onJourneyLevelChanged,
     required this.onPickBirthDate,
+    required this.onBirthDateChanged,
     required this.onSubmit,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController displayNameController;
+  final TextEditingController birthDateController;
   final TextEditingController bioController;
   final TextEditingController customGenderController;
   final String gender;
-  final DateTime? birthDate;
-  final double journeyLevel;
+  final String? birthDateError;
   final bool isSaving;
   final ValueChanged<String> onGenderChanged;
-  final ValueChanged<double> onJourneyLevelChanged;
   final VoidCallback onPickBirthDate;
+  final ValueChanged<String> onBirthDateChanged;
   final VoidCallback onSubmit;
 
   @override
@@ -1493,29 +1555,32 @@ class _OverviewSection extends StatelessWidget {
             const SizedBox(height: 22),
             TextFormField(
               controller: displayNameController,
+              maxLength: maxDisplayNameLength,
               decoration: const InputDecoration(
                 labelText: 'Nome',
                 prefixIcon: Icon(Icons.badge_rounded),
               ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Informe seu nome.'
-                  : null,
+              validator: validateDisplayName,
             ),
             const SizedBox(height: 16),
-            InkWell(
-              onTap: onPickBirthDate,
-              borderRadius: BorderRadius.circular(18),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Data de nascimento',
-                  prefixIcon: Icon(Icons.cake_rounded),
-                ),
-                child: Text(
-                  birthDate == null
-                      ? 'Selecione sua data'
-                      : '${birthDate!.day.toString().padLeft(2, '0')}/${birthDate!.month.toString().padLeft(2, '0')}/${birthDate!.year}',
+            TextFormField(
+              controller: birthDateController,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              inputFormatters: const [_ProfileBirthDateInputFormatter()],
+              decoration: InputDecoration(
+                labelText: 'Data de nascimento',
+                hintText: 'dd/mm/aaaa',
+                prefixIcon: const Icon(Icons.cake_rounded),
+                errorText: birthDateError,
+                suffixIcon: IconButton(
+                  tooltip: 'Abrir calendário',
+                  onPressed: isSaving ? null : onPickBirthDate,
+                  icon: const Icon(Icons.calendar_month_rounded),
                 ),
               ),
+              validator: (_) => birthDateError,
+              onChanged: onBirthDateChanged,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -1554,24 +1619,10 @@ class _OverviewSection extends StatelessWidget {
               maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Bio',
-                hintText: 'Conte um pouco sobre você, se quiser.',
+                hintText: 'Conte um pouco sobre você.',
                 alignLabelWithHint: true,
                 prefixIcon: Icon(Icons.notes_rounded),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Nível da jornada: ${journeyLevel.round()}',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
-              ),
-            ),
-            Slider(
-              min: 1,
-              max: 10,
-              divisions: 9,
-              value: journeyLevel,
-              onChanged: onJourneyLevelChanged,
             ),
             const SizedBox(height: 10),
             Align(
@@ -1590,6 +1641,31 @@ class _OverviewSection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProfileBirthDateInputFormatter extends TextInputFormatter {
+  const _ProfileBirthDateInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+    final buffer = StringBuffer();
+    for (var index = 0; index < limited.length; index++) {
+      if (index == 2 || index == 4) {
+        buffer.write('/');
+      }
+      buffer.write(limited[index]);
+    }
+    final text = buffer.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

@@ -67,7 +67,12 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   void didUpdateWidget(covariant ContentModuleView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.section != widget.section) {
-      _section = widget.section;
+      setState(() {
+        _section = widget.section;
+        if (_section == ContentModuleSection.catalog) {
+          _selectedCatalogTrail = null;
+        }
+      });
     }
   }
 

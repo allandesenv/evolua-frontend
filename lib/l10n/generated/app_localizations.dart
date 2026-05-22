@@ -973,7 +973,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkInReflectionLabel.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Se quiser, conte o motivo'**
+  /// **'Escreva o que sentir vontade. Este espaço é seu.'**
   String get checkInReflectionLabel;
 
   /// No description provided for @checkInReflectionHint.

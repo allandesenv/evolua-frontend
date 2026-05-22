@@ -16,7 +16,8 @@ class EmotionalModuleView extends ConsumerStatefulWidget {
   const EmotionalModuleView({super.key});
 
   @override
-  ConsumerState<EmotionalModuleView> createState() => _EmotionalModuleViewState();
+  ConsumerState<EmotionalModuleView> createState() =>
+      _EmotionalModuleViewState();
 }
 
 class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
@@ -37,10 +38,10 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
       final error = next.error;
       final message = error is DioException
           ? (error.response?.data is Map<String, dynamic>
-              ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                  error.message ??
-                  'Nao foi possivel salvar o check-in.')
-              : error.message ?? 'Nao foi possivel salvar o check-in.')
+                ? ((error.response?.data['details'] as List?)?.join(', ') ??
+                      error.message ??
+                      'Nao foi possivel salvar o check-in.')
+                : error.message ?? 'Nao foi possivel salvar o check-in.')
           : 'Nao foi possivel salvar o check-in.';
       AppSnackBar.show(
         context,
@@ -60,10 +61,13 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(checkInControllerProvider.notifier).create(
+    await ref
+        .read(checkInControllerProvider.notifier)
+        .create(
           mood: _moodController.text.trim(),
-          reflection:
-              _reflectionController.text.trim().isEmpty ? null : _reflectionController.text.trim(),
+          reflection: _reflectionController.text.trim().isEmpty
+              ? null
+              : _reflectionController.text.trim(),
           energyLevel: _energyLevel.round(),
         );
     if (!mounted) return;
@@ -74,8 +78,12 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
 
   Future<void> _applyFilters() {
     final range = _resolvePresetRange(_selectedRangePreset);
-    return ref.read(checkInControllerProvider.notifier).applyFilters(
-          search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+    return ref
+        .read(checkInControllerProvider.notifier)
+        .applyFilters(
+          search: _searchController.text.trim().isEmpty
+              ? null
+              : _searchController.text.trim(),
           mood: _selectedMood == 'Todos' ? null : _selectedMood.toLowerCase(),
           energyRange: switch (_selectedEnergyRange) {
             'Baixa (1-3)' => 'low',
@@ -105,14 +113,21 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
       context: context,
       firstDate: DateTime(now.year - 3),
       lastDate: DateTime(now.year + 1),
-      initialDateRange: DateTimeRange(start: today.subtract(const Duration(days: 29)), end: today),
+      initialDateRange: DateTimeRange(
+        start: today.subtract(const Duration(days: 29)),
+        end: today,
+      ),
       saveText: 'Aplicar',
       helpText: 'Selecionar intervalo',
     );
     if (picked == null) return;
     setState(() => _selectedRangePreset = 'Personalizado');
-    await ref.read(checkInControllerProvider.notifier).applyFilters(
-          search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
+    await ref
+        .read(checkInControllerProvider.notifier)
+        .applyFilters(
+          search: _searchController.text.trim().isEmpty
+              ? null
+              : _searchController.text.trim(),
           mood: _selectedMood == 'Todos' ? null : _selectedMood.toLowerCase(),
           energyRange: switch (_selectedEnergyRange) {
             'Baixa (1-3)' => 'low',
@@ -129,7 +144,8 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
   Widget build(BuildContext context) {
     final checkInState = ref.watch(checkInControllerProvider);
     final isSaving = checkInState.isLoading && !checkInState.hasValue;
-    final latestInsight = checkInState.asData?.value.latestCreatedCheckIn?.aiInsight;
+    final latestInsight =
+        checkInState.asData?.value.latestCreatedCheckIn?.aiInsight;
     final compact = ResponsiveBreakpoints.isCompact(context);
 
     return Column(
@@ -145,10 +161,14 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
                 children: [
                   SizedBox(
                     width: compact ? double.infinity : 420,
-                    child: Text('Check-in emocional', style: Theme.of(context).textTheme.headlineMedium),
+                    child: Text(
+                      'Check-in emocional',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => ref.read(checkInControllerProvider.notifier).refresh(),
+                    onPressed: () =>
+                        ref.read(checkInControllerProvider.notifier).refresh(),
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Atualizar'),
                   ),
@@ -166,16 +186,24 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
                   children: [
                     TextFormField(
                       controller: _moodController,
-                      decoration: const InputDecoration(labelText: 'Como voce esta agora?', prefixIcon: Icon(Icons.mood_rounded)),
-                      validator: (value) => value == null || value.trim().isEmpty ? 'Informe seu estado.' : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Como voce esta agora?',
+                        prefixIcon: Icon(Icons.mood_rounded),
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Informe seu estado.'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _reflectionController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Se quiser, conte o motivo do seu estado atual',
-                        hintText: 'Ex.: dormi pouco, tive uma conversa dificil, consegui terminar algo importante...',
+                        labelText:
+                            'Escreva o que sentir vontade. Este espaço é seu.',
+                        hintText:
+                            'Ex.: dormi pouco, tive uma conversa dificil, consegui terminar algo importante...',
                         alignLabelWithHint: true,
                         prefixIcon: Icon(Icons.auto_fix_high_rounded),
                       ),
@@ -186,12 +214,23 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
                       label: 'Energia percebida',
                       value: '${_energyLevel.round()} de 10',
                       child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Energia percebida: ${_energyLevel.round()}', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary)),
-                        Slider(min: 1, max: 10, divisions: 9, value: _energyLevel, onChanged: (value) => setState(() => _energyLevel = value)),
-                      ],
-                    ),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Energia percebida: ${_energyLevel.round()}',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: AppColors.textPrimary),
+                          ),
+                          Slider(
+                            min: 1,
+                            max: 10,
+                            divisions: 9,
+                            value: _energyLevel,
+                            onChanged: (value) =>
+                                setState(() => _energyLevel = value),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Align(
@@ -220,10 +259,12 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
             selectedMood: _selectedMood,
             selectedEnergyRange: _selectedEnergyRange,
             selectedRangePreset: _selectedRangePreset,
-            onPageChanged: (page) => ref.read(checkInControllerProvider.notifier).goToPage(page),
+            onPageChanged: (page) =>
+                ref.read(checkInControllerProvider.notifier).goToPage(page),
             onSearch: _applyFilters,
             onClearFilters: _clearFilters,
-            onRefresh: () => ref.read(checkInControllerProvider.notifier).refresh(),
+            onRefresh: () =>
+                ref.read(checkInControllerProvider.notifier).refresh(),
             onMoodChanged: (value) async {
               setState(() => _selectedMood = value);
               await _applyFilters();
@@ -239,7 +280,8 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
             },
           ),
           error: (error, stackTrace) => _ErrorState(
-            onRetry: () => ref.read(checkInControllerProvider.notifier).refresh(),
+            onRetry: () =>
+                ref.read(checkInControllerProvider.notifier).refresh(),
           ),
           loading: () => const _LoadingState(),
         ),
@@ -296,10 +338,19 @@ class _HistoryPanel extends StatelessWidget {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final grouped = <String, List<CheckIn>>{};
     for (final item in items) {
-      grouped.putIfAbsent(_monthLabel(item.createdAt), () => <CheckIn>[]).add(item);
+      grouped
+          .putIfAbsent(_monthLabel(item.createdAt), () => <CheckIn>[])
+          .add(item);
     }
-    final hasActiveFilters = searchController.text.trim().isNotEmpty || selectedMood != 'Todos' || selectedEnergyRange != 'Todas' || selectedRangePreset != '30 dias';
-    final totalEnergy = items.fold<int>(0, (sum, item) => sum + item.energyLevel);
+    final hasActiveFilters =
+        searchController.text.trim().isNotEmpty ||
+        selectedMood != 'Todos' ||
+        selectedEnergyRange != 'Todas' ||
+        selectedRangePreset != '30 dias';
+    final totalEnergy = items.fold<int>(
+      0,
+      (sum, item) => sum + item.energyLevel,
+    );
     final averageEnergy = items.isEmpty ? 0.0 : totalEnergy / items.length;
     final dominantMood = items.isEmpty ? 'sem dados' : _dominantMood(items);
 
@@ -319,13 +370,24 @@ class _HistoryPanel extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Sua evolucao emocional', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary)),
+                        Text(
+                          'Sua evolucao emocional',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(color: AppColors.textPrimary),
+                        ),
                         const SizedBox(height: 8),
-                        Text(_narrative(items, averageEnergy, dominantMood), style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          _narrative(items, averageEnergy, dominantMood),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ],
                     ),
                   ),
-                  TextButton.icon(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Atualizar')),
+                  TextButton.icon(
+                    onPressed: onRefresh,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Atualizar'),
+                  ),
                 ],
               ),
               const SizedBox(height: 18),
@@ -335,11 +397,19 @@ class _HistoryPanel extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: compact ? double.infinity : 260,
-                    child: _MetricCard(title: 'Energia media', value: '${averageEnergy.toStringAsFixed(1)}/10', subtitle: 'Registros visiveis'),
+                    child: _MetricCard(
+                      title: 'Energia media',
+                      value: '${averageEnergy.toStringAsFixed(1)}/10',
+                      subtitle: 'Registros visiveis',
+                    ),
                   ),
                   SizedBox(
                     width: compact ? double.infinity : 260,
-                    child: _MetricCard(title: 'Humor dominante', value: _capitalize(dominantMood), subtitle: 'Predominio recente'),
+                    child: _MetricCard(
+                      title: 'Humor dominante',
+                      value: _capitalize(dominantMood),
+                      subtitle: 'Predominio recente',
+                    ),
                   ),
                 ],
               ),
@@ -349,27 +419,45 @@ class _HistoryPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceStrong.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
+                  border: Border.all(
+                    color: AppColors.outline.withValues(alpha: 0.5),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Tendencia recente', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.textPrimary)),
+                    Text(
+                      'Tendencia recente',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
-                      children: items.reversed.map((item) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: Container(
-                            height: 20 + (item.energyLevel * 6),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              gradient: const LinearGradient(colors: [AppColors.accent, AppColors.accentWarm], begin: Alignment.bottomCenter, end: Alignment.topCenter),
+                      children: items.reversed
+                          .map(
+                            (item) => Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: Container(
+                                  height: 20 + (item.energyLevel * 6),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.accent,
+                                        AppColors.accentWarm,
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      )).toList(),
+                          )
+                          .toList(),
                     ),
                   ],
                 ),
@@ -381,22 +469,75 @@ class _HistoryPanel extends StatelessWidget {
                 decoration: InputDecoration(
                   labelText: 'Buscar por reflexao ou pratica',
                   prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(onPressed: onSearch, icon: const Icon(Icons.arrow_forward_rounded)),
+                  suffixIcon: IconButton(
+                    onPressed: onSearch,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
-              Wrap(spacing: 8, runSpacing: 8, children: _moodOptions(items, selectedMood).map((option) => ChoiceChip(label: Text(option), selected: option == selectedMood, onSelected: (_) => onMoodChanged(option))).toList()),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _moodOptions(items, selectedMood)
+                    .map(
+                      (option) => ChoiceChip(
+                        label: Text(option),
+                        selected: option == selectedMood,
+                        onSelected: (_) => onMoodChanged(option),
+                      ),
+                    )
+                    .toList(),
+              ),
               const SizedBox(height: 14),
-              Wrap(spacing: 8, runSpacing: 8, children: const ['Todas', 'Baixa (1-3)', 'Moderada (4-7)', 'Alta (8-10)'].map((option) => ChoiceChip(label: Text(option), selected: option == selectedEnergyRange, onSelected: (_) => onEnergyRangeChanged(option))).toList()),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    const [
+                          'Todas',
+                          'Baixa (1-3)',
+                          'Moderada (4-7)',
+                          'Alta (8-10)',
+                        ]
+                        .map(
+                          (option) => ChoiceChip(
+                            label: Text(option),
+                            selected: option == selectedEnergyRange,
+                            onSelected: (_) => onEnergyRangeChanged(option),
+                          ),
+                        )
+                        .toList(),
+              ),
               const SizedBox(height: 14),
-              Wrap(spacing: 8, runSpacing: 8, children: const ['7 dias', '30 dias', '90 dias', 'Personalizado'].map((option) => ChoiceChip(label: Text(option), selected: option == selectedRangePreset, onSelected: (_) => onRangePresetChanged(option))).toList()),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    const ['7 dias', '30 dias', '90 dias', 'Personalizado']
+                        .map(
+                          (option) => ChoiceChip(
+                            label: Text(option),
+                            selected: option == selectedRangePreset,
+                            onSelected: (_) => onRangePresetChanged(option),
+                          ),
+                        )
+                        .toList(),
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  Text('${result.totalItems} registros encontrados nesta leitura.', style: Theme.of(context).textTheme.bodySmall),
-                  if (hasActiveFilters) TextButton(onPressed: onClearFilters, child: const Text('Limpar filtros')),
+                  Text(
+                    '${result.totalItems} registros encontrados nesta leitura.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (hasActiveFilters)
+                    TextButton(
+                      onPressed: onClearFilters,
+                      child: const Text('Limpar filtros'),
+                    ),
                 ],
               ),
             ],
@@ -405,69 +546,125 @@ class _HistoryPanel extends StatelessWidget {
         const SizedBox(height: 16),
         if (items.isEmpty)
           GuidedEmptyState(
-            icon: hasActiveFilters ? Icons.filter_alt_off_rounded : Icons.insights_rounded,
-            title: hasActiveFilters ? 'Nenhum registro combina com este recorte.' : 'Seu historico emocional vai ganhar forma aqui.',
-            subtitle: hasActiveFilters ? 'Tente ampliar o periodo ou remover alguns filtros para enxergar sua evolucao.' : 'Comece com um check-in curto e o app transforma seus dias em uma linha do tempo acompanhavel.',
+            icon: hasActiveFilters
+                ? Icons.filter_alt_off_rounded
+                : Icons.insights_rounded,
+            title: hasActiveFilters
+                ? 'Nenhum registro combina com este recorte.'
+                : 'Seu historico emocional vai ganhar forma aqui.',
+            subtitle: hasActiveFilters
+                ? 'Tente ampliar o periodo ou remover alguns filtros para enxergar sua evolucao.'
+                : 'Comece com um check-in curto e o app transforma seus dias em uma linha do tempo acompanhavel.',
             actionLabel: hasActiveFilters ? 'Limpar filtros' : 'Atualizar',
             onAction: hasActiveFilters ? onClearFilters : onRefresh,
           )
         else
           Column(
             children: [
-              ...grouped.entries.map((entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: PrimaryPanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text(entry.key, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary))),
-                          Text('${entry.value.length} registros', style: Theme.of(context).textTheme.bodySmall),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      ...entry.value.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _TimelineEntry(item: item),
-                      )),
-                    ],
+              ...grouped.entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: PrimaryPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                entry.key,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(color: AppColors.textPrimary),
+                              ),
+                            ),
+                            Text(
+                              '${entry.value.length} registros',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        ...entry.value.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _TimelineEntry(item: item),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              )),
-              PaginationControls(page: result.page, totalPages: result.totalPages, onPageChanged: onPageChanged),
+              ),
+              PaginationControls(
+                page: result.page,
+                totalPages: result.totalPages,
+                onPageChanged: onPageChanged,
+              ),
             ],
           ),
       ],
     );
   }
 
-  List<String> _moodOptions(List<CheckIn> items, String selectedMood) => <String>{'Todos', ...items.map((item) => _capitalize(item.mood)), selectedMood}.toList();
-  String _monthLabel(DateTime date) => '${const ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][date.month - 1]} ${date.year}';
+  List<String> _moodOptions(List<CheckIn> items, String selectedMood) =>
+      <String>{
+        'Todos',
+        ...items.map((item) => _capitalize(item.mood)),
+        selectedMood,
+      }.toList();
+  String _monthLabel(DateTime date) =>
+      '${const ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][date.month - 1]} ${date.year}';
   String _dominantMood(List<CheckIn> items) {
     final counts = <String, int>{};
     for (final item in items) {
       counts.update(item.mood, (value) => value + 1, ifAbsent: () => 1);
     }
-    return counts.entries.reduce((best, current) => current.value > best.value ? current : best).key;
+    return counts.entries
+        .reduce((best, current) => current.value > best.value ? current : best)
+        .key;
   }
 
-  String _narrative(List<CheckIn> items, double averageEnergy, String dominantMood) {
-    if (items.isEmpty) return 'Registre seus dias para enxergar como humor, energia e rotina evoluem com o tempo.';
-    if (items.length < 2) return 'Humor predominante: ${_capitalize(dominantMood)}. Energia media ${averageEnergy.toStringAsFixed(1)}/10.';
+  String _narrative(
+    List<CheckIn> items,
+    double averageEnergy,
+    String dominantMood,
+  ) {
+    if (items.isEmpty) {
+      return 'Registre seus dias para enxergar como humor, energia e rotina evoluem com o tempo.';
+    }
+    if (items.length < 2) {
+      return 'Humor predominante: ${_capitalize(dominantMood)}. Energia media ${averageEnergy.toStringAsFixed(1)}/10.';
+    }
     final midpoint = (items.length / 2).ceil();
-    final recent = items.take(midpoint).fold<int>(0, (sum, item) => sum + item.energyLevel) / midpoint;
+    final recent =
+        items
+            .take(midpoint)
+            .fold<int>(0, (sum, item) => sum + item.energyLevel) /
+        midpoint;
     final olderItems = items.skip(midpoint).toList();
-    final older = olderItems.isEmpty ? recent : olderItems.fold<int>(0, (sum, item) => sum + item.energyLevel) / olderItems.length;
-    final stability = recent - older >= 1 ? 'Sua energia esteve mais alta nas ultimas semanas.' : recent - older <= -1 ? 'Sua energia caiu um pouco no periodo recente e vale observar o contexto.' : 'Sua energia esteve mais estavel nas ultimas semanas.';
+    final older = olderItems.isEmpty
+        ? recent
+        : olderItems.fold<int>(0, (sum, item) => sum + item.energyLevel) /
+              olderItems.length;
+    final stability = recent - older >= 1
+        ? 'Sua energia esteve mais alta nas ultimas semanas.'
+        : recent - older <= -1
+        ? 'Sua energia caiu um pouco no periodo recente e vale observar o contexto.'
+        : 'Sua energia esteve mais estavel nas ultimas semanas.';
     return 'Humor predominante: ${_capitalize(dominantMood)}. Energia media ${averageEnergy.toStringAsFixed(1)}/10. $stability';
   }
 
-  String _capitalize(String value) => value.isEmpty ? value : value[0].toUpperCase() + value.substring(1).toLowerCase();
+  String _capitalize(String value) => value.isEmpty
+      ? value
+      : value[0].toUpperCase() + value.substring(1).toLowerCase();
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.title, required this.value, required this.subtitle});
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+  });
   final String title;
   final String value;
   final String subtitle;
@@ -484,9 +681,19 @@ class _MetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.textSecondary)),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 8),
-          Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary)),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary),
+          ),
           const SizedBox(height: 4),
           Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
         ],
@@ -511,8 +718,20 @@ class _TimelineEntry extends StatelessWidget {
       children: [
         Column(
           children: [
-            Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
-            Container(width: 2, height: 116, margin: const EdgeInsets.symmetric(vertical: 6), color: AppColors.outline),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: const BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+            Container(
+              width: 2,
+              height: 116,
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              color: AppColors.outline,
+            ),
           ],
         ),
         const SizedBox(width: 14),
@@ -522,15 +741,27 @@ class _TimelineEntry extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surfaceStrong.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: AppColors.outline.withValues(alpha: 0.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Expanded(child: Text(item.mood[0].toUpperCase() + item.mood.substring(1).toLowerCase(), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary))),
-                    Text('$day/$month/${item.createdAt.year} $hour:$minute', style: Theme.of(context).textTheme.bodySmall),
+                    Expanded(
+                      child: Text(
+                        item.mood[0].toUpperCase() +
+                            item.mood.substring(1).toLowerCase(),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppColors.textPrimary),
+                      ),
+                    ),
+                    Text(
+                      '$day/$month/${item.createdAt.year} $hour:$minute',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -538,13 +769,22 @@ class _TimelineEntry extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _InfoChip(icon: Icons.bolt_rounded, label: 'Energia ${item.energyLevel}/10'),
-                    _InfoChip(icon: Icons.self_improvement_rounded, label: item.recommendedPractice),
+                    _InfoChip(
+                      icon: Icons.bolt_rounded,
+                      label: 'Energia ${item.energyLevel}/10',
+                    ),
+                    _InfoChip(
+                      icon: Icons.self_improvement_rounded,
+                      label: item.recommendedPractice,
+                    ),
                   ],
                 ),
                 if (item.reflection.trim().isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text(item.reflection, style: Theme.of(context).textTheme.bodyLarge),
+                  Text(
+                    item.reflection,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                 ],
               ],
             ),
@@ -574,7 +814,12 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: AppColors.accent),
           const SizedBox(width: 6),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textPrimary)),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textPrimary),
+          ),
         ],
       ),
     );
@@ -599,7 +844,8 @@ class _ErrorState extends StatelessWidget {
     return GuidedEmptyState(
       icon: Icons.error_outline_rounded,
       title: 'Nao conseguimos abrir sua linha do tempo agora.',
-      subtitle: 'Atualize a pagina ou tente novamente em alguns instantes para retomar sua leitura.',
+      subtitle:
+          'Atualize a pagina ou tente novamente em alguns instantes para retomar sua leitura.',
       actionLabel: 'Tentar de novo',
       onAction: onRetry,
     );

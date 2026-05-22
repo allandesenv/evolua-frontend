@@ -475,7 +475,8 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get checkInReflectionLabel => 'Se quiser, conte o motivo';
+  String get checkInReflectionLabel =>
+      'Escreva o que sentir vontade. Este espaço é seu.';
 
   @override
   String get checkInReflectionHint =>
@@ -1099,7 +1100,8 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   }
 
   @override
-  String get checkInReflectionLabel => 'Se quiser, conte o motivo';
+  String get checkInReflectionLabel =>
+      'Escreva o que sentir vontade. Este espaço é seu.';
 
   @override
   String get checkInReflectionHint =>
