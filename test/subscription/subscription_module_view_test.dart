@@ -132,6 +132,102 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('starts Google Play checkout on Android yearly tap', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await _setDesktopSurface(tester);
+
+    final repository = _FakeSubscriptionRepository(plans: _plans());
+    final googlePlay = _FakeGooglePlayBillingGateway();
+    await tester.pumpWidget(
+      _testApp(repository: repository, googlePlayBilling: googlePlay),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Evoluir continuamente'));
+    await tester.pumpAndSettle();
+
+    expect(googlePlay.startedProductIds, ['premium_anual']);
+    expect(repository.verifiedProductIds, ['premium_anual']);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('starts Google Play checkout on Android founder tap', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await _setDesktopSurface(tester);
+
+    final repository = _FakeSubscriptionRepository(plans: _plans());
+    final googlePlay = _FakeGooglePlayBillingGateway();
+    await tester.pumpWidget(
+      _testApp(repository: repository, googlePlayBilling: googlePlay),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Apoiar como fundador'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apoiar como fundador'));
+    await tester.pumpAndSettle();
+
+    expect(googlePlay.startedProductIds, ['evolua_founder']);
+    expect(repository.verifiedProductIds, ['evolua_founder']);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets(
+    'keeps Android checkout dynamic and fails gracefully without product id',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await _setDesktopSurface(tester);
+
+      final plans = _plans()
+          .map(
+            (plan) => plan.planCode == 'premium-monthly'
+                ? const PlanView(
+                    planCode: 'premium-monthly',
+                    title: 'Premium Mensal',
+                    subtitle: 'Mais contexto emocional.',
+                    billingCycle: 'MONTHLY',
+                    premium: true,
+                    price: 14.9,
+                    currency: 'BRL',
+                    benefits: ['Experiência sem anúncios'],
+                    active: true,
+                    planFamily: 'PREMIUM',
+                    sortOrder: 10,
+                  )
+                : plan,
+          )
+          .toList();
+      await tester.pumpWidget(
+        _testApp(
+          repository: _FakeSubscriptionRepository(plans: plans),
+          googlePlayBilling: _FakeGooglePlayBillingGateway(
+            error: StateError(
+              'Produto Google Play não configurado para este plano.',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Aprofundar jornada'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Produto Google Play não configurado para este plano.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton).at(1)).enabled,
+        isTrue,
+      );
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
   testWidgets(
     're-enables premium button and shows feedback on Google Play error',
     (tester) async {
