@@ -17,7 +17,7 @@ class NotificationBellButton extends ConsumerWidget {
       clipBehavior: Clip.none,
       children: [
         IconButton(
-          tooltip: 'Notificacoes',
+          tooltip: 'Notificações',
           onPressed: () async {
             await showDialog<void>(
               context: context,
@@ -86,18 +86,9 @@ class _NotificationAdminConsoleState
     super.initState();
     ref.listenManual(notificationInboxControllerProvider, (previous, next) {
       if (next.hasError) {
-        final error = next.error;
-        final message = error is DioException
-            ? (error.response?.data is Map<String, dynamic>
-                  ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                        error.message ??
-                        'Nao foi possivel enviar a notificacao.')
-                  : error.message ?? 'Nao foi possivel enviar a notificacao.')
-            : 'Nao foi possivel enviar a notificacao.';
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_notificationErrorMessage(next.error))),
+        );
       }
     });
   }
@@ -178,7 +169,7 @@ class _NotificationAdminConsoleState
                   items: const [
                     DropdownMenuItem(
                       value: 'ADMIN_MESSAGE',
-                      child: Text('Comunicacao manual'),
+                      child: Text('Comunicação manual'),
                     ),
                     DropdownMenuItem(
                       value: 'EVENT',
@@ -199,11 +190,11 @@ class _NotificationAdminConsoleState
                 TextFormField(
                   controller: _titleController,
                   decoration: const InputDecoration(
-                    labelText: 'Titulo',
+                    labelText: 'Título',
                     prefixIcon: Icon(Icons.title_rounded),
                   ),
                   validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Informe o titulo.'
+                      ? 'Informe o título.'
                       : null,
                 ),
                 const SizedBox(height: 16),
@@ -235,7 +226,7 @@ class _NotificationAdminConsoleState
                         ? null
                         : _submit,
                     icon: const Icon(Icons.send_rounded),
-                    label: const Text('Enviar notificacao'),
+                    label: const Text('Enviar notificação'),
                   ),
                 ),
               ],
@@ -247,39 +238,106 @@ class _NotificationAdminConsoleState
   }
 }
 
+String _notificationErrorMessage(Object? error) {
+  const fallback = 'Não foi possível enviar a notificação agora.';
+  if (error is! DioException) {
+    return fallback;
+  }
+  final data = error.response?.data;
+  if (data is Map<String, dynamic>) {
+    final details = data['details'];
+    if (details is List && details.isNotEmpty) {
+      final first = details.first.toString();
+      return _isTechnicalNotificationMessage(first) ? fallback : first;
+    }
+    final message = data['message'];
+    if (message != null) {
+      final text = message.toString();
+      return _isTechnicalNotificationMessage(text) ? fallback : text;
+    }
+  }
+  return fallback;
+}
+
+bool _isTechnicalNotificationMessage(String message) {
+  final normalized = message.toLowerCase();
+  return normalized.contains('dioexception') ||
+      normalized.contains('forbidden') ||
+      normalized.contains('stacktrace') ||
+      normalized.contains('exception') ||
+      normalized.contains('bad request') ||
+      normalized.contains('401') ||
+      normalized.contains('403') ||
+      normalized.contains('500');
+}
+
 class _NotificationInboxDialog extends ConsumerWidget {
   const _NotificationInboxDialog();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsState = ref.watch(notificationInboxControllerProvider);
+    final mediaQuery = MediaQuery.of(context);
+    final compact = mediaQuery.size.width < 520;
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(24),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 24,
+        vertical: compact ? 16 : 24,
+      ),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 700),
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: mediaQuery.size.height - (compact ? 32 : 48),
+        ),
         child: PrimaryPanel(
+          padding: EdgeInsets.all(compact ? 18 : 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Notificacoes',
-                      style: Theme.of(context).textTheme.headlineSmall,
+                  SizedBox(
+                    width: compact ? double.infinity : 260,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Notificações',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ),
+                        if (compact)
+                          IconButton(
+                            tooltip: 'Fechar',
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                      ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => ref
-                        .read(notificationInboxControllerProvider.notifier)
-                        .markAllAsRead(),
-                    child: const Text('Marcar todas como lidas'),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
+                  if (!compact)
+                    IconButton(
+                      tooltip: 'Fechar',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  TextButton.icon(
+                    onPressed: notificationsState.hasValue
+                        ? () => ref
+                              .read(
+                                notificationInboxControllerProvider.notifier,
+                              )
+                              .markAllAsRead()
+                        : null,
+                    icon: const Icon(Icons.done_all_rounded),
+                    label: const Text('Marcar todas como lidas'),
                   ),
                 ],
               ),
@@ -293,8 +351,8 @@ class _NotificationInboxDialog extends ConsumerWidget {
                 child: notificationsState.when(
                   data: (items) {
                     if (items.isEmpty) {
-                      return const Center(
-                        child: Text('Nenhuma notificacao por enquanto.'),
+                      return const SingleChildScrollView(
+                        child: _NotificationEmptyState(),
                       );
                     }
                     return ListView.separated(
@@ -316,7 +374,7 @@ class _NotificationInboxDialog extends ConsumerWidget {
                           },
                           borderRadius: BorderRadius.circular(18),
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(compact ? 14 : 16),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(18),
                               color: item.isRead
@@ -338,6 +396,8 @@ class _NotificationInboxDialog extends ConsumerWidget {
                                     Expanded(
                                       child: Text(
                                         item.title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                         style: Theme.of(
                                           context,
                                         ).textTheme.titleMedium,
@@ -357,6 +417,7 @@ class _NotificationInboxDialog extends ConsumerWidget {
                                 const SizedBox(height: 8),
                                 Text(
                                   item.message,
+                                  softWrap: true,
                                   style: Theme.of(context).textTheme.bodyMedium,
                                 ),
                                 const SizedBox(height: 10),
@@ -412,6 +473,48 @@ class _NotificationInboxDialog extends ConsumerWidget {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day/$month $hour:$minute';
+  }
+}
+
+class _NotificationEmptyState extends StatelessWidget {
+  const _NotificationEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.notifications_none_rounded,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Nenhuma notificação por enquanto',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Quando houver lembretes ou avisos importantes, eles aparecerão aqui.',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
   }
 }
 

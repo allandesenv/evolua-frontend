@@ -1,6 +1,7 @@
 const minimumSignupAge = 13;
 const maxEmailLength = 254;
 const minPasswordLength = 6;
+const maxPasswordLength = 72;
 const minDisplayNameLength = 2;
 const maxDisplayNameLength = 80;
 
@@ -66,6 +67,24 @@ String? validatePassword(String? value) {
     return 'A senha deve ter ao menos $minPasswordLength caracteres.';
   }
 
+  if (password.length > maxPasswordLength) {
+    return 'Use uma senha com até $maxPasswordLength caracteres.';
+  }
+
+  return null;
+}
+
+String? validateConfirmPassword(String? value, String password) {
+  final confirmation = value ?? '';
+
+  if (confirmation.isEmpty) {
+    return 'Confirme sua senha.';
+  }
+
+  if (confirmation != password) {
+    return 'As senhas não conferem.';
+  }
+
   return null;
 }
 
@@ -84,12 +103,51 @@ String? validateDisplayName(String? value) {
     return 'Informe um nome com até $maxDisplayNameLength caracteres.';
   }
 
-  final namePattern = RegExp(r"^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$");
+  final namePattern = RegExp(r'^[A-Za-zÀ-ÖØ-öø-ÿ ]+$');
   if (!namePattern.hasMatch(name)) {
-    return 'Use apenas letras, espaços, hífen ou apóstrofo no nome.';
+    return 'Use apenas letras, espaços e acentos no nome.';
   }
 
   return null;
+}
+
+DateTime? parseBirthDateText(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.length != 8) {
+    return null;
+  }
+
+  final day = int.tryParse(digits.substring(0, 2));
+  final month = int.tryParse(digits.substring(2, 4));
+  final year = int.tryParse(digits.substring(4, 8));
+  if (day == null || month == null || year == null) {
+    return null;
+  }
+
+  final parsed = DateTime(year, month, day);
+  if (parsed.day != day || parsed.month != month || parsed.year != year) {
+    return null;
+  }
+
+  return parsed;
+}
+
+String formatBirthDate(DateTime value) {
+  return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+}
+
+String? validateBirthDateText(String? value, {DateTime? now}) {
+  final raw = (value ?? '').trim();
+  if (raw.isEmpty) {
+    return 'Informe sua data de nascimento.';
+  }
+
+  final parsed = parseBirthDateText(raw);
+  if (parsed == null) {
+    return 'Use uma data válida no formato dd/mm/aaaa.';
+  }
+
+  return validateBirthDate(parsed, now: now);
 }
 
 String? validateBirthDate(DateTime? value, {DateTime? now}) {

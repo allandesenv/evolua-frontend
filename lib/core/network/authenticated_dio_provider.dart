@@ -39,20 +39,24 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
           return;
         }
 
+        final original = error.requestOptions;
+        final originalAuthorization = _authorizationHeader(original);
         final refreshed = await ref
             .read(authControllerProvider.notifier)
             .refreshSession();
-        if (refreshed == null) {
-          await ref.read(authControllerProvider.notifier).logout();
+        final refreshedAuthorization = refreshed?.accessToken == null
+            ? null
+            : 'Bearer ${refreshed!.accessToken}';
+        if (refreshedAuthorization == null ||
+            refreshedAuthorization == originalAuthorization) {
           handler.next(error);
           return;
         }
 
-        final original = error.requestOptions;
         final retryOptions = original.copyWith(
           headers: {
             ...original.headers,
-            'Authorization': 'Bearer ${refreshed.accessToken}',
+            'Authorization': refreshedAuthorization,
           },
           extra: {...original.extra, _authRetryExtraKey: true},
         );
@@ -72,7 +76,7 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
 
 bool _shouldRefresh(DioException error) {
   final response = error.response;
-  if (response?.statusCode != 401) {
+  if (response?.statusCode != 401 && response?.statusCode != 403) {
     return false;
   }
 
@@ -81,10 +85,23 @@ bool _shouldRefresh(DioException error) {
     return false;
   }
 
-  return !_isPublicAuthPath(request.path);
+  return !_isPublicAuthPath(request.path) &&
+      _authorizationHeader(request) != null;
 }
 
 bool _isPublicAuthPath(String path) {
   return path.contains('/v1/public/auth/') ||
       path.endsWith('/auth/google/callback');
+}
+
+String? _authorizationHeader(RequestOptions request) {
+  for (final entry in request.headers.entries) {
+    if (entry.key.toLowerCase() == 'authorization') {
+      final value = entry.value?.toString();
+      if (value != null && value.trim().isNotEmpty) {
+        return value;
+      }
+    }
+  }
+  return null;
 }

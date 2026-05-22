@@ -49,6 +49,10 @@ class ContentModuleView extends ConsumerStatefulWidget {
 
 class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   final _searchController = TextEditingController();
+  static const _minimumSearchLength = 4;
+  static const _searchDebounceDuration = Duration(milliseconds: 450);
+  Timer? _searchDebounce;
+  String? _searchHelperText;
   bool? _premiumFilter;
   Trail? _selectedCatalogTrail;
   late ContentModuleSection _section;
@@ -63,26 +67,81 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   void didUpdateWidget(covariant ContentModuleView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.section != widget.section) {
-      _section = widget.section;
+      setState(() {
+        _section = widget.section;
+        if (_section == ContentModuleSection.catalog) {
+          _selectedCatalogTrail = null;
+        }
+      });
     }
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _applyFilters() {
+  Future<void> _applyFilters({String? searchOverride}) {
+    final rawSearch = searchOverride ?? _searchController.text;
+    final normalizedSearch = rawSearch.trim();
     setState(() => _selectedCatalogTrail = null);
     return ref
         .read(trailControllerProvider.notifier)
         .applyFilters(
-          search: _searchController.text.trim().isEmpty
-              ? null
-              : _searchController.text.trim(),
+          search: normalizedSearch.isEmpty ? null : normalizedSearch,
           premium: _premiumFilter,
         );
+  }
+
+  void _handleSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final normalizedSearch = value.trim();
+
+    if (normalizedSearch.isNotEmpty &&
+        normalizedSearch.length < _minimumSearchLength) {
+      setState(() {
+        _searchHelperText = 'Digite pelo menos 4 caracteres para buscar.';
+      });
+      return;
+    }
+
+    setState(() => _searchHelperText = null);
+    _searchDebounce = Timer(
+      _searchDebounceDuration,
+      () => _applyFilters(searchOverride: normalizedSearch),
+    );
+  }
+
+  void _handlePremiumFilterChanged(bool? value) {
+    _searchDebounce?.cancel();
+    final normalizedSearch = _searchController.text.trim();
+    setState(() {
+      _premiumFilter = value;
+      _selectedCatalogTrail = null;
+      _searchHelperText =
+          normalizedSearch.isNotEmpty &&
+              normalizedSearch.length < _minimumSearchLength
+          ? 'Digite pelo menos 4 caracteres para buscar.'
+          : null;
+    });
+    _applyFilters(
+      searchOverride: normalizedSearch.length >= _minimumSearchLength
+          ? normalizedSearch
+          : null,
+    );
+  }
+
+  void _clearCatalogFilters() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _premiumFilter = null;
+      _selectedCatalogTrail = null;
+      _searchHelperText = null;
+    });
+    _applyFilters(searchOverride: null);
   }
 
   void _selectSection(ContentModuleSection section) {
@@ -140,42 +199,36 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
             onBack: () => setState(() => _selectedCatalogTrail = null),
             onOpenMentor: widget.onOpenMentor,
           ),
+          (false, _)
+              when _section == ContentModuleSection.journey &&
+                  currentJourney.isLoading =>
+            const PanelSkeleton(rows: 4, tileHeight: 92),
+          (false, _)
+              when _section == ContentModuleSection.journey &&
+                  currentJourney.hasValue =>
+            _EmptyJourneyPanel(
+              onOpenCatalog: () => _selectSection(ContentModuleSection.catalog),
+            ),
           _ => SingleChildScrollView(
             child: Column(
               children: [
-                currentJourney.when(
-                  data: (trail) => trail == null
-                      ? const SizedBox.shrink()
-                      : _CurrentJourneyBanner(
-                          trail: trail,
-                          onOpenJourney: () => setState(
-                            () => _section = ContentModuleSection.journey,
-                          ),
-                        ),
-                  error: (_, _) => const SizedBox.shrink(),
-                  loading: () => const SizedBox.shrink(),
-                ),
-                const SizedBox(height: 16),
                 trailsState.when(
                   data: (result) => _TrailExplorer(
                     result: result,
                     hasPremiumAccess: hasPremiumAccess,
                     searchController: _searchController,
                     premiumFilter: _premiumFilter,
-                    onSearchChanged: (_) => _applyFilters(),
-                    onPremiumFilterChanged: (value) {
-                      setState(() {
-                        _premiumFilter = value;
-                        _selectedCatalogTrail = null;
-                      });
-                      _applyFilters();
-                    },
+                    searchHelperText: _searchHelperText,
+                    onSearchChanged: _handleSearchChanged,
+                    onPremiumFilterChanged: _handlePremiumFilterChanged,
+                    onClearFilters: _clearCatalogFilters,
                     onOpenTrail: (trail) => setState(() {
                       _section = ContentModuleSection.catalog;
                       _selectedCatalogTrail = trail;
                     }),
                     onOpenPremium: widget.onOpenPremium,
                     onPageChanged: (page) {
+                      _searchDebounce?.cancel();
                       setState(() => _selectedCatalogTrail = null);
                       ref.read(trailControllerProvider.notifier).goToPage(page);
                     },
@@ -306,42 +359,40 @@ class _ContentSectionButton extends StatelessWidget {
   }
 }
 
-class _CurrentJourneyBanner extends StatelessWidget {
-  const _CurrentJourneyBanner({
-    required this.trail,
-    required this.onOpenJourney,
-  });
+class _EmptyJourneyPanel extends StatelessWidget {
+  const _EmptyJourneyPanel({required this.onOpenCatalog});
 
-  final Trail trail;
-  final VoidCallback onOpenJourney;
+  final VoidCallback onOpenCatalog;
 
   @override
   Widget build(BuildContext context) {
-    return PrimaryPanel(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Minha jornada ativa',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: context.evoluaColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(trail.title, style: Theme.of(context).textTheme.bodyLarge),
-              ],
+    return SingleChildScrollView(
+      child: PrimaryPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sua jornada',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: context.evoluaColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          OutlinedButton.icon(
-            onPressed: onOpenJourney,
-            icon: const Icon(Icons.auto_awesome_rounded),
-            label: const Text('Abrir jornada'),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Aqui ficam suas trilhas em andamento, o próximo passo e recomendações para continuar com constância.',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 18),
+            GuidedEmptyState(
+              icon: Icons.route_rounded,
+              title: 'Nenhuma jornada em andamento',
+              subtitle:
+                  'Explore o catálogo e escolha uma trilha para iniciar sua próxima etapa.',
+              actionLabel: 'Explorar trilhas',
+              onAction: onOpenCatalog,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -713,7 +764,9 @@ class _JourneyHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Trilha de ${_categoryLabel(trail.category)}',
+          isCatalogTrail
+              ? 'Trilha de ${_categoryLabel(trail.category)}'
+              : 'Sua jornada',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: activeColor,
             fontWeight: FontWeight.w700,
@@ -1206,7 +1259,6 @@ class _StepTtsPlayerState extends State<_StepTtsPlayer> {
   }
 }
 
-
 class _JourneyVideoPlayer extends StatelessWidget {
   const _JourneyVideoPlayer({required this.trailId, required this.step});
 
@@ -1248,7 +1300,8 @@ class _JourneyIframeVideoPlayerState
   }
 
   String? _effectiveVideoId() {
-    return widget.step.video?.videoId ?? _extractYoutubeId(widget.step.video?.url);
+    return widget.step.video?.videoId ??
+        _extractYoutubeId(widget.step.video?.url);
   }
 
   ytw.YoutubePlayerController _createController(String videoId) {
@@ -1310,10 +1363,15 @@ class _JourneyIframeVideoPlayerState
   Future<void> _sendProgress({bool force = false}) async {
     final controller = _controller;
     final declaredDuration = widget.step.video?.durationSeconds;
-    if (controller == null || declaredDuration == null || declaredDuration <= 0) {
+    if (controller == null ||
+        declaredDuration == null ||
+        declaredDuration <= 0) {
       return;
     }
-    final watched = (await controller.currentTime).round().clamp(0, declaredDuration);
+    final watched = (await controller.currentTime).round().clamp(
+      0,
+      declaredDuration,
+    );
     await _sendVideoProgress(
       ref: ref,
       trailId: widget.trailId,
@@ -1385,7 +1443,8 @@ class _JourneyMobileVideoPlayerState
   }
 
   String? _effectiveVideoId() {
-    return widget.step.video?.videoId ?? _extractYoutubeId(widget.step.video?.url);
+    return widget.step.video?.videoId ??
+        _extractYoutubeId(widget.step.video?.url);
   }
 
   ytm.YoutubePlayerController _createController(String videoId) {
@@ -1767,12 +1826,17 @@ Future<void> _sendVideoProgress({
   required bool force,
   required ValueChanged<int> onPercentSent,
 }) async {
-  final percent = ((watchedSeconds * 100) / durationSeconds).round().clamp(0, 100);
+  final percent = ((watchedSeconds * 100) / durationSeconds).round().clamp(
+    0,
+    100,
+  );
   if (!force && percent < 90 && percent < lastSentPercent + 10) {
     return;
   }
   onPercentSent(percent);
-  await ref.read(trailJourneyActionProvider).updateVideoProgress(
+  await ref
+      .read(trailJourneyActionProvider)
+      .updateVideoProgress(
         trailId: trailId,
         stepIndex: stepIndex,
         watchedSeconds: watchedSeconds,
@@ -1823,6 +1887,47 @@ String _catalogTrailCtaLabel(TrailJourney journey) {
     return 'Continuar trilha';
   }
   return 'Iniciar trilha';
+}
+
+String _resultCountLabel(int totalItems) {
+  if (totalItems == 1) {
+    return '1 trilha encontrada';
+  }
+  return '$totalItems trilhas encontradas';
+}
+
+String _emptyStateTitle({
+  required bool? premiumFilter,
+  required String search,
+}) {
+  final hasSearch = search.trim().length >= 4;
+  if (hasSearch) {
+    return 'Nenhuma trilha encontrada para essa busca.';
+  }
+  if (premiumFilter == true) {
+    return 'Novas trilhas premium em breve.';
+  }
+  if (premiumFilter == false) {
+    return 'Novas trilhas essenciais em breve.';
+  }
+  return 'Novas trilhas serão adicionadas em breve.';
+}
+
+String _emptyStateSubtitle({
+  required bool? premiumFilter,
+  required String search,
+}) {
+  final hasSearch = search.trim().length >= 4;
+  if (hasSearch) {
+    return 'Tente outro termo ou limpe os filtros para ampliar sua descoberta.';
+  }
+  if (premiumFilter == true) {
+    return 'Enquanto isso, continue nas trilhas essenciais ou volte mais tarde para novas experiências premium.';
+  }
+  if (premiumFilter == false) {
+    return 'Em breve, novas jornadas gratuitas estarão disponíveis para continuar sua evolução.';
+  }
+  return 'O catálogo está sendo preparado. Volte em breve para descobrir novas jornadas.';
 }
 
 String _stepTypeLabel(String type) {
@@ -2041,8 +2146,10 @@ class _TrailExplorer extends ConsumerWidget {
     required this.hasPremiumAccess,
     required this.searchController,
     required this.premiumFilter,
+    required this.searchHelperText,
     required this.onSearchChanged,
     required this.onPremiumFilterChanged,
+    required this.onClearFilters,
     required this.onOpenTrail,
     required this.onOpenPremium,
     required this.onPageChanged,
@@ -2052,8 +2159,10 @@ class _TrailExplorer extends ConsumerWidget {
   final bool hasPremiumAccess;
   final TextEditingController searchController;
   final bool? premiumFilter;
+  final String? searchHelperText;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<bool?> onPremiumFilterChanged;
+  final VoidCallback onClearFilters;
   final ValueChanged<Trail> onOpenTrail;
   final VoidCallback? onOpenPremium;
   final ValueChanged<int> onPageChanged;
@@ -2067,23 +2176,29 @@ class _TrailExplorer extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Encontrar uma trilha certa',
+                'Catálogo de trilhas',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: context.evoluaColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                '${result.totalItems} trilhas encontradas nesta busca.',
+                'Descubra trilhas por tema, formato e profundidade. Use a busca quando quiser encontrar um caminho específico.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _resultCountLabel(result.totalItems),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: searchController,
                 onChanged: onSearchChanged,
-                decoration: const InputDecoration(
-                  labelText: 'Buscar por titulo, tema ou resumo',
-                  prefixIcon: Icon(Icons.search_rounded),
+                decoration: InputDecoration(
+                  labelText: 'Buscar por título, tema ou resumo',
+                  helperText: searchHelperText,
+                  prefixIcon: const Icon(Icons.search_rounded),
                 ),
               ),
               const SizedBox(height: 14),
@@ -2115,14 +2230,16 @@ class _TrailExplorer extends ConsumerWidget {
         if (result.items.isEmpty)
           GuidedEmptyState(
             icon: Icons.spa_rounded,
-            title: 'Nenhuma trilha aparece com esse filtro.',
-            subtitle:
-                'Experimente outro termo ou limpe os filtros para ampliar sua busca.',
+            title: _emptyStateTitle(
+              premiumFilter: premiumFilter,
+              search: searchController.text,
+            ),
+            subtitle: _emptyStateSubtitle(
+              premiumFilter: premiumFilter,
+              search: searchController.text,
+            ),
             actionLabel: 'Ver todas as trilhas',
-            onAction: () {
-              searchController.clear();
-              onPremiumFilterChanged(null);
-            },
+            onAction: onClearFilters,
           )
         else
           Column(

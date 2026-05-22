@@ -59,6 +59,18 @@ class AppConfig {
     defaultValue: 'evolua://app',
   );
 
+  static const privacyPolicyUrl = String.fromEnvironment(
+    'EVOLUA_PRIVACY_POLICY_URL',
+    defaultValue:
+        'https://allandesenv.github.io/evolua-legal/politica-de-privacidade.html',
+  );
+
+  static const termsOfUseUrl = String.fromEnvironment(
+    'EVOLUA_TERMS_OF_USE_URL',
+    defaultValue:
+        'https://allandesenv.github.io/evolua-legal/termos-de-uso.html',
+  );
+
   static const adMobAndroidRewardedAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_ANDROID_REWARDED_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-1136517314419681/4183412880',

@@ -5,17 +5,25 @@ import 'package:evolua_frontend/features/subscription/domain/repositories/subscr
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
-final googlePlayBillingServiceProvider = Provider<GooglePlayBillingService>(
+final googlePlayBillingServiceProvider = Provider<GooglePlayBillingGateway>(
   (ref) => GooglePlayBillingService(InAppPurchase.instance),
 );
 
-class GooglePlayBillingService {
+abstract class GooglePlayBillingGateway {
+  Future<CheckoutSession> buyPremium({
+    required PlanView plan,
+    required SubscriptionRepository repository,
+  });
+}
+
+class GooglePlayBillingService implements GooglePlayBillingGateway {
   GooglePlayBillingService(this._iap);
 
   static const packageName = 'br.com.zenithit.evolua';
 
   final InAppPurchase _iap;
 
+  @override
   Future<CheckoutSession> buyPremium({
     required PlanView plan,
     required SubscriptionRepository repository,
@@ -26,7 +34,9 @@ class GooglePlayBillingService {
     }
     final available = await _iap.isAvailable();
     if (!available) {
-      throw StateError('Google Play Billing não está disponível neste aparelho.');
+      throw StateError(
+        'Google Play Billing não está disponível neste aparelho.',
+      );
     }
     final products = await _iap.queryProductDetails({productId});
     if (products.error != null) {
@@ -38,7 +48,9 @@ class GooglePlayBillingService {
 
     final purchase = _waitForPurchase(productId);
     final started = await _iap.buyNonConsumable(
-      purchaseParam: PurchaseParam(productDetails: products.productDetails.first),
+      purchaseParam: PurchaseParam(
+        productDetails: products.productDetails.first,
+      ),
     );
     if (!started) {
       throw StateError('Não foi possível iniciar o checkout do Google Play.');

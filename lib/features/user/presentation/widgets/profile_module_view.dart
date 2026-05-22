@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/presentation/utils/auth_form_validators.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -14,6 +16,7 @@ import 'package:evolua_frontend/features/future_message/domain/entities/future_m
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
@@ -33,6 +36,12 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+typedef LegalUrlLauncher = Future<bool> Function(Uri url);
+
+final legalUrlLauncherProvider = Provider<LegalUrlLauncher>((ref) {
+  return (url) => launchUrl(url, mode: LaunchMode.externalApplication);
+});
+
 enum ProfileModuleSection {
   overview,
   settingsPrivacy,
@@ -42,6 +51,13 @@ enum ProfileModuleSection {
   plansSubscriptions,
   evolutionMirror,
 }
+
+final _advancedMirrorAccessProvider =
+    FutureProvider.autoDispose<MonetizationAccessStatus>((ref) {
+      return ref
+          .read(monetizationAccessControllerProvider.notifier)
+          .access(resource: 'ADVANCED_MIRROR');
+    });
 
 class ProfileModuleView extends ConsumerStatefulWidget {
   const ProfileModuleView({
@@ -58,14 +74,18 @@ class ProfileModuleView extends ConsumerStatefulWidget {
 class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
+  final _birthDateController = TextEditingController();
   final _bioController = TextEditingController();
   final _customGenderController = TextEditingController();
   final _picker = ImagePicker();
   double _journeyLevel = 1;
   String _gender = 'MALE';
   DateTime? _birthDate;
+  String? _birthDateError;
   bool _didSeedForm = false;
   bool _isSavingProfile = false;
+  bool _isUploadingAvatar = false;
+  int _avatarRefreshNonce = 0;
   late ProfileModuleSection _section;
 
   @override
@@ -77,19 +97,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         return;
       }
 
-      final error = next.error;
-      final message = error is DioException
-          ? (error.response?.data is Map<String, dynamic>
-                ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                      error.response?.data['message']?.toString() ??
-                      error.message ??
-                      'Não foi possível salvar o perfil.')
-                : error.message ?? 'Não foi possível salvar o perfil.')
-          : 'Não foi possível salvar o perfil.';
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendlySettingsError(next.error!))),
+      );
     });
   }
 
@@ -104,6 +114,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   @override
   void dispose() {
     _displayNameController.dispose();
+    _birthDateController.dispose();
     _bioController.dispose();
     _customGenderController.dispose();
     super.dispose();
@@ -125,6 +136,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     _gender = profile?.gender ?? 'MALE';
     _customGenderController.text = profile?.customGender ?? '';
     _birthDate = profile?.birthDate;
+    _birthDateController.text = _birthDate == null
+        ? ''
+        : formatBirthDate(_birthDate!);
     _didSeedForm = true;
   }
 
@@ -138,17 +152,32 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       locale: const Locale('pt', 'BR'),
     );
     if (selected != null) {
-      setState(() => _birthDate = selected);
+      setState(() {
+        _birthDate = selected;
+        _birthDateController.text = formatBirthDate(selected);
+        _birthDateError = validateBirthDateText(_birthDateController.text);
+      });
     }
+  }
+
+  void _handleProfileBirthDateChanged(String value) {
+    setState(() {
+      _birthDate = parseBirthDateText(value);
+      _birthDateError = validateBirthDateText(value);
+    });
   }
 
   Future<void> _saveProfile() async {
     if (_isSavingProfile) {
       return;
     }
+    _birthDate = parseBirthDateText(_birthDateController.text);
+    _birthDateError = validateBirthDateText(_birthDateController.text);
     if (!_formKey.currentState!.validate() || _birthDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe sua data de nascimento.')),
+        SnackBar(
+          content: Text(_birthDateError ?? 'Informe sua data de nascimento.'),
+        ),
       );
       return;
     }
@@ -183,6 +212,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   }
 
   Future<void> _pickAvatar() async {
+    if (_isUploadingAvatar) {
+      return;
+    }
     final image = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 88,
@@ -192,9 +224,26 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     }
 
     final bytes = await image.readAsBytes();
-    await ref
-        .read(profileControllerProvider.notifier)
-        .uploadAvatar(bytes: bytes, fileName: image.name);
+    setState(() => _isUploadingAvatar = true);
+    try {
+      await ref
+          .read(profileControllerProvider.notifier)
+          .uploadAvatar(bytes: bytes, fileName: image.name);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _avatarRefreshNonce++);
+      _showSettingsMessage('Foto atualizada.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingAvatar = false);
+      }
+    }
   }
 
   void _showSettingsMessage(String message) {
@@ -217,6 +266,32 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         return;
       }
       _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _openLegalLink(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      _showSettingsMessage(
+        'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+      );
+      return;
+    }
+
+    try {
+      final opened = await ref.read(legalUrlLauncherProvider)(uri);
+      if (!opened && mounted) {
+        _showSettingsMessage(
+          'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(
+        'Não foi possível abrir este documento agora. Tente novamente em instantes.',
+      );
     }
   }
 
@@ -259,7 +334,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 Clipboard.setData(ClipboardData(text: exportJson));
                 Navigator.of(context).pop();
                 _showSettingsMessage(
-                  'Exportação cópiada para a area de transferencia.',
+                  'Exportação copiada para a área de transferência.',
                 );
               },
               child: const Text('Copiar JSON'),
@@ -302,7 +377,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final confirmed = await _showConfirmDialog(
       title: 'Encerrar sessões ativas',
       message:
-          'As outras sessões da sua conta serao encerradas. Você continuara usando este app ate precisar entrar novamente.',
+          'As outras sessões da sua conta serão encerradas. Você continuará usando este app até precisar entrar novamente.',
       confirmLabel: 'Encerrar sessões',
     );
     if (!confirmed) {
@@ -313,7 +388,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       if (!mounted) {
         return;
       }
-      _showSettingsMessage('Sessoes ativas encerradas.');
+      _showSettingsMessage('Sessões ativas encerradas.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -681,23 +756,46 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   }
 
   String _friendlySettingsError(Object error) {
+    const fallback = 'Não foi possível concluir esta ação agora.';
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
         final details = data['details'];
         if (details is List && details.isNotEmpty) {
-          return details.first.toString();
+          final first = details.first.toString();
+          return _isTechnicalMessage(first) ? fallback : first;
         }
         final message = data['message'];
         if (message != null) {
-          return message.toString();
+          final text = message.toString();
+          return _isTechnicalMessage(text) ? fallback : text;
         }
       }
       if (error.message != null && error.message!.isNotEmpty) {
-        return error.message!;
+        return _isTechnicalMessage(error.message!) ? fallback : error.message!;
       }
     }
-    return 'Não foi possível concluir esta ação agora.';
+    return fallback;
+  }
+
+  bool _isTechnicalMessage(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('dioexception') ||
+        normalized.contains('forbidden') ||
+        normalized.contains('stacktrace') ||
+        normalized.contains('exception') ||
+        normalized.contains('bad request') ||
+        normalized.contains('401') ||
+        normalized.contains('403') ||
+        normalized.contains('500');
+  }
+
+  String? _cacheBustedAvatarUrl(String? url, int nonce) {
+    if (url == null || url.isEmpty || nonce <= 0) {
+      return url;
+    }
+    final separator = url.contains('?') ? '&' : '?';
+    return '$url${separator}v=$nonce';
   }
 
   @override
@@ -733,7 +831,11 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       hero: _ProfileHero(
         displayName: profile?.displayName ?? fallbackName,
         email: session?.email ?? 'você@evolua.app',
-        avatarUrl: profile?.avatarUrl ?? session?.avatarUrl,
+        avatarUrl: _cacheBustedAvatarUrl(
+          profile?.avatarUrl ?? session?.avatarUrl,
+          _avatarRefreshNonce,
+        ),
+        isUploadingAvatar: _isUploadingAvatar,
         onRefresh: () => ref.read(profileControllerProvider.notifier).refresh(),
         onChangeAvatar: _pickAvatar,
       ),
@@ -747,16 +849,15 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
             _OverviewSection(
               formKey: _formKey,
               displayNameController: _displayNameController,
+              birthDateController: _birthDateController,
               bioController: _bioController,
               customGenderController: _customGenderController,
               gender: _gender,
-              birthDate: _birthDate,
-              journeyLevel: _journeyLevel,
+              birthDateError: _birthDateError,
               isSaving: isSaving,
               onGenderChanged: (value) => setState(() => _gender = value),
-              onJourneyLevelChanged: (value) =>
-                  setState(() => _journeyLevel = value),
               onPickBirthDate: _pickBirthDate,
+              onBirthDateChanged: _handleProfileBirthDateChanged,
               onSubmit: _saveProfile,
             )
           else if (_section == ProfileModuleSection.settingsPrivacy)
@@ -826,8 +927,12 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                   onDeleteAccount: () =>
                       _deleteAccount(session?.email ?? 'você@evolua.app'),
                   onInformationalAction: () => _showSettingsMessage(
-                    'Esta informação sera aberta em uma area dedicada em breve.',
+                    'Esta informação será aberta em uma área dedicada em breve.',
                   ),
+                  onOpenPrivacyPolicy: () =>
+                      _openLegalLink(AppConfig.privacyPolicyUrl),
+                  onOpenTermsOfUse: () =>
+                      _openLegalLink(AppConfig.termsOfUseUrl),
                   localePreference: localePreference,
                   onLocalePreferenceChanged: (value) => ref
                       .read(localeControllerProvider.notifier)
@@ -982,13 +1087,13 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                 ProfileModuleSection.displayAccessibility =>
                   'Centralize preferências de leitura, foco visual e conforto de uso nesta tela.',
                 ProfileModuleSection.feedback =>
-                  'Registre sugestoes e percepcoes sobre a experiência do app sem sair do seu espaco.',
+                  'Registre sugestões e percepções sobre a experiência do app sem sair do seu espaço.',
                 ProfileModuleSection.plansSubscriptions =>
                   'Gerencie seu plano atual e as opcoes de assinatura.',
                 ProfileModuleSection.evolutionMirror =>
-                  'Acompanhe progresso, padroes e conquistas da sua jornada.',
+                  'Acompanhe progresso, padrões e conquistas da sua jornada.',
                 ProfileModuleSection.overview =>
-                  'Visao geral do seu perfil e dos dados principais da sua conta.',
+                  'Visão geral do seu perfil e dos dados principais da sua conta.',
               },
             ),
           if (profileState.isLoading && !profileState.hasValue) ...[
@@ -1079,7 +1184,7 @@ class _ProfileSectionNavigation extends StatelessWidget {
         Text('Preferências', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),
         Text(
-          'Escolha uma area para ajustar sua experiência no Evolua.',
+          'Escolha uma área para ajustar sua experiência no Evolua.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
@@ -1249,26 +1354,26 @@ _ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
     ProfileModuleSection.overview => const _ProfileSectionMeta(
       section: ProfileModuleSection.overview,
       icon: Icons.person_rounded,
-      title: 'Visao geral',
+      title: 'Visão geral',
       description: 'Dados principais e identidade da conta.',
     ),
     ProfileModuleSection.plansSubscriptions => const _ProfileSectionMeta(
       section: ProfileModuleSection.plansSubscriptions,
       icon: Icons.workspace_premium_rounded,
       title: 'Planos e assinaturas',
-      description: 'Plano atual, beneficios e upgrade.',
+      description: 'Plano atual, benefícios e upgrade.',
     ),
     ProfileModuleSection.evolutionMirror => const _ProfileSectionMeta(
       section: ProfileModuleSection.evolutionMirror,
       icon: Icons.auto_graph_rounded,
       title: 'Espelho da Evolução',
-      description: 'Progresso, padroes, IA e conquistas.',
+      description: 'Progresso, padrões, IA e conquistas.',
     ),
     ProfileModuleSection.settingsPrivacy => const _ProfileSectionMeta(
       section: ProfileModuleSection.settingsPrivacy,
       icon: Icons.shield_rounded,
       title: 'Configurações e privacidade',
-      description: 'Conta, dados, segurança e preferencias.',
+      description: 'Conta, dados, segurança e preferências.',
     ),
     ProfileModuleSection.displayAccessibility => const _ProfileSectionMeta(
       section: ProfileModuleSection.displayAccessibility,
@@ -1286,7 +1391,7 @@ _ProfileSectionMeta _profileSectionMeta(ProfileModuleSection section) {
       section: ProfileModuleSection.feedback,
       icon: Icons.feedback_outlined,
       title: 'Dar feedback',
-      description: 'Compartilhe percepcoes e sugestoes.',
+      description: 'Compartilhe percepções e sugestões.',
     ),
   };
 }
@@ -1296,6 +1401,7 @@ class _ProfileHero extends StatelessWidget {
     required this.displayName,
     required this.email,
     required this.avatarUrl,
+    required this.isUploadingAvatar,
     required this.onRefresh,
     required this.onChangeAvatar,
   });
@@ -1303,6 +1409,7 @@ class _ProfileHero extends StatelessWidget {
   final String displayName;
   final String email;
   final String? avatarUrl;
+  final bool isUploadingAvatar;
   final VoidCallback onRefresh;
   final VoidCallback onChangeAvatar;
 
@@ -1351,8 +1458,13 @@ class _ProfileHero extends StatelessWidget {
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: constraints.maxWidth),
               child: OutlinedButton.icon(
-                onPressed: onChangeAvatar,
-                icon: const Icon(Icons.photo_camera_back_rounded),
+                onPressed: isUploadingAvatar ? null : onChangeAvatar,
+                icon: isUploadingAvatar
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.photo_camera_back_rounded),
                 label: const Text(
                   'Trocar foto',
                   maxLines: 1,
@@ -1398,29 +1510,29 @@ class _OverviewSection extends StatelessWidget {
   const _OverviewSection({
     required this.formKey,
     required this.displayNameController,
+    required this.birthDateController,
     required this.bioController,
     required this.customGenderController,
     required this.gender,
-    required this.birthDate,
-    required this.journeyLevel,
+    required this.birthDateError,
     required this.isSaving,
     required this.onGenderChanged,
-    required this.onJourneyLevelChanged,
     required this.onPickBirthDate,
+    required this.onBirthDateChanged,
     required this.onSubmit,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController displayNameController;
+  final TextEditingController birthDateController;
   final TextEditingController bioController;
   final TextEditingController customGenderController;
   final String gender;
-  final DateTime? birthDate;
-  final double journeyLevel;
+  final String? birthDateError;
   final bool isSaving;
   final ValueChanged<String> onGenderChanged;
-  final ValueChanged<double> onJourneyLevelChanged;
   final VoidCallback onPickBirthDate;
+  final ValueChanged<String> onBirthDateChanged;
   final VoidCallback onSubmit;
 
   @override
@@ -1432,40 +1544,43 @@ class _OverviewSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Visao geral',
+              'Visão geral',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 12),
             Text(
-              'Essas informacoes passam a sustentar seu perfil principal e a experiência personalizada no app.',
+              'Essas informações passam a sustentar seu perfil principal e a experiência personalizada no app.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 22),
             TextFormField(
               controller: displayNameController,
+              maxLength: maxDisplayNameLength,
               decoration: const InputDecoration(
                 labelText: 'Nome',
                 prefixIcon: Icon(Icons.badge_rounded),
               ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Informe seu nome.'
-                  : null,
+              validator: validateDisplayName,
             ),
             const SizedBox(height: 16),
-            InkWell(
-              onTap: onPickBirthDate,
-              borderRadius: BorderRadius.circular(18),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Data de nascimento',
-                  prefixIcon: Icon(Icons.cake_rounded),
-                ),
-                child: Text(
-                  birthDate == null
-                      ? 'Selecione sua data'
-                      : '${birthDate!.day.toString().padLeft(2, '0')}/${birthDate!.month.toString().padLeft(2, '0')}/${birthDate!.year}',
+            TextFormField(
+              controller: birthDateController,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              inputFormatters: const [_ProfileBirthDateInputFormatter()],
+              decoration: InputDecoration(
+                labelText: 'Data de nascimento',
+                hintText: 'dd/mm/aaaa',
+                prefixIcon: const Icon(Icons.cake_rounded),
+                errorText: birthDateError,
+                suffixIcon: IconButton(
+                  tooltip: 'Abrir calendário',
+                  onPressed: isSaving ? null : onPickBirthDate,
+                  icon: const Icon(Icons.calendar_month_rounded),
                 ),
               ),
+              validator: (_) => birthDateError,
+              onChanged: onBirthDateChanged,
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -1504,24 +1619,10 @@ class _OverviewSection extends StatelessWidget {
               maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Bio',
-                hintText: 'Conte um pouco sobre você, se quiser.',
+                hintText: 'Conte um pouco sobre você.',
                 alignLabelWithHint: true,
                 prefixIcon: Icon(Icons.notes_rounded),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Nível da jornada: ${journeyLevel.round()}',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
-              ),
-            ),
-            Slider(
-              min: 1,
-              max: 10,
-              divisions: 9,
-              value: journeyLevel,
-              onChanged: onJourneyLevelChanged,
             ),
             const SizedBox(height: 10),
             Align(
@@ -1540,6 +1641,31 @@ class _OverviewSection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProfileBirthDateInputFormatter extends TextInputFormatter {
+  const _ProfileBirthDateInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+    final buffer = StringBuffer();
+    for (var index = 0; index < limited.length; index++) {
+      if (index == 2 || index == 4) {
+        buffer.write('/');
+      }
+      buffer.write(limited[index]);
+    }
+    final text = buffer.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }
@@ -1569,6 +1695,12 @@ class _EvolutionMirrorSection extends ConsumerWidget {
             .current
             ?.premium ??
         false;
+    final advancedMirrorAccess = ref.watch(_advancedMirrorAccessProvider);
+    final advancedAccess = advancedMirrorAccess.asData?.value;
+    final advancedMirrorAllowed =
+        premium ||
+        (advancedAccess?.allowed ?? false) ||
+        advancedAccess?.entitlementExpiresAt != null;
     final history = checkInState.asData?.value;
     final checkIns = history?.result.items ?? const <CheckIn>[];
     final totalCheckIns = history?.result.totalItems ?? checkIns.length;
@@ -1628,11 +1760,11 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        if (!premium) ...[
+        if (!advancedMirrorAllowed) ...[
           const _AdvancedMirrorPrompt(),
           const SizedBox(height: 16),
         ],
-        if (premium) ...[
+        if (advancedMirrorAllowed) ...[
           _EvolutionSectionGroup(
             title: 'Padroes percebidos',
             description:
@@ -1710,11 +1842,21 @@ class _AdvancedMirrorPromptState extends ConsumerState<_AdvancedMirrorPrompt> {
       return;
     }
     setState(() => _isLoading = true);
-    final unlocked = await ref
-        .read(monetizationAccessControllerProvider.notifier)
-        .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR');
+    var unlocked = false;
+    try {
+      unlocked = await ref
+          .read(monetizationAccessControllerProvider.notifier)
+          .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR')
+          .timeout(const Duration(seconds: 90), onTimeout: () => false);
+      if (unlocked) {
+        ref.invalidate(_advancedMirrorAccessProvider);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
     if (mounted) {
-      setState(() => _isLoading = false);
       AppSnackBar.show(
         context,
         message: unlocked
@@ -2651,7 +2793,7 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
       label: 'ansiedade a noite',
       headline: 'Você tende a registrar mais ansiedade à noite.',
       description:
-          'Esse pode ser um bom horario para reduzir estimulos, fazer uma pausa curta e escolher uma ação simples antes de dormir.',
+          'Esse pode ser um bom horario para reduzir estímulos, fazer uma pausa curta e escolher uma ação simples antes de dormir.',
       identified: true,
     );
   }
@@ -3162,19 +3304,19 @@ class _HelpSupportSection extends StatelessWidget {
                   'As trilhas organizam praticas, reflexoes e próximos passos em uma sequencia privada para apoiar seu momento atual.',
             ),
             const _HelpFaqTile(
-              title: 'O que sao check-ins?',
+              title: 'O que são check-ins?',
               answer:
-                  'Check-ins sao registros rapidos do seu estado emocional. Eles ajudam o Evolua a entender seu ritmo e sugerir um cuidado mais coerente.',
+                  'Check-ins são registros rápidos do seu estado emocional. Eles ajudam o Evolua a entender seu ritmo e sugerir um cuidado mais coerente.',
             ),
             const _HelpFaqTile(
-              title: 'Como a IA gera sugestoes?',
+              title: 'Como a IA gera sugestões?',
               answer:
                   'A IA usa seu check-in e, quando permitido, seu histórico para criar orientacoes de autocuidado. Ela não substitui apoio profissional.',
             ),
             const _HelpFaqTile(
               title: 'Como editar meu perfil?',
               answer:
-                  'Abra seu perfil, fique em Visao geral, ajuste os dados desejados e toque em Salvar perfil.',
+                  'Abra seu perfil, fique em Visão geral, ajuste os dados desejados e toque em Salvar perfil.',
             ),
             const _HelpFaqTile(
               title: 'Como funciona o plano premium?',
@@ -3234,7 +3376,7 @@ class _HelpSupportSection extends StatelessWidget {
           description:
               'O Evolua apoia processos de autoconhecimento, mas não substitui acompanhamento profissional.',
           microcopy:
-              'O Evolua pode apoiar sua jornada, mas cuidado emocional profundo tambem merece apoio humano qualificado.',
+              'O Evolua pode apoiar sua jornada, mas cuidado emocional profundo também merece apoio humano qualificado.',
           children: [
             _SettingsActionRow(
               icon: Icons.health_and_safety_outlined,
@@ -3437,7 +3579,7 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Ajuste a interface para uma experiência mais confortavel, acessivel e alinhada ao seu ritmo.',
+                'Ajuste a interface para uma experiência mais confortável, acessível e alinhada ao seu ritmo.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
@@ -3445,14 +3587,14 @@ class _DisplayAccessibilitySection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _SettingsGroup(
-          title: 'Aparencia',
+          title: 'Aparência',
           description:
-              'Adapte a interface ao seu ambiente e preferencia visual.',
-          microcopy: 'Conforto visual tambem faz parte do cuidado.',
+              'Adapte a interface ao seu ambiente e preferência visual.',
+          microcopy: 'Conforto visual também faz parte do cuidado.',
           children: [
             _AccessibilitySegmentedRow(
               title: 'Tema',
-              subtitle: 'Escolha entre escuro, claro ou automatico.',
+              subtitle: 'Escolha entre escuro, claro ou automático.',
               value: preferences.themeMode,
               options: const {
                 'dark': 'Escuro',
@@ -3463,25 +3605,25 @@ class _DisplayAccessibilitySection extends StatelessWidget {
             ),
             _SettingsSwitchRow(
               title: 'Contraste elevado',
-              subtitle: 'Aumenta a diferenca entre texto, fundo e bordas.',
+              subtitle: 'Aumenta a diferença entre texto, fundo e bordas.',
               value: preferences.highContrast,
               onChanged: onHighContrastChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Reducao de transparencia',
+              title: 'Redução de transparência',
               subtitle:
-                  'Prefere superficies mais solidas e menos translucidas.',
+                  'Prefere superfícies mais sólidas e menos translúcidas.',
               value: preferences.reduceTransparency,
               onChanged: onReduceTransparencyChanged,
             ),
             _SettingsDropdownRow(
-              title: 'Ajuste de animacoes',
-              subtitle: 'Controle a intensidade das transicoes.',
+              title: 'Ajuste de animações',
+              subtitle: 'Controle a intensidade das transições.',
               value: preferences.animationLevel,
               items: const {
                 'normal': 'Normal',
                 'reduced': 'Reduzida',
-                'none': 'Sem animacoes',
+                'none': 'Sem animações',
               },
               onChanged: onAnimationLevelChanged,
             ),
@@ -3490,9 +3632,9 @@ class _DisplayAccessibilitySection extends StatelessWidget {
         const SizedBox(height: 16),
         _SettingsGroup(
           title: 'Leitura e legibilidade',
-          description: 'Melhore a leitura e reduza o esforco visual.',
+          description: 'Melhore a leitura e reduza o esforço visual.',
           microcopy:
-              'Uma interface mais confortavel torna a experiência mais leve e presente.',
+              'Uma interface mais confortável torna a experiência mais leve e presente.',
           children: [
             _SettingsDropdownRow(
               title: 'Tamanho do texto',
@@ -3507,25 +3649,26 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               onChanged: onTextSizeChanged,
             ),
             _SettingsDropdownRow(
-              title: 'Espacamento de leitura',
+              title: 'Espaçamento de leitura',
               subtitle: 'Defina o respiro entre as linhas.',
               value: preferences.readingSpacing,
               items: const {
                 'compact': 'Compacto',
-                'comfortable': 'Confortavel',
+                'comfortable': 'Confortável',
                 'wide': 'Amplo',
               },
               onChanged: onReadingSpacingChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Fonte acessivel',
+              title: 'Fonte acessível',
               subtitle: 'Usa a fonte do sistema para leitura mais familiar.',
               value: preferences.accessibleFont,
               onChanged: onAccessibleFontChanged,
             ),
             _SettingsSwitchRow(
               title: 'Modo foco',
-              subtitle: 'Guarda a preferencia para telas com menos distração.',
+              subtitle:
+                  'Reduz distrações visuais e deixa a interface mais limpa e calma.',
               value: preferences.focusMode,
               onChanged: onFocusModeChanged,
             ),
@@ -3540,19 +3683,20 @@ class _DisplayAccessibilitySection extends StatelessWidget {
           children: [
             _SettingsSwitchRow(
               title: 'Reduzir movimento',
-              subtitle: 'Diminui transicoes e efeitos animados no app.',
+              subtitle: 'Diminui transições e efeitos animados no app.',
               value: preferences.reduceMotion,
               onChanged: onReduceMotionChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Feedback tatil',
-              subtitle: 'Permite respostas tateis em acoes importantes.',
+              title: 'Feedback tátil',
+              subtitle: 'Permite respostas táteis em ações importantes.',
               value: preferences.hapticFeedback,
               onChanged: onHapticFeedbackChanged,
             ),
             _SettingsSwitchRow(
               title: 'Tempo de resposta estendido',
-              subtitle: 'Guarda mais tempo para interacoes futuras.',
+              subtitle:
+                  'Oferece mais tempo para concluir interações importantes.',
               value: preferences.extendedResponseTime,
               onChanged: onExtendedResponseTimeChanged,
             ),
@@ -3568,13 +3712,14 @@ class _DisplayAccessibilitySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Acessibilidade emocional',
           description:
-              'Ajuste estimulos e linguagem para uma experiência mais segura emocionalmente.',
+              'Ajuste estímulos e linguagem para uma experiência mais segura emocionalmente.',
           microcopy:
-              'Seu estado emocional importa. A interface tambem pode respeitar isso.',
+              'Seu estado emocional importa. A interface também pode respeitar isso.',
           children: [
             _SettingsSwitchRow(
-              title: 'Reduzir estimulos visuais',
-              subtitle: 'Registra preferencia por telas menos carregadas.',
+              title: 'Reduzir estímulos visuais',
+              subtitle:
+                  'Prioriza telas mais limpas e com menos elementos ao mesmo tempo.',
               value: preferences.reduceVisualStimuli,
               onChanged: onReduceVisualStimuliChanged,
             ),
@@ -3585,15 +3730,15 @@ class _DisplayAccessibilitySection extends StatelessWidget {
               onChanged: onSofterLanguageChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Ocultar conteúdos sensiveis',
-              subtitle: 'Guarda preferencia para filtros de cuidado emocional.',
+              title: 'Ocultar conteúdos sensíveis',
+              subtitle:
+                  'Evita exibir conteúdos que possam ser sensíveis sem aviso.',
               value: preferences.hideSensitiveContent,
               onChanged: onHideSensitiveContentChanged,
             ),
             _SettingsSwitchRow(
               title: 'Modo acolhimento',
-              subtitle:
-                  'Sinaliza que você prefere uma experiência mais gentil.',
+              subtitle: 'Prioriza uma experiência mais gentil e acolhedora.',
               value: preferences.comfortMode,
               onChanged: onComfortModeChanged,
             ),
@@ -3606,7 +3751,7 @@ class _DisplayAccessibilitySection extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onSavePreferences,
               icon: const Icon(Icons.save_rounded),
-              label: const Text('Salvar preferencias visuais'),
+              label: const Text('Salvar'),
             ),
           ),
         ),
@@ -3691,6 +3836,8 @@ class _SettingsPrivacySection extends StatelessWidget {
     required this.onDeactivateAccount,
     required this.onDeleteAccount,
     required this.onInformationalAction,
+    required this.onOpenPrivacyPolicy,
+    required this.onOpenTermsOfUse,
     required this.localePreference,
     required this.onLocalePreferenceChanged,
   });
@@ -3721,6 +3868,8 @@ class _SettingsPrivacySection extends StatelessWidget {
   final VoidCallback onDeactivateAccount;
   final VoidCallback onDeleteAccount;
   final VoidCallback onInformationalAction;
+  final VoidCallback onOpenPrivacyPolicy;
+  final VoidCallback onOpenTermsOfUse;
   final LocalePreference localePreference;
   final ValueChanged<LocalePreference> onLocalePreferenceChanged;
 
@@ -3772,9 +3921,8 @@ class _SettingsPrivacySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Conta e acesso',
           description:
-              'Controle as informacoes basicas da sua conta e como você acessa o Evolua.',
-          microcopy:
-              'Sua conta e a base da sua jornada. Mantenha seus acessos seguros e atualizados.',
+              'Controle as informações básicas da sua conta e mantenha seus acessos seguros.',
+          microcopy: '',
           children: [
             _SettingsInfoRow(
               icon: Icons.alternate_email_rounded,
@@ -3790,7 +3938,7 @@ class _SettingsPrivacySection extends StatelessWidget {
             _SettingsInfoRow(
               icon: Icons.g_mobiledata_rounded,
               title: 'Login com Google',
-              subtitle: 'Conexao disponível para entrada rápida.',
+              subtitle: 'Conexão disponível para entrada rápida.',
             ),
             _SettingsActionRow(
               icon: Icons.devices_rounded,
@@ -3811,19 +3959,18 @@ class _SettingsPrivacySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Privacidade emocional',
           description:
-              'Escolha como seus registros emocionais e reflexoes sao tratados dentro da plataforma.',
-          microcopy:
-              'Seu processo e pessoal. Você decide o que fica privado e o que pode ser usado para tornar sua experiência mais precisa.',
+              'Controle como seus registros emocionais aparecem dentro do Evolua. Essas informações são privadas e não são compartilhadas com outras pessoas.',
+          microcopy: '',
           children: [
             _SettingsSwitchRow(
-              title: 'Tornar diario privado',
-              subtitle: 'Mantenha seus registros apenas no seu espaco.',
+              title: 'Tornar diário privado',
+              subtitle: 'Mantenha seus registros apenas no seu espaço.',
               value: privateJournal,
               onChanged: onPrivateJournalChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Ocultar check-ins da visao social',
-              subtitle: 'Evite que check-ins aparecam em areas sociais.',
+              title: 'Ocultar check-ins da visão social',
+              subtitle: 'Evite que check-ins apareçam em áreas sociais.',
               value: hideSocialCheckIns,
               onChanged: onHideSocialCheckInsChanged,
             ),
@@ -3850,14 +3997,14 @@ class _SettingsPrivacySection extends StatelessWidget {
         const SizedBox(height: 16),
         _SettingsGroup(
           title: 'Dados e segurança',
-          description: 'Tenha total transparencia sobre seus dados.',
+          description: 'Tenha transparência sobre seus dados e ações da conta.',
           microcopy:
-              'Seus dados pertencem a você. O Evolua existe para apoiar sua jornada, não para invadir sua privacidade.',
+              'Seus dados pertencem a você. O Evolua existe para apoiar sua jornada com privacidade.',
           children: [
             _SettingsActionRow(
               icon: Icons.download_rounded,
               title: 'Baixar meus dados',
-              subtitle: 'Solicite uma cópia completa das suas informacoes.',
+              subtitle: 'Solicite uma cópia completa das suas informações.',
               onTap: onExportData,
             ),
             _SettingsActionRow(
@@ -3878,21 +4025,21 @@ class _SettingsPrivacySection extends StatelessWidget {
             ),
             _SettingsActionRow(
               icon: Icons.history_rounded,
-              title: 'Historico de atividade',
+              title: 'Histórico de atividade',
               subtitle: 'Veja eventos importantes da sua conta.',
               onTap: onInformationalAction,
             ),
             _SettingsActionRow(
               icon: Icons.privacy_tip_outlined,
               title: 'Política de privacidade',
-              subtitle: 'Entenda como seus dados sao tratados.',
-              onTap: onInformationalAction,
+              subtitle: 'Entenda como seus dados são tratados.',
+              onTap: onOpenPrivacyPolicy,
             ),
             _SettingsActionRow(
               icon: Icons.article_outlined,
               title: 'Termos de uso',
               subtitle: 'Leia os termos que orientam o uso do Evolua.',
-              onTap: onInformationalAction,
+              onTap: onOpenTermsOfUse,
             ),
           ],
         ),
@@ -3900,8 +4047,7 @@ class _SettingsPrivacySection extends StatelessWidget {
         _SettingsGroup(
           title: 'Personalização da experiência',
           description: 'Ajuste como o Evolua se adapta ao seu momento.',
-          microcopy:
-              'O Evolua pode se adaptar ao seu ritmo. Ajuste a experiência para que ela faca sentido no seu momento atual.',
+          microcopy: '',
           children: [
             _SettingsDropdownRow(
               title: 'Tom da IA',
@@ -3915,7 +4061,7 @@ class _SettingsPrivacySection extends StatelessWidget {
               onChanged: onAiToneChanged,
             ),
             _SettingsDropdownRow(
-              title: 'Frequencia de sugestoes',
+              title: 'Frequência de sugestões',
               subtitle: 'Defina o ritmo das recomendações.',
               value: suggestionFrequency,
               items: const {
@@ -3984,13 +4130,15 @@ class _SettingsGroup extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(description, style: Theme.of(context).textTheme.bodyLarge),
-          const SizedBox(height: 10),
-          Text(
-            microcopy,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: context.evoluaColors.textSecondary,
+          if (microcopy.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              microcopy,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 18),
           ...children,
         ],
@@ -4215,7 +4363,7 @@ class _SettingsFooterActions extends StatelessWidget {
           FilledButton.icon(
             onPressed: onSavePreferences,
             icon: const Icon(Icons.save_rounded),
-            label: const Text('Salvar preferencias'),
+            label: const Text('Salvar preferências'),
           ),
           OutlinedButton.icon(
             onPressed: onExportData,
@@ -4345,7 +4493,7 @@ class _AvatarCircle extends StatelessWidget {
 
 String _sectionLabel(ProfileModuleSection section) {
   return switch (section) {
-    ProfileModuleSection.overview => 'Visao geral',
+    ProfileModuleSection.overview => 'Visão geral',
     ProfileModuleSection.settingsPrivacy => 'Configurações e privacidade',
     ProfileModuleSection.helpSupport => 'Ajuda e suporte',
     ProfileModuleSection.displayAccessibility => 'Tela e acessibilidade',

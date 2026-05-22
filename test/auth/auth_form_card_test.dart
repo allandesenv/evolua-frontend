@@ -138,7 +138,12 @@ void main() {
         await _tapSubmit(tester, 'Entrar');
         await tester.pumpAndSettle();
 
-        expect(find.text('Credenciais invalidas.'), findsOneWidget);
+        expect(
+          find.text(
+            'Não foi possível autenticar. Revise os dados e tente novamente.',
+          ),
+          findsOneWidget,
+        );
         expect(find.textContaining('existe'), findsNothing);
       },
     );
@@ -252,11 +257,15 @@ void main() {
     ) async {
       SharedPreferences.setMockInitialValues({});
       final launchedUrls = <String>[];
+      final launcherCompleter = Completer<void>();
 
       await tester.pumpWidget(
         _testApp(
           repository: _FakeAuthRepository(),
-          googleLauncher: (url) async => launchedUrls.add(url),
+          googleLauncher: (url) {
+            launchedUrls.add(url);
+            return launcherCompleter.future;
+          },
         ),
       );
 
@@ -272,6 +281,10 @@ void main() {
       expect(launchedUrls.single, contains('/v1/public/auth/google/start'));
       expect(launchedUrls.single, contains('frontendRedirectUri='));
       expect(find.byType(CircularProgressIndicator), findsWidgets);
+
+      launcherCompleter.complete();
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
     testWidgets('shows friendly OAuth launcher failure', (tester) async {
@@ -314,18 +327,25 @@ void main() {
         find.byType(TextFormField).at(0),
         '  José da Silva  ',
       );
-      await tester.tap(find.byKey(const Key('auth-birth-date-field')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
       await tester.enterText(
-        find.byType(TextFormField).at(1),
-        ' NOVO@Evolua.App ',
+        find.byKey(const Key('auth-birth-date-field')),
+        '01011990',
       );
       await tester.enterText(
         find.byType(TextFormField).at(2),
+        ' NOVO@Evolua.App ',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(3),
         ' senha com espaco ',
       );
+      await tester.enterText(
+        find.byType(TextFormField).at(4),
+        ' senha com espaco ',
+      );
+      await tester.pump();
+
+      expect(find.text('01/01/1990'), findsOneWidget);
 
       await _tapSubmit(tester, 'Criar conta');
       await tester.pump();
@@ -344,6 +364,62 @@ void main() {
       expect(repository.loginCalls, 1);
     });
 
+    testWidgets('date picker fills masked birth date field', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(
+        _testApp(repository: _FakeAuthRepository(), initialRegisterMode: true),
+      );
+      await tester.pumpAndSettle();
+
+      final calendarButton = tester.widget<IconButton>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is IconButton &&
+              widget.icon is Icon &&
+              (widget.icon as Icon).icon == Icons.calendar_month_rounded,
+        ),
+      );
+      calendarButton.onPressed!();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      final birthDateField = tester.widget<TextFormField>(
+        find.byKey(const Key('auth-birth-date-field')),
+      );
+      expect(
+        birthDateField.controller?.text,
+        matches(RegExp(r'^\d{2}/\d{2}/\d{4}$')),
+      );
+    });
+
+    testWidgets('register validates password confirmation', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = _FakeAuthRepository();
+      await tester.pumpWidget(
+        _testApp(repository: repository, initialRegisterMode: true),
+      );
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Ana Maria');
+      await tester.enterText(
+        find.byKey(const Key('auth-birth-date-field')),
+        '01011990',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).at(2),
+        'ana@evolua.app',
+      );
+      await tester.enterText(find.byType(TextFormField).at(3), '123456');
+      await tester.enterText(find.byType(TextFormField).at(4), '1234567');
+      await tester.pump();
+
+      await _tapSubmit(tester, 'Criar conta');
+      await tester.pump();
+
+      expect(find.text('As senhas não conferem.'), findsOneWidget);
+      expect(repository.registerCalls, 0);
+    });
+
     testWidgets(
       'validates register name, birth date, gender and custom gender',
       (tester) async {
@@ -356,15 +432,19 @@ void main() {
 
         await tester.enterText(find.byType(TextFormField).at(0), 'A1');
         await tester.enterText(
-          find.byType(TextFormField).at(1),
+          find.byKey(const Key('auth-birth-date-field')),
+          '01011990',
+        );
+        await tester.enterText(
+          find.byType(TextFormField).at(2),
           'valid@evolua.app',
         );
-        await tester.enterText(find.byType(TextFormField).at(2), '123456');
+        await tester.enterText(find.byType(TextFormField).at(3), '123456');
+        await tester.enterText(find.byType(TextFormField).at(4), '123456');
         await _tapSubmit(tester, 'Criar conta');
         await tester.pump();
 
         expect(find.textContaining('Use apenas letras'), findsOneWidget);
-        expect(find.text('Informe sua data de nascimento.'), findsOneWidget);
         expect(repository.registerCalls, 0);
 
         await tester.tap(find.text('Masculino'));
