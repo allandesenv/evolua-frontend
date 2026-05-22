@@ -68,7 +68,7 @@ void main() {
       expect(preferences.getString(_sessionStorageKey), isNull);
     });
 
-    test('clears session when refresh fails', () async {
+    test('clears session when refresh token is rejected', () async {
       final expired = _testSession(
         accessToken: _buildJwt(
           expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
@@ -79,7 +79,13 @@ void main() {
         _sessionStorageKey: jsonEncode(expired.toJson()),
       });
       final repository = _FakeAuthRepository(
-        refreshError: StateError('expired'),
+        refreshError: DioException(
+          requestOptions: RequestOptions(path: '/v1/public/auth/refresh'),
+          response: Response<void>(
+            requestOptions: RequestOptions(path: '/v1/public/auth/refresh'),
+            statusCode: 401,
+          ),
+        ),
       );
       final container = _container(repository);
       addTearDown(container.dispose);
@@ -90,6 +96,33 @@ void main() {
       expect(repository.refreshCalls, 1);
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(_sessionStorageKey), isNull);
+    });
+
+    test('keeps session when refresh fails transiently', () async {
+      final expired = _testSession(
+        accessToken: _buildJwt(
+          expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
+        ),
+        refreshToken: 'old-refresh-token',
+      );
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(expired.toJson()),
+      });
+      final repository = _FakeAuthRepository(
+        refreshError: DioException(
+          type: DioExceptionType.connectionTimeout,
+          requestOptions: RequestOptions(path: '/v1/public/auth/refresh'),
+        ),
+      );
+      final container = _container(repository);
+      addTearDown(container.dispose);
+
+      final session = await container.read(authControllerProvider.future);
+
+      expect(session?.refreshToken, 'old-refresh-token');
+      expect(repository.refreshCalls, 1);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString(_sessionStorageKey), isNotNull);
     });
 
     test('deduplicates concurrent refresh requests', () async {
@@ -207,6 +240,91 @@ void main() {
         throwsA(isA<DioException>()),
       );
       expect(repository.refreshCalls, 0);
+    });
+
+    test('refreshes on 403 with bearer and retries with new token', () async {
+      final oldAccessToken = _buildJwt(
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      );
+      final newAccessToken = _buildJwt(
+        expiresAt: DateTime.now().add(const Duration(hours: 2)),
+      );
+      final current = _testSession(
+        accessToken: oldAccessToken,
+        refreshToken: 'old-refresh-token',
+      );
+      final refreshed = _testSession(
+        accessToken: newAccessToken,
+        refreshToken: 'new-refresh-token',
+      );
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(current.toJson()),
+      });
+      final repository = _FakeAuthRepository(refreshSession: refreshed);
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(authControllerProvider.future);
+
+      final dio = container.read(
+        authenticatedDioProvider('https://api.evolua.test'),
+      );
+      final adapter = _QueuedAdapter([
+        (_) => ResponseBody.fromString('{"message":"forbidden"}', 403),
+        (_) => ResponseBody.fromString('{"ok":true}', 200),
+      ]);
+      dio.httpClientAdapter = adapter;
+
+      final response = await dio.get<dynamic>('/v1/profiles/me');
+
+      expect(response.statusCode, 200);
+      expect(repository.refreshCalls, 1);
+      expect(adapter.requests, hasLength(2));
+      expect(
+        adapter.requests[1].headers['Authorization'],
+        'Bearer $newAccessToken',
+      );
+    });
+
+    test('does not retry when refresh failure is transient', () async {
+      final oldAccessToken = _buildJwt(
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      );
+      final current = _testSession(
+        accessToken: oldAccessToken,
+        refreshToken: 'old-refresh-token',
+      );
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(current.toJson()),
+      });
+      final repository = _FakeAuthRepository(
+        refreshError: DioException(
+          type: DioExceptionType.receiveTimeout,
+          requestOptions: RequestOptions(path: '/v1/public/auth/refresh'),
+        ),
+      );
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(authControllerProvider.future);
+
+      final dio = container.read(
+        authenticatedDioProvider('https://api.evolua.test'),
+      );
+      final adapter = _QueuedAdapter([
+        (_) => ResponseBody.fromString('{"message":"expired"}', 401),
+      ]);
+      dio.httpClientAdapter = adapter;
+
+      await expectLater(
+        dio.get<dynamic>('/v1/profiles/me'),
+        throwsA(isA<DioException>()),
+      );
+
+      expect(repository.refreshCalls, 1);
+      expect(adapter.requests, hasLength(1));
+      expect(
+        container.read(authControllerProvider).asData?.value?.refreshToken,
+        'old-refresh-token',
+      );
     });
   });
 }

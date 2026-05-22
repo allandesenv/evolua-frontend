@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/emotional/data/repositories/check_in_repository_impl.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
@@ -41,6 +42,7 @@ class CheckInHistoryState {
   const CheckInHistoryState({
     required this.result,
     required this.selectedGrouping,
+    this.ownerUserId,
     this.latestCreatedCheckIn,
     this.pendingInsightCheckInId,
     this.unavailableInsightCheckInId,
@@ -53,6 +55,7 @@ class CheckInHistoryState {
 
   final PaginatedResponse<CheckIn> result;
   final String selectedGrouping;
+  final String? ownerUserId;
   final CheckIn? latestCreatedCheckIn;
   final int? pendingInsightCheckInId;
   final int? unavailableInsightCheckInId;
@@ -71,6 +74,9 @@ class CheckInHistoryState {
       latestCreatedCheckIn != null &&
       latestCreatedCheckIn!.id == unavailableInsightCheckInId &&
       latestCreatedCheckIn!.aiInsight == null;
+
+  bool belongsToUser(String? userId) =>
+      ownerUserId == null || (userId != null && ownerUserId == userId);
 }
 
 class CheckInController extends AsyncNotifier<CheckInHistoryState> {
@@ -84,9 +90,14 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   String _selectedGrouping = 'monthly';
   CheckIn? _latestKnownCheckIn;
   int? _activeInsightPollId;
+  Timer? _pollDelayTimer;
+  Completer<void>? _pollDelayCompleter;
+  bool _disposeRegistered = false;
+  bool _disposed = false;
 
   @override
   Future<CheckInHistoryState> build() async {
+    _registerDisposeHandler();
     final result = await _fetch(page: 0);
     final nextState = _stateFromResult(
       result,
@@ -192,6 +203,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       CheckInHistoryState(
         result: current.result,
         selectedGrouping: grouping,
+        ownerUserId: current.ownerUserId,
         latestCreatedCheckIn: current.latestCreatedCheckIn,
         pendingInsightCheckInId: current.pendingInsightCheckInId,
         unavailableInsightCheckInId: current.unavailableInsightCheckInId,
@@ -305,6 +317,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     return CheckInHistoryState(
       result: result,
       selectedGrouping: _selectedGrouping,
+      ownerUserId: ref.read(authControllerProvider).asData?.value?.userId,
       latestCreatedCheckIn: latest,
       pendingInsightCheckInId: hasInsight
           ? null
@@ -328,7 +341,16 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     PaginatedResponse<CheckIn> result,
     CheckIn? fallback,
   ) {
+    final currentUserId = ref
+        .read(authControllerProvider)
+        .asData
+        ?.value
+        ?.userId;
     if (fallback != null) {
+      if (currentUserId != null && fallback.userId != currentUserId) {
+        return result.items.firstOrNull;
+      }
+
       final listed = result.items
           .where((item) => item.id == fallback.id)
           .firstOrNull;
@@ -388,7 +410,10 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   Future<void> _pollForInsight(int checkInId) async {
     final pollingConfig = ref.read(checkInInsightPollingConfigProvider);
     for (var attempt = 0; attempt < pollingConfig.attempts; attempt++) {
-      await Future<void>.delayed(pollingConfig.delay);
+      await _waitForPollDelay(pollingConfig.delay);
+      if (_disposed) {
+        return;
+      }
       if (state.asData?.value.pendingInsightCheckInId != checkInId) {
         return;
       }
@@ -423,6 +448,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       CheckInHistoryState(
         result: current.result,
         selectedGrouping: current.selectedGrouping,
+        ownerUserId: current.ownerUserId,
         latestCreatedCheckIn: current.latestCreatedCheckIn,
         pendingInsightCheckInId: null,
         unavailableInsightCheckInId: checkInId,
@@ -449,5 +475,37 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     }
 
     return DateTime(value.year, value.month, value.day);
+  }
+
+  void _registerDisposeHandler() {
+    if (_disposeRegistered) {
+      return;
+    }
+    _disposeRegistered = true;
+    ref.onDispose(() {
+      _disposed = true;
+      _pollDelayTimer?.cancel();
+      final completer = _pollDelayCompleter;
+      if (completer != null && !completer.isCompleted) {
+        completer.complete();
+      }
+    });
+  }
+
+  Future<void> _waitForPollDelay(Duration delay) {
+    _pollDelayTimer?.cancel();
+    final completer = Completer<void>();
+    _pollDelayCompleter = completer;
+    _pollDelayTimer = Timer(delay, () {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    });
+    return completer.future.whenComplete(() {
+      if (identical(_pollDelayCompleter, completer)) {
+        _pollDelayCompleter = null;
+        _pollDelayTimer = null;
+      }
+    });
   }
 }

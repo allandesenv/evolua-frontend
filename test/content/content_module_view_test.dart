@@ -53,9 +53,9 @@ void main() {
       await tester.tap(find.text('Explorar'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Encontrar uma trilha certa'), findsOneWidget);
+      expect(find.text('Catálogo de trilhas'), findsOneWidget);
       expect(find.text('Respiracao breve'), findsOneWidget);
-      expect(find.text('Minha jornada ativa'), findsOneWidget);
+      expect(find.text('Minha jornada ativa'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -68,9 +68,158 @@ void main() {
       await tester.tap(find.text('Explorar trilhas'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Encontrar uma trilha certa'), findsOneWidget);
+      expect(find.text('Catálogo de trilhas'), findsOneWidget);
       expect(find.text('Respiracao breve'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('journey and catalog communicate different purposes', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua jornada'), findsOneWidget);
+      expect(find.text('Catálogo de trilhas'), findsNothing);
+
+      await tester.tap(find.text('Explorar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Catálogo de trilhas'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Descubra trilhas por tema, formato e profundidade',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('premium filters send explicit premium values', (tester) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        catalogTrails: [
+          _trail(
+            id: 2,
+            title: 'Respiracao breve',
+            summary: 'Uma trilha essencial.',
+            activeJourney: false,
+            generatedByAi: false,
+          ),
+          _trail(
+            id: 3,
+            title: 'Sono premium',
+            summary: 'Uma trilha premium.',
+            activeJourney: false,
+            generatedByAi: false,
+            premium: true,
+            accessible: false,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Essenciais'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.lastPremium, isFalse);
+      expect(find.text('Respiracao breve'), findsOneWidget);
+      expect(find.text('Sono premium'), findsNothing);
+
+      await tester.tap(find.text('Premium'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.lastPremium, isTrue);
+      expect(find.text('Sono premium'), findsOneWidget);
+      expect(find.text('Respiracao breve'), findsNothing);
+
+      await tester.tap(find.text('Todas'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.lastPremium, isNull);
+    });
+
+    testWidgets('search waits for four chars and debounces requests', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final initialCalls = trailRepository.listCallCount;
+
+      await tester.enterText(find.byType(TextFormField), 'son');
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(trailRepository.listCallCount, initialCalls);
+      expect(
+        find.text('Digite pelo menos 4 caracteres para buscar.'),
+        findsOneWidget,
+      );
+
+      await tester.enterText(find.byType(TextFormField), 'sono');
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(trailRepository.listCallCount, initialCalls);
+
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.lastSearch, 'sono');
+      expect(trailRepository.listCallCount, initialCalls + 1);
+    });
+
+    testWidgets('catalog shows real count and premium empty state', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        catalogTrails: [
+          _trail(
+            id: 2,
+            title: 'Respiracao breve',
+            summary: 'Uma trilha essencial.',
+            activeJourney: false,
+            generatedByAi: false,
+          ),
+          _trail(
+            id: 3,
+            title: 'Foco gentil',
+            summary: 'Outra trilha essencial.',
+            activeJourney: false,
+            generatedByAi: false,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 trilhas encontradas'), findsOneWidget);
+
+      await tester.tap(find.text('Premium'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Novas trilhas premium em breve.'), findsOneWidget);
     });
 
     testWidgets('uses light surfaces and readable text in light theme', (
@@ -318,29 +467,37 @@ Widget _testApp({
 }
 
 class _FakeTrailRepository implements TrailRepository {
-  _FakeTrailRepository({Trail? activeTrail, Trail? catalogTrail})
-    : _activeTrail =
-          activeTrail ??
-          _trail(
-            id: 1,
-            title: 'Clareza em 8 minutos',
-            summary: 'Uma jornada ativa para organizar o momento.',
-            activeJourney: true,
-            generatedByAi: true,
-          ),
-      _catalogTrail =
-          catalogTrail ??
-          _trail(
-            id: 2,
-            title: 'Respiracao breve',
-            summary: 'Uma trilha curta para voltar ao corpo.',
-            activeJourney: false,
-            generatedByAi: false,
-          );
+  _FakeTrailRepository({
+    Trail? activeTrail,
+    Trail? catalogTrail,
+    List<Trail>? catalogTrails,
+  }) : _activeTrail =
+           activeTrail ??
+           _trail(
+             id: 1,
+             title: 'Clareza em 8 minutos',
+             summary: 'Uma jornada ativa para organizar o momento.',
+             activeJourney: true,
+             generatedByAi: true,
+           ),
+       _catalogTrails =
+           catalogTrails ??
+           [
+             catalogTrail ??
+                 _trail(
+                   id: 2,
+                   title: 'Respiracao breve',
+                   summary: 'Uma trilha curta para voltar ao corpo.',
+                   activeJourney: false,
+                   generatedByAi: false,
+                 ),
+           ];
 
   final Trail _activeTrail;
-  final Trail _catalogTrail;
+  final List<Trail> _catalogTrails;
   int listCallCount = 0;
+  String? lastSearch;
+  bool? lastPremium;
 
   @override
   Future<Trail?> currentJourney() async => _activeTrail;
@@ -356,11 +513,28 @@ class _FakeTrailRepository implements TrailRepository {
     bool? premium,
   }) async {
     listCallCount++;
+    lastSearch = search;
+    lastPremium = premium;
+    var items = _catalogTrails;
+    if (premium != null) {
+      items = items.where((trail) => trail.premium == premium).toList();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      final normalized = search.trim().toLowerCase();
+      items = items
+          .where(
+            (trail) =>
+                trail.title.toLowerCase().contains(normalized) ||
+                trail.summary.toLowerCase().contains(normalized) ||
+                trail.category.toLowerCase().contains(normalized),
+          )
+          .toList();
+    }
     return PaginatedResponse(
-      items: [_catalogTrail],
+      items: items,
       page: page,
       size: size,
-      totalItems: 1,
+      totalItems: items.length,
       totalPages: 1,
       hasNext: false,
       hasPrevious: false,
@@ -372,7 +546,9 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<TrailJourney> journey(int trailId) async {
-    final trail = trailId == _activeTrail.id ? _activeTrail : _catalogTrail;
+    final trail = trailId == _activeTrail.id
+        ? _activeTrail
+        : _catalogTrails.firstWhere((trail) => trail.id == trailId);
     return _journey(trail);
   }
 

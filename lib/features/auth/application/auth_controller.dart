@@ -211,13 +211,36 @@ class AuthController extends AsyncNotifier<AuthSession?> {
         state = AsyncData(refreshed);
       }
       return refreshed;
-    } catch (_) {
-      await _clearSession();
-      if (updateState) {
-        state = const AsyncData(null);
+    } catch (error) {
+      if (_isInvalidRefreshFailure(error)) {
+        await _clearSession();
+        if (updateState) {
+          state = const AsyncData(null);
+        }
+        if (kDebugMode) {
+          debugPrint('Auth refresh rejected; session cleared.');
+        }
+        return null;
       }
-      return null;
+
+      if (updateState && session != null) {
+        state = AsyncData(session);
+      }
+      if (kDebugMode) {
+        debugPrint(
+          'Auth refresh failed transiently; keeping stored session (${error.runtimeType}).',
+        );
+      }
+      return session;
     }
+  }
+
+  bool _isInvalidRefreshFailure(Object error) {
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      return status == 400 || status == 401 || status == 403;
+    }
+    return true;
   }
 
   Future<AuthSession?> _readStoredSession(AuthSessionStorage storage) async {

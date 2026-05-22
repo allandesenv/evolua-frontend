@@ -29,6 +29,7 @@ class SoftPremiumPrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     return PrimaryPanel(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -122,6 +123,7 @@ class RewardedAdPrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     return PrimaryPanel(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -189,7 +191,7 @@ class RewardedAdPrompt extends StatelessWidget {
                 ),
               if (onOpenPremium != null)
                 OutlinedButton.icon(
-                  onPressed: onOpenPremium,
+                  onPressed: isRewardLoading ? null : onOpenPremium,
                   icon: const Icon(Icons.workspace_premium_rounded),
                   label: Text(premiumLabel),
                 ),

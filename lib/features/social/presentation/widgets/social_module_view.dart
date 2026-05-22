@@ -3,6 +3,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
+import 'package:evolua_frontend/features/social/application/social_feed_state.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_communities_area.dart';
@@ -10,6 +11,8 @@ import 'package:evolua_frontend/features/social/presentation/widgets/social_feed
 import 'package:evolua_frontend/features/social/presentation/widgets/social_post_composer.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_shared_widgets.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,16 +51,20 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final _postFormKey = GlobalKey<FormState>();
+  final _communityPostFormKey = GlobalKey<FormState>();
   final _postContentController = TextEditingController();
+  final _communityPostContentController = TextEditingController();
   final _feedSearchController = TextEditingController();
   final _communitySearchController = TextEditingController();
   String _postVisibility = 'PUBLIC';
+  String _communityPostVisibility = 'PUBLIC';
   String _feedVisibilityFilter = 'TODAS';
   String _feedCommunityFilter = 'TODAS';
   String _communityVisibilityFilter = 'TODAS';
   String _communityCategoryFilter = 'TODAS';
   String _communityMembershipFilter = 'TODAS';
   String? _postCommunitySlug;
+  Community? _selectedCommunity;
   late SocialFeedScope _feedScope;
   late SocialCommunityScope _communityScope;
 
@@ -113,6 +120,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     _postContentController.dispose();
+    _communityPostContentController.dispose();
     _feedSearchController.dispose();
     _communitySearchController.dispose();
     super.dispose();
@@ -151,6 +159,48 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       message: 'Reflexao publicada com sucesso.',
       icon: Icons.check_circle_outline_rounded,
     );
+  }
+
+  Future<void> _submitCommunityPost() async {
+    final community = _selectedCommunity;
+    if (community == null || !_communityPostFormKey.currentState!.validate()) {
+      return;
+    }
+
+    await ref
+        .read(socialPostControllerProvider.notifier)
+        .create(
+          content: _communityPostContentController.text.trim(),
+          community: community.slug,
+          visibility: _communityPostVisibility,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    _communityPostContentController.clear();
+    AppSnackBar.show(
+      context,
+      message: 'Reflexão publicada em ${community.name}.',
+      icon: Icons.check_circle_outline_rounded,
+    );
+  }
+
+  Future<void> _openCommunityDetail(Community community) async {
+    setState(() {
+      _selectedCommunity = community;
+      _communityPostVisibility = 'PUBLIC';
+      _communityPostContentController.clear();
+    });
+    await ref
+        .read(socialPostControllerProvider.notifier)
+        .applyFilters(community: community.slug, visibility: null, mine: null);
+  }
+
+  Future<void> _closeCommunityDetail() async {
+    setState(() => _selectedCommunity = null);
+    await _syncScopes(force: true);
   }
 
   Future<void> _applyFeedFilters() {
@@ -357,6 +407,28 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
     }.toList();
     final postsCount = postsState.asData?.value.result.totalItems ?? 0;
 
+    final selectedCommunity = _selectedCommunity;
+    if (selectedCommunity != null) {
+      return _CommunityDetailView(
+        community: selectedCommunity,
+        postsState: postsState,
+        formKey: _communityPostFormKey,
+        contentController: _communityPostContentController,
+        visibility: _communityPostVisibility,
+        onVisibilityChanged: (value) =>
+            setState(() => _communityPostVisibility = value),
+        onSubmit: postsState.isLoading && !postsState.hasValue
+            ? null
+            : _submitCommunityPost,
+        onBack: _closeCommunityDetail,
+        onRefresh: () => ref
+            .read(socialPostControllerProvider.notifier)
+            .applyFilters(community: selectedCommunity.slug),
+        onPageChanged: (page) =>
+            ref.read(socialPostControllerProvider.notifier).goToPage(page),
+      );
+    }
+
     return Column(
       children: [
         if (widget.showTabs)
@@ -478,6 +550,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
                 onPageChanged: (page) => ref
                     .read(communityControllerProvider.notifier)
                     .goToPage(page),
+                onView: _openCommunityDetail,
                 onJoin: (community) async {
                   await ref
                       .read(communityControllerProvider.notifier)
@@ -558,6 +631,231 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView>
       return 'Seu momento recente abre espaco para clareza. Estas reflexoes priorizam presenca, constancia e aplicacao pratica.';
     }
     return 'Leia reflexoes curtas, aprendizados e relatos leves sem entrar no ritmo de uma rede social.';
+  }
+}
+
+class _CommunityDetailView extends StatelessWidget {
+  const _CommunityDetailView({
+    required this.community,
+    required this.postsState,
+    required this.formKey,
+    required this.contentController,
+    required this.visibility,
+    required this.onVisibilityChanged,
+    required this.onSubmit,
+    required this.onBack,
+    required this.onRefresh,
+    required this.onPageChanged,
+  });
+
+  final Community community;
+  final AsyncValue<SocialFeedState> postsState;
+  final GlobalKey<FormState> formKey;
+  final TextEditingController contentController;
+  final String visibility;
+  final ValueChanged<String> onVisibilityChanged;
+  final VoidCallback? onSubmit;
+  final VoidCallback onBack;
+  final VoidCallback onRefresh;
+  final ValueChanged<int> onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PrimaryPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconButton(
+                tooltip: 'Voltar',
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded),
+                color: AppColors.accent,
+                style: IconButton.styleFrom(
+                  side: BorderSide(
+                    color: AppColors.accent.withValues(alpha: 0.36),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: AppColors.accent.withValues(alpha: 0.14),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.24),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          community.name,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          community.description,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            SocialMetaPill(label: community.category),
+                            SocialMetaPill(
+                              label: '${community.memberCount} pessoas',
+                            ),
+                            const SocialMetaPill(label: 'Participando'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        PrimaryPanel(
+          child: Form(
+            key: formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Criar reflexão neste espaço',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Compartilhe um registro curto conectado ao tema deste espaço.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: contentController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Sua reflexão',
+                    hintText: 'Escreva com calma, no seu ritmo.',
+                    alignLabelWithHint: true,
+                    prefixIcon: Icon(Icons.edit_note_rounded),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Escreva sua reflexão.'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  initialValue: visibility,
+                  decoration: const InputDecoration(
+                    labelText: 'Visibilidade',
+                    prefixIcon: Icon(Icons.visibility_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'PUBLIC', child: Text('Pública')),
+                    DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      onVisibilityChanged(value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: onSubmit,
+                  icon: const Icon(Icons.send_rounded),
+                  label: const Text('Publicar reflexão'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        postsState.when(
+          data: (feedState) {
+            final result = feedState.result;
+            if (result.items.isEmpty) {
+              return GuidedEmptyState(
+                icon: Icons.forum_rounded,
+                title: 'Nenhuma reflexão ainda',
+                subtitle:
+                    'Quando alguém compartilhar uma reflexão neste espaço, ela aparecerá aqui.',
+                actionLabel: 'Atualizar',
+                onAction: onRefresh,
+              );
+            }
+            return Column(
+              children: [
+                ...result.items.map(
+                  (post) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: PrimaryPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.format_quote_rounded,
+                                color: AppColors.accentWarm,
+                              ),
+                              const SizedBox(width: 8),
+                              SocialMetaPill(label: post.visibility),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            post.content,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                PaginationControls(
+                  page: result.page,
+                  totalPages: result.totalPages,
+                  onPageChanged: onPageChanged,
+                ),
+              ],
+            );
+          },
+          error: (_, _) => SocialActionableErrorState(
+            title: 'Não conseguimos abrir as reflexões deste espaço agora.',
+            onRetry: onRefresh,
+          ),
+          loading: () =>
+              const SocialLoadingState(label: 'Carregando reflexões...'),
+        ),
+      ],
+    );
   }
 }
 

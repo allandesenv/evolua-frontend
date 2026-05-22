@@ -11,6 +11,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 class AuthFormCard extends ConsumerStatefulWidget {
   const AuthFormCard({super.key, this.initialRegisterMode = false});
@@ -24,14 +25,17 @@ class AuthFormCard extends ConsumerStatefulWidget {
 class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
+  final _birthDateController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _customGenderController = TextEditingController();
 
   final _displayNameFocusNode = FocusNode();
   final _birthDateFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _confirmPasswordFocusNode = FocusNode();
   final _customGenderFocusNode = FocusNode();
 
   bool _isRegisterMode = false;
@@ -47,6 +51,11 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   void initState() {
     super.initState();
     _isRegisterMode = widget.initialRegisterMode;
+    _displayNameController.addListener(_handleInputChanged);
+    _emailController.addListener(_handleInputChanged);
+    _passwordController.addListener(_handleInputChanged);
+    _confirmPasswordController.addListener(_handleInputChanged);
+    _customGenderController.addListener(_handleInputChanged);
     ref.listenManual(authControllerProvider, (previous, next) {
       final error = next.error;
 
@@ -67,16 +76,25 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     });
   }
 
+  void _handleInputChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
     _displayNameController.dispose();
+    _birthDateController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _customGenderController.dispose();
     _displayNameFocusNode.dispose();
     _birthDateFocusNode.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
     _customGenderFocusNode.dispose();
     super.dispose();
   }
@@ -88,7 +106,12 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
     setState(() {
       _submitted = true;
-      _birthDateError = _isRegisterMode ? validateBirthDate(_birthDate) : null;
+      if (_isRegisterMode) {
+        _birthDate = parseBirthDateText(_birthDateController.text);
+        _birthDateError = validateBirthDateText(_birthDateController.text);
+      } else {
+        _birthDateError = null;
+      }
     });
 
     final isValid = _formKey.currentState!.validate();
@@ -156,6 +179,16 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     }
 
     if (_isRegisterMode &&
+        validateConfirmPassword(
+              _confirmPasswordController.text,
+              _passwordController.text,
+            ) !=
+            null) {
+      _confirmPasswordFocusNode.requestFocus();
+      return;
+    }
+
+    if (_isRegisterMode &&
         validateCustomGender(
               selectedGender: _gender,
               customGender: _customGenderController.text,
@@ -179,12 +212,21 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
     setState(() => _isOAuthStarting = true);
     try {
+      if (kDebugMode) {
+        debugPrint('Google OAuth start requested.');
+      }
       await ref.read(googleOAuthLauncherProvider)(startUri.toString());
-    } catch (_) {
+      if (!kIsWeb && mounted) {
+        setState(() => _isOAuthStarting = false);
+      }
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() => _isOAuthStarting = false);
+      if (kDebugMode) {
+        debugPrint('Google OAuth start failed: ${error.runtimeType}.');
+      }
       AppSnackBar.show(
         context,
         message: context.l10n.authGoogleStartError,
@@ -214,9 +256,19 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     if (selected != null) {
       setState(() {
         _birthDate = selected;
-        _birthDateError = _submitted ? validateBirthDate(_birthDate) : null;
+        _birthDateController.text = formatBirthDate(selected);
+        _birthDateError = _submitted
+            ? validateBirthDateText(_birthDateController.text)
+            : null;
       });
     }
+  }
+
+  void _handleBirthDateChanged(String value) {
+    setState(() {
+      _birthDate = parseBirthDateText(value);
+      _birthDateError = _submitted ? validateBirthDateText(value) : null;
+    });
   }
 
   void _switchMode(bool isRegisterMode) {
@@ -225,16 +277,37 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       _submitted = false;
       _birthDateError = null;
       _displayNameController.clear();
+      _birthDateController.clear();
+      _passwordController.clear();
+      _confirmPasswordController.clear();
       _customGenderController.clear();
       _birthDate = null;
       _gender = genderMale;
     });
   }
 
+  bool get _canSubmit {
+    if (_isOAuthStarting || _isSubmitting) {
+      return false;
+    }
+
+    if (!_isRegisterMode) {
+      return true;
+    }
+
+    return normalizeDisplayName(_displayNameController.text).isNotEmpty &&
+        parseBirthDateText(_birthDateController.text) != null &&
+        normalizeEmail(_emailController.text).isNotEmpty &&
+        _passwordController.text.isNotEmpty &&
+        _confirmPasswordController.text.isNotEmpty &&
+        validGenderValues.contains(_gender);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading || _isSubmitting || _isOAuthStarting;
+    final canSubmit = !isLoading && _canSubmit;
     final l10n = context.l10n;
 
     return LayoutBuilder(
@@ -294,6 +367,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           controller: _displayNameController,
                           focusNode: _displayNameFocusNode,
                           autofillHints: const [AutofillHints.name],
+                          maxLength: maxDisplayNameLength,
                           textInputAction: TextInputAction.next,
                           decoration: InputDecoration(
                             labelText: l10n.authDisplayNameLabel,
@@ -303,25 +377,27 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           validator: validateDisplayName,
                         ),
                         SizedBox(height: compact ? 12 : 14),
-                        Focus(
+                        TextFormField(
+                          key: const Key('auth-birth-date-field'),
+                          controller: _birthDateController,
                           focusNode: _birthDateFocusNode,
-                          child: InkWell(
-                            onTap: isLoading ? null : _pickBirthDate,
-                            borderRadius: BorderRadius.circular(18),
-                            child: InputDecorator(
-                              key: const Key('auth-birth-date-field'),
-                              decoration: InputDecoration(
-                                labelText: l10n.authBirthDateLabel,
-                                prefixIcon: const Icon(Icons.cake_rounded),
-                                errorText: _submitted ? _birthDateError : null,
-                              ),
-                              child: Text(
-                                _birthDate == null
-                                    ? l10n.authBirthDateEmpty
-                                    : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}',
-                              ),
+                          enabled: !isLoading,
+                          keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.next,
+                          inputFormatters: const [_BirthDateInputFormatter()],
+                          decoration: InputDecoration(
+                            labelText: l10n.authBirthDateLabel,
+                            hintText: l10n.authBirthDateHint,
+                            prefixIcon: const Icon(Icons.cake_rounded),
+                            errorText: _submitted ? _birthDateError : null,
+                            suffixIcon: IconButton(
+                              tooltip: l10n.authBirthDateOpenPicker,
+                              onPressed: isLoading ? null : _pickBirthDate,
+                              icon: const Icon(Icons.calendar_month_rounded),
                             ),
                           ),
+                          validator: (_) => _birthDateError,
+                          onChanged: _handleBirthDateChanged,
                         ),
                         SizedBox(height: compact ? 12 : 14),
                         DropdownButtonFormField<String>(
@@ -379,6 +455,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                         focusNode: _emailFocusNode,
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
+                        maxLength: maxEmailLength,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
                           labelText: l10n.authEmailLabel,
@@ -393,11 +470,17 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                         focusNode: _passwordFocusNode,
                         obscureText: !_isPasswordVisible,
                         autofillHints: const [AutofillHints.password],
-                        textInputAction: TextInputAction.done,
+                        maxLength: maxPasswordLength,
+                        textInputAction: _isRegisterMode
+                            ? TextInputAction.next
+                            : TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
                         decoration: InputDecoration(
                           labelText: l10n.authPasswordLabel,
                           hintText: l10n.authPasswordHint,
+                          helperText: _isRegisterMode
+                              ? l10n.authPasswordRules
+                              : null,
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: IconButton(
                             tooltip: _isPasswordVisible
@@ -417,6 +500,27 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                         ),
                         validator: validatePassword,
                       ),
+                      if (_isRegisterMode) ...[
+                        SizedBox(height: compact ? 12 : 14),
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          focusNode: _confirmPasswordFocusNode,
+                          obscureText: !_isPasswordVisible,
+                          autofillHints: const [AutofillHints.newPassword],
+                          maxLength: maxPasswordLength,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            labelText: l10n.authConfirmPasswordLabel,
+                            hintText: l10n.authConfirmPasswordHint,
+                            prefixIcon: const Icon(Icons.lock_reset_rounded),
+                          ),
+                          validator: (value) => validateConfirmPassword(
+                            value,
+                            _passwordController.text,
+                          ),
+                        ),
+                      ],
                       if (!_isRegisterMode) ...[
                         const SizedBox(height: 10),
                         Align(
@@ -442,7 +546,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: isLoading ? null : _submit,
+                          onPressed: canSubmit ? _submit : null,
                           key: const Key('auth-submit-button'),
                           child: _isSubmitting && !_isOAuthStarting
                               ? const SizedBox(
@@ -467,6 +571,33 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
           ),
         );
       },
+    );
+  }
+}
+
+class _BirthDateInputFormatter extends TextInputFormatter {
+  const _BirthDateInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < limited.length; index += 1) {
+      if (index == 2 || index == 4) {
+        buffer.write('/');
+      }
+      buffer.write(limited[index]);
+    }
+
+    final text = buffer.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

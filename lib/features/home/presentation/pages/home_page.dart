@@ -1,3 +1,4 @@
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
@@ -10,8 +11,15 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
-    if (checkInState.isLoading && !checkInState.hasValue) {
+    final checkInHistory = checkInState.asData?.value;
+    final hasStaleSessionState =
+        session != null &&
+        checkInHistory != null &&
+        !checkInHistory.belongsToUser(session.userId);
+    if ((checkInState.isLoading && !checkInState.hasValue) ||
+        hasStaleSessionState) {
       return const GradientScaffold(child: _HomeGateLoading());
     }
 

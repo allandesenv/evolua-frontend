@@ -5,6 +5,11 @@ import 'package:evolua_frontend/features/auth/application/authenticated_session_
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
+import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
@@ -24,7 +29,14 @@ void main() {
       final profileRepository = _FakeProfileRepository(
         _profile(userId: 'user-a', displayName: 'Usuario A'),
       );
-      final container = _container(authRepository, profileRepository);
+      final checkInRepository = _FakeCheckInRepository(
+        _checkIn(userId: 'user-a', insight: 'Leitura do usuário A'),
+      );
+      final container = _container(
+        authRepository,
+        profileRepository,
+        checkInRepository,
+      );
       addTearDown(container.dispose);
 
       container.read(authenticatedSessionResetObserverProvider);
@@ -39,11 +51,26 @@ void main() {
         profileControllerProvider.future,
       );
       expect(firstProfile?.userId, 'user-a');
+      final firstCheckInHistory = await container.read(
+        checkInControllerProvider.future,
+      );
+      expect(firstCheckInHistory.ownerUserId, 'user-a');
+      expect(
+        firstCheckInHistory.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura do usuário A',
+      );
 
       await container.read(authControllerProvider.notifier).logout();
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(checkInControllerProvider).isLoading, isTrue);
+
       profileRepository.profile = _profile(
         userId: 'user-b',
         displayName: 'Usuario B',
+      );
+      checkInRepository.item = _checkIn(
+        userId: 'user-b',
+        insight: 'Leitura do usuário B',
       );
       await container
           .read(authControllerProvider.notifier)
@@ -55,6 +82,14 @@ void main() {
       );
       expect(secondProfile?.userId, 'user-b');
       expect(secondProfile?.displayName, 'Usuario B');
+      final secondCheckInHistory = await container.read(
+        checkInControllerProvider.future,
+      );
+      expect(secondCheckInHistory.ownerUserId, 'user-b');
+      expect(
+        secondCheckInHistory.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura do usuário B',
+      );
     },
   );
 }
@@ -62,11 +97,13 @@ void main() {
 ProviderContainer _container(
   AuthRepository authRepository,
   ProfileRepository profileRepository,
+  CheckInRepository checkInRepository,
 ) {
   return ProviderContainer(
     overrides: [
       authRepositoryProvider.overrideWithValue(authRepository),
       profileRepositoryProvider.overrideWithValue(profileRepository),
+      checkInRepositoryProvider.overrideWithValue(checkInRepository),
     ],
   );
 }
@@ -109,6 +146,51 @@ class _FakeAuthRepository implements AuthRepository {
     required String token,
     required String newPassword,
   }) async {}
+}
+
+class _FakeCheckInRepository implements CheckInRepository {
+  _FakeCheckInRepository(this.item);
+
+  CheckIn item;
+
+  @override
+  Future<PaginatedResponse<CheckIn>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    return PaginatedResponse(
+      items: [item],
+      page: page,
+      size: size,
+      totalItems: 1,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      filters: const {},
+    );
+  }
+
+  @override
+  Future<CheckIn> create({
+    required String mood,
+    String? reflection,
+    required int energyLevel,
+  }) async {
+    item = _checkIn(userId: item.userId, insight: 'Nova leitura');
+    return item;
+  }
+
+  @override
+  Future<CheckIn> generateDeepReading(int checkInId) async => item;
 }
 
 class _FakeProfileRepository implements ProfileRepository {
@@ -164,6 +246,30 @@ AuthSession _session({required String userId, required String email}) {
     accessToken: _jwt(userId: userId, email: email),
     refreshToken: 'refresh-$userId',
     expiresAt: DateTime.now().add(const Duration(hours: 1)),
+  );
+}
+
+CheckIn _checkIn({required String userId, required String insight}) {
+  return CheckIn(
+    id: userId == 'user-a' ? 1 : 2,
+    userId: userId,
+    mood: 'calma',
+    reflection: '',
+    energyLevel: 7,
+    recommendedPractice: 'Respire por dois minutos.',
+    aiInsight: CheckInAiInsight(
+      insight: insight,
+      suggestedAction: 'Respire com calma.',
+      riskLevel: 'low',
+      suggestedTrailId: null,
+      suggestedTrailTitle: null,
+      suggestedTrailReason: '',
+      suggestedSpace: null,
+      journeyPlan: null,
+      generatedTrailDraft: null,
+      fallbackUsed: false,
+    ),
+    createdAt: DateTime.now(),
   );
 }
 

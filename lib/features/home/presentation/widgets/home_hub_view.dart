@@ -2,6 +2,7 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
@@ -155,18 +156,26 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   @override
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
+    final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
     final futureMessageState = ref.watch(futureMessageControllerProvider);
     final dailyRitualState = ref.watch(dailyRitualControllerProvider);
     final currentJourney = ref.watch(currentJourneyTrailProvider).asData?.value;
-    final result = checkInState.asData?.value.result;
+    final checkInHistory = checkInState.asData?.value;
+    final canUseCheckInState =
+        session == null ||
+        checkInHistory?.belongsToUser(session.userId) == true;
+    final result = canUseCheckInState ? checkInHistory?.result : null;
     final recentItems = result?.items ?? const <CheckIn>[];
-    final latestCreatedCheckIn =
-        checkInState.asData?.value.latestCreatedCheckIn;
-    final isInsightPending =
-        checkInState.asData?.value.isLatestInsightPending ?? false;
-    final isInsightUnavailable =
-        checkInState.asData?.value.isLatestInsightUnavailable ?? false;
+    final latestCreatedCheckIn = canUseCheckInState
+        ? checkInHistory?.latestCreatedCheckIn
+        : null;
+    final isInsightPending = canUseCheckInState
+        ? checkInHistory?.isLatestInsightPending ?? false
+        : false;
+    final isInsightUnavailable = canUseCheckInState
+        ? checkInHistory?.isLatestInsightUnavailable ?? false
+        : false;
     final latestInsight =
         latestCreatedCheckIn?.aiInsight ??
         recentItems

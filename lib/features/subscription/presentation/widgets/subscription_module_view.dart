@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -30,33 +29,32 @@ class _SubscriptionModuleViewState
       }
 
       if (next.hasError) {
-        final error = next.error;
-        final message = error is DioException
-            ? (error.response?.data is Map<String, dynamic>
-                  ? ((error.response?.data['details'] as List?)?.join(', ') ??
-                        error.message ??
-                        'Não foi possível processar a assinatura.')
-                  : error.message ?? 'Não foi possível processar a assinatura.')
-            : 'Não foi possível processar a assinatura.';
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível processar a assinatura agora. Tente novamente em instantes.',
+            ),
+          ),
+        );
       }
     });
   }
 
   Future<void> _startCheckout(PlanView plan) async {
-    final checkout = await ref
-        .read(subscriptionControllerProvider.notifier)
-        .startPremiumCheckout(plan);
-    final url = checkout.checkoutUrl;
-    if (url != null && url.isNotEmpty) {
-      await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-        webOnlyWindowName: '_self',
-      );
+    try {
+      final checkout = await ref
+          .read(subscriptionControllerProvider.notifier)
+          .startPremiumCheckout(plan);
+      final url = checkout.checkoutUrl;
+      if (url != null && url.isNotEmpty) {
+        await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_self',
+        );
+      }
+    } on SubscriptionCheckoutException {
+      // O controller já publicou uma mensagem amigável e reabilitou os botões.
     }
   }
 
@@ -109,13 +107,15 @@ class _SubscriptionModuleViewState
             cta: 'Plano atual',
             disabled: true,
           ),
-          ...premiumPlans.map(
-            (plan) => _PlanCard(
+          ...premiumPlans.map((plan) {
+            final active =
+                current?.planCode == plan.planCode && current?.premium == true;
+            return _PlanCard(
               title: plan.title,
               subtitle: plan.subtitle,
               priceLabel: plan.billingCycle == 'YEARLY'
                   ? '${_formatPrice(plan.price, plan.currency)}/ano'
-                  : '${_formatPrice(plan.price, plan.currency)}/mes',
+                  : '${_formatPrice(plan.price, plan.currency)}/mês',
               bullets: plan.benefits,
               accent: _accentForPlan(plan),
               badge:
@@ -123,15 +123,12 @@ class _SubscriptionModuleViewState
                   (plan.billingCycle == 'YEARLY' ? 'Economize 33%' : null),
               availabilityNote: plan.availabilityNote,
               featured: plan.highlighted || plan.isFounder,
-              highlighted: current?.planCode == plan.planCode,
-              cta: _ctaForPlan(plan, current),
-              disabled:
-                  data.isBusy ||
-                  (current?.planCode == plan.planCode &&
-                      current?.premium == true),
+              highlighted: active,
+              cta: data.isBusy ? 'Processando...' : _ctaForPlan(plan, current),
+              disabled: data.isBusy || active,
               onTap: () => _startCheckout(plan),
-            ),
-          ),
+            );
+          }),
         ];
 
         return Column(
@@ -152,17 +149,9 @@ class _SubscriptionModuleViewState
                         : 'Você está no plano Essencial. Comece sua jornada de autoconhecimento com leveza e constância.',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  const SizedBox(height: 20),
-                  _CurrentPlanCard(
-                    current: current,
-                    pending: data.pendingCheckout,
-                    plans: plans,
-                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            const _MonetizationPrinciplesPanel(),
             const SizedBox(height: 16),
             _PlanCardsLayout(cards: cards),
           ],
@@ -239,131 +228,6 @@ class _PlanCardsLayout extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-class _MonetizationPrinciplesPanel extends StatelessWidget {
-  const _MonetizationPrinciplesPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return PrimaryPanel(
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: const [
-          _PrinciplePill(
-            icon: Icons.favorite_rounded,
-            label: 'Free útil, sem pressão',
-          ),
-          _PrinciplePill(
-            icon: Icons.visibility_off_rounded,
-            label: 'Premium sem anúncios',
-          ),
-          _PrinciplePill(
-            icon: Icons.ondemand_video_rounded,
-            label: 'Anúncios só em áreas neutras',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PrinciplePill extends StatelessWidget {
-  const _PrinciplePill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 280),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceStrong,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge,
-                softWrap: true,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CurrentPlanCard extends StatelessWidget {
-  const _CurrentPlanCard({
-    required this.current,
-    required this.pending,
-    required this.plans,
-  });
-
-  final CurrentSubscription? current;
-  final CheckoutSession? pending;
-  final List<PlanView> plans;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = _labelForCurrent();
-    final status = current?.status ?? 'NONE';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceStrong,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Plano atual', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
-          Text(label, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 6),
-          Text('Status: $status', style: Theme.of(context).textTheme.bodyLarge),
-          if (current?.currentPeriodEndsAt != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Próxima referência: ${current!.currentPeriodEndsAt!.day.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.month.toString().padLeft(2, '0')}/${current!.currentPeriodEndsAt!.year}',
-            ),
-          ],
-          if (pending != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              pending!.isApproved
-                  ? 'Pagamento confirmado para ${pending!.planCode}.'
-                  : 'Checkout ${pending!.status.toLowerCase()} para ${pending!.planCode}.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _labelForCurrent() {
-    for (final plan in plans) {
-      if (plan.planCode == current?.planCode) {
-        return plan.title;
-      }
-    }
-    return current?.premium == true ? 'Premium' : 'Essencial';
   }
 }
 

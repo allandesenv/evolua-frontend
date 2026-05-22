@@ -166,6 +166,18 @@ abstract class AppLocalizations {
   /// **'Selecione sua data'**
   String get authBirthDateEmpty;
 
+  /// No description provided for @authBirthDateHint.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'dd/mm/aaaa'**
+  String get authBirthDateHint;
+
+  /// No description provided for @authBirthDateOpenPicker.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Abrir calendário'**
+  String get authBirthDateOpenPicker;
+
   /// No description provided for @authGenderLabel.
   ///
   /// In pt_BR, this message translates to:
@@ -229,8 +241,26 @@ abstract class AppLocalizations {
   /// No description provided for @authPasswordHint.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Mínimo de 6 caracteres'**
+  /// **'De 6 a 72 caracteres'**
   String get authPasswordHint;
+
+  /// No description provided for @authConfirmPasswordLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirmar senha'**
+  String get authConfirmPasswordLabel;
+
+  /// No description provided for @authConfirmPasswordHint.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Digite a senha novamente'**
+  String get authConfirmPasswordHint;
+
+  /// No description provided for @authPasswordRules.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use de 6 a 72 caracteres. Você pode usar letras, números e símbolos.'**
+  String get authPasswordRules;
 
   /// No description provided for @authHidePassword.
   ///
@@ -879,6 +909,348 @@ abstract class AppLocalizations {
   /// In pt_BR, this message translates to:
   /// **'Check-in'**
   String get checkInTitle;
+
+  /// No description provided for @checkInSemanticLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Check-in do dia'**
+  String get checkInSemanticLabel;
+
+  /// No description provided for @checkInEyebrow.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Como estou?'**
+  String get checkInEyebrow;
+
+  /// No description provided for @checkInPromptTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Comece pelo seu estado agora'**
+  String get checkInPromptTitle;
+
+  /// No description provided for @checkInPromptSubtitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Um check-in curto já dá contexto para o seu registro breve do dia.'**
+  String get checkInPromptSubtitle;
+
+  /// No description provided for @checkInMoreStatesTooltip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ver mais estados'**
+  String get checkInMoreStatesTooltip;
+
+  /// No description provided for @checkInMoreStates.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Mais estados'**
+  String get checkInMoreStates;
+
+  /// No description provided for @checkInSelectedState.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Estado selecionado: {state}'**
+  String checkInSelectedState(Object state);
+
+  /// No description provided for @checkInOtherMoodLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Descreva com suas palavras'**
+  String get checkInOtherMoodLabel;
+
+  /// No description provided for @checkInOtherMoodHint.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Opcional: escreva como você está se sentindo'**
+  String get checkInOtherMoodHint;
+
+  /// No description provided for @checkInEnergyLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Energia percebida: {value}/10'**
+  String checkInEnergyLabel(Object value);
+
+  /// No description provided for @checkInReflectionLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Escreva o que sentir vontade. Este espaço é seu.'**
+  String get checkInReflectionLabel;
+
+  /// No description provided for @checkInReflectionHint.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Uma frase simples ajuda a leitura ficar mais precisa.'**
+  String get checkInReflectionHint;
+
+  /// No description provided for @checkInSubmit.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Fazer check-in'**
+  String get checkInSubmit;
+
+  /// No description provided for @checkInNotNow.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Agora não'**
+  String get checkInNotNow;
+
+  /// No description provided for @checkInSavedSnack.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Check-in registrado. Continue no seu ritmo.'**
+  String get checkInSavedSnack;
+
+  /// No description provided for @checkInSaveError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível salvar o check-in.'**
+  String get checkInSaveError;
+
+  /// No description provided for @checkInDeepReadingTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Deseja desbloquear mais uma leitura emocional?'**
+  String get checkInDeepReadingTitle;
+
+  /// No description provided for @checkInDeepReadingMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu check-in foi salvo. A leitura básica continua disponível, e você pode liberar uma leitura aprofundada assistindo a um anúncio ou assinando Premium.'**
+  String get checkInDeepReadingMessage;
+
+  /// No description provided for @checkInDeepReadingReward.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Recompensa: +1 leitura emocional aprofundada hoje.'**
+  String get checkInDeepReadingReward;
+
+  /// No description provided for @checkInDeepReadingUnlocked.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Leitura aprofundada liberada para hoje.'**
+  String get checkInDeepReadingUnlocked;
+
+  /// No description provided for @checkInRewardAdNotConfirmed.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.'**
+  String get checkInRewardAdNotConfirmed;
+
+  /// No description provided for @checkInPremiumAction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Assinar Premium'**
+  String get checkInPremiumAction;
+
+  /// No description provided for @checkInChooseStateTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Escolha um estado'**
+  String get checkInChooseStateTitle;
+
+  /// No description provided for @checkInSearchState.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Buscar estado'**
+  String get checkInSearchState;
+
+  /// No description provided for @checkInRecentStates.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Recentes'**
+  String get checkInRecentStates;
+
+  /// No description provided for @checkInAiSuggestedStates.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sugeridos pela IA'**
+  String get checkInAiSuggestedStates;
+
+  /// No description provided for @checkInMoodGroupEmotional.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Emocionais'**
+  String get checkInMoodGroupEmotional;
+
+  /// No description provided for @checkInMoodGroupMental.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Mentais'**
+  String get checkInMoodGroupMental;
+
+  /// No description provided for @checkInMoodGroupPhysical.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Físicos'**
+  String get checkInMoodGroupPhysical;
+
+  /// No description provided for @checkInMoodGroupBehavioral.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Comportamentais'**
+  String get checkInMoodGroupBehavioral;
+
+  /// No description provided for @checkInMoodGroupOther.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Outros'**
+  String get checkInMoodGroupOther;
+
+  /// No description provided for @checkInMoodCalm.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Calma'**
+  String get checkInMoodCalm;
+
+  /// No description provided for @checkInMoodAnxiety.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ansiedade'**
+  String get checkInMoodAnxiety;
+
+  /// No description provided for @checkInMoodTiredness.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Cansaço'**
+  String get checkInMoodTiredness;
+
+  /// No description provided for @checkInMoodDistraction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Distração'**
+  String get checkInMoodDistraction;
+
+  /// No description provided for @checkInMoodSadness.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Tristeza'**
+  String get checkInMoodSadness;
+
+  /// No description provided for @checkInMoodEnthusiasm.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ânimo'**
+  String get checkInMoodEnthusiasm;
+
+  /// No description provided for @checkInMoodIrritation.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Irritação'**
+  String get checkInMoodIrritation;
+
+  /// No description provided for @checkInMoodHope.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Esperança'**
+  String get checkInMoodHope;
+
+  /// No description provided for @checkInMoodOverload.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sobrecarga'**
+  String get checkInMoodOverload;
+
+  /// No description provided for @checkInMoodFocus.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Foco'**
+  String get checkInMoodFocus;
+
+  /// No description provided for @checkInMoodConfusion.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confusão'**
+  String get checkInMoodConfusion;
+
+  /// No description provided for @checkInMoodCreativity.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Criatividade'**
+  String get checkInMoodCreativity;
+
+  /// No description provided for @checkInMoodAcceleration.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Aceleração'**
+  String get checkInMoodAcceleration;
+
+  /// No description provided for @checkInMoodBlock.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Bloqueio'**
+  String get checkInMoodBlock;
+
+  /// No description provided for @checkInMoodEnergy.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Energia'**
+  String get checkInMoodEnergy;
+
+  /// No description provided for @checkInMoodTension.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Tensão'**
+  String get checkInMoodTension;
+
+  /// No description provided for @checkInMoodLightness.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Leveza'**
+  String get checkInMoodLightness;
+
+  /// No description provided for @checkInMoodSleepiness.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sonolência'**
+  String get checkInMoodSleepiness;
+
+  /// No description provided for @checkInMoodAgitation.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Agitação'**
+  String get checkInMoodAgitation;
+
+  /// No description provided for @checkInMoodAvoidance.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Evitação'**
+  String get checkInMoodAvoidance;
+
+  /// No description provided for @checkInMoodProductivity.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Produtividade'**
+  String get checkInMoodProductivity;
+
+  /// No description provided for @checkInMoodIsolation.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Isolamento'**
+  String get checkInMoodIsolation;
+
+  /// No description provided for @checkInMoodConnection.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Conexão'**
+  String get checkInMoodConnection;
+
+  /// No description provided for @checkInMoodProcrastination.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Procrastinação'**
+  String get checkInMoodProcrastination;
+
+  /// No description provided for @checkInMoodConsistency.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Constância'**
+  String get checkInMoodConsistency;
+
+  /// No description provided for @checkInMoodOther.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Outro estado'**
+  String get checkInMoodOther;
 
   /// No description provided for @dailyRitualCarryMorning.
   ///
