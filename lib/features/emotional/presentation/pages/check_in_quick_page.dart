@@ -102,9 +102,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     super.dispose();
   }
 
-  Future<void> _submit({bool allowLimitUnlock = true}) async {
+  Future<bool> _submit({bool allowLimitUnlock = true}) async {
     if (_isSubmitting) {
-      return;
+      return false;
     }
 
     setState(() => _isSubmitting = true);
@@ -120,7 +120,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           );
 
       if (!mounted) {
-        return;
+        return false;
       }
 
       final asyncState = ref.read(checkInControllerProvider);
@@ -129,7 +129,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           setState(() => _isSubmitting = false);
           await _showExtraCheckInUnlockSheet();
         }
-        return;
+        return false;
       }
 
       _reflectionController.clear();
@@ -142,7 +142,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           ?.aiInsight;
       if (insight?.quotaLimited == true) {
         await _showDeepReadingUnlockSheet();
-        return;
+        return true;
       }
       AppSnackBar.show(
         context,
@@ -150,6 +150,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         icon: Icons.check_circle_outline_rounded,
       );
       widget.onCompleted?.call();
+      return true;
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -161,59 +162,91 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     if (!mounted) {
       return;
     }
+    var rewardLoading = false;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
-      builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 18,
-          right: 18,
-          top: 18,
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 18,
-        ),
-        child: RewardedAdPrompt(
-          title: 'Desbloquear novo check-in hoje',
-          message:
-              'Você já fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anúncio, assine Premium ou volte amanhã.',
-          rewardLabel: 'Assistir anúncio libera mais um check-in hoje.',
-          rewardedAdAvailable: true,
-          isRewardLoading: _isRewardLoading,
-          onWatchRewardedAd: () async {
-            if (_isRewardLoading) {
-              return;
-            }
-            setState(() => _isRewardLoading = true);
-            var unlocked = false;
-            try {
-              unlocked = await ref
-                  .read(monetizationAccessControllerProvider.notifier)
-                  .unlockWithRewardedAd(resource: 'DEEP_EMOTIONAL_READING')
-                  .timeout(const Duration(seconds: 90), onTimeout: () => false);
-            } finally {
-              if (mounted) {
-                setState(() => _isRewardLoading = false);
-              }
-            }
-            if (!mounted || !sheetContext.mounted) {
-              return;
-            }
-            if (!unlocked) {
-              AppSnackBar.show(
-                context,
-                message: context.l10n.checkInRewardAdNotConfirmed,
-                icon: Icons.info_outline_rounded,
-              );
-              return;
-            }
-            Navigator.of(sheetContext).pop();
-            await _submit(allowLimitUnlock: false);
-          },
-          onOpenPremium: () {
-            Navigator.of(sheetContext).pop();
-            widget.onOpenPremium?.call();
-          },
-          premiumLabel: context.l10n.checkInPremiumAction,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+            ),
+            child: Center(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: RewardedAdPrompt(
+                  title: 'Desbloquear novo check-in hoje',
+                  message:
+                      'Você já fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anúncio, assine Premium ou volte amanhã.',
+                  rewardLabel: 'Assistir anúncio libera mais um check-in hoje.',
+                  rewardedAdAvailable: true,
+                  isRewardLoading: rewardLoading,
+                  onWatchRewardedAd: () async {
+                    if (rewardLoading) {
+                      return;
+                    }
+                    setSheetState(() => rewardLoading = true);
+                    var unlocked = false;
+                    try {
+                      unlocked = await ref
+                          .read(monetizationAccessControllerProvider.notifier)
+                          .unlockWithRewardedAd(
+                            resource: 'DEEP_EMOTIONAL_READING',
+                          )
+                          .timeout(
+                            const Duration(seconds: 90),
+                            onTimeout: () => false,
+                          );
+                    } finally {
+                      if (sheetContext.mounted) {
+                        setSheetState(() => rewardLoading = false);
+                      }
+                    }
+                    if (!mounted || !sheetContext.mounted) {
+                      return;
+                    }
+                    if (!unlocked) {
+                      AppSnackBar.show(
+                        context,
+                        message: context.l10n.checkInRewardAdNotConfirmed,
+                        icon: Icons.info_outline_rounded,
+                      );
+                      return;
+                    }
+                    Navigator.of(sheetContext).pop();
+                    final saved = await _submit(allowLimitUnlock: false);
+                    if (!mounted || saved) {
+                      return;
+                    }
+                    final error = ref.read(checkInControllerProvider).error;
+                    if (_isCheckInLimitError(error)) {
+                      AppSnackBar.show(
+                        context,
+                        message:
+                            'Não conseguimos confirmar o desbloqueio agora. Tente novamente em instantes.',
+                        icon: Icons.info_outline_rounded,
+                      );
+                    }
+                  },
+                  onOpenPremium: () {
+                    if (rewardLoading) {
+                      return;
+                    }
+                    Navigator.of(sheetContext).pop();
+                    widget.onOpenPremium?.call();
+                  },
+                  premiumLabel: context.l10n.checkInPremiumAction,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -345,7 +378,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       }),
       onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
       onEnergyChanged: (value) => setState(() => _energyLevel = value),
-      onSubmit: _submit,
+      onSubmit: () {
+        _submit();
+      },
       onCancel: widget.onCancel ?? () => Navigator.of(context).maybePop(),
       l10n: l10n,
     );

@@ -109,7 +109,10 @@ void main() {
         final repository = _FakeCheckInRepository(
           blockFirstCreateWith402: true,
         );
-        final rewarded = _FakeRewardedAdService(result: true);
+        final rewarded = _FakeRewardedAdService(
+          result: true,
+          delay: const Duration(milliseconds: 700),
+        );
 
         await tester.pumpWidget(
           _testApp(
@@ -128,19 +131,107 @@ void main() {
         );
         await tester.tap(find.text('Fazer check-in'));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle();
 
         expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
 
+        await tester.ensureVisible(find.text('Assistir anúncio'));
         await tester.tap(find.text('Assistir anúncio'));
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.text('Carregando anúncio'), findsOneWidget);
+        expect(
+          tester
+              .widget<OutlinedButton>(
+                find.widgetWithText(OutlinedButton, 'Assinar Premium'),
+              )
+              .onPressed,
+          isNull,
+        );
+
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
 
         expect(rewarded.rewardType, 'DEEP_EMOTIONAL_READING');
         expect(repository.createCalls, 2);
         expect(repository.createdReflection, 'preciso registrar outro momento');
+        expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
       },
     );
+
+    testWidgets('reward failure keeps form and re-enables ad button', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
+      final rewarded = _FakeRewardedAdService(
+        result: false,
+        delay: const Duration(milliseconds: 300),
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          rewardedAdService: rewarded,
+          subscriptionRepository: _FakeSubscriptionRepository(
+            accessAllowed: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'preciso registrar outro momento',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Assistir anúncio'));
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      expect(find.text('Carregando anúncio'), findsOneWidget);
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assistir anúncio'), findsOneWidget);
+      expect(find.text('preciso registrar outro momento'), findsOneWidget);
+      expect(repository.createCalls, 1);
+    });
+
+    testWidgets('second 402 after reward shows friendly confirmation message', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository(blockCreateCountWith402: 2);
+      final rewarded = _FakeRewardedAdService(result: true);
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          rewardedAdService: rewarded,
+          subscriptionRepository: _FakeSubscriptionRepository(
+            accessAllowed: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'preciso registrar outro momento',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Assistir anúncio'));
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pumpAndSettle();
+
+      expect(repository.createCalls, 2);
+      expect(
+        find.text(
+          'Não conseguimos confirmar o desbloqueio agora. Tente novamente em instantes.',
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }
 
@@ -177,10 +268,12 @@ class _FakeCheckInRepository implements CheckInRepository {
   _FakeCheckInRepository({
     List<CheckIn>? items,
     this.blockFirstCreateWith402 = false,
+    this.blockCreateCountWith402 = 0,
   }) : items = items ?? _checkIns();
 
   final List<CheckIn> items;
   final bool blockFirstCreateWith402;
+  final int blockCreateCountWith402;
   int createCalls = 0;
   String? createdMood;
   String? createdReflection;
@@ -219,7 +312,8 @@ class _FakeCheckInRepository implements CheckInRepository {
     required int energyLevel,
   }) async {
     createCalls++;
-    if (blockFirstCreateWith402 && createCalls == 1) {
+    if ((blockFirstCreateWith402 && createCalls == 1) ||
+        createCalls <= blockCreateCountWith402) {
       final requestOptions = RequestOptions(path: '/v1/check-ins');
       throw DioException(
         requestOptions: requestOptions,
@@ -268,9 +362,10 @@ class _FakeCheckInRepository implements CheckInRepository {
 }
 
 class _FakeRewardedAdService implements RewardedAdService {
-  _FakeRewardedAdService({required this.result});
+  _FakeRewardedAdService({required this.result, this.delay = Duration.zero});
 
   final bool result;
+  final Duration delay;
   String? rewardType;
 
   @override
@@ -279,6 +374,9 @@ class _FakeRewardedAdService implements RewardedAdService {
     String? contextId,
   }) async {
     this.rewardType = rewardType;
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
     return result;
   }
 }
