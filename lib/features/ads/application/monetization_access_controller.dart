@@ -25,14 +25,17 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     required String resource,
     String? contextId,
   }) async {
+    var rewardConfirmedByBackend = false;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await ref
+      rewardConfirmedByBackend = await ref
           .read(rewardedAdServiceProvider)
           .showRewardedAd(rewardType: resource, contextId: contextId);
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
+      if (rewardConfirmedByBackend) {
+        await ref.read(subscriptionControllerProvider.notifier).refresh();
+      }
     });
-    if (state.hasError) {
+    if (state.hasError || !rewardConfirmedByBackend) {
       return false;
     }
     final refreshed = await access(resource: resource, contextId: contextId);

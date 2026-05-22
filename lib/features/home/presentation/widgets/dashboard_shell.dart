@@ -127,6 +127,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   Navigator.of(sheetContext).pop();
                 }
               },
+              onOpenPremium: () {
+                if (sheetContext.mounted) {
+                  Navigator.of(sheetContext).pop();
+                }
+                _openProfileSection(ProfileModuleSection.plansSubscriptions);
+              },
             ),
           ),
         ),

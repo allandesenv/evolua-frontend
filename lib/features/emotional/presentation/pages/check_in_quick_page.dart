@@ -42,6 +42,9 @@ class CheckInQuickPage extends StatelessWidget {
                     context.go('/home');
                   }
                 },
+                onOpenPremium: () {
+                  context.go('/home');
+                },
               ),
             ),
           ),
@@ -52,10 +55,16 @@ class CheckInQuickPage extends StatelessWidget {
 }
 
 class CheckInQuickView extends ConsumerStatefulWidget {
-  const CheckInQuickView({super.key, this.onCompleted, this.onCancel});
+  const CheckInQuickView({
+    super.key,
+    this.onCompleted,
+    this.onCancel,
+    this.onOpenPremium,
+  });
 
   final VoidCallback? onCompleted;
   final VoidCallback? onCancel;
+  final VoidCallback? onOpenPremium;
 
   @override
   ConsumerState<CheckInQuickView> createState() => _CheckInQuickViewState();
@@ -74,7 +83,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   void initState() {
     super.initState();
     ref.listenManual(checkInControllerProvider, (previous, next) {
-      if (!next.hasError || !mounted) {
+      if (!next.hasError || !mounted || _isCheckInLimitError(next.error)) {
         return;
       }
 
@@ -93,7 +102,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool allowLimitUnlock = true}) async {
     if (_isSubmitting) {
       return;
     }
@@ -111,6 +120,15 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           );
 
       if (!mounted) {
+        return;
+      }
+
+      final asyncState = ref.read(checkInControllerProvider);
+      if (asyncState.hasError) {
+        if (allowLimitUnlock && _isCheckInLimitError(asyncState.error)) {
+          setState(() => _isSubmitting = false);
+          await _showExtraCheckInUnlockSheet();
+        }
         return;
       }
 
@@ -137,6 +155,68 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _showExtraCheckInUnlockSheet() async {
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 18,
+          right: 18,
+          top: 18,
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 18,
+        ),
+        child: RewardedAdPrompt(
+          title: 'Desbloquear novo check-in hoje',
+          message:
+              'Você já fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anúncio, assine Premium ou volte amanhã.',
+          rewardLabel: 'Assistir anúncio libera mais um check-in hoje.',
+          rewardedAdAvailable: true,
+          isRewardLoading: _isRewardLoading,
+          onWatchRewardedAd: () async {
+            if (_isRewardLoading) {
+              return;
+            }
+            setState(() => _isRewardLoading = true);
+            var unlocked = false;
+            try {
+              unlocked = await ref
+                  .read(monetizationAccessControllerProvider.notifier)
+                  .unlockWithRewardedAd(resource: 'DEEP_EMOTIONAL_READING')
+                  .timeout(const Duration(seconds: 90), onTimeout: () => false);
+            } finally {
+              if (mounted) {
+                setState(() => _isRewardLoading = false);
+              }
+            }
+            if (!mounted || !sheetContext.mounted) {
+              return;
+            }
+            if (!unlocked) {
+              AppSnackBar.show(
+                context,
+                message: context.l10n.checkInRewardAdNotConfirmed,
+                icon: Icons.info_outline_rounded,
+              );
+              return;
+            }
+            Navigator.of(sheetContext).pop();
+            await _submit(allowLimitUnlock: false);
+          },
+          onOpenPremium: () {
+            Navigator.of(sheetContext).pop();
+            widget.onOpenPremium?.call();
+          },
+          premiumLabel: context.l10n.checkInPremiumAction,
+        ),
+      ),
+    );
   }
 
   Future<void> _showDeepReadingUnlockSheet() async {
@@ -293,6 +373,10 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     }
 
     return context.l10n.checkInSaveError;
+  }
+
+  bool _isCheckInLimitError(Object? error) {
+    return error is DioException && error.response?.statusCode == 402;
   }
 }
 

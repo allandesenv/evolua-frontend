@@ -14,6 +14,7 @@ import 'package:evolua_frontend/features/future_message/domain/entities/future_m
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
@@ -42,6 +43,13 @@ enum ProfileModuleSection {
   plansSubscriptions,
   evolutionMirror,
 }
+
+final _advancedMirrorAccessProvider =
+    FutureProvider.autoDispose<MonetizationAccessStatus>((ref) {
+      return ref
+          .read(monetizationAccessControllerProvider.notifier)
+          .access(resource: 'ADVANCED_MIRROR');
+    });
 
 class ProfileModuleView extends ConsumerStatefulWidget {
   const ProfileModuleView({
@@ -1569,6 +1577,12 @@ class _EvolutionMirrorSection extends ConsumerWidget {
             .current
             ?.premium ??
         false;
+    final advancedMirrorAccess = ref.watch(_advancedMirrorAccessProvider);
+    final advancedAccess = advancedMirrorAccess.asData?.value;
+    final advancedMirrorAllowed =
+        premium ||
+        (advancedAccess?.allowed ?? false) ||
+        advancedAccess?.entitlementExpiresAt != null;
     final history = checkInState.asData?.value;
     final checkIns = history?.result.items ?? const <CheckIn>[];
     final totalCheckIns = history?.result.totalItems ?? checkIns.length;
@@ -1628,11 +1642,11 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        if (!premium) ...[
+        if (!advancedMirrorAllowed) ...[
           const _AdvancedMirrorPrompt(),
           const SizedBox(height: 16),
         ],
-        if (premium) ...[
+        if (advancedMirrorAllowed) ...[
           _EvolutionSectionGroup(
             title: 'Padroes percebidos',
             description:
@@ -1710,11 +1724,21 @@ class _AdvancedMirrorPromptState extends ConsumerState<_AdvancedMirrorPrompt> {
       return;
     }
     setState(() => _isLoading = true);
-    final unlocked = await ref
-        .read(monetizationAccessControllerProvider.notifier)
-        .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR');
+    var unlocked = false;
+    try {
+      unlocked = await ref
+          .read(monetizationAccessControllerProvider.notifier)
+          .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR')
+          .timeout(const Duration(seconds: 90), onTimeout: () => false);
+      if (unlocked) {
+        ref.invalidate(_advancedMirrorAccessProvider);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
     if (mounted) {
-      setState(() => _isLoading = false);
       AppSnackBar.show(
         context,
         message: unlocked
