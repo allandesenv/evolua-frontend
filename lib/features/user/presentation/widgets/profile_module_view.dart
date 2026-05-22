@@ -13,6 +13,7 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
@@ -261,6 +262,59 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
         return;
       }
       _showSettingsMessage('Preferências salvas com segurança.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _setDailyCheckInReminderEnabled(bool enabled) async {
+    try {
+      final reminderEnabled = await ref
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .setEnabled(enabled);
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(
+        reminderEnabled
+            ? 'Lembrete diário de check-in ativado.'
+            : 'Lembrete diário de check-in desativado.',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSettingsMessage(_friendlySettingsError(error));
+    }
+  }
+
+  Future<void> _pickDailyCheckInReminderTime() async {
+    final reminder =
+        ref.read(dailyCheckInReminderControllerProvider).value ??
+        DailyCheckInReminderPreferences.defaults();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: reminder.hour, minute: reminder.minute),
+      helpText: 'Horário do lembrete',
+      cancelText: 'Cancelar',
+      confirmText: 'Salvar',
+    );
+    if (picked == null) {
+      return;
+    }
+    try {
+      await ref
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .updateReminderTime(hour: picked.hour, minute: picked.minute);
+      if (!mounted) {
+        return;
+      }
+      final formatted =
+          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      _showSettingsMessage('Lembrete diário ajustado para $formatted.');
     } catch (error) {
       if (!mounted) {
         return;
@@ -805,6 +859,9 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final settingsState = ref.watch(
       settingsPrivacyPreferencesControllerProvider,
     );
+    final checkInReminderState = ref.watch(
+      dailyCheckInReminderControllerProvider,
+    );
     final localePreference =
         ref.watch(localeControllerProvider).value ?? LocalePreference.ptBr;
     final accessibilityState = ref.watch(
@@ -872,8 +929,10 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                   hideSocialCheckIns: preferences.hideSocialCheckIns,
                   allowHistoryInsights: preferences.allowHistoryInsights,
                   useEmotionalDataForAi: preferences.useEmotionalDataForAi,
-                  dailyReminders: preferences.dailyReminders,
                   contentPreferences: preferences.contentPreferences,
+                  checkInReminder:
+                      checkInReminderState.value ??
+                      DailyCheckInReminderPreferences.defaults(),
                   aiTone: preferences.aiTone,
                   suggestionFrequency: preferences.suggestionFrequency,
                   trailStyle: preferences.trailStyle,
@@ -896,15 +955,14 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                         (current) =>
                             current.copyWith(useEmotionalDataForAi: value),
                       ),
-                  onDailyRemindersChanged: (value) =>
-                      settingsController.updatePreferences(
-                        (current) => current.copyWith(dailyReminders: value),
-                      ),
                   onContentPreferencesChanged: (value) =>
                       settingsController.updatePreferences(
                         (current) =>
                             current.copyWith(contentPreferences: value),
                       ),
+                  onCheckInReminderEnabledChanged:
+                      _setDailyCheckInReminderEnabled,
+                  onPickCheckInReminderTime: _pickDailyCheckInReminderTime,
                   onAiToneChanged: (value) =>
                       settingsController.updatePreferences(
                         (current) => current.copyWith(aiTone: value),
@@ -3815,8 +3873,8 @@ class _SettingsPrivacySection extends StatelessWidget {
     required this.hideSocialCheckIns,
     required this.allowHistoryInsights,
     required this.useEmotionalDataForAi,
-    required this.dailyReminders,
     required this.contentPreferences,
+    required this.checkInReminder,
     required this.aiTone,
     required this.suggestionFrequency,
     required this.trailStyle,
@@ -3824,8 +3882,9 @@ class _SettingsPrivacySection extends StatelessWidget {
     required this.onHideSocialCheckInsChanged,
     required this.onAllowHistoryInsightsChanged,
     required this.onUseEmotionalDataForAiChanged,
-    required this.onDailyRemindersChanged,
     required this.onContentPreferencesChanged,
+    required this.onCheckInReminderEnabledChanged,
+    required this.onPickCheckInReminderTime,
     required this.onAiToneChanged,
     required this.onSuggestionFrequencyChanged,
     required this.onTrailStyleChanged,
@@ -3847,8 +3906,8 @@ class _SettingsPrivacySection extends StatelessWidget {
   final bool hideSocialCheckIns;
   final bool allowHistoryInsights;
   final bool useEmotionalDataForAi;
-  final bool dailyReminders;
   final bool contentPreferences;
+  final DailyCheckInReminderPreferences checkInReminder;
   final String aiTone;
   final String suggestionFrequency;
   final String trailStyle;
@@ -3856,8 +3915,9 @@ class _SettingsPrivacySection extends StatelessWidget {
   final ValueChanged<bool> onHideSocialCheckInsChanged;
   final ValueChanged<bool> onAllowHistoryInsightsChanged;
   final ValueChanged<bool> onUseEmotionalDataForAiChanged;
-  final ValueChanged<bool> onDailyRemindersChanged;
   final ValueChanged<bool> onContentPreferencesChanged;
+  final ValueChanged<bool> onCheckInReminderEnabledChanged;
+  final VoidCallback onPickCheckInReminderTime;
   final ValueChanged<String> onAiToneChanged;
   final ValueChanged<String> onSuggestionFrequencyChanged;
   final ValueChanged<String> onTrailStyleChanged;
@@ -4072,10 +4132,20 @@ class _SettingsPrivacySection extends StatelessWidget {
               onChanged: onSuggestionFrequencyChanged,
             ),
             _SettingsSwitchRow(
-              title: 'Lembretes diários',
-              subtitle: 'Receba lembretes gentis para manter constância.',
-              value: dailyReminders,
-              onChanged: onDailyRemindersChanged,
+              title: 'Lembrete diário de check-in',
+              subtitle: checkInReminder.enabled
+                  ? 'Ativo todos os dias às ${checkInReminder.formattedTime}.'
+                  : 'Receba um convite leve pela manhã para cuidar do seu momento.',
+              value: checkInReminder.enabled,
+              onChanged: onCheckInReminderEnabledChanged,
+            ),
+            _SettingsRowShell(
+              icon: Icons.schedule_rounded,
+              title: 'Horário do lembrete',
+              subtitle:
+                  'Padrão ${checkInReminder.formattedTime}, no horário local do dispositivo.',
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: onPickCheckInReminderTime,
             ),
             _SettingsDropdownRow(
               title: 'Estilo das trilhas',
