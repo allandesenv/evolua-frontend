@@ -3,5 +3,6 @@ abstract class RewardedAdService {
     required String rewardType,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   });
 }

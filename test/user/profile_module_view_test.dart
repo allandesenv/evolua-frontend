@@ -932,7 +932,7 @@ void main() {
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
 
-    await _pumpEvolutionMirror(tester, premium: true);
+    await _pumpEvolutionMirror(tester, premium: false);
 
     expect(find.text('Espelho da Evolução'), findsAtLeastNWidgets(1));
     expect(find.text('Como eu estou evoluindo?'), findsOneWidget);
@@ -941,6 +941,9 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsNothing);
     expect(find.text('Padroes percebidos'), findsOneWidget);
     expect(find.text('Mensagem da IA'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsNothing);
+    expect(find.textContaining('Veja padr'), findsNothing);
+    expect(find.textContaining('Espelho avançado'), findsNothing);
     expect(find.text('Mensagens do seu eu anterior'), findsNothing);
     expect(find.text('Trilhas em andamento'), findsOneWidget);
     expect(find.text('Marcos da jornada'), findsOneWidget);

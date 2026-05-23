@@ -25,6 +25,7 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     required String resource,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     var rewardConfirmedByBackend = false;
     state = const AsyncLoading();
@@ -35,6 +36,7 @@ class MonetizationAccessController extends AsyncNotifier<void> {
             rewardType: resource,
             contextId: contextId,
             allowClientOpenedFallback: allowClientOpenedFallback,
+            onAdClosed: onAdClosed,
           );
       if (rewardConfirmedByBackend) {
         await ref.read(subscriptionControllerProvider.notifier).refresh();
@@ -42,6 +44,10 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     });
     if (state.hasError || !rewardConfirmedByBackend) {
       return false;
+    }
+    if (allowClientOpenedFallback &&
+        resource.trim().toUpperCase() == 'DEEP_EMOTIONAL_READING') {
+      return true;
     }
     final refreshed = await access(resource: resource, contextId: contextId);
     return rewardedAccessGranted(refreshed);

@@ -92,8 +92,8 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
       AppSnackBar.show(
         context,
         message: _isEvening
-            ? 'Fechamento salvo. Agora solte o que nao precisa carregar.'
-            : 'Ritual salvo. Sua jornada diaria ja tem um norte.',
+            ? 'Fechamento salvo. Agora solte o que não precisa carregar.'
+            : 'Ritual salvo. Sua jornada diária já tem um norte.',
         icon: Icons.check_circle_outline_rounded,
       );
     } catch (error) {
@@ -144,7 +144,7 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Nao foi possivel abrir seu ritual agora.'),
+            const Text('Não foi possível abrir seu ritual agora.'),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => ref.invalidate(dailyRitualControllerProvider),
@@ -167,7 +167,7 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
         }
       }
     }
-    return 'Nao foi possivel salvar seu ritual agora.';
+    return 'Não foi possível salvar seu ritual agora.';
   }
 }
 
@@ -223,9 +223,9 @@ class _DailyRitualIntro extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onStart,
                 icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Comecar agora'),
+                label: const Text('Começar agora'),
               ),
-              TextButton(onPressed: onSkip, child: const Text('Agora nao')),
+              TextButton(onPressed: onSkip, child: const Text('Agora não')),
             ],
           ),
         ],
@@ -344,13 +344,13 @@ class _DailyRitualResult extends StatelessWidget {
           const SizedBox(height: 16),
           _ResultRow(label: 'Estado emocional', value: ritual.emotionalState),
           _ResultRow(label: 'Necessidade do dia', value: ritual.dayNeed),
-          _ResultRow(label: 'Intencao escolhida', value: ritual.intention),
-          _ResultRow(label: 'Microacao escolhida', value: ritual.microAction),
+          _ResultRow(label: 'Intenção escolhida', value: ritual.intention),
+          _ResultRow(label: 'Microação escolhida', value: ritual.microAction),
           const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: () => context.go('/home'),
             icon: const Icon(Icons.home_rounded),
-            label: const Text('Voltar para Inicio'),
+            label: const Text('Voltar para Início'),
           ),
         ],
       ),
@@ -474,13 +474,13 @@ class _DailyRitualCopy {
       return const _DailyRitualCopy(
         title: 'Fechamento do Dia',
         description:
-            'Uma pausa curta para revisar o que pesou, reconhecer o que foi bom e soltar o que nao precisa carregar.',
-        resultTitle: 'Seu fechamento de hoje esta pronto',
+            'Uma pausa curta para revisar o que pesou, reconhecer o que foi bom e soltar o que não precisa carregar.',
+        resultTitle: 'Seu fechamento de hoje está pronto',
         resultCarryTitle: 'Guarde isso do seu dia',
         questions: [
-          'Como voce esta agora?',
-          'O que voce mais precisa soltar hoje?',
-          'Qual intencao quer levar para o descanso?',
+          'Como você está agora?',
+          'O que você mais precisa soltar hoje?',
+          'Qual intenção quer levar para o descanso?',
           'Qual pequeno cuidado consegue fazer agora?',
         ],
       );
@@ -488,13 +488,13 @@ class _DailyRitualCopy {
     return const _DailyRitualCopy(
       title: 'Ritual do Dia',
       description:
-          'Uma pausa curta para perceber como voce esta, escolher uma intencao e definir um pequeno passo possivel para hoje.',
-      resultTitle: 'Seu ritual de hoje esta pronto',
-      resultCarryTitle: 'Leve isso com voce hoje',
+          'Uma pausa curta para perceber como você está, escolher uma intenção e definir um pequeno passo possível para hoje.',
+      resultTitle: 'Seu ritual de hoje está pronto',
+      resultCarryTitle: 'Leve isso com você hoje',
       questions: [
-        'Como voce esta agora?',
-        'O que voce mais precisa hoje?',
-        'Qual intencao quer carregar hoje?',
+        'Como você está agora?',
+        'O que você mais precisa hoje?',
+        'Qual intenção quer carregar hoje?',
         'Qual pequeno passo consegue dar hoje?',
       ],
     );

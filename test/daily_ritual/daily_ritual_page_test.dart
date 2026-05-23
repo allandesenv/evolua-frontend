@@ -14,9 +14,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ritual do Dia'), findsOneWidget);
-    expect(find.text('Comecar agora'), findsOneWidget);
+    expect(find.text('Começar agora'), findsOneWidget);
 
-    await tester.tap(find.text('Comecar agora'));
+    await tester.tap(find.text('Começar agora'));
     await tester.pumpAndSettle();
 
     await _answerStep(tester, 'calmo');
@@ -24,8 +24,13 @@ void main() {
     await _answerStep(tester, 'agir com calma');
     await _answerStep(tester, 'pausar antes de reagir', submit: true);
 
-    expect(find.text('Seu ritual de hoje esta pronto'), findsOneWidget);
-    expect(find.text('Leve isso com voce hoje'), findsOneWidget);
+    expect(find.text('Seu ritual de hoje está pronto'), findsOneWidget);
+    expect(find.text('Leve isso com você hoje'), findsOneWidget);
+    expect(find.text('Intenção escolhida'), findsOneWidget);
+    expect(find.text('Microação escolhida'), findsOneWidget);
+    expect(find.textContaining('Intencao'), findsNothing);
+    expect(find.textContaining('Microacao'), findsNothing);
+    expect(find.textContaining('Nao foi possivel'), findsNothing);
     expect(find.text('calmo'), findsOneWidget);
     expect(find.text('clareza'), findsOneWidget);
     expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
@@ -43,10 +48,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Seu fechamento de hoje esta pronto'), findsOneWidget);
+    expect(find.text('Seu fechamento de hoje está pronto'), findsOneWidget);
     expect(find.text('Guarde isso do seu dia'), findsOneWidget);
     expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
-    expect(find.text('Comecar agora'), findsNothing);
+    expect(find.text('Começar agora'), findsNothing);
+    expect(find.text('Intenção escolhida'), findsOneWidget);
+    expect(find.text('Microação escolhida'), findsOneWidget);
   });
 }
 
@@ -121,4 +128,3 @@ DailyRitual _ritual(String type) {
     createdAt: DateTime(2026, 5, 7, 8),
   );
 }
-

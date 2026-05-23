@@ -75,6 +75,96 @@ void main() {
       },
     );
 
+    testWidgets('initial boot does not show auth page while session restores', (
+      tester,
+    ) async {
+      final session = _testSession();
+      final storage = _DelayedAuthSessionStorage();
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FakeAuthRepository(googleSession: session),
+          ),
+          authSessionStorageProvider.overrideWithValue(storage),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final authRouterNotifier = _bindAuthRouterNotifier(container);
+      addTearDown(authRouterNotifier.dispose);
+      final router = _buildTestRouter(authRouterNotifier);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('auth-page'), findsNothing);
+      expect(find.text('home-page'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(
+        router.routerDelegate.currentConfiguration.last.matchedLocation,
+        '/',
+      );
+
+      storage.complete(jsonEncode(session.toJson()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('home-page'), findsOneWidget);
+      expect(find.text('auth-page'), findsNothing);
+      expect(
+        router.routerDelegate.currentConfiguration.last.matchedLocation,
+        '/home',
+      );
+    });
+
+    testWidgets(
+      'initial boot redirects to auth only after empty session read',
+      (tester) async {
+        final storage = _DelayedAuthSessionStorage();
+        final container = ProviderContainer(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(
+              _FakeAuthRepository(googleSession: _testSession()),
+            ),
+            authSessionStorageProvider.overrideWithValue(storage),
+            profileRepositoryProvider.overrideWithValue(
+              _FakeProfileRepository(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final authRouterNotifier = _bindAuthRouterNotifier(container);
+        addTearDown(authRouterNotifier.dispose);
+        final router = _buildTestRouter(authRouterNotifier);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('auth-page'), findsNothing);
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+        storage.complete(null);
+        await tester.pumpAndSettle();
+
+        expect(find.text('auth-page'), findsOneWidget);
+        expect(
+          router.routerDelegate.currentConfiguration.last.matchedLocation,
+          '/auth',
+        );
+      },
+    );
+
     testWidgets('unauthenticated user trying /home is redirected to /auth', (
       tester,
     ) async {
@@ -94,7 +184,10 @@ void main() {
 
       final authRouterNotifier = _bindAuthRouterNotifier(container);
       addTearDown(authRouterNotifier.dispose);
-      final router = _buildTestRouter(authRouterNotifier);
+      final router = _buildTestRouter(
+        authRouterNotifier,
+        initialLocation: '/auth',
+      );
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -472,13 +565,17 @@ AuthRouterNotifier _bindAuthRouterNotifier(ProviderContainer container) {
   return notifier;
 }
 
-GoRouter _buildTestRouter(AuthRouterNotifier authRouterNotifier) {
+GoRouter _buildTestRouter(
+  AuthRouterNotifier authRouterNotifier, {
+  String initialLocation = '/',
+}) {
   return buildAppRouter(
     authRouterNotifier: authRouterNotifier,
     authPageBuilder: (context, state) => const _PlaceholderPage('auth-page'),
     googleCallbackPageBuilder: (context, state) =>
         const _PlaceholderPage('callback-page'),
     homePageBuilder: (context, state) => const _PlaceholderPage('home-page'),
+    initialLocation: initialLocation,
   );
 }
 
@@ -571,6 +668,25 @@ class _SharedPreferencesAuthSessionStorage implements AuthSessionStorage {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_sessionStorageKey);
   }
+}
+
+class _DelayedAuthSessionStorage implements AuthSessionStorage {
+  final Completer<String?> _readCompleter = Completer<String?>();
+
+  void complete(String? value) {
+    if (!_readCompleter.isCompleted) {
+      _readCompleter.complete(value);
+    }
+  }
+
+  @override
+  Future<String?> read() => _readCompleter.future;
+
+  @override
+  Future<void> write(String value) async {}
+
+  @override
+  Future<void> clear() async {}
 }
 
 typedef _ExchangeHandler = Future<AuthSession> Function(String code);

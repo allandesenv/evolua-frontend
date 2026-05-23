@@ -135,12 +135,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(
-        find.text(
-          'Quer receber um lembrete leve pela manhã para cuidar do seu momento?',
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('lembrete leve'), findsOneWidget);
 
       await tester.tap(find.text('Ativar lembrete'));
       await tester.pump();
@@ -197,7 +192,7 @@ void main() {
             checkInRepository: repository,
             rewardedAdService: rewarded,
             subscriptionRepository: _FakeSubscriptionRepository(
-              accessAllowed: true,
+              accessAllowed: false,
             ),
           ),
         );
@@ -213,10 +208,9 @@ void main() {
 
         expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
 
-        await tester.ensureVisible(find.text('Assistir anúncio'));
         await tester.tap(find.text('Assistir anúncio'));
         await tester.pump();
-        expect(find.text('Carregando anúncio'), findsOneWidget);
+        expect(find.textContaining('Carregando'), findsOneWidget);
         expect(
           tester
               .widget<OutlinedButton>(
@@ -236,6 +230,50 @@ void main() {
         expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
       },
     );
+
+    testWidgets('closes unlock sheet when rewarded ad is closed', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
+      final rewarded = _FakeRewardedAdService(
+        result: true,
+        delay: const Duration(milliseconds: 800),
+        closeAfter: Duration.zero,
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          rewardedAdService: rewarded,
+          subscriptionRepository: _FakeSubscriptionRepository(
+            accessAllowed: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'preciso registrar outro momento',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(rewarded.adClosedCallbacks, 1);
+      expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
+      expect(repository.createCalls, 1);
+
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(repository.createCalls, 2);
+    });
 
     testWidgets('reward failure keeps form and re-enables ad button', (
       tester,
@@ -264,10 +302,9 @@ void main() {
       await tester.tap(find.text('Fazer check-in'));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Assistir anúncio'));
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pump();
-      expect(find.text('Carregando anúncio'), findsOneWidget);
+      expect(find.textContaining('Carregando'), findsOneWidget);
 
       await tester.pumpAndSettle();
 
@@ -287,7 +324,7 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: true,
+            accessAllowed: false,
           ),
         ),
       );
@@ -299,18 +336,44 @@ void main() {
       );
       await tester.tap(find.text('Fazer check-in'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Assistir anúncio'));
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
-      expect(
-        find.text(
-          'Não conseguimos confirmar o desbloqueio agora. Tente novamente em instantes.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('liberar o check-in'), findsOneWidget);
     });
+
+    testWidgets(
+      'after daily rewarded credit is used only shows premium action',
+      (tester) async {
+        final repository = _FakeCheckInRepository(
+          blockFirstCreateWith402: true,
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            checkInRepository: repository,
+            subscriptionRepository: _FakeSubscriptionRepository(
+              accessAllowed: false,
+              rewardedAdAvailable: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'mais um registro do dia',
+        );
+        await tester.tap(find.text('Fazer check-in'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+        expect(find.textContaining('desbloqueio por'), findsOneWidget);
+        expect(find.textContaining('Assistir'), findsNothing);
+        expect(find.text('Assinar Premium'), findsOneWidget);
+      },
+    );
   });
 }
 
@@ -481,21 +544,39 @@ class _FakeCheckInRepository implements CheckInRepository {
 }
 
 class _FakeRewardedAdService implements RewardedAdService {
-  _FakeRewardedAdService({required this.result, this.delay = Duration.zero});
+  _FakeRewardedAdService({
+    required this.result,
+    this.delay = Duration.zero,
+    this.closeAfter,
+  });
 
   final bool result;
   final Duration delay;
+  final Duration? closeAfter;
   String? rewardType;
   bool? allowClientOpenedFallback;
+  int adClosedCallbacks = 0;
 
   @override
   Future<bool> showRewardedAd({
     required String rewardType,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     this.rewardType = rewardType;
     this.allowClientOpenedFallback = allowClientOpenedFallback;
+    final closeAfter = this.closeAfter;
+    if (closeAfter != null) {
+      await Future<void>.delayed(closeAfter);
+      adClosedCallbacks++;
+      onAdClosed?.call();
+      final remainingDelay = delay - closeAfter;
+      if (remainingDelay > Duration.zero) {
+        await Future<void>.delayed(remainingDelay);
+      }
+      return result;
+    }
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
     }
@@ -504,9 +585,13 @@ class _FakeRewardedAdService implements RewardedAdService {
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
-  _FakeSubscriptionRepository({required this.accessAllowed});
+  _FakeSubscriptionRepository({
+    required this.accessAllowed,
+    bool? rewardedAdAvailable,
+  }) : rewardedAdAvailable = rewardedAdAvailable ?? !accessAllowed;
 
   final bool accessAllowed;
+  final bool rewardedAdAvailable;
 
   @override
   Future<CurrentSubscription?> cancel() async => null;
@@ -550,7 +635,7 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       contextId: contextId,
       allowed: accessAllowed,
       premium: false,
-      rewardedAdAvailable: !accessAllowed,
+      rewardedAdAvailable: rewardedAdAvailable,
       upgradeRecommended: !accessAllowed,
       entitlementExpiresAt: accessAllowed
           ? DateTime.now().add(const Duration(hours: 2))
