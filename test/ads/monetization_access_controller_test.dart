@@ -60,6 +60,7 @@ class _FakeRewardedAdService implements RewardedAdService {
     required String rewardType,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     this.rewardType = rewardType;
     return result;

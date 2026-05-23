@@ -223,8 +223,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   }) async {
     final repository = ref.read(checkInRepositoryProvider);
     int? pendingInsightId;
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    try {
       final created = await repository.create(
         mood: mood,
         reflection: reflection,
@@ -238,14 +237,24 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       final result = await _fetch(page: 0);
       final latest = _canonicalLatestCheckIn(result, created);
       pendingInsightId = latest?.aiInsight == null ? latest?.id : null;
-      return _stateFromResult(
-        result,
-        latestCreatedCheckIn: latest,
-        pendingInsightCheckInId: pendingInsightId,
-        unavailableInsightCheckInId: null,
+      state = AsyncData(
+        _stateFromResult(
+          result,
+          latestCreatedCheckIn: latest,
+          pendingInsightCheckInId: pendingInsightId,
+          unavailableInsightCheckInId: null,
+        ),
       );
-    });
-    _resumeInsightPollingFromState();
+      _resumeInsightPollingFromState();
+    } catch (error, stackTrace) {
+      final previous = state.asData?.value;
+      if (previous != null) {
+        state = AsyncData(previous);
+      } else {
+        state = AsyncError(error, stackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<CheckIn?> generateDeepReadingForLatest() async {

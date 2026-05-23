@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
@@ -87,13 +88,14 @@ void main() {
         lists: [
           const <CheckIn>[],
           const <CheckIn>[],
+          const <CheckIn>[],
           [listedWithInsight],
         ],
       );
       final container = _container(
         repository,
         pollingConfig: const CheckInInsightPollingConfig(
-          attempts: 2,
+          attempts: 3,
           delay: Duration(milliseconds: 1),
         ),
       );
@@ -109,7 +111,7 @@ void main() {
       expect(state?.latestCreatedCheckIn?.aiInsight, isNull);
       expect(state?.isLatestInsightPending, isTrue);
 
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 30));
 
       state = container.read(checkInControllerProvider).asData?.value;
       expect(
@@ -194,6 +196,45 @@ void main() {
       );
     },
   );
+
+  test('create failure keeps previous check-in history visible', () async {
+    final latest = _checkIn(
+      id: 50,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(insight: 'Leitura que nao deve sumir.'),
+    );
+    final requestOptions = RequestOptions(path: '/v1/check-ins');
+    final repository = _FakeCheckInRepository(
+      lists: [
+        [latest],
+      ],
+      createError: DioException(
+        requestOptions: requestOptions,
+        response: Response(
+          requestOptions: requestOptions,
+          statusCode: 402,
+          data: const {'message': 'Limite diario atingido.'},
+        ),
+      ),
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await expectLater(
+      container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 7),
+      throwsA(isA<DioException>()),
+    );
+
+    final state = container.read(checkInControllerProvider).asData?.value;
+    expect(state?.latestCreatedCheckIn?.id, 50);
+    expect(
+      state?.latestCreatedCheckIn?.aiInsight?.insight,
+      'Leitura que nao deve sumir.',
+    );
+  });
 }
 
 ProviderContainer _container(
@@ -216,10 +257,12 @@ class _FakeCheckInRepository implements CheckInRepository {
   _FakeCheckInRepository({
     required List<List<CheckIn>> lists,
     this.createResult,
+    this.createError,
   }) : _lists = List<List<CheckIn>>.from(lists);
 
   final List<List<CheckIn>> _lists;
   final CheckIn? createResult;
+  final Object? createError;
 
   @override
   Future<PaginatedResponse<CheckIn>> list({
@@ -254,6 +297,10 @@ class _FakeCheckInRepository implements CheckInRepository {
     String? reflection,
     required int energyLevel,
   }) async {
+    final error = createError;
+    if (error != null) {
+      throw error;
+    }
     return createResult ??
         _checkIn(id: 99, createdAt: DateTime(2026, 5, 5, 10), aiInsight: null);
   }

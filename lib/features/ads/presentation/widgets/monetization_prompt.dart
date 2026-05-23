@@ -152,25 +152,29 @@ class RewardedAdPrompt extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.46),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: context.evoluaColors.outline.withValues(alpha: 0.18),
+          if (rewardedAdAvailable && rewardLabel.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: context.evoluaColors.surfaceStrong.withValues(
+                  alpha: 0.46,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: context.evoluaColors.outline.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Text(
+                rewardLabel,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-            child: Text(
-              rewardLabel,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,

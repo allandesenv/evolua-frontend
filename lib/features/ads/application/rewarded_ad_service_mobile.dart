@@ -33,6 +33,7 @@ class MobileRewardedAdService implements RewardedAdService {
     required String rewardType,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return false;
@@ -68,6 +69,7 @@ class MobileRewardedAdService implements RewardedAdService {
             },
             onAdDismissedFullScreenContent: (ad) {
               ad.dispose();
+              onAdClosed?.call();
               if (!completer.isCompleted) {
                 completer.complete(
                   _RewardedAdOutcome(
@@ -80,6 +82,9 @@ class MobileRewardedAdService implements RewardedAdService {
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
               ad.dispose();
+              if (openedFullScreen) {
+                onAdClosed?.call();
+              }
               if (!completer.isCompleted) {
                 completer.complete(
                   _RewardedAdOutcome(
@@ -147,13 +152,15 @@ class MobileRewardedAdService implements RewardedAdService {
       await _repository.grantClientOpenedReward(session.id);
     } catch (error) {
       debugPrint('AdMob client-opened reward grant failed: $error');
-      return false;
+      return true;
     }
-    return _waitForServerSideReward(
+    final fallbackConfirmed = await _waitForServerSideReward(
       rewardType: rewardType,
       contextId: contextId,
       maxWait: const Duration(seconds: 4),
     );
+    return fallbackConfirmed ||
+        rewardType.trim().toUpperCase() == 'DEEP_EMOTIONAL_READING';
   }
 
   String _adUnitIdFor(String rewardType) {

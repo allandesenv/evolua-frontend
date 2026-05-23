@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:evolua_frontend/app/app.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter/material.dart';
@@ -11,9 +12,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   testWidgets('renders Evolua auth shell', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
+    await tester.pumpWidget(_testApp());
 
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
     expect(find.text('Evolua'), findsWidgets);
     expect(find.text('Continue sua jornada'), findsWidgets);
@@ -23,7 +24,7 @@ void main() {
   testWidgets('uses pt-BR as default locale', (tester) async {
     SharedPreferences.setMockInitialValues({});
 
-    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Continue sua jornada'), findsWidgets);
@@ -35,7 +36,7 @@ void main() {
       localePreferenceStorageKey: LocalePreference.enUs.storageValue,
     });
 
-    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Continue your journey'), findsWidgets);
@@ -53,11 +54,44 @@ void main() {
       ),
     });
 
-    await tester.pumpWidget(const ProviderScope(child: EvoluaApp()));
+    await tester.pumpWidget(_testApp());
     await tester.pumpAndSettle();
 
     final context = tester.element(find.text('Evolua').first);
     expect(Theme.of(context).brightness, Brightness.light);
     expect(MediaQuery.of(context).textScaler.scale(10), 12.4);
   });
+}
+
+Widget _testApp() {
+  return ProviderScope(
+    overrides: [
+      authSessionStorageProvider.overrideWithValue(
+        _SharedPreferencesAuthSessionStorage(),
+      ),
+    ],
+    child: const EvoluaApp(),
+  );
+}
+
+class _SharedPreferencesAuthSessionStorage implements AuthSessionStorage {
+  static const _key = 'evolua.auth.session';
+
+  @override
+  Future<String?> read() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_key);
+  }
+
+  @override
+  Future<void> write(String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_key, value);
+  }
+
+  @override
+  Future<void> clear() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_key);
+  }
 }
