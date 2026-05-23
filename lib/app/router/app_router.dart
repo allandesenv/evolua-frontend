@@ -10,19 +10,21 @@ import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_q
 import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/subscription/presentation/pages/billing_return_page.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authRouterNotifier = AuthRouterNotifier();
   ref.watch(authenticatedSessionResetObserverProvider);
-  authRouterNotifier.sync(ref.read(authControllerProvider));
   ref.listen(authControllerProvider, (previous, next) {
     final changed = authRouterNotifier.sync(next);
     if (changed) {
       authRouterNotifier.refresh();
     }
-  });
+  }, fireImmediately: true);
   ref.onDispose(authRouterNotifier.dispose);
 
   return buildAppRouter(authRouterNotifier: authRouterNotifier);
@@ -38,7 +40,7 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? dailyRitualPageBuilder,
   GoRouterWidgetBuilder? futureMessagesPageBuilder,
   GoRouterWidgetBuilder? futureMessageDetailPageBuilder,
-  String initialLocation = '/auth',
+  String initialLocation = '/',
   bool overridePlatformDefaultLocation = false,
 }) {
   return GoRouter(
@@ -48,8 +50,13 @@ GoRouter buildAppRouter({
     routes: [
       GoRoute(
         path: '/',
-        redirect: (context, state) =>
-            authRouterNotifier.isAuthenticated ? '/home' : '/auth',
+        builder: (context, state) => const _AuthBootPage(),
+        redirect: (context, state) {
+          if (authRouterNotifier.isBootstrapping) {
+            return null;
+          }
+          return authRouterNotifier.isAuthenticated ? '/home' : '/auth';
+        },
       ),
       GoRoute(
         path: '/auth',
@@ -114,6 +121,9 @@ GoRouter buildAppRouter({
     ],
     redirect: (context, state) {
       if (authRouterNotifier.isBootstrapping) {
+        if (state.matchedLocation == '/auth') {
+          return '/';
+        }
         return null;
       }
 
@@ -135,4 +145,31 @@ GoRouter buildAppRouter({
       return null;
     },
   );
+}
+
+class _AuthBootPage extends StatelessWidget {
+  const _AuthBootPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const GradientScaffold(
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
+              SizedBox(height: 28),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
