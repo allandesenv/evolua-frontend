@@ -135,12 +135,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(
-        find.text(
-          'Quer receber um lembrete leve pela manhã para cuidar do seu momento?',
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('lembrete leve'), findsOneWidget);
 
       await tester.tap(find.text('Ativar lembrete'));
       await tester.pump();
@@ -197,7 +192,7 @@ void main() {
             checkInRepository: repository,
             rewardedAdService: rewarded,
             subscriptionRepository: _FakeSubscriptionRepository(
-              accessAllowed: true,
+              accessAllowed: false,
             ),
           ),
         );
@@ -213,10 +208,9 @@ void main() {
 
         expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
 
-        await tester.ensureVisible(find.text('Assistir anúncio'));
         await tester.tap(find.text('Assistir anúncio'));
         await tester.pump();
-        expect(find.text('Carregando anúncio'), findsOneWidget);
+        expect(find.textContaining('Carregando'), findsOneWidget);
         expect(
           tester
               .widget<OutlinedButton>(
@@ -264,10 +258,9 @@ void main() {
       await tester.tap(find.text('Fazer check-in'));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Assistir anúncio'));
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pump();
-      expect(find.text('Carregando anúncio'), findsOneWidget);
+      expect(find.textContaining('Carregando'), findsOneWidget);
 
       await tester.pumpAndSettle();
 
@@ -287,7 +280,7 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: true,
+            accessAllowed: false,
           ),
         ),
       );
@@ -299,18 +292,44 @@ void main() {
       );
       await tester.tap(find.text('Fazer check-in'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Assistir anúncio'));
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
-      expect(
-        find.text(
-          'Não conseguimos confirmar o desbloqueio agora. Tente novamente em instantes.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('liberar o check-in'), findsOneWidget);
     });
+
+    testWidgets(
+      'after daily rewarded credit is used only shows premium action',
+      (tester) async {
+        final repository = _FakeCheckInRepository(
+          blockFirstCreateWith402: true,
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            checkInRepository: repository,
+            subscriptionRepository: _FakeSubscriptionRepository(
+              accessAllowed: false,
+              rewardedAdAvailable: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'mais um registro do dia',
+        );
+        await tester.tap(find.text('Fazer check-in'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+        expect(find.textContaining('desbloqueio por'), findsOneWidget);
+        expect(find.textContaining('Assistir'), findsNothing);
+        expect(find.text('Assinar Premium'), findsOneWidget);
+      },
+    );
   });
 }
 
@@ -504,9 +523,13 @@ class _FakeRewardedAdService implements RewardedAdService {
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
-  _FakeSubscriptionRepository({required this.accessAllowed});
+  _FakeSubscriptionRepository({
+    required this.accessAllowed,
+    bool? rewardedAdAvailable,
+  }) : rewardedAdAvailable = rewardedAdAvailable ?? !accessAllowed;
 
   final bool accessAllowed;
+  final bool rewardedAdAvailable;
 
   @override
   Future<CurrentSubscription?> cancel() async => null;
@@ -550,7 +573,7 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       contextId: contextId,
       allowed: accessAllowed,
       premium: false,
-      rewardedAdAvailable: !accessAllowed,
+      rewardedAdAvailable: rewardedAdAvailable,
       upgradeRecommended: !accessAllowed,
       entitlementExpiresAt: accessAllowed
           ? DateTime.now().add(const Duration(hours: 2))

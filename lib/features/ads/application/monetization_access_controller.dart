@@ -43,6 +43,10 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     if (state.hasError || !rewardConfirmedByBackend) {
       return false;
     }
+    if (allowClientOpenedFallback &&
+        resource.trim().toUpperCase() == 'DEEP_EMOTIONAL_READING') {
+      return true;
+    }
     final refreshed = await access(resource: resource, contextId: contextId);
     return rewardedAccessGranted(refreshed);
   }

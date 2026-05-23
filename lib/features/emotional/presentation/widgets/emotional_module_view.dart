@@ -61,15 +61,32 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref
-        .read(checkInControllerProvider.notifier)
-        .create(
-          mood: _moodController.text.trim(),
-          reflection: _reflectionController.text.trim().isEmpty
-              ? null
-              : _reflectionController.text.trim(),
-          energyLevel: _energyLevel.round(),
-        );
+    try {
+      await ref
+          .read(checkInControllerProvider.notifier)
+          .create(
+            mood: _moodController.text.trim(),
+            reflection: _reflectionController.text.trim().isEmpty
+                ? null
+                : _reflectionController.text.trim(),
+            energyLevel: _energyLevel.round(),
+          );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is DioException
+          ? (error.response?.data is Map<String, dynamic>
+                ? ((error.response?.data['details'] as List?)?.join(', ') ??
+                      error.message ??
+                      'Nao foi possivel salvar o check-in.')
+                : error.message ?? 'Nao foi possivel salvar o check-in.')
+          : 'Nao foi possivel salvar o check-in.';
+      AppSnackBar.show(
+        context,
+        message: message,
+        icon: Icons.favorite_border_rounded,
+      );
+      return;
+    }
     if (!mounted) return;
     _moodController.text = 'calmo';
     _reflectionController.clear();
