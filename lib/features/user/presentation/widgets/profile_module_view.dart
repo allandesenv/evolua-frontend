@@ -14,10 +14,6 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_i
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
-import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
-import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
-import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
-import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/feedback_controller.dart';
@@ -28,7 +24,6 @@ import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
-import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,13 +47,6 @@ enum ProfileModuleSection {
   plansSubscriptions,
   evolutionMirror,
 }
-
-final _advancedMirrorAccessProvider =
-    FutureProvider.autoDispose<MonetizationAccessStatus>((ref) {
-      return ref
-          .read(monetizationAccessControllerProvider.notifier)
-          .access(resource: 'ADVANCED_MIRROR');
-    });
 
 class ProfileModuleView extends ConsumerStatefulWidget {
   const ProfileModuleView({
@@ -1759,20 +1747,6 @@ class _EvolutionMirrorSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final premium =
-        ref
-            .watch(subscriptionControllerProvider)
-            .asData
-            ?.value
-            .current
-            ?.premium ??
-        false;
-    final advancedMirrorAccess = ref.watch(_advancedMirrorAccessProvider);
-    final advancedAccess = advancedMirrorAccess.asData?.value;
-    final advancedMirrorAllowed =
-        premium ||
-        (advancedAccess?.allowed ?? false) ||
-        advancedAccess?.entitlementExpiresAt != null;
     final history = checkInState.asData?.value;
     final checkIns = history?.result.items ?? const <CheckIn>[];
     final totalCheckIns = history?.result.totalItems ?? checkIns.length;
@@ -1832,125 +1806,62 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        if (!advancedMirrorAllowed) ...[
-          const _AdvancedMirrorPrompt(),
+        _EvolutionSectionGroup(
+          title: 'Padroes percebidos',
+          description:
+              'Sinais simples do seu hist??rico, para perceber repeticoes sem transformar isso em cobranca.',
+          child: _PatternPanel(stats: stats),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Mensagem da IA',
+          description:
+              'Uma leitura curta a partir do ??ltimo insight salvo, sem gerar nova an??lise.',
+          child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
+        ),
+        const SizedBox(height: 16),
+        if (shouldShowFutureMessages) ...[
+          _EvolutionSectionGroup(
+            title: 'Mensagens do seu eu anterior',
+            description:
+                'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
+            child: _FutureMessagesMirrorPanel(
+              state: futureMessageState,
+              onOpen: onOpenFutureMessages,
+            ),
+          ),
           const SizedBox(height: 16),
         ],
-        if (advancedMirrorAllowed) ...[
-          _EvolutionSectionGroup(
-            title: 'Padroes percebidos',
-            description:
-                'Sinais simples do seu histórico, para perceber repeticoes sem transformar isso em cobranca.',
-            child: _PatternPanel(stats: stats),
+        _EvolutionSectionGroup(
+          title: 'Trilhas em andamento',
+          description:
+              'Acompanhe a trilha que est?? guiando seus pr??ximos passos.',
+          child: _TrailEvolutionPanel(
+            currentJourneyState: currentJourneyState,
+            journeyState: journeyState,
           ),
-          const SizedBox(height: 16),
-          _EvolutionSectionGroup(
-            title: 'Mensagem da IA',
-            description:
-                'Uma leitura curta a partir do último insight salvo, sem gerar nova análise.',
-            child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Marcos da jornada',
+          description:
+              'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: stats.milestones
+                .map((item) => _MilestoneBadge(milestone: item))
+                .toList(),
           ),
-          const SizedBox(height: 16),
-          if (shouldShowFutureMessages) ...[
-            _EvolutionSectionGroup(
-              title: 'Mensagens do seu eu anterior',
-              description:
-                  'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
-              child: _FutureMessagesMirrorPanel(
-                state: futureMessageState,
-                onOpen: onOpenFutureMessages,
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          _EvolutionSectionGroup(
-            title: 'Trilhas em andamento',
-            description:
-                'Acompanhe a trilha que está guiando seus próximos passos.',
-            child: _TrailEvolutionPanel(
-              currentJourneyState: currentJourneyState,
-              journeyState: journeyState,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _EvolutionSectionGroup(
-            title: 'Marcos da jornada',
-            description:
-                'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: stats.milestones
-                  .map((item) => _MilestoneBadge(milestone: item))
-                  .toList(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _EvolutionSectionGroup(
-            title: 'Consistência',
-            description:
-                'Uma leitura de continuidade para ajudar você a voltar sem peso quando o ritmo oscilar.',
-            child: _ConsistencyPanel(stats: stats),
-          ),
-        ],
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Consist??ncia',
+          description:
+              'Uma leitura de continuidade para ajudar voc?? a voltar sem peso quando o ritmo oscilar.',
+          child: _ConsistencyPanel(stats: stats),
+        ),
       ],
-    );
-  }
-}
-
-class _AdvancedMirrorPrompt extends ConsumerStatefulWidget {
-  const _AdvancedMirrorPrompt();
-
-  @override
-  ConsumerState<_AdvancedMirrorPrompt> createState() =>
-      _AdvancedMirrorPromptState();
-}
-
-class _AdvancedMirrorPromptState extends ConsumerState<_AdvancedMirrorPrompt> {
-  bool _isLoading = false;
-
-  Future<void> _unlock() async {
-    if (_isLoading) {
-      return;
-    }
-    setState(() => _isLoading = true);
-    var unlocked = false;
-    try {
-      unlocked = await ref
-          .read(monetizationAccessControllerProvider.notifier)
-          .unlockWithRewardedAd(resource: 'ADVANCED_MIRROR')
-          .timeout(const Duration(seconds: 90), onTimeout: () => false);
-      if (unlocked) {
-        ref.invalidate(_advancedMirrorAccessProvider);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-    if (mounted) {
-      AppSnackBar.show(
-        context,
-        message: unlocked
-            ? 'Espelho avançado liberado por hoje.'
-            : 'Não foi possível carregar o anúncio agora. Tente novamente em instantes.',
-        icon: unlocked ? Icons.check_circle_rounded : Icons.info_rounded,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RewardedAdPrompt(
-      title: 'Veja padrões emocionais dos últimos 90 dias',
-      message:
-          'A visão semanal continua disponível no plano gratuito. Para ampliar o Espelho com padrões, comparações e continuidade histórica, assista a um anúncio ou evolua com Premium.',
-      rewardLabel: 'Recompensa: Espelho avançado liberado até o fim do dia.',
-      rewardedAdAvailable: true,
-      isRewardLoading: _isLoading,
-      onWatchRewardedAd: _unlock,
-      onOpenPremium: null,
-      premiumLabel: 'Evoluir com Premium',
     );
   }
 }
