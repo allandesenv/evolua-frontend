@@ -25,6 +25,7 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     required String resource,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     var rewardConfirmedByBackend = false;
     state = const AsyncLoading();
@@ -35,6 +36,7 @@ class MonetizationAccessController extends AsyncNotifier<void> {
             rewardType: resource,
             contextId: contextId,
             allowClientOpenedFallback: allowClientOpenedFallback,
+            onAdClosed: onAdClosed,
           );
       if (rewardConfirmedByBackend) {
         await ref.read(subscriptionControllerProvider.notifier).refresh();

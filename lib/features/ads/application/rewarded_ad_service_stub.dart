@@ -13,6 +13,7 @@ class WebRewardedAdService implements RewardedAdService {
     required String rewardType,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     return false;
   }

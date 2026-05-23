@@ -257,96 +257,130 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       return;
     }
     var rewardLoading = false;
+    var sheetClosedFromAd = false;
+    final unlockSheetNavigator = Navigator.of(context);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
-            ),
-            child: Center(
-              heightFactor: 1,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: RewardedAdPrompt(
-                  title: 'Desbloquear novo check-in hoje',
-                  message: rewardedAdAvailable
-                      ? 'Você já fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anúncio, assine Premium ou volte amanhã.'
-                      : 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, assine Premium ou volte amanhã.',
-                  rewardLabel: rewardedAdAvailable
-                      ? 'Assistir anúncio libera mais um check-in hoje.'
-                      : '',
-                  rewardedAdAvailable: rewardedAdAvailable,
-                  isRewardLoading: rewardLoading,
-                  onWatchRewardedAd: rewardedAdAvailable
-                      ? () async {
-                          if (rewardLoading) {
-                            return;
-                          }
-                          setSheetState(() => rewardLoading = true);
-                          var unlocked = false;
-                          try {
-                            unlocked = await ref
-                                .read(
-                                  monetizationAccessControllerProvider.notifier,
-                                )
-                                .unlockWithRewardedAd(
-                                  resource: 'DEEP_EMOTIONAL_READING',
-                                  allowClientOpenedFallback: true,
-                                )
-                                .timeout(
-                                  const Duration(seconds: 100),
-                                  onTimeout: () => false,
-                                );
-                          } finally {
-                            if (sheetContext.mounted) {
-                              setSheetState(() => rewardLoading = false);
+        builder: (sheetContext, setSheetState) {
+          if (sheetClosedFromAd) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (sheetContext.mounted) {
+                Navigator.of(sheetContext).maybePop();
+              }
+            });
+            return const SizedBox.shrink();
+          }
+          return SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+              ),
+              child: Center(
+                heightFactor: 1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: RewardedAdPrompt(
+                    title: 'Desbloquear novo check-in hoje',
+                    message: rewardedAdAvailable
+                        ? 'Você já fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anúncio, assine Premium ou volte amanhã.'
+                        : 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, assine Premium ou volte amanhã.',
+                    rewardLabel: rewardedAdAvailable
+                        ? 'Assistir anúncio libera mais um check-in hoje.'
+                        : '',
+                    rewardedAdAvailable: rewardedAdAvailable,
+                    isRewardLoading: rewardLoading,
+                    onWatchRewardedAd: rewardedAdAvailable
+                        ? () async {
+                            if (rewardLoading) {
+                              return;
                             }
-                          }
-                          if (!mounted || !sheetContext.mounted) {
-                            return;
-                          }
-                          if (!unlocked) {
+                            void closeSheetAfterAd() {
+                              if (sheetClosedFromAd || !sheetContext.mounted) {
+                                return;
+                              }
+                              setSheetState(() => sheetClosedFromAd = true);
+                              Navigator.of(
+                                sheetContext,
+                                rootNavigator: true,
+                              ).maybePop();
+                              Navigator.of(sheetContext).maybePop();
+                              if (unlockSheetNavigator.mounted) {
+                                unlockSheetNavigator.maybePop();
+                              }
+                            }
+
+                            setSheetState(() => rewardLoading = true);
+                            var unlocked = false;
+                            try {
+                              unlocked = await ref
+                                  .read(
+                                    monetizationAccessControllerProvider
+                                        .notifier,
+                                  )
+                                  .unlockWithRewardedAd(
+                                    resource: 'DEEP_EMOTIONAL_READING',
+                                    allowClientOpenedFallback: true,
+                                    onAdClosed: closeSheetAfterAd,
+                                  )
+                                  .timeout(
+                                    const Duration(seconds: 100),
+                                    onTimeout: () => false,
+                                  );
+                            } finally {
+                              if (sheetContext.mounted) {
+                                setSheetState(() => rewardLoading = false);
+                              }
+                            }
+                            if (!mounted) {
+                              return;
+                            }
+                            if (!unlocked) {
+                              AppSnackBar.show(
+                                context,
+                                message:
+                                    context.l10n.checkInRewardAdNotConfirmed,
+                                icon: Icons.info_outline_rounded,
+                              );
+                              return;
+                            }
+                            if (sheetContext.mounted && !sheetClosedFromAd) {
+                              Navigator.of(sheetContext).pop();
+                            }
+                            final saved = await _submit(
+                              allowLimitUnlock: false,
+                            );
+                            if (!mounted || saved) {
+                              return;
+                            }
                             AppSnackBar.show(
                               context,
-                              message: context.l10n.checkInRewardAdNotConfirmed,
+                              message:
+                                  'Não conseguimos liberar o check-in agora. Tente novamente em instantes.',
                               icon: Icons.info_outline_rounded,
                             );
-                            return;
                           }
-                          Navigator.of(sheetContext).pop();
-                          final saved = await _submit(allowLimitUnlock: false);
-                          if (!mounted || saved) {
-                            return;
-                          }
-                          AppSnackBar.show(
-                            context,
-                            message:
-                                'Não conseguimos liberar o check-in agora. Tente novamente em instantes.',
-                            icon: Icons.info_outline_rounded,
-                          );
-                        }
-                      : null,
-                  onOpenPremium: () {
-                    if (rewardLoading) {
-                      return;
-                    }
-                    Navigator.of(sheetContext).pop();
-                    widget.onOpenPremium?.call();
-                  },
-                  premiumLabel: context.l10n.checkInPremiumAction,
+                        : null,
+                    onOpenPremium: () {
+                      if (rewardLoading) {
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop();
+                      widget.onOpenPremium?.call();
+                    },
+                    premiumLabel: context.l10n.checkInPremiumAction,
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

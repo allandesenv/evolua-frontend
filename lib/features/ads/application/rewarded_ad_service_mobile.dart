@@ -33,6 +33,7 @@ class MobileRewardedAdService implements RewardedAdService {
     required String rewardType,
     String? contextId,
     bool allowClientOpenedFallback = false,
+    void Function()? onAdClosed,
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return false;
@@ -68,6 +69,7 @@ class MobileRewardedAdService implements RewardedAdService {
             },
             onAdDismissedFullScreenContent: (ad) {
               ad.dispose();
+              onAdClosed?.call();
               if (!completer.isCompleted) {
                 completer.complete(
                   _RewardedAdOutcome(
@@ -80,6 +82,9 @@ class MobileRewardedAdService implements RewardedAdService {
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
               ad.dispose();
+              if (openedFullScreen) {
+                onAdClosed?.call();
+              }
               if (!completer.isCompleted) {
                 completer.complete(
                   _RewardedAdOutcome(
