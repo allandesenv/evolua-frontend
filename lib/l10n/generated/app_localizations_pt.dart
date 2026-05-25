@@ -512,7 +512,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get checkInRewardAdNotConfirmed =>
-      'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.';
+      'Tivemos um problema para confirmar o anúncio. Tente novamente em instantes.';
 
   @override
   String get checkInPremiumAction => 'Assinar Premium';
@@ -1137,7 +1137,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
 
   @override
   String get checkInRewardAdNotConfirmed =>
-      'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.';
+      'Tivemos um problema para confirmar o anúncio. Tente novamente em instantes.';
 
   @override
   String get checkInPremiumAction => 'Assinar Premium';

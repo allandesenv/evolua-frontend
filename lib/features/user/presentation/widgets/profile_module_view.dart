@@ -1667,7 +1667,7 @@ class _OverviewSection extends StatelessWidget {
                 validator: (value) {
                   if (gender == 'CUSTOM' &&
                       (value == null || value.trim().isEmpty)) {
-                    return 'Informe seu genero personalizado.';
+                    return 'Informe seu gênero personalizado.';
                   }
                   return null;
                 },
@@ -1778,8 +1778,8 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Resumo da semana',
-          description:
-              'Uma leitura curta para entender como seus registros recentes estao se organizando.',
+            description:
+              'Uma leitura curta para entender como seus registros recentes estão se organizando.',
           child: _EvolutionMetricGrid(
             metrics: [
               _EvolutionMetric(
@@ -1808,15 +1808,15 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Padroes percebidos',
-          description:
-              'Sinais simples do seu hist??rico, para perceber repeticoes sem transformar isso em cobranca.',
+            description:
+              'Sinais simples do seu histórico, para perceber repetições sem transformar isso em cobrança.',
           child: _PatternPanel(stats: stats),
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Mensagem da IA',
-          description:
-              'Uma leitura curta a partir do ??ltimo insight salvo, sem gerar nova an??lise.',
+            description:
+              'Uma leitura curta a partir do último insight salvo, sem gerar nova análise.',
           child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
         ),
         const SizedBox(height: 16),
@@ -1824,7 +1824,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           _EvolutionSectionGroup(
             title: 'Mensagens do seu eu anterior',
             description:
-                'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
+              'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
             child: _FutureMessagesMirrorPanel(
               state: futureMessageState,
               onOpen: onOpenFutureMessages,
@@ -1834,8 +1834,8 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         ],
         _EvolutionSectionGroup(
           title: 'Trilhas em andamento',
-          description:
-              'Acompanhe a trilha que est?? guiando seus pr??ximos passos.',
+            description:
+              'Acompanhe a trilha que está guiando seus próximos passos.',
           child: _TrailEvolutionPanel(
             currentJourneyState: currentJourneyState,
             journeyState: journeyState,
@@ -1844,7 +1844,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Marcos da jornada',
-          description:
+            description:
               'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
           child: Wrap(
             spacing: 10,
@@ -1856,9 +1856,9 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
-          title: 'Consist??ncia',
-          description:
-              'Uma leitura de continuidade para ajudar voc?? a voltar sem peso quando o ritmo oscilar.',
+          title: 'Consistência',
+            description:
+              'Uma leitura de continuidade para ajudar você a voltar sem peso quando o ritmo oscilar.',
           child: _ConsistencyPanel(stats: stats),
         ),
       ],
@@ -2289,10 +2289,10 @@ class _FutureMessageTimelineCard extends StatelessWidget {
     final createdEnergy = message.createdContext['energyLevel']?.toString();
     final deliveredEnergy = message.deliveredContext['energyLevel']?.toString();
     final statusLabel = message.isRead
-        ? 'Você ja leu essa carta.'
-        : message.isDelivered
-        ? 'Há uma carta sua pronta para ser lida com calma.'
-        : 'Essa carta ainda está guardada.';
+      ? 'Você já leu essa carta.'
+      : message.isDelivered
+      ? 'Há uma carta sua pronta para ser lida com calma.'
+      : 'Essa carta ainda está guardada.';
 
     return Container(
       width: double.infinity,
@@ -2759,7 +2759,7 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
       headline:
           'Seu espelho ainda está reunindo pontos suficientes para mostrar um padrão confiável.',
       description:
-          'Com mais alguns check-ins, o Evolua consegue perceber horarios, energia e emocoes recorrentes com mais clareza.',
+          'Com mais alguns check-ins, o Evolua consegue perceber horários, energia e emoções recorrentes com mais clareza.',
       identified: false,
     );
   }
@@ -2801,9 +2801,9 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
   if (distinctMoods.length >= 3) {
     return const _MirrorPattern(
       label: 'nomeação emocional',
-      headline: 'Você evoluiu na capacidade de nomear emocoes.',
+      headline: 'Você evoluiu na capacidade de nomear emoções.',
       description:
-          'Seu histórico mostra mais nuances emocionais. Isso e sinal de percepcao crescendo, não de instabilidade.',
+          'Seu histórico mostra mais nuances emocionais. Isso e sinal de percepção crescendo, não de instabilidade.',
       identified: true,
     );
   }
@@ -2832,7 +2832,7 @@ String _mirrorWeeklySummary({
   required Trail? activeTrail,
 }) {
   if (weeklyCheckIns == 0) {
-    return 'Esta tela vai ganhar vida conforme você registra seus check-ins, reflexoes e passos nas trilhas.';
+    return 'Esta tela vai ganhar vida conforme você registra seus check-ins, reflexões e passos nas trilhas.';
   }
   final energy = averageEnergy == null
       ? 'energia ainda em leitura'
@@ -2845,10 +2845,10 @@ String _mirrorWeeklySummary({
 
 String _mirrorLocalAiFallback(List<CheckIn> items) {
   if (items.isEmpty) {
-    return 'Ainda não ha histórico suficiente para uma mensagem personalizada, mas o primeiro check-in ja cria um ponto de partida.';
+    return 'Ainda não há histórico suficiente para uma mensagem personalizada, mas o primeiro check-in já cria um ponto de partida.';
   }
   final mood = _mirrorCapitalize(_mirrorDominantMood(items));
-  return 'Seu histórico recente aponta para $mood. Um próximo passo simples e escolher uma pratica curta e observar como sua energia responde.';
+  return 'Seu histórico recente aponta para $mood. Um próximo passo simples é escolher uma prática curta e observar como sua energia responde.';
 }
 
 String _mirrorCapitalize(String value) {
@@ -2922,7 +2922,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
   Future<void> _submit() async {
     final draft = _draft();
     if (!draft.hasMeaningfulContent) {
-      _showMessage('Conte pelo menos uma percepcao ou escolha uma avaliação.');
+      _showMessage('Conte pelo menos uma percepção ou escolha uma avaliação.');
       return;
     }
 
@@ -3041,19 +3041,19 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
     final suggestionFields = [
       _FeedbackTextField(
         controller: _featureSuggestionController,
-        label: 'Sugestao de funcionalidade',
+        label: 'Sugestão de funcionalidade',
       ),
       _FeedbackTextField(
         controller: _contentSuggestionController,
-        label: 'Sugestao de conteúdo',
+        label: 'Sugestão de conteúdo',
       ),
       _FeedbackTextField(
         controller: _visualSuggestionController,
-        label: 'Sugestao de melhoria visual',
+        label: 'Sugestão de melhoria visual',
       ),
       _FeedbackTextField(
         controller: _aiSuggestionController,
-        label: 'Sugestao para IA',
+        label: 'Sugestão para IA',
       ),
     ];
 
@@ -3081,7 +3081,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
           title: 'Compartilhe sua experiência',
           description: 'Conte como tem sido usar o Evolua no seu dia a dia.',
           microcopy:
-              'Sua percepcao mostra onde o app ja apoia bem e onde ainda pode cuidar melhor.',
+              'Sua percepção mostra onde o app ja apoia bem e onde ainda pode cuidar melhor.',
           children: feedbackFields,
         ),
         const SizedBox(height: 16),
@@ -3126,7 +3126,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
           title: 'Avaliação rápida',
           description: 'Como tem sido sua experiência no Evolua?',
           microcopy:
-              'Cada feedback ajuda o Evolua a evoluir com mais intencao, clareza e cuidado.',
+              'Cada feedback ajuda o Evolua a evoluir com mais intenção, clareza e cuidado.',
           children: [
             Wrap(
               spacing: 8,
@@ -3277,14 +3277,14 @@ class _HelpSupportSection extends StatelessWidget {
         _SettingsGroup(
           title: 'Central de ajuda',
           description:
-              'Encontre respostas rápidas para duvidas comuns sobre o Evolua.',
+              'Encontre respostas rápidas para dúvidas comuns sobre o Evolua.',
           microcopy:
               'Respostas simples ajudam você a seguir sem precisar pausar a jornada por muito tempo.',
           children: [
             const _HelpFaqTile(
               title: 'Como funcionam as trilhas?',
               answer:
-                  'As trilhas organizam praticas, reflexoes e próximos passos em uma sequencia privada para apoiar seu momento atual.',
+                  'As trilhas organizam práticas, reflexões e próximos passos em uma sequência privada para apoiar seu momento atual.',
             ),
             const _HelpFaqTile(
               title: 'O que são check-ins?',

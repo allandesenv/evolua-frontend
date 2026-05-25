@@ -185,7 +185,7 @@
   "checkInDeepReadingMessage": "Seu check-in foi salvo. A leitura básica continua disponível, e você pode liberar uma leitura aprofundada assistindo a um anúncio ou assinando Premium.",
   "checkInDeepReadingReward": "Recompensa: +1 leitura emocional aprofundada hoje.",
   "checkInDeepReadingUnlocked": "Leitura aprofundada liberada para hoje.",
-  "checkInRewardAdNotConfirmed": "Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.",
+  "checkInRewardAdNotConfirmed": "Tivemos um problema para confirmar o anúncio. Tente novamente em instantes.",
   "checkInPremiumAction": "Assinar Premium",
   "checkInChooseStateTitle": "Escolha um estado",
   "checkInSearchState": "Buscar estado",
