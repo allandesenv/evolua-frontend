@@ -258,21 +258,13 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     }
     var rewardLoading = false;
     var sheetClosedFromAd = false;
-    final unlockSheetNavigator = Navigator.of(context);
+    //final unlockSheetNavigator = Navigator.of(context);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
-          if (sheetClosedFromAd) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (sheetContext.mounted) {
-                Navigator.of(sheetContext).maybePop();
-              }
-            });
-            return const SizedBox.shrink();
-          }
           return SafeArea(
             top: false,
             child: Padding(
@@ -306,14 +298,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                                 return;
                               }
                               setSheetState(() => sheetClosedFromAd = true);
-                              Navigator.of(
-                                sheetContext,
-                                rootNavigator: true,
-                              ).maybePop();
-                              Navigator.of(sheetContext).maybePop();
-                              if (unlockSheetNavigator.mounted) {
-                                unlockSheetNavigator.maybePop();
-                              }
+                              Navigator.of(sheetContext).pop();
                             }
 
                             setSheetState(() => rewardLoading = true);
