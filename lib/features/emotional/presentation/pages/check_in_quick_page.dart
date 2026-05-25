@@ -240,6 +240,43 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     );
   }
 
+
+  Future<void> _showRewardConfirmationProblemMessage() async {
+    debugPrint('Evolua: exibindo falha de confirmação do anúncio.');
+
+    if (!mounted) {
+      return;
+    }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    // Aguarda a bottom sheet/animações terminarem antes de abrir o diálogo.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    if (!mounted) {
+      return;
+    }
+
+    const message =
+        'Tivemos um problema para confirmar o anúncio. Tente novamente em instantes.';
+
+    await showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Não foi possível confirmar o anúncio'),
+        content: const Text(message),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showExtraCheckInUnlockSheet() async {
     if (!mounted) {
       return;
@@ -257,7 +294,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       return;
     }
     var rewardLoading = false;
-    var sheetClosedFromAd = false;
+    //var sheetClosedFromAd = false;
     //final unlockSheetNavigator = Navigator.of(context);
     await showModalBottomSheet<void>(
       context: context,
@@ -293,14 +330,6 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                             if (rewardLoading) {
                               return;
                             }
-                            void closeSheetAfterAd() {
-                              if (sheetClosedFromAd || !sheetContext.mounted) {
-                                return;
-                              }
-                              setSheetState(() => sheetClosedFromAd = true);
-                              Navigator.of(sheetContext).pop();
-                            }
-
                             setSheetState(() => rewardLoading = true);
                             var unlocked = false;
                             try {
@@ -312,11 +341,6 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                                   .unlockWithRewardedAd(
                                     resource: 'DEEP_EMOTIONAL_READING',
                                     allowClientOpenedFallback: true,
-                                    onAdClosed: closeSheetAfterAd,
-                                  )
-                                  .timeout(
-                                    const Duration(seconds: 100),
-                                    onTimeout: () => false,
                                   );
                             } finally {
                               if (sheetContext.mounted) {
@@ -327,15 +351,23 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               return;
                             }
                             if (!unlocked) {
-                              AppSnackBar.show(
-                                context,
-                                message:
-                                    context.l10n.checkInRewardAdNotConfirmed,
-                                icon: Icons.info_outline_rounded,
+                              if (sheetContext.mounted) {
+                                Navigator.of(sheetContext).pop();
+                              }
+
+                              final saved = await _submit(
+                                allowLimitUnlock: false,
                               );
+
+                              if (!mounted || saved) {
+                                return;
+                              }
+
+                              await _showRewardConfirmationProblemMessage();
+
                               return;
                             }
-                            if (sheetContext.mounted && !sheetClosedFromAd) {
+                            if (sheetContext.mounted) {
                               Navigator.of(sheetContext).pop();
                             }
                             final saved = await _submit(
@@ -344,12 +376,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                             if (!mounted || saved) {
                               return;
                             }
-                            AppSnackBar.show(
-                              context,
-                              message:
-                                  'Não conseguimos liberar o check-in agora. Tente novamente em instantes.',
-                              icon: Icons.info_outline_rounded,
-                            );
+                            await _showRewardConfirmationProblemMessage();
                           }
                         : null,
                     onOpenPremium: () {

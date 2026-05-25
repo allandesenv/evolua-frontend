@@ -1033,7 +1033,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkInRewardAdNotConfirmed.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Não foi possível confirmar o anúncio agora. Seu check-in continua salvo.'**
+  /// **'Tivemos um problema para confirmar o anúncio. Tente novamente em instantes.'**
   String get checkInRewardAdNotConfirmed;
 
   /// No description provided for @checkInPremiumAction.
