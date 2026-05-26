@@ -277,7 +277,7 @@ class _ContentSectionSwitcher extends StatelessWidget {
   Widget build(BuildContext context) {
     return PrimaryPanel(
       padding: const EdgeInsets.all(8),
-      semanticLabel: 'Alternar area de trilhas',
+      semanticLabel: 'Alternar área de trilhas',
       child: Row(
         children: [
           Expanded(
@@ -725,7 +725,7 @@ class _JourneyMentorEntryCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Converse com seu Mentor Evolua para ajustar sua proxima etapa.',
+            'Converse com seu Mentor Evolua para ajustar sua próxima etapa.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 14),
@@ -1066,7 +1066,7 @@ class _JourneyStepDetailCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isCompleted ? 'Jornada concluida' : 'Proximo passo',
+            isCompleted ? 'Jornada concluída' : 'Próximo passo',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: activeColor),
@@ -1803,7 +1803,7 @@ class _VideoShell extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               progress.completed
-                  ? 'V?deo assistido. Continue com a reflex?o abaixo.'
+                  ? 'Vídeo assistido. Continue com a reflexão abaixo.'
                   : '${progress.watchedPercent}% assistido',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: context.evoluaColors.textSecondary,
@@ -1876,7 +1876,7 @@ String _journeyCtaLabel(TrailJourney journey) {
   if (!journey.isStarted) {
     return 'Iniciar trilha';
   }
-  return 'Fazer proxima etapa';
+  return 'Fazer próxima etapa';
 }
 
 String _catalogTrailCtaLabel(TrailJourney journey) {
@@ -1932,14 +1932,14 @@ String _emptyStateSubtitle({
 
 String _stepTypeLabel(String type) {
   return switch (type.toUpperCase()) {
-    'EXERCISE' => 'Exercicio',
+    'EXERCISE' => 'Exercício',
     'READING' => 'Leitura',
     'VIDEO' => 'Vídeo',
-    'AUDIO' => 'Audio',
+    'AUDIO' => 'Áudio',
     'RITUAL' => 'Ritual',
     'AI' => 'IA guiada',
     'CHECKPOINT' => 'Checkpoint',
-    _ => 'Reflexao',
+    _ => 'Reflexão',
   };
 }
 
@@ -2246,9 +2246,9 @@ class _TrailExplorer extends ConsumerWidget {
             children: [
               ...result.items.map((trail) {
                 final effectiveAccessible =
-                    trail.accessible || (hasPremiumAccess && trail.premium);
+                    trail.premium ? hasPremiumAccess : trail.accessible;
                 final lockedMentorTrail =
-                    _isLockedMentorPremiumTrail(trail) && !hasPremiumAccess;
+                    _isMentorPremiumTrail(trail) && !hasPremiumAccess;
                 final journeyState = effectiveAccessible
                     ? ref.watch(trailJourneyProvider(trail.id))
                     : null;
@@ -2301,14 +2301,14 @@ class _TrailExplorer extends ConsumerWidget {
                             if (journeyState?.hasValue ?? false)
                               _StatusBadge(
                                 label:
-                                    '${journeyState!.requireValue.progressPercent}% concluido',
+                                    '${journeyState!.requireValue.progressPercent}% concluído',
                                 color: context.evoluaColors.textSecondary,
                               ),
                             if (!effectiveAccessible && !hasPremiumAccess) ...[
                               _StatusBadge(
                                 label: lockedMentorTrail
                                     ? 'Mentoria premium'
-                                    : 'Faca upgrade para acessar',
+                                    : 'Faça upgrade para acessar',
                                 color: AppColors.danger,
                               ),
                               if (lockedMentorTrail)
@@ -2370,6 +2370,7 @@ class _TrailExplorer extends ConsumerWidget {
                                     : () => _showTrailDetails(
                                         context,
                                         trail,
+                                        accessible: effectiveAccessible,
                                         lockedMentorTrail: lockedMentorTrail,
                                       ),
                                 icon: const Icon(Icons.visibility_rounded),
@@ -2401,6 +2402,7 @@ class _TrailExplorer extends ConsumerWidget {
   void _showTrailDetails(
     BuildContext context,
     Trail trail, {
+    required bool accessible,
     required bool lockedMentorTrail,
   }) {
     showDialog<void>(
@@ -2445,7 +2447,7 @@ class _TrailExplorer extends ConsumerWidget {
                       const SizedBox(height: 18),
                       Expanded(
                         child: SingleChildScrollView(
-                          child: trail.accessible
+                          child: accessible
                               ? _UnlockedTrailDetails(trail: trail)
                               : SoftPremiumPrompt(
                                   icon: Icons.auto_stories_rounded,
