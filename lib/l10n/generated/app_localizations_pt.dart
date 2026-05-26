@@ -367,19 +367,19 @@ class AppLocalizationsPt extends AppLocalizations {
   String get trailCatalog => 'Catálogo';
 
   @override
-  String get trailMyJourney => 'Jornada atual';
+  String get trailMyJourney => 'Trilha atual';
 
   @override
   String get trailStart => 'Iniciar trilha';
 
   @override
-  String get trailCompleteJourney => 'Jornada completa';
+  String get trailCompleteJourney => 'Trilha completa';
 
   @override
   String get trailViewCatalog => 'Ver catálogo';
 
   @override
-  String get trailNoActiveJourney => 'Sem jornada ativa.';
+  String get trailNoActiveJourney => 'Sem trilha ativa.';
 
   @override
   String get trailVideo => 'Vídeo';
@@ -992,19 +992,19 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get trailCatalog => 'Catálogo';
 
   @override
-  String get trailMyJourney => 'Jornada atual';
+  String get trailMyJourney => 'Trilha atual';
 
   @override
   String get trailStart => 'Iniciar trilha';
 
   @override
-  String get trailCompleteJourney => 'Jornada completa';
+  String get trailCompleteJourney => 'Trilha completa';
 
   @override
   String get trailViewCatalog => 'Ver catálogo';
 
   @override
-  String get trailNoActiveJourney => 'Sem jornada ativa.';
+  String get trailNoActiveJourney => 'Sem trilha ativa.';
 
   @override
   String get trailVideo => 'Vídeo';

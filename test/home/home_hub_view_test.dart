@@ -554,8 +554,8 @@ void main() {
 
       expect(find.text('8 min'), findsOneWidget);
       expect(find.text('mantém constância'), findsOneWidget);
-      expect(find.text('jornada ativa'), findsOneWidget);
-      expect(find.text('Continuar jornada'), findsAtLeastNWidgets(1));
+      expect(find.text('trilha ativa'), findsOneWidget);
+      expect(find.text('Continuar trilha'), findsAtLeastNWidgets(1));
       expect(find.text('Espaços'), findsOneWidget);
 
       expect(find.widgetWithText(OutlinedButton, 'Espaços'), findsOneWidget);
@@ -572,9 +572,9 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Sua jornada em movimento'), findsNothing);
+      expect(find.text('Sua trilha em movimento'), findsNothing);
       expect(find.text('50%'), findsNothing);
-      expect(find.text('50% da jornada'), findsNothing);
+      expect(find.text('50% da trilha'), findsNothing);
       expect(find.text('1/2 etapas'), findsNothing);
       expect(find.text('Proxima etapa: Escolher'), findsNothing);
     });
@@ -1000,7 +1000,7 @@ class _FakeTrailRepository implements TrailRepository {
   Future<TrailJourney> journey(int trailId) async {
     final trail = _currentJourney;
     if (trail == null) {
-      throw StateError('Sem jornada ativa.');
+      throw StateError('Sem trilha ativa.');
     }
     final steps = [
       const TrailJourneyStep(

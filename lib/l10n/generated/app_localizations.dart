@@ -769,7 +769,7 @@ abstract class AppLocalizations {
   /// No description provided for @trailMyJourney.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Jornada atual'**
+  /// **'Trilha atual'**
   String get trailMyJourney;
 
   /// No description provided for @trailStart.
@@ -781,7 +781,7 @@ abstract class AppLocalizations {
   /// No description provided for @trailCompleteJourney.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Jornada completa'**
+  /// **'Trilha completa'**
   String get trailCompleteJourney;
 
   /// No description provided for @trailViewCatalog.
@@ -793,7 +793,7 @@ abstract class AppLocalizations {
   /// No description provided for @trailNoActiveJourney.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Sem jornada ativa.'**
+  /// **'Sem trilha ativa.'**
   String get trailNoActiveJourney;
 
   /// No description provided for @trailVideo.

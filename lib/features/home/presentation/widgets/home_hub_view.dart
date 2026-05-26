@@ -211,7 +211,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       _ => widget.onOpenTrails,
     };
     final paceButtonLabel = switch (widget.trailsCount) {
-      _ when currentJourney != null => 'Continuar jornada',
+      _ when currentJourney != null => 'Continuar trilha',
       0 => 'Ver trilhas',
       _ when widget.checkInsCount == 0 => 'Fazer check-in',
       _ when widget.postsCount == 0 => 'Ver reflexoes',
