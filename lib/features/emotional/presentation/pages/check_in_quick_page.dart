@@ -757,10 +757,10 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 18,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          left: 18,
+          right: 18,
+          top: 8,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 14,
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -771,35 +771,56 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: widget.l10n.commonBack,
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      iconSize: 18,
-                    ),
-                    const Spacer(),
-                    const _BottomSheetHandle(),
-                    const Spacer(),
-                    const SizedBox(width: 48),
-                  ],
+                SizedBox(
+                  height: 36,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const _BottomSheetHandle(),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          tooltip: widget.l10n.commonBack,
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 8),
                 Text(
                   widget.l10n.checkInChooseStateTitle,
-                  style: Theme.of(context).textTheme.headlineSmall,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    labelText: widget.l10n.checkInSearchState,
-                    prefixIcon: const Icon(Icons.search_rounded),
+                    hintText: widget.l10n.checkInSearchState,
+                    prefixIcon: const Icon(Icons.search_rounded, size: 22),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
                   ),
                   onChanged: (value) => setState(() => _query = value),
                 ),
                 if (recentMoods.isNotEmpty) ...[
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   _MoodGroup(
                     title: widget.l10n.checkInRecentStates,
                     moods: _filterMoods(recentMoods),
@@ -808,7 +829,7 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
                   ),
                 ],
                 if (suggestedMoods.isNotEmpty) ...[
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   _MoodGroup(
                     title: widget.l10n.checkInAiSuggestedStates,
                     moods: _filterMoods(suggestedMoods),
@@ -818,7 +839,7 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
                 ],
                 ...groups.entries.map(
                   (entry) => Padding(
-                    padding: const EdgeInsets.only(top: 18),
+                    padding: const EdgeInsets.only(top: 14),
                     child: _MoodGroup(
                       title: entry.key,
                       moods: _filterMoods(entry.value),
@@ -891,21 +912,33 @@ class _MoodGroup extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: AppColors.textPrimary),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 8,
+          runSpacing: 8,
           children: moods
               .map(
-                (mood) => ChoiceChip(
-                  label: Text(mood.label),
-                  selected: selectedMoodValue == mood.value,
-                  onSelected: (_) => onSelected(mood),
-                ),
+                (mood) {
+                  final selected = selectedMoodValue == mood.value;
+                  return ChoiceChip(
+                    label: Text(mood.label),
+                    selected: selected,
+                    showCheckmark: selected,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    onSelected: (_) => onSelected(mood),
+                  );
+                },
               )
               .toList(),
         ),
@@ -963,7 +996,7 @@ class _BottomSheetHandle extends StatelessWidget {
       child: Container(
         width: 42,
         height: 4,
-        margin: const EdgeInsets.only(bottom: 18),
+        margin: EdgeInsets.zero,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           color: AppColors.outline.withValues(alpha: 0.8),
