@@ -36,7 +36,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Jornada atual'), findsOneWidget);
+      expect(find.text('Trilha atual'), findsOneWidget);
       expect(find.text('Explorar'), findsOneWidget);
       expect(find.text('Explorar trilhas'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -55,7 +55,7 @@ void main() {
 
       expect(find.text('Catálogo de trilhas'), findsOneWidget);
       expect(find.text('Respiracao breve'), findsOneWidget);
-      expect(find.text('Minha jornada ativa'), findsNothing);
+      expect(find.text('Minha trilha ativa'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -81,7 +81,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Sua jornada'), findsOneWidget);
+      expect(find.text('Sua trilha'), findsOneWidget);
       expect(find.text('Catálogo de trilhas'), findsNothing);
 
       await tester.tap(find.text('Explorar'));
@@ -232,7 +232,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final context = tester.element(find.text('Jornada atual'));
+      final context = tester.element(find.text('Trilha atual'));
       final colors = context.evoluaColors;
       final panel = tester.widget<AnimatedContainer>(
         find.byType(AnimatedContainer).first,
@@ -263,7 +263,7 @@ void main() {
           trailRepository: _FakeTrailRepository(
             catalogTrail: _trail(
               id: 7,
-              title: 'Mentoria para destravar a jornada',
+              title: 'Mentoria para destravar a trilha',
               summary: 'Uma trilha de mentoria para clarear bloqueios.',
               activeJourney: false,
               generatedByAi: false,
@@ -310,7 +310,7 @@ void main() {
       final trailRepository = _FakeTrailRepository(
         catalogTrail: _trail(
           id: 8,
-          title: 'Mentoria para destravar a jornada',
+          title: 'Mentoria para destravar a trilha',
           summary: 'Uma trilha de mentoria para clarear bloqueios.',
           activeJourney: false,
           generatedByAi: false,
@@ -351,7 +351,7 @@ void main() {
       final trailRepository = _FakeTrailRepository(
         catalogTrail: _trail(
           id: 10,
-          title: 'Mentoria para destravar a jornada',
+          title: 'Mentoria para destravar a trilha',
           summary: 'Uma trilha de mentoria para clarear bloqueios.',
           activeJourney: false,
           generatedByAi: false,
@@ -476,7 +476,7 @@ class _FakeTrailRepository implements TrailRepository {
            _trail(
              id: 1,
              title: 'Clareza em 8 minutos',
-             summary: 'Uma jornada ativa para organizar o momento.',
+             summary: 'Uma trilha ativa para organizar o momento.',
              activeJourney: true,
              generatedByAi: true,
            ),

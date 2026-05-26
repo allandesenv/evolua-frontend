@@ -283,7 +283,7 @@ class _ContentSectionSwitcher extends StatelessWidget {
           Expanded(
             child: _ContentSectionButton(
               icon: Icons.route_rounded,
-              label: hasActiveJourney ? 'Jornada atual' : 'Jornada',
+              label: hasActiveJourney ? 'Trilha atual' : 'Trilha',
               selected: selected == ContentModuleSection.journey,
               onTap: () => onSelected(ContentModuleSection.journey),
             ),
@@ -372,7 +372,7 @@ class _EmptyJourneyPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Sua jornada',
+              'Sua trilha',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: context.evoluaColors.textPrimary,
               ),
@@ -385,7 +385,7 @@ class _EmptyJourneyPanel extends StatelessWidget {
             const SizedBox(height: 18),
             GuidedEmptyState(
               icon: Icons.route_rounded,
-              title: 'Nenhuma jornada em andamento',
+              title: 'Nenhuma trilha em andamento',
               subtitle:
                   'Explore o catálogo e escolha uma trilha para iniciar sua próxima etapa.',
               actionLabel: 'Explorar trilhas',
@@ -718,7 +718,7 @@ class _JourneyMentorEntryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Precisa adaptar sua jornada hoje?',
+            'Precisa adaptar sua trilha hoje?',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: context.evoluaColors.textPrimary,
             ),
@@ -766,7 +766,7 @@ class _JourneyHeader extends StatelessWidget {
         Text(
           isCatalogTrail
               ? 'Trilha de ${_categoryLabel(trail.category)}'
-              : 'Sua jornada',
+              : 'Sua trilha',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: activeColor,
             fontWeight: FontWeight.w700,
@@ -781,7 +781,7 @@ class _JourneyHeader extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _StatusBadge(label: 'Jornada guiada', color: activeColor),
+            _StatusBadge(label: 'Trilha guiada', color: activeColor),
             _StatusBadge(
               label: '${journey.steps.length} etapas',
               color: context.evoluaColors.textSecondary,
@@ -815,7 +815,7 @@ class _JourneyHeader extends StatelessWidget {
               onPressed: onOpenFullJourney,
               icon: const Icon(Icons.auto_stories_rounded),
               label: Text(
-                isCatalogTrail ? 'Conteúdo completo' : 'Jornada completa',
+                isCatalogTrail ? 'Conteúdo completo' : 'Trilha completa',
               ),
             ),
           ],
@@ -865,7 +865,7 @@ class _JourneyProgressSummary extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${journey.progressPercent}% da jornada',
+                  '${journey.progressPercent}% da trilha',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: context.evoluaColors.textPrimary,
                   ),
@@ -1066,7 +1066,7 @@ class _JourneyStepDetailCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isCompleted ? 'Jornada concluída' : 'Próximo passo',
+            isCompleted ? 'Trilha concluída' : 'Próximo passo',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: activeColor),
@@ -1871,7 +1871,7 @@ String? _extractYoutubeId(String? url) {
 
 String _journeyCtaLabel(TrailJourney journey) {
   if (journey.isCompleted) {
-    return 'Revisar jornada';
+    return 'Revisar trilha';
   }
   if (!journey.isStarted) {
     return 'Iniciar trilha';
@@ -1925,9 +1925,9 @@ String _emptyStateSubtitle({
     return 'Enquanto isso, continue nas trilhas essenciais ou volte mais tarde para novas experiências premium.';
   }
   if (premiumFilter == false) {
-    return 'Em breve, novas jornadas gratuitas estarão disponíveis para continuar sua evolução.';
+    return 'Em breve, novas trilhas gratuitas estarão disponíveis para continuar sua evolução.';
   }
-  return 'O catálogo está sendo preparado. Volte em breve para descobrir novas jornadas.';
+  return 'O catálogo está sendo preparado. Volte em breve para descobrir novas trilhas.';
 }
 
 String _stepTypeLabel(String type) {
@@ -2456,7 +2456,7 @@ class _TrailExplorer extends ConsumerWidget {
                                       : 'Esta trilha aprofunda sua evolução emocional',
                                   message: lockedMentorTrail
                                       ? 'O Mentor Evolua e as trilhas de mentoria ficam no Premium para manter uma experiência profunda, contínua e sem anúncios.'
-                                      : 'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua jornada com mais contexto, sem anúncios e sem pressão.',
+                                      : 'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua trilha com mais contexto, sem anúncios e sem pressão.',
                                   benefit:
                                       'Premium libera trilhas premium, Espelho da Evolução completo, histórico completo e insights avançados.',
                                   primaryLabel: 'Aprofundar com Premium',

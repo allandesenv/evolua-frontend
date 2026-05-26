@@ -40,7 +40,7 @@ ProactiveGreeting buildProactiveGreeting({
   if (!hasToday) {
     final base = checkIns.isEmpty
         ? 'Que bom te ver por aqui. Um check-in curto ajuda o Evolua a entender seu momento de hoje.'
-        : 'Antes de seguir, vale registrar como voce esta hoje para ajustar a jornada ao seu momento real.';
+        : 'Antes de seguir, vale registrar como voce esta hoje para ajustar a trilha ao seu momento real.';
     return ProactiveGreeting(
       greeting: greeting,
       message: base,
@@ -52,7 +52,7 @@ ProactiveGreeting buildProactiveGreeting({
   if (activeJourney != null) {
     final mood = _dominantMood(checkIns);
     final prefix = mood == null
-        ? 'Sua jornada esta pronta para o proximo passo.'
+        ? 'Sua trilha esta pronta para o proximo passo.'
         : 'Seu historico recente aponta mais $mood.';
     final passNote = mentorPremiumPassActive
         ? ' Seu passe de mentoria esta ativo hoje.'
@@ -62,7 +62,7 @@ ProactiveGreeting buildProactiveGreeting({
       message:
           '$prefix Continue ${activeJourney.title} com um passo pequeno e possivel.$passNote',
       action: ProactiveGreetingAction.continueJourney,
-      actionLabel: 'Continuar jornada',
+      actionLabel: 'Continuar trilha',
     );
   }
 
