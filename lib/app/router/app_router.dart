@@ -39,6 +39,7 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? googleCallbackPageBuilder,
   GoRouterWidgetBuilder? homePageBuilder,
   GoRouterWidgetBuilder? checkInPageBuilder,
+  GoRouterWidgetBuilder? careClaimPageBuilder,
   GoRouterWidgetBuilder? dailyRitualPageBuilder,
   GoRouterWidgetBuilder? futureMessagesPageBuilder,
   GoRouterWidgetBuilder? futureMessageDetailPageBuilder,
@@ -52,8 +53,16 @@ GoRouter buildAppRouter({
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const _AuthBootPage(),
+        builder: (context, state) {
+          if (_hasCareClaimHash()) {
+            return const CareClaimPage();
+          }
+          return const _AuthBootPage();
+        },
         redirect: (context, state) {
+          if (_hasCareClaimHash()) {
+            return null;
+          }
           if (authRouterNotifier.isBootstrapping) {
             return null;
           }
@@ -102,7 +111,8 @@ GoRouter buildAppRouter({
       ),
       GoRoute(
         path: '/care/claim',
-        builder: (context, state) => const CareClaimPage(),
+        builder:
+            careClaimPageBuilder ?? (context, state) => const CareClaimPage(),
       ),
       GoRoute(
         path: '/daily-ritual',
@@ -142,11 +152,14 @@ GoRouter buildAppRouter({
       final goingToGoogleCallback =
           state.matchedLocation == '/auth/google/callback';
       final goingToCareClaim = state.matchedLocation == '/care/claim';
+      final goingToCareClaimHash =
+          state.matchedLocation == '/' && _hasCareClaimHash();
       if (!authRouterNotifier.isAuthenticated &&
           !goingToAuth &&
           !goingToResetPassword &&
           !goingToGoogleCallback &&
-          !goingToCareClaim) {
+          !goingToCareClaim &&
+          !goingToCareClaimHash) {
         return '/auth';
       }
 
@@ -157,6 +170,11 @@ GoRouter buildAppRouter({
       return null;
     },
   );
+}
+
+bool _hasCareClaimHash() {
+  final fragment = Uri.base.fragment;
+  return fragment == '/care/claim' || fragment.startsWith('/care/claim?');
 }
 
 class _AuthBootPage extends StatelessWidget {

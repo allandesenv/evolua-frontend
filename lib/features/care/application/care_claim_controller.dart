@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
+import 'package:evolua_frontend/features/care/application/care_claim_secret_reader.dart';
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
@@ -120,37 +121,34 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
       ),
     );
 
-    final uri = Uri.base;
-    final shareId = uri.queryParameters['sid']?.trim() ?? '';
-    final code = uri.queryParameters['code']?.trim() ?? '';
-    final secret = _secretFromFragment(uri.fragment);
-    if (shareId.isEmpty || code.isEmpty || secret.isEmpty) {
+    final link = CareClaimLink.fromUri(Uri.base);
+    if (!link.isComplete) {
       throw const FormatException('Link do Evolua Care incompleto.');
     }
 
     final claim = await _dio.post<dynamic>(
-      '/v1/public/care/shares/$shareId/claim',
-      data: {'numericCode': code},
+      '/v1/public/care/shares/${link.shareId}/claim',
+      data: {'numericCode': link.code, 'code': link.code},
     );
     final session = ApiPayloadParser.dataMap(claim.data);
 
     final reportResponse = await _dio.get<dynamic>(
-      '/v1/public/care/shares/$shareId/encrypted-report',
-      queryParameters: {'code': code},
+      '/v1/public/care/shares/${link.shareId}/encrypted-report',
+      queryParameters: {'code': link.code},
     );
     final encryptedReport = CareEncryptedPayload.fromJson(
       ApiPayloadParser.dataMap(reportResponse.data),
     );
     final report = await _decryptClinicalReport(
-      shareId: shareId,
-      secretBase64: secret,
+      shareId: link.shareId,
+      secretBase64: link.secretBase64,
       payload: encryptedReport,
     );
 
     return CareClaimState(
-      shareId: shareId,
-      numericCode: code,
-      secretBase64: secret,
+      shareId: link.shareId,
+      numericCode: link.code,
+      secretBase64: link.secretBase64,
       report: report,
       sessionExpiresAt: DateTime.tryParse(
         session['expiresAt']?.toString() ?? '',
@@ -274,12 +272,66 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
       microAction: json['microAction']?.toString() ?? '',
     );
   }
+}
 
-  String _secretFromFragment(String fragment) {
-    if (fragment.isEmpty) return '';
-    final normalized = fragment.startsWith('#')
-        ? fragment.substring(1)
-        : fragment;
-    return Uri.splitQueryString(normalized)['k']?.trim() ?? '';
+class CareClaimLink {
+  const CareClaimLink({
+    required this.shareId,
+    required this.code,
+    required this.secretBase64,
+  });
+
+  final String shareId;
+  final String code;
+  final String secretBase64;
+
+  bool get isComplete =>
+      shareId.isNotEmpty && code.isNotEmpty && secretBase64.isNotEmpty;
+
+  factory CareClaimLink.fromUri(
+    Uri uri, {
+    String Function(String shareId)? storedSecretReader,
+  }) {
+    final hashParameters = _careHashParameters(uri.fragment);
+    final shareId = (hashParameters['sid'] ?? uri.queryParameters['sid'] ?? '')
+        .trim();
+    final code = (hashParameters['code'] ?? uri.queryParameters['code'] ?? '')
+        .trim();
+    var secretBase64 =
+        (hashParameters['k'] ?? _legacySecretFromFragment(uri.fragment)).trim();
+    if (secretBase64.isEmpty && shareId.isNotEmpty) {
+      secretBase64 = (storedSecretReader ?? readStoredCareClaimSecret)(
+        shareId,
+      ).trim();
+    }
+    return CareClaimLink(
+      shareId: shareId,
+      code: code,
+      secretBase64: secretBase64,
+    );
+  }
+
+  static Map<String, String> _careHashParameters(String fragment) {
+    final normalized = _normalizedFragment(fragment);
+    if (!normalized.startsWith('/care/claim')) {
+      return const {};
+    }
+    final queryStart = normalized.indexOf('?');
+    if (queryStart < 0 || queryStart == normalized.length - 1) {
+      return const {};
+    }
+    return Uri.splitQueryString(normalized.substring(queryStart + 1));
+  }
+
+  static String _legacySecretFromFragment(String fragment) {
+    final normalized = _normalizedFragment(fragment);
+    if (normalized.isEmpty || normalized.startsWith('/care/claim')) {
+      return '';
+    }
+    return Uri.splitQueryString(normalized)['k'] ?? '';
+  }
+
+  static String _normalizedFragment(String fragment) {
+    return fragment.startsWith('#') ? fragment.substring(1) : fragment;
   }
 }

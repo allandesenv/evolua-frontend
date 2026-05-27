@@ -216,6 +216,23 @@ class _CareShareContent extends ConsumerWidget {
               icon: const Icon(Icons.copy_rounded),
               label: const Text('Copiar código'),
             ),
+            if (qrPayload != null)
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(
+                    ClipboardData(text: qrPayload.toString()),
+                  );
+                  if (context.mounted) {
+                    AppSnackBar.show(
+                      context,
+                      message: 'Link completo copiado com segurança.',
+                      icon: Icons.link_rounded,
+                    );
+                  }
+                },
+                icon: const Icon(Icons.link_rounded),
+                label: const Text('Copiar link completo'),
+              ),
             OutlinedButton.icon(
               onPressed: state.status == CareAccessStatus.revoking
                   ? null

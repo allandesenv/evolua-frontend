@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
+import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
@@ -49,6 +50,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   String? _initialCheckInPromptKey;
   bool _openingReminderCheckIn = false;
   ProviderSubscription<AsyncValue<String>>? _reminderTapSubscription;
+  ProviderSubscription<AsyncValue<CareShareState>>? _careShareSubscription;
   ProviderSubscription<int>? _carePrescriptionSubscription;
 
   static const _spacesIndex = 2;
@@ -74,6 +76,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         });
       },
     );
+    _careShareSubscription = ref.listenManual(
+      careShareControllerProvider,
+      (_, _) {},
+    );
     _carePrescriptionSubscription = ref.listenManual<int>(
       carePrescriptionAppliedEventProvider,
       (previous, next) {
@@ -94,6 +100,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void dispose() {
     _reminderTapSubscription?.close();
+    _careShareSubscription?.close();
     _carePrescriptionSubscription?.close();
     super.dispose();
   }
