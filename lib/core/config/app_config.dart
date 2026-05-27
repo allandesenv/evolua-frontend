@@ -71,6 +71,16 @@ class AppConfig {
         'https://allandesenv.github.io/evolua-legal/termos-de-uso.html',
   );
 
+  static const carePortalBaseUrl = String.fromEnvironment(
+    'EVOLUA_CARE_PORTAL_BASE_URL',
+    defaultValue: 'https://allandesenv.github.io/evolua-care',
+  );
+
+  static const careBaseUrl = String.fromEnvironment(
+    'EVOLUA_CARE_BASE_URL',
+    defaultValue: apiBaseUrl,
+  );
+
   static const adMobAndroidRewardedAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_ANDROID_REWARDED_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-1136517314419681/4183412880',
@@ -116,6 +126,12 @@ class AppConfig {
 
   static String get chatSocketUrl {
     return chatBaseUrl
+        .replaceFirst('https://', 'wss://')
+        .replaceFirst('http://', 'ws://');
+  }
+
+  static String get careSocketUrl {
+    return careBaseUrl
         .replaceFirst('https://', 'wss://')
         .replaceFirst('http://', 'ws://');
   }
