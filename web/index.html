@@ -35,11 +35,79 @@
 <body>
   <script>
     (function () {
-      var redirect = sessionStorage.getItem('evolua.github_pages.redirect');
+      var redirectKey = 'evolua.github_pages.redirect';
+      var careSecretPrefix = 'evolua.care.claim.secret.';
+
+      function storeCareSecret(sid, secret) {
+        if (sid && secret) {
+          sessionStorage.setItem(careSecretPrefix + sid, secret);
+        }
+      }
+
+      function normalizeCareHashRoute() {
+        var hash = window.location.hash || '';
+        if (hash.indexOf('#/care/claim') !== 0) {
+          return false;
+        }
+
+        var queryIndex = hash.indexOf('?');
+        if (queryIndex < 0) {
+          return false;
+        }
+
+        var params = new URLSearchParams(hash.substring(queryIndex + 1));
+        var sid = params.get('sid') || '';
+        var code = params.get('code') || '';
+        var secret = params.get('k') || '';
+        storeCareSecret(sid, secret);
+
+        if (sid && code) {
+          var next =
+            '/evolua-frontend/care/claim?sid=' +
+            encodeURIComponent(sid) +
+            '&code=' +
+            encodeURIComponent(code);
+          history.replaceState(null, '', next);
+          return true;
+        }
+
+        return false;
+      }
+
+      function normalizeLegacyCareHash() {
+        if (window.location.pathname.indexOf('/care/claim') < 0) {
+          return false;
+        }
+
+        var hash = window.location.hash || '';
+        if (hash.indexOf('#k=') !== 0) {
+          return false;
+        }
+
+        var params = new URLSearchParams(hash.substring(1));
+        var query = new URLSearchParams(window.location.search);
+        storeCareSecret(query.get('sid') || '', params.get('k') || '');
+        history.replaceState(
+          null,
+          '',
+          window.location.pathname + window.location.search
+        );
+        return true;
+      }
+
+      if (normalizeCareHashRoute()) {
+        sessionStorage.removeItem(redirectKey);
+        return;
+      }
+
+      var redirect = sessionStorage.getItem(redirectKey);
       if (redirect) {
-        sessionStorage.removeItem('evolua.github_pages.redirect');
+        sessionStorage.removeItem(redirectKey);
         history.replaceState(null, '', redirect);
       }
+
+      normalizeCareHashRoute();
+      normalizeLegacyCareHash();
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>

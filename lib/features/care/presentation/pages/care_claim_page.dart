@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/care/application/care_claim_controller.dart';
@@ -31,7 +32,7 @@ class CareClaimPage extends ConsumerWidget {
               padding: const EdgeInsets.all(28),
               child: state.when(
                 loading: () => const _CareClaimLoading(),
-                error: (_, _) => const _CareClaimError(),
+                error: (error, _) => _CareClaimError(error: error),
                 data: (value) => _CareDashboard(state: value),
               ),
             ),
@@ -455,35 +456,76 @@ class _CareClaimLoading extends StatelessWidget {
 }
 
 class _CareClaimError extends StatelessWidget {
-  const _CareClaimError();
+  const _CareClaimError({required this.error});
+
+  final Object error;
 
   @override
   Widget build(BuildContext context) {
-    return const PrimaryPanel(
+    final copy = _CareClaimErrorCopy.fromError(error);
+    return PrimaryPanel(
       child: Padding(
-        padding: EdgeInsets.all(28),
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.lock_outline_rounded,
               color: AppColors.accentGold,
               size: 42,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
-              'Não foi possível abrir este acesso.',
+              copy.title,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Confira se o link está completo, dentro do prazo e foi aberto pelo QR Code do paciente.',
-              textAlign: TextAlign.center,
-            ),
+            const SizedBox(height: 8),
+            Text(copy.message, textAlign: TextAlign.center),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CareClaimErrorCopy {
+  const _CareClaimErrorCopy({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  factory _CareClaimErrorCopy.fromError(Object error) {
+    if (error is FormatException) {
+      return const _CareClaimErrorCopy(
+        title: 'Link incompleto',
+        message:
+            'Abra novamente pelo QR Code ou copie o link completo, incluindo a chave segura.',
+      );
+    }
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      if (status == 410) {
+        return const _CareClaimErrorCopy(
+          title: 'Acesso expirado ou revogado',
+          message: 'Peça ao paciente para gerar um novo acesso seguro.',
+        );
+      }
+      if (status == 400 || status == 404) {
+        return const _CareClaimErrorCopy(
+          title: 'Acesso não encontrado',
+          message: 'Confira se o código pertence ao QR Code mais recente.',
+        );
+      }
+      return const _CareClaimErrorCopy(
+        title: 'Não foi possível conectar',
+        message: 'Tente novamente em instantes, mantendo o link completo.',
+      );
+    }
+    return const _CareClaimErrorCopy(
+      title: 'Não foi possível abrir este acesso.',
+      message:
+          'Confira se o link está completo, dentro do prazo e foi aberto pelo QR Code do paciente.',
     );
   }
 }
