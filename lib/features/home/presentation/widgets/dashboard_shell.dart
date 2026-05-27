@@ -3,6 +3,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
+import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
@@ -48,6 +49,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   String? _initialCheckInPromptKey;
   bool _openingReminderCheckIn = false;
   ProviderSubscription<AsyncValue<String>>? _reminderTapSubscription;
+  ProviderSubscription<int>? _carePrescriptionSubscription;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -72,11 +74,27 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         });
       },
     );
+    _carePrescriptionSubscription = ref.listenManual<int>(
+      carePrescriptionAppliedEventProvider,
+      (previous, next) {
+        if ((previous ?? 0) >= next) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Novo ritual recebido do seu terapeuta.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        });
+      },
+    );
   }
 
   @override
   void dispose() {
     _reminderTapSubscription?.close();
+    _carePrescriptionSubscription?.close();
     super.dispose();
   }
 
@@ -724,6 +742,7 @@ class _DashboardContent extends ConsumerWidget {
             onOpenProfileSection(ProfileModuleSection.evolutionMirror),
         onOpenFutureMessages: () => context.push('/future-messages'),
         onOpenFutureMessage: (id) => context.push('/future-messages/$id'),
+        onOpenCareShare: () => context.push('/care/share'),
         onOpenDailyRitual: (type) => context.push(
           '/daily-ritual?type=${type == 'EVENING' ? 'evening' : 'morning'}',
         ),

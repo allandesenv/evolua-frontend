@@ -4,6 +4,8 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/google_auth_callback_page.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/reset_password_page.dart';
+import 'package:evolua_frontend/features/care/presentation/pages/care_claim_page.dart';
+import 'package:evolua_frontend/features/care/presentation/pages/care_share_page.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/presentation/pages/daily_ritual_page.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
@@ -95,6 +97,14 @@ GoRouter buildAppRouter({
             checkInPageBuilder ?? (context, state) => const CheckInQuickPage(),
       ),
       GoRoute(
+        path: '/care/share',
+        builder: (context, state) => const CareSharePage(),
+      ),
+      GoRoute(
+        path: '/care/claim',
+        builder: (context, state) => const CareClaimPage(),
+      ),
+      GoRoute(
         path: '/daily-ritual',
         builder:
             dailyRitualPageBuilder ??
@@ -131,10 +141,12 @@ GoRouter buildAppRouter({
       final goingToResetPassword = state.matchedLocation == '/reset-password';
       final goingToGoogleCallback =
           state.matchedLocation == '/auth/google/callback';
+      final goingToCareClaim = state.matchedLocation == '/care/claim';
       if (!authRouterNotifier.isAuthenticated &&
           !goingToAuth &&
           !goingToResetPassword &&
-          !goingToGoogleCallback) {
+          !goingToGoogleCallback &&
+          !goingToCareClaim) {
         return '/auth';
       }
 

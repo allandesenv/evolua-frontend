@@ -1092,7 +1092,7 @@ void main() {
     await tester.tap(find.text('Como funcionam as trilhas?'));
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('As trilhas organizam praticas'),
+      find.textContaining('As trilhas organizam práticas'),
       findsOneWidget,
     );
 

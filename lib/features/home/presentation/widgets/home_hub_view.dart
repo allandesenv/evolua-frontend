@@ -36,6 +36,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.onOpenEvolutionMirror,
     required this.onOpenFutureMessages,
     required this.onOpenFutureMessage,
+    required this.onOpenCareShare,
     required this.onOpenDailyRitual,
     required this.onOpenCheckIn,
     this.onOpenPremium,
@@ -57,6 +58,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback onOpenEvolutionMirror;
   final VoidCallback onOpenFutureMessages;
   final ValueChanged<int> onOpenFutureMessage;
+  final VoidCallback onOpenCareShare;
   final ValueChanged<String> onOpenDailyRitual;
   final VoidCallback onOpenCheckIn;
   final VoidCallback? onOpenPremium;
@@ -255,6 +257,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
               ? widget.onOpenCheckIn
               : () => _openInsightSheet(latestInsight),
           onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
+          onOpenCareShare: widget.onOpenCareShare,
         ),
         if (showFutureMessage) ...[
           const SizedBox(height: 14),
@@ -871,6 +874,7 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
     required this.onOpenReflection,
     required this.onOpenInsight,
     required this.onOpenEvolutionMirror,
+    required this.onOpenCareShare,
   });
 
   final CheckInAiInsight? insight;
@@ -879,6 +883,7 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
   final VoidCallback onOpenReflection;
   final VoidCallback onOpenInsight;
   final VoidCallback onOpenEvolutionMirror;
+  final VoidCallback onOpenCareShare;
 
   @override
   Widget build(BuildContext context) {
@@ -921,6 +926,14 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
         subtitle: 'Compare seu agora com antes.',
         color: AppColors.accent,
         onTap: onOpenEvolutionMirror,
+      ),
+      _ContextMiniCard(
+        width: cardWidth,
+        icon: Icons.health_and_safety_outlined,
+        title: 'Evolua Care',
+        subtitle: 'Compartilhe com seu terapeuta.',
+        color: AppColors.accent,
+        onTap: onOpenCareShare,
       ),
     ];
 
@@ -1772,7 +1785,7 @@ class _PaceMeta {
       return const _PaceMeta(
         duration: '8 min',
         benefit: 'mantém constância',
-        reason: 'jornada ativa',
+        reason: 'trilha ativa',
       );
     }
 

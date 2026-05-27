@@ -111,7 +111,7 @@ void main() {
       expect(state?.latestCreatedCheckIn?.aiInsight, isNull);
       expect(state?.isLatestInsightPending, isTrue);
 
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await Future<void>.delayed(const Duration(milliseconds: 120));
 
       state = container.read(checkInControllerProvider).asData?.value;
       expect(

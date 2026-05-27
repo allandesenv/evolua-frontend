@@ -33,6 +33,15 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    (function () {
+      var redirect = sessionStorage.getItem('evolua.github_pages.redirect');
+      if (redirect) {
+        sessionStorage.removeItem('evolua.github_pages.redirect');
+        history.replaceState(null, '', redirect);
+      }
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

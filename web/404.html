@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Evolua</title>
+  <script>
+    (function () {
+      var target = window.location.pathname + window.location.search + window.location.hash;
+      sessionStorage.setItem('evolua.github_pages.redirect', target);
+      window.location.replace('/evolua-frontend/');
+    })();
+  </script>
+</head>
+<body>
+  <p>Redirecionando para o Evolua...</p>
+</body>
+</html>
