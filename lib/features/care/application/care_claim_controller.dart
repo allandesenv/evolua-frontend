@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
@@ -7,7 +8,9 @@ import 'package:evolua_frontend/features/care/application/care_claim_secret_read
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http_parser/http_parser.dart';
 
 final careClaimControllerProvider =
     AsyncNotifierProvider<CareClaimController, CareClaimState>(
@@ -22,6 +25,7 @@ class CareClaimState {
     required this.report,
     this.sessionExpiresAt,
     this.isSendingPrescription = false,
+    this.isSendingRecommendation = false,
     this.successMessage,
   });
 
@@ -31,10 +35,12 @@ class CareClaimState {
   final CareClinicalReport report;
   final DateTime? sessionExpiresAt;
   final bool isSendingPrescription;
+  final bool isSendingRecommendation;
   final String? successMessage;
 
   CareClaimState copyWith({
     bool? isSendingPrescription,
+    bool? isSendingRecommendation,
     String? successMessage,
     bool clearSuccessMessage = false,
   }) {
@@ -46,6 +52,8 @@ class CareClaimState {
       sessionExpiresAt: sessionExpiresAt,
       isSendingPrescription:
           isSendingPrescription ?? this.isSendingPrescription,
+      isSendingRecommendation:
+          isSendingRecommendation ?? this.isSendingRecommendation,
       successMessage: clearSuccessMessage
           ? null
           : successMessage ?? this.successMessage,
@@ -211,6 +219,125 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
     }
   }
 
+  Future<void> sendRecommendation({
+    required String guidanceText,
+    required List<PlatformFile> attachments,
+  }) async {
+    final current = state.asData?.value;
+    if (current == null || current.isSendingRecommendation) return;
+    final trimmed = guidanceText.trim();
+    if (trimmed.isEmpty && attachments.isEmpty) return;
+    state = AsyncData(
+      current.copyWith(
+        isSendingRecommendation: true,
+        clearSuccessMessage: true,
+      ),
+    );
+    try {
+      final secret = base64Url.decode(base64.normalize(current.secretBase64));
+      final crypto = ref.read(careCryptoServiceProvider);
+      final guidanceKey = await crypto.deriveSessionKey(
+        shareSecret: secret,
+        shareId: current.shareId,
+        purpose: 'care-guidance-v1',
+      );
+      final attachmentKey = await crypto.deriveSessionKey(
+        shareSecret: secret,
+        shareId: current.shareId,
+        purpose: 'care-attachment-v1',
+      );
+
+      final encryptedFiles = <Map<String, dynamic>>[];
+      final formFiles = <MultipartFile>[];
+      for (final (index, file) in attachments.indexed) {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) continue;
+        final attachmentId = _clientAttachmentId(index);
+        final contentType = _contentTypeFor(file.name);
+        final filePayload = await crypto.encryptBytes(
+          key: attachmentKey,
+          shareId: current.shareId,
+          bytes: bytes,
+          purpose: CareCryptoPayloadPurpose.attachment,
+        );
+        encryptedFiles.add({
+          'attachmentId': attachmentId,
+          'displayName': file.name,
+          'contentType': contentType,
+          'sizeBytes': file.size,
+          'algorithm': filePayload.algorithm,
+          'nonceBase64': filePayload.nonceBase64,
+          'macBase64': filePayload.macBase64,
+        });
+        formFiles.add(
+          MultipartFile.fromBytes(
+            base64Url.decode(filePayload.cipherTextBase64),
+            filename: '$attachmentId.bin',
+            contentType: MediaType.parse('application/octet-stream'),
+          ),
+        );
+      }
+
+      final encryptedGuidance = await crypto.encryptJson(
+        key: guidanceKey,
+        shareId: current.shareId,
+        purpose: CareCryptoPayloadPurpose.guidance,
+        json: {
+          'guidanceText': trimmed,
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'therapistLabel': 'Terapeuta',
+          'attachments': encryptedFiles
+              .map(
+                (item) => {
+                  'attachmentId': item['attachmentId'],
+                  'displayName': item['displayName'],
+                  'contentType': item['contentType'],
+                  'sizeBytes': item['sizeBytes'],
+                },
+              )
+              .toList(),
+        },
+      );
+
+      final metadata = {
+        'numericCode': current.numericCode,
+        'therapistLabel': 'Terapeuta',
+        'encryptedPayload': encryptedGuidance.toJson(),
+        'attachments': encryptedFiles
+            .map(
+              (item) => {
+                'attachmentId': item['attachmentId'],
+                'contentType': item['contentType'],
+                'algorithm': item['algorithm'],
+                'nonceBase64': item['nonceBase64'],
+                'macBase64': item['macBase64'],
+              },
+            )
+            .toList(),
+      };
+
+      await _dio.post<dynamic>(
+        '/v1/public/care/shares/${current.shareId}/recommendations',
+        data: FormData.fromMap({
+          'metadata': MultipartFile.fromString(
+            jsonEncode(metadata),
+            contentType: MediaType.parse('application/json'),
+          ),
+          'files': formFiles,
+        }),
+      );
+      state = AsyncData(
+        current.copyWith(
+          isSendingRecommendation: false,
+          successMessage: 'Orientação enviada ao paciente com segurança.',
+        ),
+      );
+    } catch (_) {
+      state = AsyncData(current.copyWith(isSendingRecommendation: false));
+      rethrow;
+    }
+  }
+
   Future<CareClinicalReport> _decryptClinicalReport({
     required String shareId,
     required String secretBase64,
@@ -262,6 +389,21 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
       aiInsight: insight,
     );
+  }
+
+  String _clientAttachmentId(int index) {
+    final random = Random.secure();
+    final bytes = List<int>.generate(12, (_) => random.nextInt(256));
+    return 'att_${index}_${base64UrlEncode(bytes).replaceAll('=', '')}';
+  }
+
+  String _contentTypeFor(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'application/octet-stream';
   }
 
   CareClinicalRitual _parseRitual(Map<String, dynamic> json) {

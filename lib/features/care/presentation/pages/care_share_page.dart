@@ -1,7 +1,9 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
+import 'package:evolua_frontend/features/care/domain/entities/care_recommendation_envelope.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
@@ -70,9 +72,135 @@ class CareSharePage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
+                const _CareRecommendationsPanel(),
+                const SizedBox(height: 18),
                 const _CareHistoryPanel(),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CareRecommendationsPanel extends ConsumerWidget {
+  const _CareRecommendationsPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recommendations = ref.watch(careRecommendationsProvider);
+    return PrimaryPanel(
+      padding: const EdgeInsets.all(20),
+      child: recommendations.when(
+        loading: () => const _CareLoadingState(
+          text: 'Carregando orientações do terapeuta...',
+        ),
+        error: (_, _) => _CareInlineNotice(
+          icon: Icons.info_outline_rounded,
+          text: 'Não foi possível carregar as orientações agora.',
+        ),
+        data: (items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Orientações do terapeuta',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Recomendações e anexos recebidos por acesso seguro.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (items.isEmpty)
+              _CareInlineNotice(
+                icon: Icons.health_and_safety_outlined,
+                text: 'Nenhuma orientação recebida por enquanto.',
+              )
+            else
+              ...items.take(10).map(_CareRecommendationTile.new),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CareRecommendationTile extends ConsumerWidget {
+  const _CareRecommendationTile(this.recommendation);
+
+  final CareRecommendation recommendation;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.42),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: context.evoluaColors.outline.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                recommendation.therapistLabel ?? 'Terapeuta',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (recommendation.guidanceText.isNotEmpty)
+                Text(
+                  recommendation.guidanceText,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    height: 1.45,
+                  ),
+                ),
+              if (recommendation.attachments.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ...recommendation.attachments.map(
+                  (attachment) => Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => ref
+                          .read(careRecommendationHandlerProvider)
+                          .openAttachment(
+                            recommendation: recommendation,
+                            attachment: attachment,
+                          ),
+                      icon: const Icon(Icons.download_rounded),
+                      label: Text(
+                        attachment.displayName,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () => ref
+                    .read(careRecommendationHandlerProvider)
+                    .acknowledge(recommendation),
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Confirmar leitura'),
+              ),
+            ],
           ),
         ),
       ),

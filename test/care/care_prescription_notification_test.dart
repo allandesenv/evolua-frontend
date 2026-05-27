@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/care/application/care_secret_store.dart
 import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_prescription_envelope.dart';
+import 'package:evolua_frontend/features/care/domain/entities/care_recommendation_envelope.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 import 'package:evolua_frontend/features/care/domain/repositories/care_repository.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
@@ -194,6 +195,9 @@ class _FakeCareRepository implements CareRepository {
   }
 
   @override
+  Future<void> acknowledgeRecommendation(String recommendationId) async {}
+
+  @override
   Future<CareShareSession?> currentShare() async => null;
 
   @override
@@ -208,6 +212,19 @@ class _FakeCareRepository implements CareRepository {
   @override
   Future<List<CarePrescriptionEnvelope>> pendingPrescriptions() async =>
       const [];
+
+  @override
+  Future<List<CareRecommendationEnvelope>> pendingRecommendations() async =>
+      const [];
+
+  @override
+  Future<List<CareRecommendationEnvelope>> recommendations() async => const [];
+
+  @override
+  Future<List<int>> downloadRecommendationAttachment({
+    required String recommendationId,
+    required String attachmentId,
+  }) async => const [];
 
   @override
   Future<CareShareSession> revokeShare(String shareId) async => _session();
