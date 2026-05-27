@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/care/application/care_realtime_event.da
 import 'package:evolua_frontend/features/care/application/care_secret_store.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_recommendation_envelope.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,7 +45,11 @@ final careRecommendationsProvider = FutureProvider<List<CareRecommendation>>((
 class CareRecommendationHandler {
   CareRecommendationHandler(this._ref);
 
+  static const _seenRecommendationsKey =
+      'evolua.care.recommendations.seen_notifications';
+
   final Ref _ref;
+  final Set<String> _receivedRecommendationIds = <String>{};
 
   Future<bool> applyRealtimeEvent(CareRealtimeEvent event) async {
     if (event.recommendationId == null) return false;
@@ -56,14 +61,20 @@ class CareRecommendationHandler {
       final pending = await _ref
           .read(careRepositoryProvider)
           .pendingRecommendations();
+      final seen = await _loadSeenRecommendationIds();
       var applied = false;
       for (final envelope in pending) {
         final recommendation = await decryptEnvelope(envelope);
         if (recommendation != null) {
-          applied = true;
+          final isNewInMemory = _receivedRecommendationIds.add(
+            recommendation.recommendationId,
+          );
+          final isNewPersisted = seen.add(recommendation.recommendationId);
+          applied = isNewInMemory && isNewPersisted || applied;
         }
       }
       if (applied) {
+        await _saveSeenRecommendationIds(seen);
         _ref.invalidate(careRecommendationsProvider);
         _ref.read(careRecommendationReceivedEventProvider.notifier).emit();
       }
@@ -74,6 +85,26 @@ class CareRecommendationHandler {
       }
       return false;
     }
+  }
+
+  Future<Set<String>> _loadSeenRecommendationIds() async {
+    final preferences = await _ref.read(sharedPreferencesProvider.future);
+    return preferences.getStringList(_seenRecommendationIdsKey())?.toSet() ??
+        <String>{};
+  }
+
+  Future<void> _saveSeenRecommendationIds(Set<String> ids) async {
+    final preferences = await _ref.read(sharedPreferencesProvider.future);
+    await preferences.setStringList(
+      _seenRecommendationIdsKey(),
+      ids.take(100).toList(),
+    );
+  }
+
+  String _seenRecommendationIdsKey() {
+    final userId =
+        _ref.read(authControllerProvider).asData?.value?.userId ?? 'anonymous';
+    return '$_seenRecommendationsKey.$userId';
   }
 
   Future<CareRecommendation?> decryptEnvelope(

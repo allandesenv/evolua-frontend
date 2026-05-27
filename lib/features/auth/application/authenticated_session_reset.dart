@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
+import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/chat/application/chat_message_controller.dart';
 import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -54,6 +56,9 @@ Future<void> resetAuthenticatedSessionState(Ref ref) async {
   ref.invalidate(communityControllerProvider);
   ref.invalidate(subscriptionControllerProvider);
   ref.invalidate(notificationInboxControllerProvider);
+  ref.invalidate(careShareControllerProvider);
+  ref.invalidate(careShareHistoryProvider);
+  ref.invalidate(careRecommendationsProvider);
   ref.invalidate(chatMessageControllerProvider);
   ref.invalidate(supportConfigProvider);
   ref.invalidate(supportStatusProvider);
