@@ -33,11 +33,16 @@ class CarePrescriptionHandler {
   CarePrescriptionHandler(this._ref);
 
   final Ref _ref;
+  final Set<String> _appliedPrescriptionIds = <String>{};
 
   Future<bool> applyRealtimeEvent(CareRealtimeEvent event) async {
     final prescriptionId = event.prescriptionId;
     final payload = event.encryptedPayload;
-    if (prescriptionId == null || payload == null) return false;
+    if (prescriptionId == null || prescriptionId.isEmpty) return false;
+
+    if (payload == null) {
+      return applyPending(prescriptionId: prescriptionId);
+    }
 
     return applyEnvelope(
       CarePrescriptionEnvelope(
@@ -49,7 +54,35 @@ class CarePrescriptionHandler {
     );
   }
 
+  Future<bool> applyPending({String? prescriptionId}) async {
+    try {
+      final pending = await _ref
+          .read(careRepositoryProvider)
+          .pendingPrescriptions();
+      var applied = false;
+      for (final envelope in pending) {
+        if (prescriptionId != null &&
+            prescriptionId.isNotEmpty &&
+            envelope.prescriptionId != prescriptionId) {
+          continue;
+        }
+        applied = await applyEnvelope(envelope) || applied;
+      }
+      return applied;
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          'Care pending prescriptions ignored (${error.runtimeType}).',
+        );
+      }
+      return false;
+    }
+  }
+
   Future<bool> applyEnvelope(CarePrescriptionEnvelope envelope) async {
+    if (_appliedPrescriptionIds.contains(envelope.prescriptionId)) {
+      return true;
+    }
     try {
       final secretBase64 = await _ref
           .read(careSecretStoreProvider)
@@ -74,6 +107,7 @@ class CarePrescriptionHandler {
       await _ref
           .read(careRepositoryProvider)
           .acknowledgePrescription(envelope.prescriptionId);
+      _appliedPrescriptionIds.add(envelope.prescriptionId);
       await _ref
           .read(notificationInboxControllerProvider.notifier)
           .addCarePrescriptionNotification(

@@ -60,12 +60,13 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
   Future<void> markAsRead(String id) async {
     final currentItems = state.asData?.value ?? const <NotificationJob>[];
     if (_isLocalCareNotification(id)) {
+      final userId = await _resolveCurrentUserId();
       final updatedItems = [
         for (final item in currentItems)
           if (item.id == id) item.copyWith(readAt: DateTime.now()) else item,
       ];
       state = AsyncData(updatedItems);
-      await _saveLocalCareNotifications(_localOnly(updatedItems));
+      await _saveLocalCareNotifications(_localOnly(updatedItems, userId));
       return;
     }
     final repository = ref.read(notificationRepositoryProvider);
@@ -85,7 +86,9 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
         item.isRead ? item : item.copyWith(readAt: DateTime.now()),
     ];
     state = AsyncData(updatedItems);
-    await _saveLocalCareNotifications(_localOnly(updatedItems));
+    await _saveLocalCareNotifications(
+      _localOnly(updatedItems, await _resolveCurrentUserId()),
+    );
   }
 
   Future<void> createAdmin({
@@ -110,6 +113,10 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
     required String prescriptionId,
     required String ritualType,
   }) async {
+    final userId = await _resolveCurrentUserId();
+    if (userId == null) {
+      return;
+    }
     final currentItems = state.asData?.value ?? const <NotificationJob>[];
     final id = 'care-prescription-$prescriptionId';
     if (currentItems.any((item) => item.id == id)) {
@@ -120,7 +127,7 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
         : 'morning';
     final notification = NotificationJob(
       id: id,
-      userId: 'local',
+      userId: userId,
       type: carePrescriptionType,
       title: carePrescriptionTitle,
       message: carePrescriptionMessage,
@@ -132,15 +139,49 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
     );
     final updatedItems = [notification, ...currentItems];
     state = AsyncData(updatedItems);
-    await _saveLocalCareNotifications(_localOnly(updatedItems));
+    await _saveLocalCareNotifications(_localOnly(updatedItems, userId), userId);
+  }
+
+  Future<String?> _resolveCurrentUserId() async {
+    final current = _currentUserId;
+    if (current != null) {
+      return current;
+    }
+    return (await ref.read(authControllerProvider.future))?.userId;
+  }
+
+  String? get _currentUserId {
+    final userId = ref.read(authControllerProvider).asData?.value?.userId;
+    if (userId == null || userId.isEmpty) {
+      return null;
+    }
+    return userId;
+  }
+
+  String? _localCareNotificationsKeyFor([String? userId]) {
+    userId ??= _currentUserId;
+    if (userId == null) {
+      return null;
+    }
+    return '$_localCareNotificationsKey.$userId';
   }
 
   bool _isLocalCareNotification(String id) {
     return id.startsWith('care-prescription-');
   }
 
-  List<NotificationJob> _localOnly(List<NotificationJob> items) {
-    return items.where((item) => _isLocalCareNotification(item.id)).toList();
+  List<NotificationJob> _localOnly(
+    List<NotificationJob> items, [
+    String? userId,
+  ]) {
+    userId ??= _currentUserId;
+    return items
+        .where(
+          (item) =>
+              _isLocalCareNotification(item.id) &&
+              (userId == null || item.userId == userId),
+        )
+        .toList();
   }
 
   List<NotificationJob> _mergeNotifications({
@@ -159,8 +200,13 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
   }
 
   Future<List<NotificationJob>> _loadLocalCareNotifications() async {
+    final userId = await _resolveCurrentUserId();
+    final key = _localCareNotificationsKeyFor(userId);
+    if (userId == null || key == null) {
+      return const [];
+    }
     final preferences = await ref.read(sharedPreferencesProvider.future);
-    final raw = preferences.getString(_localCareNotificationsKey);
+    final raw = preferences.getString(key);
     if (raw == null || raw.isEmpty) {
       return const [];
     }
@@ -172,19 +218,25 @@ class NotificationInboxController extends AsyncNotifier<List<NotificationJob>> {
       return decoded
           .whereType<Map>()
           .map((item) => _notificationFromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.userId == userId)
           .toList();
     } catch (_) {
       return const [];
     }
   }
 
-  Future<void> _saveLocalCareNotifications(List<NotificationJob> items) async {
+  Future<void> _saveLocalCareNotifications(
+    List<NotificationJob> items, [
+    String? userId,
+  ]) async {
+    final key = _localCareNotificationsKeyFor(userId);
+    if (key == null) {
+      return;
+    }
     final preferences = await ref.read(sharedPreferencesProvider.future);
     final trimmed = items.take(20).map(_notificationToJson).toList();
-    await preferences.setString(
-      _localCareNotificationsKey,
-      jsonEncode(trimmed),
-    );
+    await preferences.setString(key, jsonEncode(trimmed));
+    await preferences.remove(_localCareNotificationsKey);
   }
 
   Map<String, dynamic> _notificationToJson(NotificationJob item) {
