@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
+import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
+import 'package:evolua_frontend/l10n/generated/app_localizations.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/evolua_async_button.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -63,10 +69,11 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
   }
 
   Future<void> _submit() async {
+    final l10n = context.l10n;
     if (_answers.any((controller) => controller.text.trim().isEmpty)) {
       AppSnackBar.show(
         context,
-        message: 'Responda as quatro etapas no seu ritmo.',
+        message: l10n.dailyRitualAnswerAllSteps,
         icon: Icons.edit_note_rounded,
       );
       return;
@@ -86,23 +93,19 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
               microAction: _answers[3].text.trim(),
             ),
           );
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppSnackBar.show(
         context,
         message: _isEvening
-            ? 'Fechamento salvo. Agora solte o que não precisa carregar.'
-            : 'Ritual salvo. Sua jornada diária já tem um norte.',
+            ? l10n.dailyRitualSavedEvening
+            : l10n.dailyRitualSavedMorning,
         icon: Icons.check_circle_outline_rounded,
       );
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: _friendlyError(error),
+        message: _friendlyError(error, l10n),
         icon: Icons.info_outline_rounded,
       );
     } finally {
@@ -115,7 +118,8 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(dailyRitualControllerProvider);
-    final copy = _DailyRitualCopy.forType(widget.type);
+    final l10n = context.l10n;
+    final copy = _DailyRitualCopy.forType(widget.type, l10n);
 
     return state.when(
       data: (data) {
@@ -126,12 +130,14 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
         if (_step < 0) {
           return _DailyRitualIntro(
             copy: copy,
+            l10n: l10n,
             onStart: () => setState(() => _step = 0),
             onSkip: () => context.go('/home'),
           );
         }
         return _DailyRitualFlow(
           copy: copy,
+          l10n: l10n,
           step: _step,
           controller: _answers[_step],
           isSubmitting: _isSubmitting,
@@ -144,12 +150,12 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Não foi possível abrir seu ritual agora.'),
+            Text(l10n.dailyRitualOpenError),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => ref.invalidate(dailyRitualControllerProvider),
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Atualizar'),
+              label: Text(l10n.commonRefresh),
             ),
           ],
         ),
@@ -157,28 +163,24 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
     );
   }
 
-  String _friendlyError(Object error) {
+  String _friendlyError(Object error, AppLocalizations l10n) {
     if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map<String, dynamic>) {
-        final details = data['details'];
-        if (details is List && details.isNotEmpty) {
-          return details.first.toString();
-        }
-      }
+      return extractApiErrorMessage(error, fallback: l10n.dailyRitualSaveError);
     }
-    return 'Não foi possível salvar seu ritual agora.';
+    return l10n.dailyRitualSaveError;
   }
 }
 
 class _DailyRitualIntro extends StatelessWidget {
   const _DailyRitualIntro({
     required this.copy,
+    required this.l10n,
     required this.onStart,
     required this.onSkip,
   });
 
   final _DailyRitualCopy copy;
+  final AppLocalizations l10n;
   final VoidCallback onStart;
   final VoidCallback onSkip;
 
@@ -203,16 +205,19 @@ class _DailyRitualIntro extends StatelessWidget {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: const [
+            children: [
               _InfoChip(
                 icon: Icons.timer_rounded,
-                label: 'Dura cerca de 2 minutos',
+                label: l10n.dailyRitualDurationChip,
               ),
               _InfoChip(
                 icon: Icons.favorite_rounded,
-                label: 'Sem certo ou errado',
+                label: l10n.dailyRitualNoRightWrongChip,
               ),
-              _InfoChip(icon: Icons.spa_rounded, label: 'No seu ritmo'),
+              _InfoChip(
+                icon: Icons.spa_rounded,
+                label: l10n.dailyRitualAtYourPaceChip,
+              ),
             ],
           ),
           const SizedBox(height: 22),
@@ -223,9 +228,9 @@ class _DailyRitualIntro extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onStart,
                 icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Começar agora'),
+                label: Text(l10n.dailyRitualStartNow),
               ),
-              TextButton(onPressed: onSkip, child: const Text('Agora não')),
+              TextButton(onPressed: onSkip, child: Text(l10n.checkInNotNow)),
             ],
           ),
         ],
@@ -237,6 +242,7 @@ class _DailyRitualIntro extends StatelessWidget {
 class _DailyRitualFlow extends StatelessWidget {
   const _DailyRitualFlow({
     required this.copy,
+    required this.l10n,
     required this.step,
     required this.controller,
     required this.isSubmitting,
@@ -245,11 +251,12 @@ class _DailyRitualFlow extends StatelessWidget {
   });
 
   final _DailyRitualCopy copy;
+  final AppLocalizations l10n;
   final int step;
   final TextEditingController controller;
   final bool isSubmitting;
   final VoidCallback? onBack;
-  final VoidCallback onNext;
+  final FutureOr<void> Function()? onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -278,10 +285,10 @@ class _DailyRitualFlow extends StatelessWidget {
             controller: controller,
             minLines: 3,
             maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: 'Sua resposta',
+            decoration: InputDecoration(
+              labelText: l10n.dailyRitualAnswerLabel,
               alignLabelWithHint: true,
-              prefixIcon: Icon(Icons.edit_note_rounded),
+              prefixIcon: const Icon(Icons.edit_note_rounded),
             ),
           ),
           const SizedBox(height: 20),
@@ -291,22 +298,19 @@ class _DailyRitualFlow extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: isSubmitting ? null : onBack,
                   icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Voltar'),
+                  label: Text(l10n.commonBack),
                 ),
               const Spacer(),
-              FilledButton.icon(
+              EvoluaAsyncButton.filled(
                 onPressed: isSubmitting ? null : onNext,
-                icon: isSubmitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        step == 3
-                            ? Icons.check_rounded
-                            : Icons.arrow_forward_rounded,
-                      ),
-                label: Text(step == 3 ? 'Concluir' : 'Continuar'),
+                isBusy: isSubmitting,
+                icon: step == 3
+                    ? Icons.check_rounded
+                    : Icons.arrow_forward_rounded,
+                label: step == 3
+                    ? l10n.dailyRitualFinish
+                    : l10n.dailyRitualContinue,
+                loadingLabel: l10n.commonSaving,
               ),
             ],
           ),
@@ -324,6 +328,7 @@ class _DailyRitualResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return PrimaryPanel(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -342,15 +347,24 @@ class _DailyRitualResult extends StatelessWidget {
             intention: ritual.intention,
           ),
           const SizedBox(height: 16),
-          _ResultRow(label: 'Estado emocional', value: ritual.emotionalState),
-          _ResultRow(label: 'Necessidade do dia', value: ritual.dayNeed),
-          _ResultRow(label: 'Intenção escolhida', value: ritual.intention),
-          _ResultRow(label: 'Microação escolhida', value: ritual.microAction),
+          _ResultRow(
+            label: l10n.dailyRitualEmotionalState,
+            value: ritual.emotionalState,
+          ),
+          _ResultRow(label: l10n.dailyRitualDayNeed, value: ritual.dayNeed),
+          _ResultRow(
+            label: l10n.dailyRitualChosenIntention,
+            value: ritual.intention,
+          ),
+          _ResultRow(
+            label: l10n.dailyRitualChosenMicroAction,
+            value: ritual.microAction,
+          ),
           const SizedBox(height: 18),
           FilledButton.icon(
             onPressed: () => context.go('/home'),
             icon: const Icon(Icons.home_rounded),
-            label: const Text('Voltar para Início'),
+            label: Text(l10n.dailyRitualBackHome),
           ),
         ],
       ),
@@ -469,33 +483,31 @@ class _DailyRitualCopy {
   final String resultCarryTitle;
   final List<String> questions;
 
-  static _DailyRitualCopy forType(String type) {
+  static _DailyRitualCopy forType(String type, AppLocalizations l10n) {
     if (type == DailyRitualType.evening) {
-      return const _DailyRitualCopy(
-        title: 'Fechamento do Dia',
-        description:
-            'Uma pausa curta para revisar o que pesou, reconhecer o que foi bom e soltar o que não precisa carregar.',
-        resultTitle: 'Seu fechamento de hoje está pronto',
-        resultCarryTitle: 'Guarde isso do seu dia',
+      return _DailyRitualCopy(
+        title: l10n.dailyRitualEveningTitle,
+        description: l10n.dailyRitualEveningDescription,
+        resultTitle: l10n.dailyRitualEveningResultTitle,
+        resultCarryTitle: l10n.dailyRitualCarryEvening,
         questions: [
-          'Como você está agora?',
-          'O que você mais precisa soltar hoje?',
-          'Qual intenção quer levar para o descanso?',
-          'Qual pequeno cuidado consegue fazer agora?',
+          l10n.dailyRitualEveningQuestionState,
+          l10n.dailyRitualEveningQuestionNeed,
+          l10n.dailyRitualEveningQuestionIntention,
+          l10n.dailyRitualEveningQuestionAction,
         ],
       );
     }
-    return const _DailyRitualCopy(
-      title: 'Ritual do Dia',
-      description:
-          'Uma pausa curta para perceber como você está, escolher uma intenção e definir um pequeno passo possível para hoje.',
-      resultTitle: 'Seu ritual de hoje está pronto',
-      resultCarryTitle: 'Leve isso com você hoje',
+    return _DailyRitualCopy(
+      title: l10n.dailyRitualMorningTitle,
+      description: l10n.dailyRitualMorningDescription,
+      resultTitle: l10n.dailyRitualMorningResultTitle,
+      resultCarryTitle: l10n.dailyRitualCarryMorning,
       questions: [
-        'Como você está agora?',
-        'O que você mais precisa hoje?',
-        'Qual intenção quer carregar hoje?',
-        'Qual pequeno passo consegue dar hoje?',
+        l10n.dailyRitualMorningQuestionState,
+        l10n.dailyRitualMorningQuestionNeed,
+        l10n.dailyRitualMorningQuestionIntention,
+        l10n.dailyRitualMorningQuestionAction,
       ],
     );
   }

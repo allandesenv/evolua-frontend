@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 String extractApiErrorMessage(
   Object error, {
-  String fallback = 'Nao foi possivel concluir a solicitacao.',
+  String fallback = 'Não foi possível concluir a solicitação.',
 }) {
   if (error is DioException) {
     final statusCode = error.response?.statusCode;

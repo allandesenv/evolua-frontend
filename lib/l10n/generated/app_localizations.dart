@@ -334,6 +334,18 @@ abstract class AppLocalizations {
   /// **'Carregando...'**
   String get commonLoading;
 
+  /// No description provided for @commonSaving.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Salvando...'**
+  String get commonSaving;
+
+  /// No description provided for @commonSending.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Enviando...'**
+  String get commonSending;
+
   /// No description provided for @commonSend.
   ///
   /// In pt_BR, this message translates to:
@@ -369,6 +381,42 @@ abstract class AppLocalizations {
   /// In pt_BR, this message translates to:
   /// **'Anterior'**
   String get commonPrevious;
+
+  /// No description provided for @errorNetwork.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível conectar agora. Verifique sua conexão e tente novamente.'**
+  String get errorNetwork;
+
+  /// No description provided for @errorTimeout.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'A resposta demorou mais que o esperado. Tente novamente em instantes.'**
+  String get errorTimeout;
+
+  /// No description provided for @errorUnexpected.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível concluir agora. Tente novamente em instantes.'**
+  String get errorUnexpected;
+
+  /// No description provided for @errorTryAgainLater.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível concluir agora. Tente novamente mais tarde.'**
+  String get errorTryAgainLater;
+
+  /// No description provided for @emptyDefaultTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nada por aqui ainda'**
+  String get emptyDefaultTitle;
+
+  /// No description provided for @emptyDefaultBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Quando houver novidades, elas aparecerão neste espaço.'**
+  String get emptyDefaultBody;
 
   /// No description provided for @authSendLink.
   ///
@@ -1263,6 +1311,444 @@ abstract class AppLocalizations {
   /// In pt_BR, this message translates to:
   /// **'Guarde isso do seu dia'**
   String get dailyRitualCarryEvening;
+
+  /// No description provided for @dailyRitualAnswerAllSteps.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Responda as quatro etapas no seu ritmo.'**
+  String get dailyRitualAnswerAllSteps;
+
+  /// No description provided for @dailyRitualSavedMorning.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ritual salvo. Sua jornada diária já tem um norte.'**
+  String get dailyRitualSavedMorning;
+
+  /// No description provided for @dailyRitualSavedEvening.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Fechamento salvo. Agora solte o que não precisa carregar.'**
+  String get dailyRitualSavedEvening;
+
+  /// No description provided for @dailyRitualOpenError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível abrir seu ritual agora.'**
+  String get dailyRitualOpenError;
+
+  /// No description provided for @dailyRitualSaveError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível salvar seu ritual agora.'**
+  String get dailyRitualSaveError;
+
+  /// No description provided for @dailyRitualMorningTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ritual do Dia'**
+  String get dailyRitualMorningTitle;
+
+  /// No description provided for @dailyRitualMorningDescription.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Uma pausa curta para perceber como você está, escolher uma intenção e definir um pequeno passo possível para hoje.'**
+  String get dailyRitualMorningDescription;
+
+  /// No description provided for @dailyRitualMorningResultTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu ritual de hoje está pronto'**
+  String get dailyRitualMorningResultTitle;
+
+  /// No description provided for @dailyRitualEveningTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Fechamento do Dia'**
+  String get dailyRitualEveningTitle;
+
+  /// No description provided for @dailyRitualEveningDescription.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Uma pausa curta para revisar o que pesou, reconhecer o que foi bom e soltar o que não precisa carregar.'**
+  String get dailyRitualEveningDescription;
+
+  /// No description provided for @dailyRitualEveningResultTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu fechamento de hoje está pronto'**
+  String get dailyRitualEveningResultTitle;
+
+  /// No description provided for @dailyRitualDurationChip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Dura cerca de 2 minutos'**
+  String get dailyRitualDurationChip;
+
+  /// No description provided for @dailyRitualNoRightWrongChip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sem certo ou errado'**
+  String get dailyRitualNoRightWrongChip;
+
+  /// No description provided for @dailyRitualAtYourPaceChip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'No seu ritmo'**
+  String get dailyRitualAtYourPaceChip;
+
+  /// No description provided for @dailyRitualStartNow.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Começar agora'**
+  String get dailyRitualStartNow;
+
+  /// No description provided for @dailyRitualAnswerLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sua resposta'**
+  String get dailyRitualAnswerLabel;
+
+  /// No description provided for @dailyRitualContinue.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Continuar'**
+  String get dailyRitualContinue;
+
+  /// No description provided for @dailyRitualFinish.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Concluir'**
+  String get dailyRitualFinish;
+
+  /// No description provided for @dailyRitualEmotionalState.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Estado emocional'**
+  String get dailyRitualEmotionalState;
+
+  /// No description provided for @dailyRitualDayNeed.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Necessidade do dia'**
+  String get dailyRitualDayNeed;
+
+  /// No description provided for @dailyRitualChosenIntention.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Intenção escolhida'**
+  String get dailyRitualChosenIntention;
+
+  /// No description provided for @dailyRitualChosenMicroAction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Microação escolhida'**
+  String get dailyRitualChosenMicroAction;
+
+  /// No description provided for @dailyRitualBackHome.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Voltar para Início'**
+  String get dailyRitualBackHome;
+
+  /// No description provided for @dailyRitualMorningQuestionState.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Como você está agora?'**
+  String get dailyRitualMorningQuestionState;
+
+  /// No description provided for @dailyRitualMorningQuestionNeed.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O que você mais precisa hoje?'**
+  String get dailyRitualMorningQuestionNeed;
+
+  /// No description provided for @dailyRitualMorningQuestionIntention.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Qual intenção quer carregar hoje?'**
+  String get dailyRitualMorningQuestionIntention;
+
+  /// No description provided for @dailyRitualMorningQuestionAction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Qual pequeno passo consegue dar hoje?'**
+  String get dailyRitualMorningQuestionAction;
+
+  /// No description provided for @dailyRitualEveningQuestionState.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Como você está agora?'**
+  String get dailyRitualEveningQuestionState;
+
+  /// No description provided for @dailyRitualEveningQuestionNeed.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O que você mais precisa soltar hoje?'**
+  String get dailyRitualEveningQuestionNeed;
+
+  /// No description provided for @dailyRitualEveningQuestionIntention.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Qual intenção quer levar para o descanso?'**
+  String get dailyRitualEveningQuestionIntention;
+
+  /// No description provided for @dailyRitualEveningQuestionAction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Qual pequeno cuidado consegue fazer agora?'**
+  String get dailyRitualEveningQuestionAction;
+
+  /// No description provided for @careLoadingSecureAccess.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Carregando acesso seguro...'**
+  String get careLoadingSecureAccess;
+
+  /// No description provided for @careLoadErrorTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível carregar o Evolua Care'**
+  String get careLoadErrorTitle;
+
+  /// No description provided for @careLoadErrorMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Verifique sua conexão e tente novamente em instantes.'**
+  String get careLoadErrorMessage;
+
+  /// No description provided for @careRecommendationsLoading.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Carregando orientações do terapeuta...'**
+  String get careRecommendationsLoading;
+
+  /// No description provided for @careRecommendationsError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível carregar as orientações agora.'**
+  String get careRecommendationsError;
+
+  /// No description provided for @careRecommendationsTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Orientações do terapeuta'**
+  String get careRecommendationsTitle;
+
+  /// No description provided for @careRecommendationsSubtitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Recomendações e anexos recebidos por acesso seguro.'**
+  String get careRecommendationsSubtitle;
+
+  /// No description provided for @careRecommendationsEmpty.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nenhuma orientação recebida por enquanto.'**
+  String get careRecommendationsEmpty;
+
+  /// No description provided for @careTherapistFallback.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Terapeuta'**
+  String get careTherapistFallback;
+
+  /// No description provided for @careAcknowledgeReading.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirmar leitura'**
+  String get careAcknowledgeReading;
+
+  /// No description provided for @carePreparingAccess.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Preparando acesso seguro...'**
+  String get carePreparingAccess;
+
+  /// No description provided for @careShareTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Compartilhe com seu terapeuta'**
+  String get careShareTitle;
+
+  /// No description provided for @careShareMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Gere um acesso temporário para que seu terapeuta veja um relatório protegido da sua jornada emocional.'**
+  String get careShareMessage;
+
+  /// No description provided for @careGenerateSecureAccess.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Gerar acesso seguro'**
+  String get careGenerateSecureAccess;
+
+  /// No description provided for @careExpiredTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sessão expirada'**
+  String get careExpiredTitle;
+
+  /// No description provided for @careExpiredMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O acesso temporário venceu. Gere um novo código quando estiver com seu terapeuta.'**
+  String get careExpiredMessage;
+
+  /// No description provided for @careGenerateNewAccess.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Gerar novo acesso'**
+  String get careGenerateNewAccess;
+
+  /// No description provided for @careRevokedTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Acesso revogado'**
+  String get careRevokedTitle;
+
+  /// No description provided for @careRevokedMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu terapeuta não pode mais acessar essa sessão compartilhada.'**
+  String get careRevokedMessage;
+
+  /// No description provided for @careQrMissing.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Por segurança, gere um novo acesso para exibir o QR Code completo.'**
+  String get careQrMissing;
+
+  /// No description provided for @careTemporaryCode.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Código temporário'**
+  String get careTemporaryCode;
+
+  /// No description provided for @careExpiresAt.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Expira em {value}'**
+  String careExpiresAt(Object value);
+
+  /// No description provided for @careCodeCopied.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Código copiado com segurança.'**
+  String get careCodeCopied;
+
+  /// No description provided for @careCopyCode.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Copiar código'**
+  String get careCopyCode;
+
+  /// No description provided for @careFullLinkCopied.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Link completo copiado com segurança.'**
+  String get careFullLinkCopied;
+
+  /// No description provided for @careCopyFullLink.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Copiar link completo'**
+  String get careCopyFullLink;
+
+  /// No description provided for @careRevokeAccess.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Revogar acesso'**
+  String get careRevokeAccess;
+
+  /// No description provided for @careConnectedTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Conectado ao terapeuta'**
+  String get careConnectedTitle;
+
+  /// No description provided for @careActiveTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Acesso temporário ativo'**
+  String get careActiveTitle;
+
+  /// No description provided for @careConnectedMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu terapeuta validou o acesso. Você pode revogar quando quiser.'**
+  String get careConnectedMessage;
+
+  /// No description provided for @careActiveMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Mostre o QR Code ou o código ao seu terapeuta somente durante a consulta.'**
+  String get careActiveMessage;
+
+  /// No description provided for @careHistoryLoading.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Carregando histórico de conexões...'**
+  String get careHistoryLoading;
+
+  /// No description provided for @careHistoryError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível carregar o histórico agora. Tente novamente mais tarde.'**
+  String get careHistoryError;
+
+  /// No description provided for @careHistoryTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Histórico de conexões'**
+  String get careHistoryTitle;
+
+  /// No description provided for @careHistorySubtitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Acompanhe os acessos temporários criados para atendimento.'**
+  String get careHistorySubtitle;
+
+  /// No description provided for @careHistoryEmpty.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nenhuma conexão anterior por enquanto.'**
+  String get careHistoryEmpty;
+
+  /// No description provided for @careHistoryTile.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sessão com terapeuta {status} em {date}'**
+  String careHistoryTile(Object status, Object date);
+
+  /// No description provided for @careStatusConnected.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'conectada'**
+  String get careStatusConnected;
+
+  /// No description provided for @careStatusRevoked.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'revogada'**
+  String get careStatusRevoked;
+
+  /// No description provided for @careStatusExpired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'expirada'**
+  String get careStatusExpired;
+
+  /// No description provided for @careStatusActive.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'ativa'**
+  String get careStatusActive;
+
+  /// No description provided for @careStatusRegistered.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'registrada'**
+  String get careStatusRegistered;
 }
 
 class _AppLocalizationsDelegate
