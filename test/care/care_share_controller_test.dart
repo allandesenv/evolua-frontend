@@ -30,6 +30,12 @@ void main() {
         final state = container.read(careShareControllerProvider).value!;
         expect(state.status, CareAccessStatus.active);
         expect(state.qrPayload, isNotNull);
+        final qrUrl = state.qrPayload.toString();
+        expect(qrUrl, contains('/evolua-frontend/#/care/claim'));
+        expect(qrUrl, contains('sid=share-1'));
+        expect(qrUrl, contains('code=123456'));
+        expect(qrUrl, contains('k='));
+        expect(qrUrl, isNot(contains('/evolua-care')));
         expect(state.numericCode, '123456');
         expect(repository.uploadedPayload, isNotNull);
         expect(

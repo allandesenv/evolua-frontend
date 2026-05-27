@@ -206,6 +206,53 @@ void main() {
       );
     });
 
+    testWidgets('public care claim route never redirects to auth', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FakeAuthRepository(googleSession: _testSession()),
+          ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final authRouterNotifier = _bindAuthRouterNotifier(container);
+      addTearDown(authRouterNotifier.dispose);
+      final router = buildAppRouter(
+        authRouterNotifier: authRouterNotifier,
+        authPageBuilder: (context, state) =>
+            const _PlaceholderPage('auth-page'),
+        homePageBuilder: (context, state) =>
+            const _PlaceholderPage('home-page'),
+        careClaimPageBuilder: (context, state) =>
+            const _PlaceholderPage('care-claim-page'),
+        initialLocation: '/care/claim?sid=share-1&code=123456',
+        overridePlatformDefaultLocation: true,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('care-claim-page'), findsOneWidget);
+      expect(find.text('auth-page'), findsNothing);
+      expect(
+        router.routerDelegate.currentConfiguration.last.matchedLocation,
+        '/care/claim',
+      );
+    });
+
     testWidgets('authenticated user in /auth is redirected to /home', (
       tester,
     ) async {

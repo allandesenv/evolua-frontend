@@ -73,7 +73,7 @@ class AppConfig {
 
   static const carePortalBaseUrl = String.fromEnvironment(
     'EVOLUA_CARE_PORTAL_BASE_URL',
-    defaultValue: 'https://allandesenv.github.io/evolua-care',
+    defaultValue: 'https://allandesenv.github.io/evolua-frontend',
   );
 
   static const careBaseUrl = String.fromEnvironment(
