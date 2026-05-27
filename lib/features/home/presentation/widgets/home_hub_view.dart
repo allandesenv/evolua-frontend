@@ -569,9 +569,8 @@ class _DailyJourneyCardModel {
     final l10n = context.l10n;
     final name = _firstName(displayName);
     final hour = now.toLocal().hour;
-    final isMorning = hour >= 6 && hour < 12;
-    final isDay = hour >= 12 && hour < 18;
-    final isEvening = !isMorning && !isDay;
+    final isDayRitualWindow = hour >= 6 && hour < 18;
+    final isEvening = !isDayRitualWindow;
 
     if (isEvening) {
       if (eveningRitual != null) {
@@ -614,7 +613,7 @@ class _DailyJourneyCardModel {
       );
     }
 
-    if (isMorning) {
+    if (isDayRitualWindow) {
       return _DailyJourneyCardModel(
         title: name == null
             ? l10n.homeDailyMorningTitleNoName
@@ -901,6 +900,14 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
       ),
       _ContextMiniCard(
         width: cardWidth,
+        icon: Icons.health_and_safety_outlined,
+        title: 'Evolua Care',
+        subtitle: 'Compartilhe com seu terapeuta.',
+        color: AppColors.accent,
+        onTap: onOpenCareShare,
+      ),
+      _ContextMiniCard(
+        width: cardWidth,
         icon: Icons.edit_note_rounded,
         title: l10n.homeRecentReflection,
         subtitle: 'Volte para o que você sentiu.',
@@ -926,14 +933,6 @@ class _ContextMiniCardsCarousel extends StatelessWidget {
         subtitle: 'Compare seu agora com antes.',
         color: AppColors.accent,
         onTap: onOpenEvolutionMirror,
-      ),
-      _ContextMiniCard(
-        width: cardWidth,
-        icon: Icons.health_and_safety_outlined,
-        title: 'Evolua Care',
-        subtitle: 'Compartilhe com seu terapeuta.',
-        color: AppColors.accent,
-        onTap: onOpenCareShare,
       ),
     ];
 

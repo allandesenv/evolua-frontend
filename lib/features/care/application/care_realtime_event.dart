@@ -9,6 +9,7 @@ class CareRealtimeEvent {
     required this.occurredAt,
     this.status,
     this.prescriptionId,
+    this.recommendationId,
     this.encryptedPayload,
   });
 
@@ -16,6 +17,7 @@ class CareRealtimeEvent {
   final String shareId;
   final String? status;
   final String? prescriptionId;
+  final String? recommendationId;
   final CareEncryptedPayload? encryptedPayload;
   final DateTime occurredAt;
 
@@ -24,6 +26,8 @@ class CareRealtimeEvent {
   bool get isExpired => type == CareRealtimeEventType.shareExpired;
   bool get isPrescriptionCreated =>
       type == CareRealtimeEventType.prescriptionCreated;
+  bool get isRecommendationCreated =>
+      type == CareRealtimeEventType.recommendationCreated;
 
   factory CareRealtimeEvent.fromStompBody(String body) {
     final decoded = jsonDecode(body);
@@ -40,6 +44,7 @@ class CareRealtimeEvent {
       shareId: json['shareId']?.toString() ?? '',
       status: json['status']?.toString(),
       prescriptionId: json['prescriptionId']?.toString(),
+      recommendationId: json['recommendationId']?.toString(),
       encryptedPayload: rawPayload is Map<String, dynamic>
           ? CareEncryptedPayload.fromJson(rawPayload)
           : null,
@@ -57,4 +62,5 @@ class CareRealtimeEventType {
   static const shareRevoked = 'CARE_SHARE_REVOKED';
   static const shareExpired = 'CARE_SHARE_EXPIRED';
   static const prescriptionCreated = 'CARE_PRESCRIPTION_CREATED';
+  static const recommendationCreated = 'CARE_RECOMMENDATION_CREATED';
 }

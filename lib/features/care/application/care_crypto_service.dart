@@ -8,7 +8,12 @@ final careCryptoServiceProvider = Provider<CareCryptoService>((ref) {
   return CareCryptoService();
 });
 
-enum CareCryptoPayloadPurpose { clinicalReport, customRitual }
+enum CareCryptoPayloadPurpose {
+  clinicalReport,
+  customRitual,
+  guidance,
+  attachment,
+}
 
 class CareCryptoService {
   CareCryptoService({AesGcm? cipher, Hkdf? hkdf})
@@ -52,6 +57,28 @@ class CareCryptoService {
     );
   }
 
+  Future<CareEncryptedPayload> encryptBytes({
+    required SecretKey key,
+    required String shareId,
+    required List<int> bytes,
+    required CareCryptoPayloadPurpose purpose,
+  }) async {
+    final nonce = _cipher.newNonce();
+    final box = await _cipher.encrypt(
+      bytes,
+      secretKey: key,
+      nonce: nonce,
+      aad: utf8.encode(_aad(shareId, purpose)),
+    );
+
+    return CareEncryptedPayload(
+      algorithm: 'AES-256-GCM',
+      nonceBase64: base64UrlEncode(nonce),
+      cipherTextBase64: base64UrlEncode(box.cipherText),
+      macBase64: base64UrlEncode(box.mac.bytes),
+    );
+  }
+
   Future<Map<String, dynamic>> decryptJson({
     required SecretKey key,
     required String shareId,
@@ -75,12 +102,33 @@ class CareCryptoService {
     return decoded;
   }
 
+  Future<List<int>> decryptBytes({
+    required SecretKey key,
+    required String shareId,
+    required CareEncryptedPayload payload,
+    required CareCryptoPayloadPurpose purpose,
+  }) async {
+    final box = SecretBox(
+      base64Url.decode(payload.cipherTextBase64),
+      nonce: base64Url.decode(payload.nonceBase64),
+      mac: Mac(base64Url.decode(payload.macBase64)),
+    );
+    return _cipher.decrypt(
+      box,
+      secretKey: key,
+      aad: utf8.encode(_aad(shareId, purpose)),
+    );
+  }
+
   String _aad(String shareId, CareCryptoPayloadPurpose purpose) {
     return switch (purpose) {
       CareCryptoPayloadPurpose.clinicalReport =>
         'evolua-care-report:$shareId:v1',
       CareCryptoPayloadPurpose.customRitual =>
         'evolua-care-prescription:$shareId:v1',
+      CareCryptoPayloadPurpose.guidance => 'evolua-care-guidance:$shareId:v1',
+      CareCryptoPayloadPurpose.attachment =>
+        'evolua-care-attachment:$shareId:v1',
     };
   }
 }

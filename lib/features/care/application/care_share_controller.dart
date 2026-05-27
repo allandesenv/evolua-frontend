@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
+import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_qr_payload.dart';
 import 'package:evolua_frontend/features/care/application/care_realtime_event.dart';
@@ -263,6 +264,13 @@ class CareShareController extends AsyncNotifier<CareShareState> {
 
     if (event.isPrescriptionCreated) {
       await ref.read(carePrescriptionHandlerProvider).applyRealtimeEvent(event);
+      return;
+    }
+
+    if (event.isRecommendationCreated) {
+      await ref
+          .read(careRecommendationHandlerProvider)
+          .applyRealtimeEvent(event);
     }
   }
 
@@ -275,6 +283,7 @@ class CareShareController extends AsyncNotifier<CareShareState> {
       for (final envelope in pending) {
         await handler.applyEnvelope(envelope);
       }
+      await ref.read(careRecommendationHandlerProvider).applyPending();
     } catch (_) {
       return;
     }

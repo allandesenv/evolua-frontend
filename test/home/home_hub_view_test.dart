@@ -57,11 +57,13 @@ void main() {
       'shows daytime check-in action when user has no check-in today',
       (tester) async {
         var openedCheckIn = false;
+        String? openedType;
         final yesterday = DateTime.now().subtract(const Duration(days: 1));
 
         await tester.pumpWidget(
           _testApp(
             onOpenCheckIn: () => openedCheckIn = true,
+            onOpenDailyRitual: (type) => openedType = type,
             now: DateTime(2026, 5, 7, 13),
             checkInRepository: _FakeCheckInRepository(
               items: [
@@ -81,13 +83,15 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Como está seu dia até aqui?'), findsOneWidget);
+        expect(find.text('Iniciar Ritual do Dia'), findsOneWidget);
+        expect(find.text('Como está seu dia até aqui?'), findsNothing);
         expect(find.text('Fazer check-in'), findsOneWidget);
 
-        await tester.tap(find.text('Fazer check-in'));
+        await tester.tap(find.text('Iniciar Ritual do Dia'));
         await tester.pumpAndSettle();
 
-        expect(openedCheckIn, isTrue);
+        expect(openedType, DailyRitualType.morning);
+        expect(openedCheckIn, isFalse);
       },
     );
 
@@ -387,12 +391,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Carta para o futuro'), findsOneWidget);
+      expect(find.text('Evolua Care'), findsOneWidget);
       expect(find.text('Reflexão recente'), findsOneWidget);
       expect(find.text('Insight rápido'), findsOneWidget);
       expect(find.text('Marco de evolução'), findsOneWidget);
 
       await tester.tap(find.text('Carta para o futuro'));
+      await tester.ensureVisible(find.text('Reflexão recente'));
       await tester.tap(find.text('Reflexão recente'));
+      await tester.ensureVisible(find.text('Marco de evolução'));
       await tester.tap(find.text('Marco de evolução'));
       await tester.pumpAndSettle();
 
@@ -484,6 +491,29 @@ void main() {
       expect(openedType, DailyRitualType.morning);
     });
 
+    testWidgets('keeps morning ritual entry point during afternoon', (
+      tester,
+    ) async {
+      String? openedType;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 15),
+          onOpenDailyRitual: (type) => openedType = type,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Iniciar Ritual do Dia'), findsOneWidget);
+      expect(find.text('Fazer check-in'), findsOneWidget);
+      expect(find.text('Ver próximo passo'), findsNothing);
+
+      await tester.tap(find.text('Iniciar Ritual do Dia'));
+      await tester.pumpAndSettle();
+
+      expect(openedType, DailyRitualType.morning);
+    });
+
     testWidgets('shows evening closing entry point', (tester) async {
       String? openedType;
       var openedReflections = false;
@@ -508,6 +538,26 @@ void main() {
       await tester.tap(find.text('Escrever reflexão'));
       await tester.pumpAndSettle();
       expect(openedReflections, isTrue);
+    });
+
+    testWidgets('starts evening closing entry point at 18h', (tester) async {
+      String? openedType;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 18),
+          onOpenDailyRitual: (type) => openedType = type,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fazer Fechamento do Dia'), findsOneWidget);
+      expect(find.text('Iniciar Ritual do Dia'), findsNothing);
+
+      await tester.tap(find.text('Fazer Fechamento do Dia'));
+      await tester.pumpAndSettle();
+
+      expect(openedType, DailyRitualType.evening);
     });
 
     testWidgets('shows completed morning ritual until evening', (tester) async {

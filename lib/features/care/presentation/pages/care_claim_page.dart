@@ -5,6 +5,7 @@ import 'package:evolua_frontend/features/care/application/care_claim_controller.
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -76,6 +77,8 @@ class _CareDashboard extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           _PrescriptionPanel(isSending: state.isSendingPrescription),
+          const SizedBox(height: 20),
+          _RecommendationPanel(isSending: state.isSendingRecommendation),
         ],
       ),
     );
@@ -777,6 +780,169 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Não foi possível enviar o ritual agora.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+}
+
+class _RecommendationPanel extends ConsumerStatefulWidget {
+  const _RecommendationPanel({required this.isSending});
+
+  final bool isSending;
+
+  @override
+  ConsumerState<_RecommendationPanel> createState() =>
+      _RecommendationPanelState();
+}
+
+class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
+  final _guidanceController = TextEditingController();
+  final List<PlatformFile> _attachments = [];
+
+  @override
+  void dispose() {
+    _guidanceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PrimaryPanel(
+      padding: _panelPadding(MediaQuery.sizeOf(context).width),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Orientações e Recomendações Gerais',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Envie orientações ou anexos. Tudo é criptografado neste navegador antes de sair daqui.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textSecondary,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _guidanceController,
+            minLines: 4,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              labelText: 'Orientações e Recomendações Gerais',
+              hintText:
+                  'Escreva recomendações, combinados ou cuidados para os próximos dias.',
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: widget.isSending ? null : _pickFiles,
+                icon: const Icon(Icons.attach_file_rounded),
+                label: const Text('Adicionar anexos'),
+              ),
+              Text(
+                '${_attachments.length}/5 anexos',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          if (_attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ..._attachments.map(
+              (file) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.insert_drive_file_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        file.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Remover anexo',
+                      onPressed: widget.isSending
+                          ? null
+                          : () => setState(() => _attachments.remove(file)),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: widget.isSending ? null : _submit,
+              icon: widget.isSending
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.lock_outline_rounded),
+              label: Text(
+                widget.isSending
+                    ? 'Enviando...'
+                    : 'Enviar orientação segura ao paciente',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickFiles() async {
+    final remaining = 5 - _attachments.length;
+    if (remaining <= 0) return;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: true,
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+    );
+    if (result == null) return;
+    final selected = result.files
+        .where((file) => file.bytes != null && file.size <= 10 * 1024 * 1024)
+        .take(remaining);
+    setState(() => _attachments.addAll(selected));
+  }
+
+  Future<void> _submit() async {
+    try {
+      await ref
+          .read(careClaimControllerProvider.notifier)
+          .sendRecommendation(
+            guidanceText: _guidanceController.text,
+            attachments: List<PlatformFile>.from(_attachments),
+          );
+      _guidanceController.clear();
+      setState(_attachments.clear);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível enviar a orientação agora.'),
             behavior: SnackBarBehavior.floating,
           ),
         );

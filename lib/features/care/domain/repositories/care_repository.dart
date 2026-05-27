@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_prescription_envelope.dart';
+import 'package:evolua_frontend/features/care/domain/entities/care_recommendation_envelope.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 
 abstract class CareRepository {
@@ -15,4 +16,11 @@ abstract class CareRepository {
   Future<List<CareShareSession>> shareHistory();
   Future<List<CarePrescriptionEnvelope>> pendingPrescriptions();
   Future<void> acknowledgePrescription(String prescriptionId);
+  Future<List<CareRecommendationEnvelope>> pendingRecommendations();
+  Future<List<CareRecommendationEnvelope>> recommendations();
+  Future<List<int>> downloadRecommendationAttachment({
+    required String recommendationId,
+    required String attachmentId,
+  });
+  Future<void> acknowledgeRecommendation(String recommendationId);
 }

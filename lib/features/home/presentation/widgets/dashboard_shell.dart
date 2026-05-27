@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
+import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
@@ -52,6 +53,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ProviderSubscription<AsyncValue<String>>? _reminderTapSubscription;
   ProviderSubscription<AsyncValue<CareShareState>>? _careShareSubscription;
   ProviderSubscription<int>? _carePrescriptionSubscription;
+  ProviderSubscription<int>? _careRecommendationSubscription;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -95,6 +97,21 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         });
       },
     );
+    _careRecommendationSubscription = ref.listenManual<int>(
+      careRecommendationReceivedEventProvider,
+      (previous, next) {
+        if ((previous ?? 0) >= next) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nova orientação do seu terapeuta.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        });
+      },
+    );
   }
 
   @override
@@ -102,6 +119,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _reminderTapSubscription?.close();
     _careShareSubscription?.close();
     _carePrescriptionSubscription?.close();
+    _careRecommendationSubscription?.close();
     super.dispose();
   }
 
@@ -818,6 +836,7 @@ class _DashboardContent extends ConsumerWidget {
                       ? () => onOpenAdminSection(AdminPanelSection.overview)
                       : null,
                   onOpenFutureMessages: onOpenFutureMessages,
+                  onOpenCareShare: () => context.push('/care/share'),
                   onLogout: onLogout,
                 ),
               ],
@@ -1088,6 +1107,7 @@ class _HeaderActions extends StatelessWidget {
     required this.onOpenProfileSection,
     required this.onOpenAdminPanel,
     required this.onOpenFutureMessages,
+    required this.onOpenCareShare,
     required this.onLogout,
   });
 
@@ -1098,6 +1118,7 @@ class _HeaderActions extends StatelessWidget {
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback? onOpenAdminPanel;
   final VoidCallback onOpenFutureMessages;
+  final VoidCallback onOpenCareShare;
   final VoidCallback onLogout;
 
   @override
@@ -1116,6 +1137,7 @@ class _HeaderActions extends StatelessWidget {
           onOpenProfileSection: onOpenProfileSection,
           onOpenAdminPanel: onOpenAdminPanel,
           onOpenFutureMessages: onOpenFutureMessages,
+          onOpenCareShare: onOpenCareShare,
           onLogout: onLogout,
         ),
       ],
@@ -1172,6 +1194,7 @@ class _AccountMenuButton extends StatelessWidget {
     required this.onOpenProfileSection,
     required this.onOpenAdminPanel,
     required this.onOpenFutureMessages,
+    required this.onOpenCareShare,
     required this.onLogout,
   });
 
@@ -1180,6 +1203,7 @@ class _AccountMenuButton extends StatelessWidget {
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback? onOpenAdminPanel;
   final VoidCallback onOpenFutureMessages;
+  final VoidCallback onOpenCareShare;
   final VoidCallback onLogout;
 
   @override
@@ -1270,6 +1294,13 @@ class _AccountMenuButton extends StatelessWidget {
             label: l10n.avatarFutureMessages,
           ),
         ),
+        const PopupMenuItem(
+          value: _AccountMenuAction.careShare,
+          child: _MenuLabel(
+            icon: Icons.health_and_safety_outlined,
+            label: 'Conectar Terapeuta',
+          ),
+        ),
         if (onOpenAdminPanel != null) ...[
           const PopupMenuDivider(),
           PopupMenuItem(
@@ -1320,6 +1351,8 @@ class _AccountMenuButton extends StatelessWidget {
             onOpenProfileSection(ProfileModuleSection.evolutionMirror);
           case _AccountMenuAction.futureMessages:
             onOpenFutureMessages();
+          case _AccountMenuAction.careShare:
+            onOpenCareShare();
           case _AccountMenuAction.adminPanel:
             onOpenAdminPanel?.call();
           case _AccountMenuAction.settings:
@@ -1348,6 +1381,7 @@ enum _AccountMenuAction {
   plans,
   evolutionMirror,
   futureMessages,
+  careShare,
   adminPanel,
   settings,
   help,
