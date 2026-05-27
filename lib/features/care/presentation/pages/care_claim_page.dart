@@ -24,11 +24,13 @@ class CareClaimPage extends ConsumerWidget {
     });
 
     return GradientScaffold(
-      child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final padding = _pagePadding(constraints.maxWidth);
-            return Center(
+      resizeToAvoidBottomInset: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final padding = _pagePadding(constraints.maxWidth);
+          return ColoredBox(
+            color: context.evoluaColors.background,
+            child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1180),
                 child: Padding(
@@ -40,9 +42,9 @@ class CareClaimPage extends ConsumerWidget {
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
