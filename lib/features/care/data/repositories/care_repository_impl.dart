@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/features/care/data/models/care_prescription_envelope_dto.dart';
+import 'package:evolua_frontend/features/care/data/models/care_recommendation_envelope_dto.dart';
 import 'package:evolua_frontend/features/care/data/models/care_share_session_dto.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_prescription_envelope.dart';
+import 'package:evolua_frontend/features/care/domain/entities/care_recommendation_envelope.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 import 'package:evolua_frontend/features/care/domain/repositories/care_repository.dart';
 
@@ -111,6 +113,41 @@ class CareRepositoryImpl implements CareRepository {
   @override
   Future<void> acknowledgePrescription(String prescriptionId) async {
     await _dio.post<dynamic>('/v1/care/prescriptions/$prescriptionId/ack');
+  }
+
+  @override
+  Future<List<CareRecommendationEnvelope>> pendingRecommendations() async {
+    final response = await _dio.get<dynamic>(
+      '/v1/care/recommendations/pending',
+    );
+    return ApiPayloadParser.dataList(response.data)
+        .map((item) => CareRecommendationEnvelopeDto.fromJson(item).toEntity())
+        .toList();
+  }
+
+  @override
+  Future<List<CareRecommendationEnvelope>> recommendations() async {
+    final response = await _dio.get<dynamic>('/v1/care/recommendations');
+    return ApiPayloadParser.dataList(response.data)
+        .map((item) => CareRecommendationEnvelopeDto.fromJson(item).toEntity())
+        .toList();
+  }
+
+  @override
+  Future<List<int>> downloadRecommendationAttachment({
+    required String recommendationId,
+    required String attachmentId,
+  }) async {
+    final response = await _dio.get<List<int>>(
+      '/v1/care/recommendations/$recommendationId/attachments/$attachmentId',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data ?? const [];
+  }
+
+  @override
+  Future<void> acknowledgeRecommendation(String recommendationId) async {
+    await _dio.post<dynamic>('/v1/care/recommendations/$recommendationId/ack');
   }
 
   String _formatDate(DateTime value) {

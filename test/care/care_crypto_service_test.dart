@@ -90,5 +90,43 @@ void main() {
         throwsA(isA<SecretBoxAuthenticationError>()),
       );
     });
+
+    test(
+      'encrypts and decrypts attachment bytes with separate purpose',
+      () async {
+        final service = CareCryptoService();
+        final secret = List<int>.generate(32, (index) => index + 3);
+        final key = await service.deriveSessionKey(
+          shareSecret: secret,
+          shareId: 'share-1',
+          purpose: 'care-attachment-v1',
+        );
+        final bytes = utf8.encode('conteudo sensivel do anexo');
+
+        final encrypted = await service.encryptBytes(
+          key: key,
+          shareId: 'share-1',
+          bytes: bytes,
+          purpose: CareCryptoPayloadPurpose.attachment,
+        );
+
+        expect(
+          utf8.decode(
+            base64Url.decode(encrypted.cipherTextBase64),
+            allowMalformed: true,
+          ),
+          isNot(contains('conteudo sensivel')),
+        );
+
+        final decrypted = await service.decryptBytes(
+          key: key,
+          shareId: 'share-1',
+          payload: encrypted,
+          purpose: CareCryptoPayloadPurpose.attachment,
+        );
+
+        expect(decrypted, bytes);
+      },
+    );
   });
 }
