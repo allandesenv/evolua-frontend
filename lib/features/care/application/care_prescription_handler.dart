@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/care/application/care_secret_store.dart
 import 'package:evolua_frontend/features/care/domain/entities/care_prescription_envelope.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -73,6 +74,12 @@ class CarePrescriptionHandler {
       await _ref
           .read(careRepositoryProvider)
           .acknowledgePrescription(envelope.prescriptionId);
+      await _ref
+          .read(notificationInboxControllerProvider.notifier)
+          .addCarePrescriptionNotification(
+            prescriptionId: envelope.prescriptionId,
+            ritualType: draft.type,
+          );
       _ref.read(carePrescriptionAppliedEventProvider.notifier).emit();
       return true;
     } catch (error) {

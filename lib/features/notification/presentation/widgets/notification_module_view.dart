@@ -4,6 +4,7 @@ import 'package:evolua_frontend/features/notification/application/notification_c
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class NotificationBellButton extends ConsumerWidget {
   const NotificationBellButton({super.key});
@@ -371,6 +372,13 @@ class _NotificationInboxDialog extends ConsumerWidget {
                                   )
                                   .markAsRead(item.id);
                             }
+                            final actionTarget = item.actionTarget;
+                            if (context.mounted &&
+                                actionTarget != null &&
+                                actionTarget.isNotEmpty) {
+                              Navigator.of(context).maybePop();
+                              context.push(actionTarget);
+                            }
                           },
                           borderRadius: BorderRadius.circular(18),
                           child: Container(
@@ -461,6 +469,7 @@ class _NotificationInboxDialog extends ConsumerWidget {
   String _typeLabel(String type) {
     return switch (type) {
       'CHECKIN_REMINDER' => 'Lembrete de check-in',
+      NotificationInboxController.carePrescriptionType => 'Evolua Care',
       'EVENT' => 'Evento relevante',
       _ => 'Mensagem',
     };
