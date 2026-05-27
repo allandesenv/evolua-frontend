@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
@@ -5,7 +7,9 @@ import 'package:evolua_frontend/features/care/application/care_share_controller.
 import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_recommendation_envelope.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/evolua_async_button.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +24,7 @@ class CareSharePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(careShareControllerProvider);
+    final l10n = context.l10n;
     return GradientScaffold(
       child: SafeArea(
         child: SingleChildScrollView(
@@ -32,7 +37,7 @@ class CareSharePage extends ConsumerWidget {
                 Row(
                   children: [
                     IconButton(
-                      tooltip: 'Voltar',
+                      tooltip: l10n.commonBack,
                       onPressed: () {
                         if (context.canPop()) {
                           context.pop();
@@ -56,15 +61,13 @@ class CareSharePage extends ConsumerWidget {
                 PrimaryPanel(
                   padding: const EdgeInsets.all(22),
                   child: state.when(
-                    loading: () => const _CareLoadingState(
-                      text: 'Carregando acesso seguro...',
-                    ),
+                    loading: () =>
+                        _CareLoadingState(text: l10n.careLoadingSecureAccess),
                     error: (_, _) => _CareMessageState(
                       icon: Icons.error_outline_rounded,
-                      title: 'Não foi possível carregar o Evolua Care',
-                      message:
-                          'Verifique sua conexão e tente novamente em instantes.',
-                      actionLabel: 'Tentar novamente',
+                      title: l10n.careLoadErrorTitle,
+                      message: l10n.careLoadErrorMessage,
+                      actionLabel: l10n.commonRetry,
                       onAction: () =>
                           ref.invalidate(careShareControllerProvider),
                     ),
@@ -89,22 +92,21 @@ class _CareRecommendationsPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final recommendations = ref.watch(careRecommendationsProvider);
     return PrimaryPanel(
       padding: const EdgeInsets.all(20),
       child: recommendations.when(
-        loading: () => const _CareLoadingState(
-          text: 'Carregando orientações do terapeuta...',
-        ),
+        loading: () => _CareLoadingState(text: l10n.careRecommendationsLoading),
         error: (_, _) => _CareInlineNotice(
           icon: Icons.info_outline_rounded,
-          text: 'Não foi possível carregar as orientações agora.',
+          text: l10n.careRecommendationsError,
         ),
         data: (items) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Orientações do terapeuta',
+              l10n.careRecommendationsTitle,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: context.evoluaColors.textPrimary,
                 fontWeight: FontWeight.w800,
@@ -112,7 +114,7 @@ class _CareRecommendationsPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Recomendações e anexos recebidos por acesso seguro.',
+              l10n.careRecommendationsSubtitle,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: context.evoluaColors.textSecondary,
                 height: 1.4,
@@ -122,7 +124,7 @@ class _CareRecommendationsPanel extends ConsumerWidget {
             if (items.isEmpty)
               _CareInlineNotice(
                 icon: Icons.health_and_safety_outlined,
-                text: 'Nenhuma orientação recebida por enquanto.',
+                text: l10n.careRecommendationsEmpty,
               )
             else
               ...items.take(10).map(_CareRecommendationTile.new),
@@ -140,6 +142,7 @@ class _CareRecommendationTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: DecoratedBox(
@@ -156,7 +159,7 @@ class _CareRecommendationTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                recommendation.therapistLabel ?? 'Terapeuta',
+                recommendation.therapistLabel ?? l10n.careTherapistFallback,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: AppColors.accent,
                   fontWeight: FontWeight.w800,
@@ -198,7 +201,7 @@ class _CareRecommendationTile extends ConsumerWidget {
                     .read(careRecommendationHandlerProvider)
                     .acknowledge(recommendation),
                 icon: const Icon(Icons.check_rounded),
-                label: const Text('Confirmar leitura'),
+                label: Text(l10n.careAcknowledgeReading),
               ),
             ],
           ),
@@ -215,17 +218,17 @@ class _CareShareContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     if (state.status == CareAccessStatus.generating) {
-      return const _CareLoadingState(text: 'Preparando acesso seguro...');
+      return _CareLoadingState(text: l10n.carePreparingAccess);
     }
 
     if (state.status == CareAccessStatus.idle) {
       return _CareMessageState(
         icon: Icons.health_and_safety_outlined,
-        title: 'Compartilhe com seu terapeuta',
-        message:
-            'Gere um acesso temporário para que seu terapeuta veja um relatório protegido da sua jornada emocional.',
-        actionLabel: 'Gerar acesso seguro',
+        title: l10n.careShareTitle,
+        message: l10n.careShareMessage,
+        actionLabel: l10n.careGenerateSecureAccess,
         onAction: () =>
             ref.read(careShareControllerProvider.notifier).generateAccess(),
       );
@@ -234,10 +237,9 @@ class _CareShareContent extends ConsumerWidget {
     if (state.status == CareAccessStatus.expired) {
       return _CareMessageState(
         icon: Icons.timer_off_outlined,
-        title: 'Sessão expirada',
-        message:
-            'O acesso temporário venceu. Gere um novo código quando estiver com seu terapeuta.',
-        actionLabel: 'Gerar novo acesso',
+        title: l10n.careExpiredTitle,
+        message: l10n.careExpiredMessage,
+        actionLabel: l10n.careGenerateNewAccess,
         onAction: () =>
             ref.read(careShareControllerProvider.notifier).generateAccess(),
       );
@@ -246,10 +248,9 @@ class _CareShareContent extends ConsumerWidget {
     if (state.status == CareAccessStatus.revoked) {
       return _CareMessageState(
         icon: Icons.lock_outline_rounded,
-        title: 'Acesso revogado',
-        message:
-            'Seu terapeuta não pode mais acessar essa sessão compartilhada.',
-        actionLabel: 'Gerar novo acesso',
+        title: l10n.careRevokedTitle,
+        message: l10n.careRevokedMessage,
+        actionLabel: l10n.careGenerateNewAccess,
         onAction: () =>
             ref.read(careShareControllerProvider.notifier).generateAccess(),
       );
@@ -282,13 +283,12 @@ class _CareShareContent extends ConsumerWidget {
         ] else ...[
           _CareInlineNotice(
             icon: Icons.qr_code_2_rounded,
-            text:
-                'Por segurança, gere um novo acesso para exibir o QR Code completo.',
+            text: l10n.careQrMissing,
           ),
           const SizedBox(height: 18),
         ],
         Text(
-          'Código temporário',
+          l10n.careTemporaryCode,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             color: context.evoluaColors.textSecondary,
             fontWeight: FontWeight.w700,
@@ -307,7 +307,7 @@ class _CareShareContent extends ConsumerWidget {
         const SizedBox(height: 14),
         if (state.expiresAt != null)
           Text(
-            'Expira em ${_formatDateTime(state.expiresAt!)}',
+            l10n.careExpiresAt(_formatDateTime(state.expiresAt!)),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: context.evoluaColors.textSecondary,
@@ -326,7 +326,7 @@ class _CareShareContent extends ConsumerWidget {
           runSpacing: 12,
           alignment: WrapAlignment.center,
           children: [
-            FilledButton.icon(
+            EvoluaAsyncButton.filled(
               onPressed: state.numericCode == null
                   ? null
                   : () async {
@@ -336,16 +336,16 @@ class _CareShareContent extends ConsumerWidget {
                       if (context.mounted) {
                         AppSnackBar.show(
                           context,
-                          message: 'Código copiado com segurança.',
+                          message: l10n.careCodeCopied,
                           icon: Icons.copy_rounded,
                         );
                       }
                     },
-              icon: const Icon(Icons.copy_rounded),
-              label: const Text('Copiar código'),
+              icon: Icons.copy_rounded,
+              label: l10n.careCopyCode,
             ),
             if (qrPayload != null)
-              OutlinedButton.icon(
+              EvoluaAsyncButton.outlined(
                 onPressed: () async {
                   await Clipboard.setData(
                     ClipboardData(text: qrPayload.toString()),
@@ -353,28 +353,24 @@ class _CareShareContent extends ConsumerWidget {
                   if (context.mounted) {
                     AppSnackBar.show(
                       context,
-                      message: 'Link completo copiado com segurança.',
+                      message: l10n.careFullLinkCopied,
                       icon: Icons.link_rounded,
                     );
                   }
                 },
-                icon: const Icon(Icons.link_rounded),
-                label: const Text('Copiar link completo'),
+                icon: Icons.link_rounded,
+                label: l10n.careCopyFullLink,
               ),
-            OutlinedButton.icon(
+            EvoluaAsyncButton.outlined(
               onPressed: state.status == CareAccessStatus.revoking
                   ? null
                   : () => ref
                         .read(careShareControllerProvider.notifier)
                         .revokeAccess(),
-              icon: state.status == CareAccessStatus.revoking
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.link_off_rounded),
-              label: const Text('Revogar acesso'),
+              isBusy: state.status == CareAccessStatus.revoking,
+              icon: Icons.link_off_rounded,
+              label: l10n.careRevokeAccess,
+              loadingLabel: l10n.commonLoading,
             ),
           ],
         ),
@@ -398,6 +394,7 @@ class _CareStatusHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final connected = state.status == CareAccessStatus.connected;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,9 +418,7 @@ class _CareStatusHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                connected
-                    ? 'Conectado ao terapeuta'
-                    : 'Acesso temporário ativo',
+                connected ? l10n.careConnectedTitle : l10n.careActiveTitle,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: context.evoluaColors.textPrimary,
                   fontWeight: FontWeight.w800,
@@ -431,9 +426,7 @@ class _CareStatusHeader extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                connected
-                    ? 'Seu terapeuta validou o acesso. Você pode revogar quando quiser.'
-                    : 'Mostre o QR Code ou o código ao seu terapeuta somente durante a consulta.',
+                connected ? l10n.careConnectedMessage : l10n.careActiveMessage,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: context.evoluaColors.textSecondary,
                   height: 1.45,
@@ -460,7 +453,7 @@ class _CareMessageState extends StatelessWidget {
   final String title;
   final String message;
   final String actionLabel;
-  final VoidCallback onAction;
+  final FutureOr<void> Function() onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -487,10 +480,12 @@ class _CareMessageState extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 22),
-        FilledButton.icon(
+        EvoluaAsyncButton.filled(
           onPressed: onAction,
-          icon: const Icon(Icons.lock_outline_rounded),
-          label: Text(actionLabel),
+          icon: Icons.lock_outline_rounded,
+          label: actionLabel,
+          loadingLabel: context.l10n.commonLoading,
+          expand: true,
         ),
       ],
     );
@@ -502,24 +497,22 @@ class _CareHistoryPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final history = ref.watch(careShareHistoryProvider);
     return PrimaryPanel(
       padding: const EdgeInsets.all(20),
       child: history.when(
-        loading: () => const _CareLoadingState(
-          text: 'Carregando histórico de conexões...',
-        ),
+        loading: () => _CareLoadingState(text: l10n.careHistoryLoading),
         error: (_, _) => _CareInlineNotice(
           icon: Icons.info_outline_rounded,
-          text:
-              'Não foi possível carregar o histórico agora. Tente novamente mais tarde.',
+          text: l10n.careHistoryError,
         ),
         data: (items) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Histórico de conexões',
+                l10n.careHistoryTitle,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: context.evoluaColors.textPrimary,
                   fontWeight: FontWeight.w800,
@@ -527,7 +520,7 @@ class _CareHistoryPanel extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Acompanhe os acessos temporários criados para atendimento.',
+                l10n.careHistorySubtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: context.evoluaColors.textSecondary,
                   height: 1.4,
@@ -537,7 +530,7 @@ class _CareHistoryPanel extends ConsumerWidget {
               if (items.isEmpty)
                 _CareInlineNotice(
                   icon: Icons.history_rounded,
-                  text: 'Nenhuma conexão anterior por enquanto.',
+                  text: l10n.careHistoryEmpty,
                 )
               else
                 ...items.take(6).map(_CareHistoryTile.new),
@@ -556,12 +549,13 @@ class _CareHistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final statusText = switch (session.status) {
-      CareAccessStatus.connected => 'conectada',
-      CareAccessStatus.revoked => 'revogada',
-      CareAccessStatus.expired => 'expirada',
-      CareAccessStatus.active => 'ativa',
-      _ => 'registrada',
+      CareAccessStatus.connected => l10n.careStatusConnected,
+      CareAccessStatus.revoked => l10n.careStatusRevoked,
+      CareAccessStatus.expired => l10n.careStatusExpired,
+      CareAccessStatus.active => l10n.careStatusActive,
+      _ => l10n.careStatusRegistered,
     };
     final date =
         session.revokedAt ??
@@ -572,7 +566,7 @@ class _CareHistoryTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.health_and_safety_outlined,
             color: AppColors.accent,
             size: 20,
@@ -580,7 +574,7 @@ class _CareHistoryTile extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Sessão com terapeuta $statusText em ${_formatShortDate(date)}',
+              l10n.careHistoryTile(statusText, _formatShortDate(date)),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: context.evoluaColors.textSecondary,
               ),

@@ -133,6 +133,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonLoading => 'Loading...';
 
   @override
+  String get commonSaving => 'Saving...';
+
+  @override
+  String get commonSending => 'Sending...';
+
+  @override
   String get commonSend => 'Send';
 
   @override
@@ -149,6 +155,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonPrevious => 'Previous';
+
+  @override
+  String get errorNetwork =>
+      'We could not connect right now. Check your connection and try again.';
+
+  @override
+  String get errorTimeout =>
+      'The response took longer than expected. Try again in a moment.';
+
+  @override
+  String get errorUnexpected =>
+      'We could not complete this right now. Try again in a moment.';
+
+  @override
+  String get errorTryAgainLater =>
+      'We could not complete this right now. Try again later.';
+
+  @override
+  String get emptyDefaultTitle => 'Nothing here yet';
+
+  @override
+  String get emptyDefaultBody =>
+      'When there is something new, it will appear here.';
 
   @override
   String get authSendLink => 'Send link';
@@ -624,6 +653,250 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dailyRitualCarryEvening => 'Keep this from your day';
+
+  @override
+  String get dailyRitualAnswerAllSteps =>
+      'Answer the four steps at your own pace.';
+
+  @override
+  String get dailyRitualSavedMorning =>
+      'Ritual saved. Your daily journey has a clear direction.';
+
+  @override
+  String get dailyRitualSavedEvening =>
+      'Evening closing saved. Release what you do not need to carry.';
+
+  @override
+  String get dailyRitualOpenError => 'We could not open your ritual right now.';
+
+  @override
+  String get dailyRitualSaveError => 'We could not save your ritual right now.';
+
+  @override
+  String get dailyRitualMorningTitle => 'Daily Ritual';
+
+  @override
+  String get dailyRitualMorningDescription =>
+      'A short pause to notice how you are, choose an intention, and define one possible small step for today.';
+
+  @override
+  String get dailyRitualMorningResultTitle => 'Your ritual for today is ready';
+
+  @override
+  String get dailyRitualEveningTitle => 'Evening Closing';
+
+  @override
+  String get dailyRitualEveningDescription =>
+      'A short pause to review what felt heavy, acknowledge what was good, and release what you do not need to carry.';
+
+  @override
+  String get dailyRitualEveningResultTitle => 'Your closing for today is ready';
+
+  @override
+  String get dailyRitualDurationChip => 'Takes about 2 minutes';
+
+  @override
+  String get dailyRitualNoRightWrongChip => 'No right or wrong';
+
+  @override
+  String get dailyRitualAtYourPaceChip => 'At your pace';
+
+  @override
+  String get dailyRitualStartNow => 'Start now';
+
+  @override
+  String get dailyRitualAnswerLabel => 'Your answer';
+
+  @override
+  String get dailyRitualContinue => 'Continue';
+
+  @override
+  String get dailyRitualFinish => 'Finish';
+
+  @override
+  String get dailyRitualEmotionalState => 'Emotional state';
+
+  @override
+  String get dailyRitualDayNeed => 'Need of the day';
+
+  @override
+  String get dailyRitualChosenIntention => 'Chosen intention';
+
+  @override
+  String get dailyRitualChosenMicroAction => 'Chosen micro-action';
+
+  @override
+  String get dailyRitualBackHome => 'Back to Home';
+
+  @override
+  String get dailyRitualMorningQuestionState => 'How are you right now?';
+
+  @override
+  String get dailyRitualMorningQuestionNeed => 'What do you need most today?';
+
+  @override
+  String get dailyRitualMorningQuestionIntention =>
+      'What intention do you want to carry today?';
+
+  @override
+  String get dailyRitualMorningQuestionAction =>
+      'What small step can you take today?';
+
+  @override
+  String get dailyRitualEveningQuestionState => 'How are you right now?';
+
+  @override
+  String get dailyRitualEveningQuestionNeed =>
+      'What do you most need to release today?';
+
+  @override
+  String get dailyRitualEveningQuestionIntention =>
+      'What intention do you want to take into rest?';
+
+  @override
+  String get dailyRitualEveningQuestionAction =>
+      'What small care can you offer yourself now?';
+
+  @override
+  String get careLoadingSecureAccess => 'Loading secure access...';
+
+  @override
+  String get careLoadErrorTitle => 'We could not load Evolua Care';
+
+  @override
+  String get careLoadErrorMessage =>
+      'Check your connection and try again in a moment.';
+
+  @override
+  String get careRecommendationsLoading => 'Loading therapist guidance...';
+
+  @override
+  String get careRecommendationsError =>
+      'We could not load therapist guidance right now.';
+
+  @override
+  String get careRecommendationsTitle => 'Therapist guidance';
+
+  @override
+  String get careRecommendationsSubtitle =>
+      'Recommendations and attachments received through secure access.';
+
+  @override
+  String get careRecommendationsEmpty => 'No guidance received yet.';
+
+  @override
+  String get careTherapistFallback => 'Therapist';
+
+  @override
+  String get careAcknowledgeReading => 'Confirm reading';
+
+  @override
+  String get carePreparingAccess => 'Preparing secure access...';
+
+  @override
+  String get careShareTitle => 'Share with your therapist';
+
+  @override
+  String get careShareMessage =>
+      'Generate temporary access so your therapist can view a protected report of your emotional journey.';
+
+  @override
+  String get careGenerateSecureAccess => 'Generate secure access';
+
+  @override
+  String get careExpiredTitle => 'Session expired';
+
+  @override
+  String get careExpiredMessage =>
+      'The temporary access expired. Generate a new code when you are with your therapist.';
+
+  @override
+  String get careGenerateNewAccess => 'Generate new access';
+
+  @override
+  String get careRevokedTitle => 'Access revoked';
+
+  @override
+  String get careRevokedMessage =>
+      'Your therapist can no longer access this shared session.';
+
+  @override
+  String get careQrMissing =>
+      'For safety, generate new access to show the complete QR Code.';
+
+  @override
+  String get careTemporaryCode => 'Temporary code';
+
+  @override
+  String careExpiresAt(Object value) {
+    return 'Expires at $value';
+  }
+
+  @override
+  String get careCodeCopied => 'Code copied safely.';
+
+  @override
+  String get careCopyCode => 'Copy code';
+
+  @override
+  String get careFullLinkCopied => 'Complete link copied safely.';
+
+  @override
+  String get careCopyFullLink => 'Copy complete link';
+
+  @override
+  String get careRevokeAccess => 'Revoke access';
+
+  @override
+  String get careConnectedTitle => 'Connected to therapist';
+
+  @override
+  String get careActiveTitle => 'Temporary access active';
+
+  @override
+  String get careConnectedMessage =>
+      'Your therapist validated access. You can revoke it whenever you want.';
+
+  @override
+  String get careActiveMessage =>
+      'Show the QR Code or code to your therapist only during the session.';
+
+  @override
+  String get careHistoryLoading => 'Loading connection history...';
+
+  @override
+  String get careHistoryError =>
+      'We could not load history right now. Try again later.';
+
+  @override
+  String get careHistoryTitle => 'Connection history';
+
+  @override
+  String get careHistorySubtitle =>
+      'Track temporary accesses created for care sessions.';
+
+  @override
+  String get careHistoryEmpty => 'No previous connection yet.';
+
+  @override
+  String careHistoryTile(Object status, Object date) {
+    return 'Session with therapist $status on $date';
+  }
+
+  @override
+  String get careStatusConnected => 'connected';
+
+  @override
+  String get careStatusRevoked => 'revoked';
+
+  @override
+  String get careStatusExpired => 'expired';
+
+  @override
+  String get careStatusActive => 'active';
+
+  @override
+  String get careStatusRegistered => 'registered';
 }
 
 /// The translations for English, as used in the United States (`en_US`).
@@ -755,6 +1028,12 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   String get commonLoading => 'Loading...';
 
   @override
+  String get commonSaving => 'Saving...';
+
+  @override
+  String get commonSending => 'Sending...';
+
+  @override
   String get commonSend => 'Send';
 
   @override
@@ -771,6 +1050,29 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get commonPrevious => 'Previous';
+
+  @override
+  String get errorNetwork =>
+      'We could not connect right now. Check your connection and try again.';
+
+  @override
+  String get errorTimeout =>
+      'The response took longer than expected. Try again in a moment.';
+
+  @override
+  String get errorUnexpected =>
+      'We could not complete this right now. Try again in a moment.';
+
+  @override
+  String get errorTryAgainLater =>
+      'We could not complete this right now. Try again later.';
+
+  @override
+  String get emptyDefaultTitle => 'Nothing here yet';
+
+  @override
+  String get emptyDefaultBody =>
+      'When there is something new, it will appear here.';
 
   @override
   String get authSendLink => 'Send link';
@@ -1246,4 +1548,248 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get dailyRitualCarryEvening => 'Keep this from your day';
+
+  @override
+  String get dailyRitualAnswerAllSteps =>
+      'Answer the four steps at your own pace.';
+
+  @override
+  String get dailyRitualSavedMorning =>
+      'Ritual saved. Your daily journey has a clear direction.';
+
+  @override
+  String get dailyRitualSavedEvening =>
+      'Evening closing saved. Release what you do not need to carry.';
+
+  @override
+  String get dailyRitualOpenError => 'We could not open your ritual right now.';
+
+  @override
+  String get dailyRitualSaveError => 'We could not save your ritual right now.';
+
+  @override
+  String get dailyRitualMorningTitle => 'Daily Ritual';
+
+  @override
+  String get dailyRitualMorningDescription =>
+      'A short pause to notice how you are, choose an intention, and define one possible small step for today.';
+
+  @override
+  String get dailyRitualMorningResultTitle => 'Your ritual for today is ready';
+
+  @override
+  String get dailyRitualEveningTitle => 'Evening Closing';
+
+  @override
+  String get dailyRitualEveningDescription =>
+      'A short pause to review what felt heavy, acknowledge what was good, and release what you do not need to carry.';
+
+  @override
+  String get dailyRitualEveningResultTitle => 'Your closing for today is ready';
+
+  @override
+  String get dailyRitualDurationChip => 'Takes about 2 minutes';
+
+  @override
+  String get dailyRitualNoRightWrongChip => 'No right or wrong';
+
+  @override
+  String get dailyRitualAtYourPaceChip => 'At your pace';
+
+  @override
+  String get dailyRitualStartNow => 'Start now';
+
+  @override
+  String get dailyRitualAnswerLabel => 'Your answer';
+
+  @override
+  String get dailyRitualContinue => 'Continue';
+
+  @override
+  String get dailyRitualFinish => 'Finish';
+
+  @override
+  String get dailyRitualEmotionalState => 'Emotional state';
+
+  @override
+  String get dailyRitualDayNeed => 'Need of the day';
+
+  @override
+  String get dailyRitualChosenIntention => 'Chosen intention';
+
+  @override
+  String get dailyRitualChosenMicroAction => 'Chosen micro-action';
+
+  @override
+  String get dailyRitualBackHome => 'Back to Home';
+
+  @override
+  String get dailyRitualMorningQuestionState => 'How are you right now?';
+
+  @override
+  String get dailyRitualMorningQuestionNeed => 'What do you need most today?';
+
+  @override
+  String get dailyRitualMorningQuestionIntention =>
+      'What intention do you want to carry today?';
+
+  @override
+  String get dailyRitualMorningQuestionAction =>
+      'What small step can you take today?';
+
+  @override
+  String get dailyRitualEveningQuestionState => 'How are you right now?';
+
+  @override
+  String get dailyRitualEveningQuestionNeed =>
+      'What do you most need to release today?';
+
+  @override
+  String get dailyRitualEveningQuestionIntention =>
+      'What intention do you want to take into rest?';
+
+  @override
+  String get dailyRitualEveningQuestionAction =>
+      'What small care can you offer yourself now?';
+
+  @override
+  String get careLoadingSecureAccess => 'Loading secure access...';
+
+  @override
+  String get careLoadErrorTitle => 'We could not load Evolua Care';
+
+  @override
+  String get careLoadErrorMessage =>
+      'Check your connection and try again in a moment.';
+
+  @override
+  String get careRecommendationsLoading => 'Loading therapist guidance...';
+
+  @override
+  String get careRecommendationsError =>
+      'We could not load therapist guidance right now.';
+
+  @override
+  String get careRecommendationsTitle => 'Therapist guidance';
+
+  @override
+  String get careRecommendationsSubtitle =>
+      'Recommendations and attachments received through secure access.';
+
+  @override
+  String get careRecommendationsEmpty => 'No guidance received yet.';
+
+  @override
+  String get careTherapistFallback => 'Therapist';
+
+  @override
+  String get careAcknowledgeReading => 'Confirm reading';
+
+  @override
+  String get carePreparingAccess => 'Preparing secure access...';
+
+  @override
+  String get careShareTitle => 'Share with your therapist';
+
+  @override
+  String get careShareMessage =>
+      'Generate temporary access so your therapist can view a protected report of your emotional journey.';
+
+  @override
+  String get careGenerateSecureAccess => 'Generate secure access';
+
+  @override
+  String get careExpiredTitle => 'Session expired';
+
+  @override
+  String get careExpiredMessage =>
+      'The temporary access expired. Generate a new code when you are with your therapist.';
+
+  @override
+  String get careGenerateNewAccess => 'Generate new access';
+
+  @override
+  String get careRevokedTitle => 'Access revoked';
+
+  @override
+  String get careRevokedMessage =>
+      'Your therapist can no longer access this shared session.';
+
+  @override
+  String get careQrMissing =>
+      'For safety, generate new access to show the complete QR Code.';
+
+  @override
+  String get careTemporaryCode => 'Temporary code';
+
+  @override
+  String careExpiresAt(Object value) {
+    return 'Expires at $value';
+  }
+
+  @override
+  String get careCodeCopied => 'Code copied safely.';
+
+  @override
+  String get careCopyCode => 'Copy code';
+
+  @override
+  String get careFullLinkCopied => 'Complete link copied safely.';
+
+  @override
+  String get careCopyFullLink => 'Copy complete link';
+
+  @override
+  String get careRevokeAccess => 'Revoke access';
+
+  @override
+  String get careConnectedTitle => 'Connected to therapist';
+
+  @override
+  String get careActiveTitle => 'Temporary access active';
+
+  @override
+  String get careConnectedMessage =>
+      'Your therapist validated access. You can revoke it whenever you want.';
+
+  @override
+  String get careActiveMessage =>
+      'Show the QR Code or code to your therapist only during the session.';
+
+  @override
+  String get careHistoryLoading => 'Loading connection history...';
+
+  @override
+  String get careHistoryError =>
+      'We could not load history right now. Try again later.';
+
+  @override
+  String get careHistoryTitle => 'Connection history';
+
+  @override
+  String get careHistorySubtitle =>
+      'Track temporary accesses created for care sessions.';
+
+  @override
+  String get careHistoryEmpty => 'No previous connection yet.';
+
+  @override
+  String careHistoryTile(Object status, Object date) {
+    return 'Session with therapist $status on $date';
+  }
+
+  @override
+  String get careStatusConnected => 'connected';
+
+  @override
+  String get careStatusRevoked => 'revoked';
+
+  @override
+  String get careStatusExpired => 'expired';
+
+  @override
+  String get careStatusActive => 'active';
+
+  @override
+  String get careStatusRegistered => 'registered';
 }
