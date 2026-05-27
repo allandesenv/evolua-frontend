@@ -990,6 +990,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
                       _openLegalLink(AppConfig.privacyPolicyUrl),
                   onOpenTermsOfUse: () =>
                       _openLegalLink(AppConfig.termsOfUseUrl),
+                  onOpenCareShare: () => context.push('/care/share'),
                   localePreference: localePreference,
                   onLocalePreferenceChanged: (value) => ref
                       .read(localeControllerProvider.notifier)
@@ -1778,7 +1779,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Resumo da semana',
-            description:
+          description:
               'Uma leitura curta para entender como seus registros recentes estão se organizando.',
           child: _EvolutionMetricGrid(
             metrics: [
@@ -1808,14 +1809,14 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Padroes percebidos',
-            description:
+          description:
               'Sinais simples do seu histórico, para perceber repetições sem transformar isso em cobrança.',
           child: _PatternPanel(stats: stats),
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Mensagem da IA',
-            description:
+          description:
               'Uma leitura curta a partir do último insight salvo, sem gerar nova análise.',
           child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
         ),
@@ -1824,7 +1825,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           _EvolutionSectionGroup(
             title: 'Mensagens do seu eu anterior',
             description:
-              'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
+                'Uma carta apareceu porque este momento tem contexto para ser revisitado.',
             child: _FutureMessagesMirrorPanel(
               state: futureMessageState,
               onOpen: onOpenFutureMessages,
@@ -1834,7 +1835,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         ],
         _EvolutionSectionGroup(
           title: 'Trilhas em andamento',
-            description:
+          description:
               'Acompanhe a trilha que está guiando seus próximos passos.',
           child: _TrailEvolutionPanel(
             currentJourneyState: currentJourneyState,
@@ -1844,7 +1845,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Marcos da jornada',
-            description:
+          description:
               'Marcos leves para reconhecer movimento real, sem ranking nem pressa.',
           child: Wrap(
             spacing: 10,
@@ -1857,7 +1858,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
           title: 'Consistência',
-            description:
+          description:
               'Uma leitura de continuidade para ajudar você a voltar sem peso quando o ritmo oscilar.',
           child: _ConsistencyPanel(stats: stats),
         ),
@@ -2289,10 +2290,10 @@ class _FutureMessageTimelineCard extends StatelessWidget {
     final createdEnergy = message.createdContext['energyLevel']?.toString();
     final deliveredEnergy = message.deliveredContext['energyLevel']?.toString();
     final statusLabel = message.isRead
-      ? 'Você já leu essa carta.'
-      : message.isDelivered
-      ? 'Há uma carta sua pronta para ser lida com calma.'
-      : 'Essa carta ainda está guardada.';
+        ? 'Você já leu essa carta.'
+        : message.isDelivered
+        ? 'Há uma carta sua pronta para ser lida com calma.'
+        : 'Essa carta ainda está guardada.';
 
     return Container(
       width: double.infinity,
@@ -3822,6 +3823,7 @@ class _SettingsPrivacySection extends StatelessWidget {
     required this.onInformationalAction,
     required this.onOpenPrivacyPolicy,
     required this.onOpenTermsOfUse,
+    required this.onOpenCareShare,
     required this.localePreference,
     required this.onLocalePreferenceChanged,
   });
@@ -3855,6 +3857,7 @@ class _SettingsPrivacySection extends StatelessWidget {
   final VoidCallback onInformationalAction;
   final VoidCallback onOpenPrivacyPolicy;
   final VoidCallback onOpenTermsOfUse;
+  final VoidCallback onOpenCareShare;
   final LocalePreference localePreference;
   final ValueChanged<LocalePreference> onLocalePreferenceChanged;
 
@@ -3986,6 +3989,12 @@ class _SettingsPrivacySection extends StatelessWidget {
           microcopy:
               'Seus dados pertencem a você. O Evolua existe para apoiar sua jornada com privacidade.',
           children: [
+            _SettingsActionRow(
+              icon: Icons.health_and_safety_outlined,
+              title: 'Evolua Care',
+              subtitle: 'Gere ou acompanhe acessos seguros para seu terapeuta.',
+              onTap: onOpenCareShare,
+            ),
             _SettingsActionRow(
               icon: Icons.download_rounded,
               title: 'Baixar meus dados',

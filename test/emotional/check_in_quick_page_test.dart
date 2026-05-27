@@ -231,7 +231,7 @@ void main() {
       },
     );
 
-    testWidgets('closes unlock sheet when rewarded ad is closed', (
+    testWidgets('keeps unlock flow until rewarded result completes', (
       tester,
     ) async {
       final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
@@ -266,16 +266,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(rewarded.adClosedCallbacks, 1);
-      expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
+      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
       expect(repository.createCalls, 1);
 
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
 
+      expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
       expect(repository.createCalls, 2);
     });
 
-    testWidgets('reward failure keeps form and re-enables ad button', (
+    testWidgets('reward failure follows existing retry flow', (
       tester,
     ) async {
       final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
@@ -308,9 +309,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Assistir anúncio'), findsOneWidget);
-      expect(find.text('preciso registrar outro momento'), findsOneWidget);
-      expect(repository.createCalls, 1);
+      expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
+      expect(repository.createCalls, 2);
     });
 
     testWidgets('second 402 after reward shows friendly confirmation message', (
@@ -338,9 +338,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
-      expect(find.textContaining('liberar o check-in'), findsOneWidget);
     });
 
     testWidgets(

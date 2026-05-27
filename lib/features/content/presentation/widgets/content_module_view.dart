@@ -1950,10 +1950,6 @@ bool _isMentorPremiumTrail(Trail trail) {
       (category == 'mentoria' || sourceStyle == 'mentor_exclusive');
 }
 
-bool _isLockedMentorPremiumTrail(Trail trail) {
-  return _isMentorPremiumTrail(trail) && !trail.accessible;
-}
-
 Color _journeyAccentColor(Trail trail) {
   final category = trail.category.toLowerCase();
   if (category.contains('ansiedade') || category.contains('sono')) {
@@ -2245,8 +2241,9 @@ class _TrailExplorer extends ConsumerWidget {
           Column(
             children: [
               ...result.items.map((trail) {
-                final effectiveAccessible =
-                    trail.premium ? hasPremiumAccess : trail.accessible;
+                final effectiveAccessible = trail.premium
+                    ? hasPremiumAccess
+                    : trail.accessible;
                 final lockedMentorTrail =
                     _isMentorPremiumTrail(trail) && !hasPremiumAccess;
                 final journeyState = effectiveAccessible

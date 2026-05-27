@@ -374,12 +374,14 @@ void main() {
       var openedFutureMessages = false;
       var openedReflections = false;
       var openedMirror = false;
+      var openedCare = false;
 
       await tester.pumpWidget(
         _testApp(
           onOpenFutureMessages: () => openedFutureMessages = true,
           onOpenFeed: () => openedReflections = true,
           onOpenEvolutionMirror: () => openedMirror = true,
+          onOpenCareShare: () => openedCare = true,
         ),
       );
       await tester.pumpAndSettle();
@@ -397,6 +399,27 @@ void main() {
       expect(openedFutureMessages, isTrue);
       expect(openedReflections, isTrue);
       expect(openedMirror, isTrue);
+      expect(openedCare, isFalse);
+    });
+
+    testWidgets('shows Evolua Care mini card and opens share flow', (
+      tester,
+    ) async {
+      var openedCare = false;
+
+      await tester.pumpWidget(
+        _testApp(onOpenCareShare: () => openedCare = true),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Evolua Care'), findsOneWidget);
+      expect(find.text('Compartilhe com seu terapeuta.'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Evolua Care'));
+      await tester.tap(find.text('Evolua Care'));
+      await tester.pumpAndSettle();
+
+      expect(openedCare, isTrue);
     });
 
     testWidgets('insight mini card opens analysis when insight exists', (
@@ -718,6 +741,7 @@ Widget _testApp({
   VoidCallback? onOpenCommunity,
   VoidCallback? onOpenEvolutionMirror,
   VoidCallback? onOpenFutureMessages,
+  VoidCallback? onOpenCareShare,
   ValueChanged<String>? onOpenDailyRitual,
   VoidCallback? onOpenCheckIn,
 }) {
@@ -757,6 +781,7 @@ Widget _testApp({
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
             onOpenFutureMessages: onOpenFutureMessages ?? () {},
             onOpenFutureMessage: (_) {},
+            onOpenCareShare: onOpenCareShare ?? () {},
             onOpenDailyRitual: onOpenDailyRitual ?? (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},
           ),

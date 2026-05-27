@@ -5,7 +5,6 @@ import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -77,10 +76,7 @@ class MobileRewardedAdService implements RewardedAdService {
       );
 
       completer.complete(
-        _RewardedAdOutcome(
-          openedFullScreen: opened,
-          earnedReward: earned,
-        ),
+        _RewardedAdOutcome(openedFullScreen: opened, earnedReward: earned),
       );
     }
 
@@ -376,9 +372,7 @@ class MobileRewardedAdService implements RewardedAdService {
 }
 
 class _RewardedAdLifecycleFallback extends WidgetsBindingObserver {
-  _RewardedAdLifecycleFallback({
-    required this.onResumedAfterAd,
-  });
+  _RewardedAdLifecycleFallback({required this.onResumedAfterAd});
 
   final VoidCallback onResumedAfterAd;
   var _wasInactiveOrPaused = false;
