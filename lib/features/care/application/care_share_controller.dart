@@ -276,13 +276,7 @@ class CareShareController extends AsyncNotifier<CareShareState> {
 
   Future<void> _applyPendingPrescriptions() async {
     try {
-      final pending = await ref
-          .read(careRepositoryProvider)
-          .pendingPrescriptions();
-      final handler = ref.read(carePrescriptionHandlerProvider);
-      for (final envelope in pending) {
-        await handler.applyEnvelope(envelope);
-      }
+      await ref.read(carePrescriptionHandlerProvider).applyPending();
       await ref.read(careRecommendationHandlerProvider).applyPending();
     } catch (_) {
       return;

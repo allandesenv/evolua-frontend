@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
 import 'package:evolua_frontend/features/notification/domain/repositories/notification_repository.dart';
@@ -44,6 +48,9 @@ void main() {
       ProviderScope(
         overrides: [
           notificationRepositoryProvider.overrideWithValue(repository),
+          authControllerProvider.overrideWith(
+            () => _FakeAuthController(userId: 'user-1'),
+          ),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -60,6 +67,23 @@ void main() {
     expect(repository.readIds, isEmpty);
     expect(find.text('ritual-morning'), findsOneWidget);
   });
+}
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController({required this.userId});
+
+  final String userId;
+
+  @override
+  Future<AuthSession?> build() async {
+    return AuthSession(
+      userId: userId,
+      email: '$userId@evolua.test',
+      roles: const ['ROLE_USER'],
+      accessToken:
+          'header.${base64Url.encode(utf8.encode(jsonEncode({'sub': userId, 'email': '$userId@evolua.test'})))}.signature',
+    );
+  }
 }
 
 class _FakeNotificationRepository implements NotificationRepository {
