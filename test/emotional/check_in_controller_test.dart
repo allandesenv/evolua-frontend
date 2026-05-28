@@ -235,6 +235,86 @@ void main() {
       'Leitura que nao deve sumir.',
     );
   });
+
+  test(
+    'deep reading style refreshes latest check-in and preserves metadata',
+    () async {
+      final original = _checkIn(
+        id: 70,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura original.'),
+      );
+      final refreshed = _checkIn(
+        id: 70,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura pratica.'),
+      );
+      final repository = _FakeCheckInRepository(
+        lists: [
+          [original],
+          [refreshed],
+        ],
+        deepReadingResult: refreshed,
+      );
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
+
+      final result = await container
+          .read(checkInControllerProvider.notifier)
+          .generateDeepReadingForLatest(style: 'practical');
+
+      expect(repository.deepReadingStyles, ['practical']);
+      expect(result?.aiInsight?.insight, 'Leitura pratica.');
+      expect(
+        container
+            .read(checkInControllerProvider)
+            .asData
+            ?.value
+            .latestCreatedCheckIn
+            ?.aiInsight
+            ?.insight,
+        'Leitura pratica.',
+      );
+    },
+  );
+
+  test('save reading updates latest saved flag', () async {
+    final original = _checkIn(
+      id: 80,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(),
+    );
+    final saved = _checkIn(
+      id: 80,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(),
+      savedReading: true,
+    );
+    final repository = _FakeCheckInRepository(
+      lists: [
+        [original],
+        [saved],
+      ],
+      savedReadingResult: saved,
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await container.read(checkInControllerProvider.notifier).saveReading(80);
+
+    expect(repository.savedReadingIds, [80]);
+    expect(
+      container
+          .read(checkInControllerProvider)
+          .asData
+          ?.value
+          .latestCreatedCheckIn
+          ?.savedReading,
+      isTrue,
+    );
+  });
 }
 
 ProviderContainer _container(
@@ -258,11 +338,18 @@ class _FakeCheckInRepository implements CheckInRepository {
     required List<List<CheckIn>> lists,
     this.createResult,
     this.createError,
+    this.deepReadingResult,
+    this.savedReadingResult,
   }) : _lists = List<List<CheckIn>>.from(lists);
 
   final List<List<CheckIn>> _lists;
   final CheckIn? createResult;
   final Object? createError;
+  final CheckIn? deepReadingResult;
+  final CheckIn? savedReadingResult;
+  final List<String> deepReadingStyles = [];
+  final List<int> savedReadingIds = [];
+  final List<int> ritualReadingIds = [];
 
   @override
   Future<PaginatedResponse<CheckIn>> list({
@@ -306,15 +393,41 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
-    return _lists.isNotEmpty && _lists.first.isNotEmpty
-        ? _lists.first.first
-        : createResult ??
-              _checkIn(
-                id: checkInId,
-                createdAt: DateTime(2026, 5, 5, 10),
-                aiInsight: null,
-              );
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
+    deepReadingStyles.add(style);
+    return deepReadingResult ??
+        (_lists.isNotEmpty && _lists.first.isNotEmpty
+            ? _lists.first.first
+            : createResult ??
+                  _checkIn(
+                    id: checkInId,
+                    createdAt: DateTime(2026, 5, 5, 10),
+                    aiInsight: null,
+                  ));
+  }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    savedReadingIds.add(checkInId);
+    return savedReadingResult ??
+        _checkIn(
+          id: checkInId,
+          createdAt: DateTime(2026, 5, 5, 10),
+          aiInsight: _insight(),
+          savedReading: true,
+        );
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {
+    ritualReadingIds.add(checkInId);
   }
 }
 
@@ -327,6 +440,7 @@ CheckIn _checkIn({
   required int id,
   required DateTime createdAt,
   required CheckInAiInsight? aiInsight,
+  bool savedReading = false,
 }) {
   return CheckIn(
     id: id,
@@ -337,6 +451,7 @@ CheckIn _checkIn({
     recommendedPractice: '',
     aiInsight: aiInsight,
     createdAt: createdAt,
+    savedReading: savedReading,
   );
 }
 

@@ -190,7 +190,20 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async => item;
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async => item;
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async => item;
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {}
 }
 
 class _FakeProfileRepository implements ProfileRepository {

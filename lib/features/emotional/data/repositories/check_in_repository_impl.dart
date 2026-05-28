@@ -68,14 +68,41 @@ class CheckInRepositoryImpl implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
     final response = await _dio.post<dynamic>(
       '/v1/check-ins/$checkInId/deep-reading',
+      queryParameters: {'style': style},
     );
 
     return CheckInDto.fromJson(
       ApiPayloadParser.dataMap(response.data),
     ).toEntity();
+  }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    final response = await _dio.post<dynamic>(
+      '/v1/check-ins/$checkInId/reading/save',
+    );
+
+    return CheckInDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {
+    await _dio.post<dynamic>(
+      '/v1/check-ins/$checkInId/reading/ritual',
+      data: {'localDate': _formatDate(localDate), 'type': type},
+    );
   }
 
   String? _formatDate(DateTime? value) {

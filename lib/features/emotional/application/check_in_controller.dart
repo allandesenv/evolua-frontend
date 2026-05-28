@@ -5,6 +5,7 @@ import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/emotional/data/repositories/check_in_repository_impl.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
@@ -257,7 +258,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     }
   }
 
-  Future<CheckIn?> generateDeepReadingForLatest() async {
+  Future<CheckIn?> generateDeepReadingForLatest({String style = 'deep'}) async {
     final current = state.asData?.value;
     final latest = current?.latestCreatedCheckIn;
     if (latest == null) {
@@ -268,7 +269,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     state = const AsyncLoading();
     CheckIn? refreshed;
     state = await AsyncValue.guard(() async {
-      refreshed = await repository.generateDeepReading(latest.id);
+      refreshed = await repository.generateDeepReading(latest.id, style: style);
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(trailControllerProvider);
       final result = await _fetch(page: current?.result.page ?? 0);
@@ -279,6 +280,53 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     });
     _resumeInsightPollingFromState();
     return refreshed;
+  }
+
+  Future<CheckIn?> saveReading(int checkInId) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return null;
+    }
+
+    final repository = ref.read(checkInRepositoryProvider);
+    CheckIn? refreshed;
+    state = await AsyncValue.guard(() async {
+      refreshed = await repository.saveReading(checkInId);
+      final result = await _fetch(page: current.result.page);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: _canonicalLatestCheckIn(result, refreshed),
+      );
+    });
+    _resumeInsightPollingFromState();
+    return refreshed;
+  }
+
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    DateTime? localDate,
+    String type = 'MORNING',
+  }) async {
+    final current = state.asData?.value;
+    if (current == null) {
+      return;
+    }
+
+    final repository = ref.read(checkInRepositoryProvider);
+    state = await AsyncValue.guard(() async {
+      await repository.createRitualFromReading(
+        checkInId,
+        localDate: localDate ?? DateTime.now(),
+        type: type,
+      );
+      ref.invalidate(dailyRitualControllerProvider);
+      final result = await _fetch(page: current.result.page);
+      return _stateFromResult(
+        result,
+        latestCreatedCheckIn: current.latestCreatedCheckIn,
+      );
+    });
+    _resumeInsightPollingFromState();
   }
 
   Future<PaginatedResponse<CheckIn>> _fetch({required int page}) {

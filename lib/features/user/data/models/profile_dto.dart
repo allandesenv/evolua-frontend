@@ -13,6 +13,7 @@ class ProfileDto {
     this.customGender,
     this.avatarUrl,
     required this.createdAt,
+    this.personalGoals,
   });
 
   final int id;
@@ -26,6 +27,7 @@ class ProfileDto {
   final String? customGender;
   final String? avatarUrl;
   final DateTime createdAt;
+  final String? personalGoals;
 
   factory ProfileDto.fromJson(Map<String, dynamic> json) {
     return ProfileDto(
@@ -42,6 +44,7 @@ class ProfileDto {
       customGender: json['customGender']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
       createdAt: DateTime.parse(json['createdAt'].toString()),
+      personalGoals: json['personalGoals']?.toString(),
     );
   }
 
@@ -58,6 +61,7 @@ class ProfileDto {
       customGender: customGender,
       avatarUrl: avatarUrl,
       createdAt: createdAt,
+      personalGoals: personalGoals,
     );
   }
 }

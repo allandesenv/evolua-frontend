@@ -17,6 +17,7 @@ class CheckInDto {
     required this.recommendedPractice,
     required this.aiInsight,
     required this.createdAt,
+    required this.savedReading,
   });
 
   final int id;
@@ -27,6 +28,7 @@ class CheckInDto {
   final String recommendedPractice;
   final CheckInAiInsight? aiInsight;
   final DateTime createdAt;
+  final bool savedReading;
 
   factory CheckInDto.fromJson(Map<String, dynamic> json) {
     return CheckInDto(
@@ -38,6 +40,7 @@ class CheckInDto {
       recommendedPractice: json['recommendedPractice']?.toString() ?? '',
       aiInsight: _parseInsight(json['aiInsight']),
       createdAt: DateTime.parse(json['createdAt'].toString()),
+      savedReading: json['savedReading'] as bool? ?? false,
     );
   }
 
@@ -51,6 +54,7 @@ class CheckInDto {
       recommendedPractice: recommendedPractice,
       aiInsight: aiInsight,
       createdAt: createdAt,
+      savedReading: savedReading,
     );
   }
 
@@ -89,6 +93,36 @@ class CheckInDto {
       rewardedAdAvailable: value['rewardedAdAvailable'] as bool? ?? false,
       upgradeRecommended: value['upgradeRecommended'] as bool? ?? false,
       limitMessage: value['limitMessage']?.toString(),
+      contextSignals: _parseStringList(value['contextSignals']),
+      readingDepth: value['readingDepth']?.toString(),
+      responseFingerprint: value['responseFingerprint']?.toString(),
+      usedContextSummary: value['usedContextSummary']?.toString(),
+      nextStep: _parseNextStep(value['nextStep']),
+    );
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    return (value as List? ?? const [])
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static CheckInAiNextStep? _parseNextStep(dynamic value) {
+    if (value is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final type = value['type']?.toString() ?? '';
+    final label = value['label']?.toString() ?? '';
+    if (type.trim().isEmpty || label.trim().isEmpty) {
+      return null;
+    }
+
+    return CheckInAiNextStep(
+      type: type,
+      label: label,
+      target: value['target']?.toString(),
     );
   }
 
