@@ -368,6 +368,15 @@ class _CareAttachmentButtonState extends ConsumerState<_CareAttachmentButton> {
             recommendation: widget.recommendation,
             attachment: widget.attachment,
           );
+    } on CareAttachmentMissingSecretException {
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          message:
+              'A chave de seguranÃ§a desta sessÃ£o nÃ£o estÃ¡ mais disponÃ­vel. NÃ£o Ã© possÃ­vel abrir o anexo.',
+          icon: Icons.info_outline_rounded,
+        );
+      }
     } catch (_) {
       if (mounted) {
         AppSnackBar.show(

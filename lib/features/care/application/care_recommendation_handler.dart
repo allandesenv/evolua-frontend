@@ -264,9 +264,9 @@ class CareRecommendationHandler {
         .read(envelope.shareId);
     try {
       if (secretBase64 == null || secretBase64.isEmpty) {
-        throw const CareAttachmentOpenException();
+        throw const CareAttachmentMissingSecretException();
       }
-      final secret = base64Url.decode(base64.normalize(secretBase64));
+      final secret = _decodeAttachmentSecret(secretBase64);
       final crypto = _ref.read(careCryptoServiceProvider);
       final key = await crypto.deriveSessionKey(
         shareSecret: secret,
@@ -301,14 +301,14 @@ class CareRecommendationHandler {
       await _ref
           .read(careRepositoryProvider)
           .acknowledgeRecommendation(recommendation.recommendationId);
+      _ref.invalidate(careRecommendationsProvider);
     } catch (error) {
       _acknowledgedRecommendationIds.remove(recommendation.recommendationId);
-      if (error is CareAttachmentOpenException) {
+      if (error is CareAttachmentOpenException ||
+          error is CareAttachmentMissingSecretException) {
         rethrow;
       }
       throw const CareAttachmentOpenException();
-    } finally {
-      _ref.invalidate(careRecommendationsProvider);
     }
   }
 
@@ -397,8 +397,20 @@ class CareRecommendationHandler {
     final minCreatedAt = DateTime.now().subtract(const Duration(days: 30));
     return !createdAt.isBefore(minCreatedAt);
   }
+
+  List<int> _decodeAttachmentSecret(String secretBase64) {
+    try {
+      return base64Url.decode(base64.normalize(secretBase64));
+    } catch (_) {
+      throw const CareAttachmentMissingSecretException();
+    }
+  }
 }
 
 class CareAttachmentOpenException implements Exception {
   const CareAttachmentOpenException();
+}
+
+class CareAttachmentMissingSecretException implements Exception {
+  const CareAttachmentMissingSecretException();
 }

@@ -252,6 +252,52 @@ void main() {
     );
   });
 
+  testWidgets('missing local secret shows specific attachment feedback', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final secret = base64UrlEncode(
+      List<int>.generate(32, (index) => index + 3),
+    );
+    final repository = _FakeCareRepository();
+    final secretStore = _FakeCareSecretStore({'share-1': secret});
+
+    await tester.pumpWidget(
+      _careSharePage(repository: repository, secretStore: secretStore),
+    );
+    await tester.pumpAndSettle();
+
+    repository.allRecommendations = [
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        attachmentId: 'att-missing-secret',
+        attachmentName: 'plano-seguro.pdf',
+        status: 'READ',
+        readAt: DateTime.now(),
+      ),
+    ];
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CareSharePage)),
+    );
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    secretStore.values.clear();
+    await tester.ensureVisible(find.text('plano-seguro.pdf'));
+    await tester.tap(find.text('plano-seguro.pdf'));
+    await tester.pumpAndSettle();
+
+    expect(repository.downloadCalls, 0);
+    expect(find.text('Alongue os ombros antes de dormir.'), findsOneWidget);
+    expect(
+      find.text(
+        'A chave de seguranÃ§a desta sessÃ£o nÃ£o estÃ¡ mais disponÃ­vel. NÃ£o Ã© possÃ­vel abrir o anexo.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('history delete hides recommendation across refreshes', (
     tester,
   ) async {

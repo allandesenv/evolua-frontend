@@ -310,7 +310,6 @@ class CareShareController extends AsyncNotifier<CareShareState> {
       final revoked = await ref
           .read(careRepositoryProvider)
           .revokeShare(shareId);
-      await ref.read(careSecretStoreProvider).delete(shareId);
       await _realtimeSubscription?.cancel();
       await ref.read(careRealtimeServiceProvider).disconnect();
       state = AsyncData(
@@ -351,7 +350,6 @@ class CareShareController extends AsyncNotifier<CareShareState> {
       final status = event.isRevoked
           ? CareAccessStatus.revoked
           : CareAccessStatus.expired;
-      await ref.read(careSecretStoreProvider).delete(event.shareId);
       await _realtimeSubscription?.cancel();
       await ref.read(careRealtimeServiceProvider).disconnect();
       state = AsyncData(current.copyWith(status: status, clearQrPayload: true));
