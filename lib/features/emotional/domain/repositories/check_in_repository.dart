@@ -20,5 +20,13 @@ abstract class CheckInRepository {
     required int energyLevel,
   });
 
-  Future<CheckIn> generateDeepReading(int checkInId);
+  Future<CheckIn> generateDeepReading(int checkInId, {String style = 'deep'});
+
+  Future<CheckIn> saveReading(int checkInId);
+
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  });
 }

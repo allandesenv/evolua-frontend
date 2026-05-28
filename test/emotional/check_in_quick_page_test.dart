@@ -276,9 +276,7 @@ void main() {
       expect(repository.createCalls, 2);
     });
 
-    testWidgets('reward failure follows existing retry flow', (
-      tester,
-    ) async {
+    testWidgets('reward failure follows existing retry flow', (tester) async {
       final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
       final rewarded = _FakeRewardedAdService(
         result: false,
@@ -527,7 +525,10 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
     return items.firstWhere(
       (item) => item.id == checkInId,
       orElse: () => CheckIn(
@@ -542,6 +543,18 @@ class _FakeCheckInRepository implements CheckInRepository {
       ),
     );
   }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    return generateDeepReading(checkInId);
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {}
 }
 
 class _FakeRewardedAdService implements RewardedAdService {
