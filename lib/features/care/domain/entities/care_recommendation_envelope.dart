@@ -7,6 +7,8 @@ class CareRecommendationEnvelope {
     required this.encryptedPayload,
     required this.attachments,
     required this.createdAt,
+    this.status = 'NEW',
+    this.readAt,
     this.therapistLabel,
   });
 
@@ -15,7 +17,14 @@ class CareRecommendationEnvelope {
   final CareEncryptedPayload encryptedPayload;
   final List<CareRecommendationAttachmentEnvelope> attachments;
   final DateTime createdAt;
+  final String status;
+  final DateTime? readAt;
   final String? therapistLabel;
+
+  bool get isRead {
+    final normalized = status.toUpperCase();
+    return normalized == 'READ' || normalized == 'OPENED' || readAt != null;
+  }
 }
 
 class CareRecommendationAttachmentEnvelope {
@@ -41,6 +50,8 @@ class CareRecommendation {
     required this.guidanceText,
     required this.attachments,
     required this.createdAt,
+    this.status = 'NEW',
+    this.readAt,
     this.therapistLabel,
   });
 
@@ -49,7 +60,14 @@ class CareRecommendation {
   final String guidanceText;
   final List<CareRecommendationAttachment> attachments;
   final DateTime createdAt;
+  final String status;
+  final DateTime? readAt;
   final String? therapistLabel;
+
+  bool get isRead {
+    final normalized = status.toUpperCase();
+    return normalized == 'READ' || normalized == 'OPENED' || readAt != null;
+  }
 }
 
 class CareRecommendationAttachment {

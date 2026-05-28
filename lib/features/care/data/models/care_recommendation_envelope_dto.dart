@@ -8,6 +8,8 @@ class CareRecommendationEnvelopeDto {
     required this.encryptedPayload,
     required this.attachments,
     required this.createdAt,
+    required this.status,
+    this.readAt,
     this.therapistLabel,
   });
 
@@ -16,6 +18,8 @@ class CareRecommendationEnvelopeDto {
   final CareEncryptedPayload encryptedPayload;
   final List<CareRecommendationAttachmentEnvelopeDto> attachments;
   final DateTime createdAt;
+  final String status;
+  final DateTime? readAt;
   final String? therapistLabel;
 
   factory CareRecommendationEnvelopeDto.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,8 @@ class CareRecommendationEnvelopeDto {
           )
           .toList(),
       therapistLabel: json['therapistLabel']?.toString(),
+      status: json['status']?.toString() ?? 'NEW',
+      readAt: DateTime.tryParse(json['readAt']?.toString() ?? '')?.toLocal(),
       createdAt:
           DateTime.tryParse(json['createdAt']?.toString() ?? '')?.toLocal() ??
           DateTime.now(),
@@ -45,6 +51,8 @@ class CareRecommendationEnvelopeDto {
     shareId: shareId,
     encryptedPayload: encryptedPayload,
     attachments: attachments.map((item) => item.toEntity()).toList(),
+    status: status,
+    readAt: readAt,
     therapistLabel: therapistLabel,
     createdAt: createdAt,
   );

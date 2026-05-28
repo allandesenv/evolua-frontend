@@ -25,7 +25,7 @@ class CareClaimPage extends ConsumerWidget {
     });
 
     return GradientScaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final padding = _pagePadding(constraints.maxWidth);
@@ -51,34 +51,75 @@ class CareClaimPage extends ConsumerWidget {
   }
 }
 
-class _CareDashboard extends ConsumerWidget {
+class _CareDashboard extends ConsumerStatefulWidget {
   const _CareDashboard({required this.state});
 
   final CareClaimState state;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CareDashboard> createState() => _CareDashboardState();
+}
+
+class _CareDashboardState extends ConsumerState<_CareDashboard>
+    with WidgetsBindingObserver {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      final position = _scrollController.position;
+      final max = position.maxScrollExtent;
+      if (position.pixels > max) {
+        _scrollController.jumpTo(max);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return SingleChildScrollView(
+      controller: _scrollController,
+      padding: EdgeInsets.only(bottom: bottomInset + 20),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _CareClaimHeader(state: state),
+          _CareClaimHeader(state: widget.state),
           const SizedBox(height: 20),
-          _ClinicalSummaryPanel(report: state.report),
+          _ClinicalSummaryPanel(report: widget.state.report),
           const SizedBox(height: 20),
           _ResponsivePair(
-            primary: _MoodChartPanel(checkIns: state.report.checkIns),
-            secondary: _AttentionPointsPanel(report: state.report),
+            primary: _MoodChartPanel(checkIns: widget.state.report.checkIns),
+            secondary: _AttentionPointsPanel(report: widget.state.report),
           ),
           const SizedBox(height: 20),
           _ResponsivePair(
-            primary: _InsightPanel(report: state.report),
-            secondary: _RitualAdherencePanel(rituals: state.report.rituals),
+            primary: _InsightPanel(report: widget.state.report),
+            secondary: _RitualAdherencePanel(
+              rituals: widget.state.report.rituals,
+            ),
           ),
           const SizedBox(height: 20),
-          _PrescriptionPanel(isSending: state.isSendingPrescription),
+          _PrescriptionPanel(isSending: widget.state.isSendingPrescription),
           const SizedBox(height: 20),
-          _RecommendationPanel(isSending: state.isSendingRecommendation),
+          _RecommendationPanel(isSending: widget.state.isSendingRecommendation),
         ],
       ),
     );
@@ -800,12 +841,49 @@ class _RecommendationPanel extends ConsumerStatefulWidget {
 
 class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
   final _guidanceController = TextEditingController();
+  final _guidanceFocusNode = FocusNode();
+  final _guidanceFieldKey = GlobalKey();
   final List<PlatformFile> _attachments = [];
 
   @override
+  void initState() {
+    super.initState();
+    _guidanceFocusNode.addListener(_handleGuidanceFocusChanged);
+  }
+
+  @override
   void dispose() {
+    _guidanceFocusNode.removeListener(_handleGuidanceFocusChanged);
+    _guidanceFocusNode.dispose();
     _guidanceController.dispose();
     super.dispose();
+  }
+
+  void _handleGuidanceFocusChanged() {
+    if (_guidanceFocusNode.hasFocus) {
+      _scheduleGuidanceScroll();
+    }
+  }
+
+  void _scheduleGuidanceScroll() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureGuidanceVisible();
+    });
+    Future<void>.delayed(const Duration(milliseconds: 260), () {
+      _ensureGuidanceVisible();
+    });
+  }
+
+  void _ensureGuidanceVisible() {
+    if (!mounted) return;
+    final fieldContext = _guidanceFieldKey.currentContext;
+    if (fieldContext == null) return;
+    Scrollable.ensureVisible(
+      fieldContext,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      alignment: 0.2,
+    );
   }
 
   @override
@@ -830,15 +908,26 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
               height: 1.45,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Anexos aceitos: PDF, JPG, PNG ou WebP, até 10 MB por arquivo.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
+          ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _guidanceController,
-            minLines: 4,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              labelText: 'Orientações e Recomendações Gerais',
-              hintText:
-                  'Escreva recomendações, combinados ou cuidados para os próximos dias.',
+          KeyedSubtree(
+            key: _guidanceFieldKey,
+            child: TextField(
+              controller: _guidanceController,
+              focusNode: _guidanceFocusNode,
+              minLines: 4,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                labelText: 'Orientações e Recomendações Gerais',
+                hintText:
+                    'Escreva recomendações, combinados ou cuidados para os próximos dias.',
+              ),
             ),
           ),
           const SizedBox(height: 14),
