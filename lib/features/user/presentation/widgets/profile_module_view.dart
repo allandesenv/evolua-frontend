@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
@@ -643,7 +643,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Esta ação e permanente. Para confirmar, digite seu e-mail e informe sua senha atual se sua conta usa email e senha.',
+              'Esta ação é permanente. Para confirmar, digite seu e-mail e informe sua senha atual se sua conta usa email e senha.',
             ),
             const SizedBox(height: 12),
             TextField(
@@ -2777,7 +2777,7 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
       label: 'ansiedade a noite',
       headline: 'Você tende a registrar mais ansiedade à noite.',
       description:
-          'Esse pode ser um bom horario para reduzir estímulos, fazer uma pausa curta e escolher uma ação simples antes de dormir.',
+          'Esse pode ser um bom horário para reduzir estímulos, fazer uma pausa curta e escolher uma ação simples antes de dormir.',
       identified: true,
     );
   }
@@ -2804,7 +2804,7 @@ _MirrorPattern _mirrorPrimaryPattern(List<CheckIn> items) {
       label: 'nomeação emocional',
       headline: 'Você evoluiu na capacidade de nomear emoções.',
       description:
-          'Seu histórico mostra mais nuances emocionais. Isso e sinal de percepção crescendo, não de instabilidade.',
+          'Seu histórico mostra mais nuances emocionais. Isso é sinal de percepção crescendo, não de instabilidade.',
       identified: true,
     );
   }
@@ -3082,7 +3082,7 @@ class _FeedbackSectionState extends ConsumerState<_FeedbackSection> {
           title: 'Compartilhe sua experiência',
           description: 'Conte como tem sido usar o Evolua no seu dia a dia.',
           microcopy:
-              'Sua percepção mostra onde o app ja apoia bem e onde ainda pode cuidar melhor.',
+              'Sua percepção mostra onde o app já apoia bem e onde ainda pode cuidar melhor.',
           children: feedbackFields,
         ),
         const SizedBox(height: 16),
@@ -3295,7 +3295,7 @@ class _HelpSupportSection extends StatelessWidget {
             const _HelpFaqTile(
               title: 'Como a IA gera sugestões?',
               answer:
-                  'A IA usa seu check-in e, quando permitido, seu histórico para criar orientacoes de autocuidado. Ela não substitui apoio profissional.',
+                  'A IA usa seu check-in e, quando permitido, seu histórico para criar orientações de autocuidado. Ela não substitui apoio profissional.',
             ),
             const _HelpFaqTile(
               title: 'Como editar meu perfil?',
@@ -3378,7 +3378,7 @@ class _HelpSupportSection extends StatelessWidget {
               subtitle: 'Acesse uma fonte segura configurada pelo Evolua.',
               onTap: () => onOpenLink(
                 config?.emotionalResourcesUrl,
-                'Os recursos de apoio emocional ainda não estao configurados.',
+                'Os recursos de apoio emocional ainda não estão configurados.',
               ),
             ),
             _SettingsActionRow(
@@ -4509,3 +4509,4 @@ String _sectionLabel(ProfileModuleSection section) {
     ProfileModuleSection.evolutionMirror => 'Espelho da Evolução',
   };
 }
+
