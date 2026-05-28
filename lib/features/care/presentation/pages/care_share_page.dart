@@ -25,64 +25,99 @@ class CareSharePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(careShareControllerProvider);
     final l10n = context.l10n;
+    final isSyncing = state.asData?.value.isSyncing ?? false;
     return GradientScaffold(
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: l10n.commonBack,
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go('/home');
-                        }
-                      },
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Evolua Care',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
+        child: RefreshIndicator(
+          onRefresh: () => _syncManually(context, ref),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: l10n.commonBack,
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/home');
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                PrimaryPanel(
-                  padding: const EdgeInsets.all(22),
-                  child: state.when(
-                    loading: () =>
-                        _CareLoadingState(text: l10n.careLoadingSecureAccess),
-                    error: (_, _) => _CareMessageState(
-                      icon: Icons.error_outline_rounded,
-                      title: l10n.careLoadErrorTitle,
-                      message: l10n.careLoadErrorMessage,
-                      actionLabel: l10n.commonRetry,
-                      onAction: () =>
-                          ref.invalidate(careShareControllerProvider),
-                    ),
-                    data: (value) => _CareShareContent(state: value),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Evolua Care',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: l10n.commonRefresh,
+                        onPressed: isSyncing
+                            ? null
+                            : () => _syncManually(context, ref),
+                        icon: isSyncing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sync_rounded),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 18),
-                const _CareRecommendationsPanel(),
-                const SizedBox(height: 18),
-                const _CareHistoryPanel(),
-              ],
+                  const SizedBox(height: 18),
+                  PrimaryPanel(
+                    padding: const EdgeInsets.all(22),
+                    child: state.when(
+                      loading: () =>
+                          _CareLoadingState(text: l10n.careLoadingSecureAccess),
+                      error: (_, _) => _CareMessageState(
+                        icon: Icons.error_outline_rounded,
+                        title: l10n.careLoadErrorTitle,
+                        message: l10n.careLoadErrorMessage,
+                        actionLabel: l10n.commonRetry,
+                        onAction: () =>
+                            ref.invalidate(careShareControllerProvider),
+                      ),
+                      data: (value) => _CareShareContent(state: value),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const _CareRecommendationsPanel(),
+                  const SizedBox(height: 18),
+                  const _CareHistoryPanel(),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _syncManually(BuildContext context, WidgetRef ref) async {
+    final result = await ref
+        .read(careShareControllerProvider.notifier)
+        .syncPendingCare(manual: true);
+    if (!context.mounted || !result.hasFailures) {
+      return;
+    }
+    AppSnackBar.show(
+      context,
+      message:
+          'Não foi possível sincronizar agora. Tente novamente em instantes.',
+      icon: Icons.info_outline_rounded,
     );
   }
 }

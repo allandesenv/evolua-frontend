@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
+import 'package:evolua_frontend/features/care/application/care_pending_processing_result.dart';
 import 'package:evolua_frontend/features/care/application/care_repository_provider.dart';
 import 'package:evolua_frontend/features/care/application/care_realtime_event.dart';
 import 'package:evolua_frontend/features/care/application/care_secret_store.dart';
@@ -55,39 +56,74 @@ class CarePrescriptionHandler {
   }
 
   Future<bool> applyPending({String? prescriptionId}) async {
+    return (await applyPendingDetailed(prescriptionId: prescriptionId)).applied;
+  }
+
+  Future<CarePendingProcessingResult> applyPendingDetailed({
+    String? prescriptionId,
+  }) async {
     try {
       final pending = await _ref
           .read(careRepositoryProvider)
           .pendingPrescriptions();
       var applied = false;
+      var failed = false;
+      var attempted = false;
       for (final envelope in pending) {
         if (prescriptionId != null &&
             prescriptionId.isNotEmpty &&
             envelope.prescriptionId != prescriptionId) {
           continue;
         }
-        applied = await applyEnvelope(envelope) || applied;
+        attempted = true;
+        final result = await applyEnvelopeDetailed(envelope);
+        applied = result.applied || applied;
+        failed = result.failed || failed;
       }
-      return applied;
+      return CarePendingProcessingResult(
+        applied: applied,
+        failed: failed,
+        attempted: attempted,
+      );
     } catch (error) {
       if (kDebugMode) {
         debugPrint(
           'Care pending prescriptions ignored (${error.runtimeType}).',
         );
       }
-      return false;
+      return const CarePendingProcessingResult(
+        applied: false,
+        failed: true,
+        attempted: true,
+      );
     }
   }
 
   Future<bool> applyEnvelope(CarePrescriptionEnvelope envelope) async {
+    return (await applyEnvelopeDetailed(envelope)).applied;
+  }
+
+  Future<CarePendingProcessingResult> applyEnvelopeDetailed(
+    CarePrescriptionEnvelope envelope,
+  ) async {
     if (_appliedPrescriptionIds.contains(envelope.prescriptionId)) {
-      return true;
+      return const CarePendingProcessingResult(
+        applied: true,
+        failed: false,
+        attempted: true,
+      );
     }
     try {
       final secretBase64 = await _ref
           .read(careSecretStoreProvider)
           .read(envelope.shareId);
-      if (secretBase64 == null || secretBase64.isEmpty) return false;
+      if (secretBase64 == null || secretBase64.isEmpty) {
+        return const CarePendingProcessingResult(
+          applied: false,
+          failed: true,
+          attempted: true,
+        );
+      }
 
       final secret = base64Url.decode(base64.normalize(secretBase64));
       final crypto = _ref.read(careCryptoServiceProvider);
@@ -115,12 +151,21 @@ class CarePrescriptionHandler {
             ritualType: draft.type,
           );
       _ref.read(carePrescriptionAppliedEventProvider.notifier).emit();
-      return true;
+      _ref.invalidate(dailyRitualControllerProvider);
+      return const CarePendingProcessingResult(
+        applied: true,
+        failed: false,
+        attempted: true,
+      );
     } catch (error) {
       if (kDebugMode) {
         debugPrint('Care prescription ignored (${error.runtimeType}).');
       }
-      return false;
+      return const CarePendingProcessingResult(
+        applied: false,
+        failed: true,
+        attempted: true,
+      );
     }
   }
 

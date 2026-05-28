@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
+import 'package:evolua_frontend/features/care/application/care_pending_processing_result.dart';
 import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_qr_payload.dart';
@@ -13,6 +14,7 @@ import 'package:evolua_frontend/features/care/application/care_secret_store.dart
 import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 export 'care_repository_provider.dart';
@@ -35,6 +37,7 @@ class CareShareState {
     this.qrPayload,
     this.numericCode,
     this.friendlyMessage,
+    this.isSyncing = false,
   });
 
   const CareShareState.idle()
@@ -42,20 +45,23 @@ class CareShareState {
       session = null,
       qrPayload = null,
       numericCode = null,
-      friendlyMessage = null;
+      friendlyMessage = null,
+      isSyncing = false;
 
   const CareShareState.generating()
     : status = CareAccessStatus.generating,
       session = null,
       qrPayload = null,
       numericCode = null,
-      friendlyMessage = null;
+      friendlyMessage = null,
+      isSyncing = false;
 
   final CareAccessStatus status;
   final CareShareSession? session;
   final CareQrPayload? qrPayload;
   final String? numericCode;
   final String? friendlyMessage;
+  final bool isSyncing;
 
   String? get shareId => session?.shareId;
   DateTime? get expiresAt => session?.expiresAt;
@@ -66,6 +72,7 @@ class CareShareState {
     CareShareSession session, {
     CareQrPayload? qrPayload,
     String? friendlyMessage,
+    bool isSyncing = false,
   }) {
     return CareShareState(
       status: session.status,
@@ -73,6 +80,7 @@ class CareShareState {
       qrPayload: qrPayload,
       numericCode: session.numericCode,
       friendlyMessage: friendlyMessage,
+      isSyncing: isSyncing,
     );
   }
 
@@ -82,6 +90,7 @@ class CareShareState {
     CareQrPayload? qrPayload,
     String? numericCode,
     String? friendlyMessage,
+    bool? isSyncing,
     bool clearQrPayload = false,
     bool clearFriendlyMessage = false,
   }) {
@@ -93,6 +102,7 @@ class CareShareState {
       friendlyMessage: clearFriendlyMessage
           ? null
           : friendlyMessage ?? this.friendlyMessage,
+      isSyncing: isSyncing ?? this.isSyncing,
     );
   }
 
@@ -107,6 +117,7 @@ class CareShareState {
 
 class CareShareController extends AsyncNotifier<CareShareState> {
   StreamSubscription<CareRealtimeEvent>? _realtimeSubscription;
+  Future<CarePendingProcessingResult>? _pendingCareSync;
 
   @override
   Future<CareShareState> build() async {
@@ -123,8 +134,7 @@ class CareShareController extends AsyncNotifier<CareShareState> {
         .read(careSecretStoreProvider)
         .read(current.shareId);
     _connectRealtime();
-    unawaited(_applyPendingPrescriptions());
-    return CareShareState.fromSession(
+    final next = CareShareState.fromSession(
       current,
       qrPayload: secret == null
           ? null
@@ -134,6 +144,10 @@ class CareShareController extends AsyncNotifier<CareShareState> {
               secretBase64: secret,
             ),
     );
+    Future<void>.microtask(() {
+      unawaited(syncPendingCare());
+    });
+    return next;
   }
 
   Future<void> generateAccess() async {
@@ -203,6 +217,88 @@ class CareShareController extends AsyncNotifier<CareShareState> {
     }
   }
 
+  Future<CarePendingProcessingResult> syncPendingCare({bool manual = false}) {
+    final running = _pendingCareSync;
+    if (running != null) {
+      return running;
+    }
+
+    final current = state.asData?.value;
+    if (current == null) {
+      return Future.value(const CarePendingProcessingResult.empty());
+    }
+
+    final operation = _syncPendingCare(current, manual: manual);
+    _pendingCareSync = operation;
+    return operation.whenComplete(() {
+      _pendingCareSync = null;
+    });
+  }
+
+  Future<CarePendingProcessingResult> _syncPendingCare(
+    CareShareState initialState, {
+    required bool manual,
+  }) async {
+    state = AsyncData(
+      initialState.copyWith(isSyncing: true, clearFriendlyMessage: manual),
+    );
+    var result = const CarePendingProcessingResult.empty();
+
+    try {
+      final prescriptionResult = await ref
+          .read(carePrescriptionHandlerProvider)
+          .applyPendingDetailed();
+      final recommendationResult = await ref
+          .read(careRecommendationHandlerProvider)
+          .applyPendingDetailed();
+      result = prescriptionResult.merge(recommendationResult);
+
+      if (result.applied || manual) {
+        ref.invalidate(dailyRitualControllerProvider);
+        ref.invalidate(careRecommendationsProvider);
+        ref.invalidate(careShareHistoryProvider);
+      }
+
+      final shareId = initialState.shareId;
+      if (shareId != null) {
+        try {
+          final session = await ref
+              .read(careRepositoryProvider)
+              .getShareStatus(shareId);
+          state = AsyncData(
+            (state.asData?.value ?? initialState)
+                .copyWithSession(session)
+                .copyWith(isSyncing: false),
+          );
+          if (session.status.isTerminal) {
+            await _realtimeSubscription?.cancel();
+            await ref.read(careRealtimeServiceProvider).disconnect();
+          }
+        } catch (_) {
+          state = AsyncData(
+            (state.asData?.value ?? initialState).copyWith(isSyncing: false),
+          );
+        }
+      } else {
+        state = AsyncData(
+          (state.asData?.value ?? initialState).copyWith(isSyncing: false),
+        );
+      }
+      return result;
+    } catch (_) {
+      state = AsyncData(
+        (state.asData?.value ?? initialState).copyWith(isSyncing: false),
+      );
+      return result.merge(
+        const CarePendingProcessingResult(
+          applied: false,
+          failed: true,
+          attempted: true,
+        ),
+      );
+    }
+  }
+
   Future<void> revokeAccess() async {
     final current = state.asData?.value;
     final shareId = current?.shareId;
@@ -263,23 +359,22 @@ class CareShareController extends AsyncNotifier<CareShareState> {
     }
 
     if (event.isPrescriptionCreated) {
-      await ref.read(carePrescriptionHandlerProvider).applyRealtimeEvent(event);
+      final applied = await ref
+          .read(carePrescriptionHandlerProvider)
+          .applyRealtimeEvent(event);
+      if (applied) {
+        ref.invalidate(dailyRitualControllerProvider);
+      }
       return;
     }
 
     if (event.isRecommendationCreated) {
-      await ref
+      final applied = await ref
           .read(careRecommendationHandlerProvider)
           .applyRealtimeEvent(event);
-    }
-  }
-
-  Future<void> _applyPendingPrescriptions() async {
-    try {
-      await ref.read(carePrescriptionHandlerProvider).applyPending();
-      await ref.read(careRecommendationHandlerProvider).applyPending();
-    } catch (_) {
-      return;
+      if (applied) {
+        ref.invalidate(careRecommendationsProvider);
+      }
     }
   }
 

@@ -195,6 +195,65 @@ void main() {
     },
   );
 
+  test(
+    'pending prescriptions continue after invalid encrypted envelope',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final secret = base64UrlEncode(
+        List<int>.generate(32, (index) => index + 1),
+      );
+      final careRepository = _FakeCareRepository();
+      final dailyRepository = _FakeDailyRitualRepository();
+      final container = ProviderContainer(
+        overrides: [
+          careSecretStoreProvider.overrideWithValue(
+            _FakeCareSecretStore({'share-1': secret}),
+          ),
+          careRepositoryProvider.overrideWithValue(careRepository),
+          dailyRitualRepositoryProvider.overrideWithValue(dailyRepository),
+          notificationRepositoryProvider.overrideWithValue(
+            _FakeNotificationRepository(),
+          ),
+          authControllerProvider.overrideWith(
+            () => _FakeAuthController(userId: 'user-a'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      careRepository.pending = [
+        CarePrescriptionEnvelope(
+          prescriptionId: 'rx-bad',
+          shareId: 'share-1',
+          encryptedPayload: const CareEncryptedPayload(
+            algorithm: 'AES-256-GCM',
+            nonceBase64: 'invalid',
+            cipherTextBase64: 'invalid',
+            macBase64: 'invalid',
+          ),
+          createdAt: DateTime(2026, 5, 27, 8),
+        ),
+        await _encryptedEnvelope(
+          container: container,
+          secretBase64: secret,
+          prescriptionId: 'rx-good',
+        ),
+      ];
+
+      final result = await container
+          .read(carePrescriptionHandlerProvider)
+          .applyPendingDetailed();
+      final rituals = await container.read(
+        dailyRitualControllerProvider.future,
+      );
+
+      expect(result.applied, isTrue);
+      expect(result.hasFailures, isTrue);
+      expect(careRepository.acknowledged, ['rx-good']);
+      expect(rituals.morning?.microAction, 'respirar por dois minutos');
+    },
+  );
+
   test('local care notifications are scoped by authenticated user', () async {
     SharedPreferences.setMockInitialValues({});
     final repository = _FakeNotificationRepository();

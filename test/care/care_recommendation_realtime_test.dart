@@ -119,6 +119,58 @@ void main() {
       expect(applied, isFalse);
     },
   );
+
+  test(
+    'pending recommendations apply valid envelopes after decrypt failures',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final secret = base64UrlEncode(
+        List<int>.generate(32, (index) => index + 7),
+      );
+      final repository = _FakeCareRepository();
+      final container = ProviderContainer(
+        overrides: [
+          careSecretStoreProvider.overrideWithValue(
+            _FakeCareSecretStore({'share-1': secret}),
+          ),
+          careRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final envelope = await _encryptedRecommendation(
+        container: container,
+        secretBase64: secret,
+      );
+      repository.pending = [
+        CareRecommendationEnvelope(
+          recommendationId: 'rec-bad',
+          shareId: 'share-1',
+          encryptedPayload: const CareEncryptedPayload(
+            algorithm: 'AES-256-GCM',
+            nonceBase64: 'invalid',
+            cipherTextBase64: 'invalid',
+            macBase64: 'invalid',
+          ),
+          attachments: const [],
+          createdAt: DateTime(2026, 5, 27, 10),
+        ),
+        envelope,
+      ];
+      repository.all = [envelope];
+
+      final result = await container
+          .read(careRecommendationHandlerProvider)
+          .applyPendingDetailed();
+      final recommendations = await container.read(
+        careRecommendationsProvider.future,
+      );
+
+      expect(result.applied, isTrue);
+      expect(result.hasFailures, isTrue);
+      expect(recommendations.single.recommendationId, 'rec-1');
+    },
+  );
 }
 
 Future<CareRecommendationEnvelope> _encryptedRecommendation({
