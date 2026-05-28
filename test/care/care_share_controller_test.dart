@@ -5,6 +5,8 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
 import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
+import 'package:evolua_frontend/features/care/application/care_realtime_event.dart';
+import 'package:evolua_frontend/features/care/application/care_realtime_service.dart';
 import 'package:evolua_frontend/features/care/application/care_secret_store.dart';
 import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
@@ -62,10 +64,11 @@ void main() {
 
     test('updates connected and revoked states', () async {
       final repository = _FakeCareRepository();
+      final secretStore = _FakeCareSecretStore();
       final container = ProviderContainer(
         overrides: [
           careRepositoryProvider.overrideWithValue(repository),
-          careSecretStoreProvider.overrideWithValue(_FakeCareSecretStore()),
+          careSecretStoreProvider.overrideWithValue(secretStore),
         ],
       );
       addTearDown(container.dispose);
@@ -74,6 +77,8 @@ void main() {
       await container
           .read(careShareControllerProvider.notifier)
           .generateAccess();
+      final shareSecret = secretStore.values['share-1'];
+      expect(shareSecret, isNotNull);
 
       repository.nextStatus = CareAccessStatus.connected;
       await container
@@ -89,6 +94,46 @@ void main() {
         container.read(careShareControllerProvider).value!.status,
         CareAccessStatus.revoked,
       );
+      expect(secretStore.values['share-1'], shareSecret);
+      expect(secretStore.deleteCount, 0);
+    });
+
+    test('terminal realtime events preserve local share secret', () async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = _FakeCareRepository()
+        ..session = _shareSession(CareAccessStatus.active);
+      final secretStore = _FakeCareSecretStore()
+        ..values['share-1'] = base64UrlEncode(List<int>.filled(32, 2));
+      final realtimeService = _FakeCareRealtimeService();
+      final container = ProviderContainer(
+        overrides: [
+          careRepositoryProvider.overrideWithValue(repository),
+          careSecretStoreProvider.overrideWithValue(secretStore),
+          careRealtimeServiceProvider.overrideWithValue(realtimeService),
+          authControllerProvider.overrideWith(
+            () => _FakeAuthController(userId: 'user-a'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.future);
+      await container.read(careShareControllerProvider.future);
+      await Future<void>.delayed(Duration.zero);
+      realtimeService.emit(
+        CareRealtimeEvent(
+          type: CareRealtimeEventType.shareExpired,
+          shareId: 'share-1',
+          occurredAt: DateTime(2026, 5, 27, 10),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(careShareControllerProvider).value!;
+      expect(state.status, CareAccessStatus.expired);
+      expect(secretStore.values['share-1'], isNotNull);
+      expect(secretStore.deleteCount, 0);
+      expect(realtimeService.disconnectCount, 1);
     });
 
     test(
@@ -471,11 +516,36 @@ class _FakeNotificationRepository implements NotificationRepository {
   Future<int> unreadCount() async => 0;
 }
 
+class _FakeCareRealtimeService implements CareRealtimeService {
+  final StreamController<CareRealtimeEvent> _events =
+      StreamController<CareRealtimeEvent>.broadcast();
+  int disconnectCount = 0;
+
+  @override
+  Stream<CareRealtimeEvent> connect({
+    required String userId,
+    required String accessToken,
+  }) {
+    return _events.stream;
+  }
+
+  void emit(CareRealtimeEvent event) {
+    _events.add(event);
+  }
+
+  @override
+  Future<void> disconnect() async {
+    disconnectCount++;
+  }
+}
+
 class _FakeCareSecretStore implements CareSecretStore {
   final Map<String, String> values = {};
+  int deleteCount = 0;
 
   @override
   Future<void> delete(String shareId) async {
+    deleteCount++;
     values.remove(shareId);
   }
 

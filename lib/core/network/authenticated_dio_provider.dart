@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _authRetryExtraKey = 'evolua.auth.retry';
+const _localePreferenceStorageKey = 'evolua.locale_preference.v1';
 
 final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
   final session = ref.watch(authControllerProvider).asData?.value;
@@ -16,13 +19,20 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
       headers: const {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Accept-Charset': 'utf-8',
+        'Accept-Language': 'pt-BR',
       },
+      responseDecoder: _utf8ResponseDecoder,
     ),
   );
 
   dio.interceptors.add(
     InterceptorsWrapper(
-      onRequest: (options, handler) {
+      onRequest: (options, handler) async {
+        final preferences = await ref.read(sharedPreferencesProvider.future);
+        options.headers['Accept-Language'] = _aiLanguageTag(
+          preferences.getString(_localePreferenceStorageKey),
+        );
         final currentSession =
             ref.read(authControllerProvider).asData?.value ?? session;
         final token = currentSession?.accessToken;
@@ -73,6 +83,22 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
 
   return dio;
 });
+
+String _aiLanguageTag(String? preference) {
+  return switch (preference) {
+    'en-US' => 'en-US',
+    'pt-BR' => 'pt-BR',
+    _ => 'pt-BR',
+  };
+}
+
+String _utf8ResponseDecoder(
+  List<int> responseBytes,
+  RequestOptions options,
+  ResponseBody responseBody,
+) {
+  return utf8.decode(responseBytes, allowMalformed: false);
+}
 
 bool _shouldRefresh(DioException error) {
   final response = error.response;
