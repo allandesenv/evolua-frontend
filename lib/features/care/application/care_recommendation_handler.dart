@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:evolua_frontend/features/care/application/care_attachment_opener.dart';
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
+import 'package:evolua_frontend/features/care/application/care_pending_processing_result.dart';
 import 'package:evolua_frontend/features/care/application/care_repository_provider.dart';
 import 'package:evolua_frontend/features/care/application/care_realtime_event.dart';
 import 'package:evolua_frontend/features/care/application/care_secret_store.dart';
@@ -57,13 +58,20 @@ class CareRecommendationHandler {
   }
 
   Future<bool> applyPending() async {
+    return (await applyPendingDetailed()).applied;
+  }
+
+  Future<CarePendingProcessingResult> applyPendingDetailed() async {
     try {
       final pending = await _ref
           .read(careRepositoryProvider)
           .pendingRecommendations();
       final seen = await _loadSeenRecommendationIds();
       var applied = false;
+      var failed = false;
+      var attempted = false;
       for (final envelope in pending) {
+        attempted = true;
         final recommendation = await decryptEnvelope(envelope);
         if (recommendation != null) {
           final isNewInMemory = _receivedRecommendationIds.add(
@@ -71,19 +79,31 @@ class CareRecommendationHandler {
           );
           final isNewPersisted = seen.add(recommendation.recommendationId);
           applied = isNewInMemory && isNewPersisted || applied;
+        } else {
+          failed = true;
         }
       }
-      if (applied) {
+      if (applied || attempted) {
         await _saveSeenRecommendationIds(seen);
         _ref.invalidate(careRecommendationsProvider);
-        _ref.read(careRecommendationReceivedEventProvider.notifier).emit();
+        if (applied) {
+          _ref.read(careRecommendationReceivedEventProvider.notifier).emit();
+        }
       }
-      return applied;
+      return CarePendingProcessingResult(
+        applied: applied,
+        failed: failed,
+        attempted: attempted,
+      );
     } catch (error) {
       if (kDebugMode) {
         debugPrint('Care recommendation ignored (${error.runtimeType}).');
       }
-      return false;
+      return const CarePendingProcessingResult(
+        applied: false,
+        failed: true,
+        attempted: true,
+      );
     }
   }
 
