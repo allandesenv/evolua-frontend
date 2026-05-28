@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
@@ -276,6 +278,104 @@ void main() {
       expect(repository.createCalls, 2);
     });
 
+    testWidgets('keeps rewarded button loading during automatic submit', (
+      tester,
+    ) async {
+      final submitGate = Completer<void>();
+      final repository = _FakeCheckInRepository(
+        blockFirstCreateWith402: true,
+        createGate: submitGate,
+      );
+      final rewarded = _FakeRewardedAdService(result: true);
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          rewardedAdService: rewarded,
+          subscriptionRepository: _FakeSubscriptionRepository(
+            accessAllowed: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'preciso registrar outro momento',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      expect(find.textContaining('Carregando'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
+      expect(repository.createCalls, 2);
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Assinar Premium'),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.textContaining('Carregando'), warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(repository.createCalls, 2);
+
+      submitGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
+    });
+
+    testWidgets('restores rewarded button after automatic submit failure', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository(
+        blockFirstCreateWith402: true,
+        failCreateCallWithNetwork: 2,
+      );
+      final rewarded = _FakeRewardedAdService(result: true);
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          rewardedAdService: rewarded,
+          subscriptionRepository: _FakeSubscriptionRepository(
+            accessAllowed: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'preciso registrar outro momento',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
+
+      expect(repository.createCalls, 2);
+      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      if (find.text('Entendi').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Entendi'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('Assistir anúncio'), findsOneWidget);
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pumpAndSettle();
+      expect(repository.createCalls, 3);
+    });
+
     testWidgets('reward failure follows existing retry flow', (tester) async {
       final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
       final rewarded = _FakeRewardedAdService(
@@ -450,11 +550,15 @@ class _FakeCheckInRepository implements CheckInRepository {
     List<CheckIn>? items,
     this.blockFirstCreateWith402 = false,
     this.blockCreateCountWith402 = 0,
+    this.createGate,
+    this.failCreateCallWithNetwork,
   }) : items = items ?? _checkIns();
 
   final List<CheckIn> items;
   final bool blockFirstCreateWith402;
   final int blockCreateCountWith402;
+  final Completer<void>? createGate;
+  final int? failCreateCallWithNetwork;
   int createCalls = 0;
   String? createdMood;
   String? createdReflection;
@@ -505,6 +609,20 @@ class _FakeCheckInRepository implements CheckInRepository {
             'message':
                 'Você já fez o check-in gratuito de hoje. Assista a um anúncio, assine Premium ou volte amanhã.',
           },
+        ),
+      );
+    }
+    if (createCalls == 2) {
+      await createGate?.future;
+    }
+    if (createCalls == failCreateCallWithNetwork) {
+      final requestOptions = RequestOptions(path: '/v1/check-ins');
+      throw DioException(
+        requestOptions: requestOptions,
+        response: Response(
+          requestOptions: requestOptions,
+          statusCode: 503,
+          data: const {'message': 'Falha temporaria.'},
         ),
       );
     }
