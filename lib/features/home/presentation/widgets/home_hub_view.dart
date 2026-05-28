@@ -1,4 +1,4 @@
-import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
+﻿import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
@@ -2051,7 +2051,7 @@ int _weeklyCheckIns(List<CheckIn> items) {
 
 String _energyTrend(List<CheckIn> items) {
   if (items.length < 2) {
-    return 'Ainda não ha oscilação suficiente para comparar.';
+    return 'Ainda não há oscilação suficiente para comparar.';
   }
 
   final midpoint = (items.length / 2).ceil();
@@ -2138,3 +2138,4 @@ String _compactText(String value, {required int maxLength}) {
 String _stripTrailingSentenceMark(String value) {
   return value.replaceFirst(RegExp(r'[.!?]+$'), '');
 }
+
