@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _sessionStorageKey = 'evolua.auth.session';
+const _localePreferenceStorageKey = 'evolua.locale_preference.v1';
 
 void main() {
   group('AuthController refresh', () {
@@ -326,6 +327,47 @@ void main() {
         'old-refresh-token',
       );
     });
+
+    test(
+      'sends locale and utf8 headers and preserves accented response',
+      () async {
+        final current = _testSession(
+          accessToken: _buildJwt(
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          ),
+          refreshToken: 'refresh-token',
+        );
+        SharedPreferences.setMockInitialValues({
+          _sessionStorageKey: jsonEncode(current.toJson()),
+          _localePreferenceStorageKey: 'en-US',
+        });
+        final repository = _FakeAuthRepository();
+        final container = _container(repository);
+        addTearDown(container.dispose);
+        await container.read(authControllerProvider.future);
+        await container.read(sharedPreferencesProvider.future);
+
+        final dio = container.read(
+          authenticatedDioProvider('https://api.evolua.test'),
+        );
+        final adapter = _QueuedAdapter([
+          (_) => ResponseBody.fromBytes(
+            utf8.encode('{"text":"estável versão ação"}'),
+            200,
+            headers: {
+              Headers.contentTypeHeader: ['application/json; charset=utf-8'],
+            },
+          ),
+        ]);
+        dio.httpClientAdapter = adapter;
+
+        final response = await dio.get<dynamic>('/v1/check-ins');
+
+        expect(adapter.requests.single.headers['Accept-Charset'], 'utf-8');
+        expect(adapter.requests.single.headers['Accept-Language'], 'en-US');
+        expect(response.data, {'text': 'estável versão ação'});
+      },
+    );
   });
 }
 

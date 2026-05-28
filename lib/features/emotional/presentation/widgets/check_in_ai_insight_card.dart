@@ -1,10 +1,13 @@
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CheckInAiInsightCard extends StatelessWidget {
+class CheckInAiInsightCard extends ConsumerWidget {
   const CheckInAiInsightCard({
     super.key,
     required this.insight,
@@ -31,7 +34,16 @@ class CheckInAiInsightCard extends StatelessWidget {
   final bool isSaved;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPremium = onRegenerate == null
+        ? true
+        : ref
+                  .watch(subscriptionControllerProvider)
+                  .asData
+                  ?.value
+                  .current
+                  ?.premium ??
+              false;
     final riskColor = switch (insight.riskLevel.toLowerCase()) {
       'high' => AppColors.accentWarm,
       'medium' => AppColors.accentGold,
@@ -269,7 +281,13 @@ class CheckInAiInsightCard extends StatelessWidget {
             _ReadingActionBar(
               isLoading: isReadingActionLoading,
               isSaved: isSaved,
-              onRegenerate: onRegenerate,
+              onRegenerate: onRegenerate == null
+                  ? null
+                  : (style) => _handleRegenerate(
+                      context,
+                      isPremium: isPremium,
+                      style: style,
+                    ),
               onSaveReading: onSaveReading,
               onCreateRitual: canCreateRitual ? onCreateRitual : null,
             ),
@@ -286,6 +304,45 @@ class CheckInAiInsightCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  void _handleRegenerate(
+    BuildContext context, {
+    required bool isPremium,
+    required String style,
+  }) {
+    if (isPremium) {
+      onRegenerate?.call(style);
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
+        child: SoftPremiumPrompt(
+          title: 'Recurso Premium',
+          message:
+              'Os refinamentos da leitura inteligente fazem parte do Premium.',
+          benefit:
+              'Assine para gerar versões mais curtas, profundas, práticas e variadas das suas leituras.',
+          onOpenPremium: onOpenPremium == null
+              ? null
+              : () {
+                  Navigator.of(sheetContext).maybePop();
+                  onOpenPremium?.call();
+                },
+          onSecondary: () => Navigator.of(sheetContext).maybePop(),
+        ),
       ),
     );
   }
