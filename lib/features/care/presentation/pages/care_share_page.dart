@@ -137,34 +137,50 @@ class _CareRecommendationsPanel extends ConsumerWidget {
           icon: Icons.info_outline_rounded,
           text: l10n.careRecommendationsError,
         ),
-        data: (items) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.careRecommendationsTitle,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: context.evoluaColors.textPrimary,
-                fontWeight: FontWeight.w800,
+        data: (items) {
+          final unread = items.where((item) => !item.isRead).toList();
+          final history = items.where((item) => item.isRead).toList();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.careRecommendationsTitle,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.careRecommendationsSubtitle,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: context.evoluaColors.textSecondary,
-                height: 1.4,
+              const SizedBox(height: 8),
+              Text(
+                l10n.careRecommendationsSubtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                  height: 1.4,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (items.isEmpty)
-              _CareInlineNotice(
-                icon: Icons.health_and_safety_outlined,
-                text: l10n.careRecommendationsEmpty,
-              )
-            else
-              ...items.take(10).map(_CareRecommendationTile.new),
-          ],
-        ),
+              const SizedBox(height: 16),
+              if (unread.isEmpty)
+                _CareInlineNotice(
+                  icon: Icons.health_and_safety_outlined,
+                  text: l10n.careRecommendationsEmpty,
+                )
+              else
+                ...unread.take(10).map(_CareRecommendationTile.new),
+              if (history.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Histórico de Orientações',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...history.take(20).map(_CareRecommendationTile.new),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -193,13 +209,50 @@ class _CareRecommendationTile extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                recommendation.therapistLabel ?? l10n.careTherapistFallback,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      recommendation.therapistLabel ??
+                          l10n.careTherapistFallback,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (!recommendation.isRead)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          'Nova',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+              if (recommendation.isRead) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Leitura confirmada',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.evoluaColors.textSecondary,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               if (recommendation.guidanceText.isNotEmpty)
                 Text(
@@ -230,14 +283,16 @@ class _CareRecommendationTile extends ConsumerWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
-              TextButton.icon(
-                onPressed: () => ref
-                    .read(careRecommendationHandlerProvider)
-                    .acknowledge(recommendation),
-                icon: const Icon(Icons.check_rounded),
-                label: Text(l10n.careAcknowledgeReading),
-              ),
+              if (!recommendation.isRead) ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: () => ref
+                      .read(careRecommendationHandlerProvider)
+                      .acknowledge(recommendation),
+                  icon: const Icon(Icons.check_rounded),
+                  label: Text(l10n.careAcknowledgeReading),
+                ),
+              ],
             ],
           ),
         ),

@@ -36,9 +36,43 @@ void main() {
     expect(find.text('Intenção terapêutica'), findsOneWidget);
     expect(find.text('Micro-ação sugerida'), findsOneWidget);
     expect(find.text('Prescrever ritual personalizado'), findsOneWidget);
+    expect(
+      find.text(
+        'Anexos aceitos: PDF, JPG, PNG ou WebP, até 10 MB por arquivo.',
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('clÃ'), findsNothing);
     expect(find.textContaining('relatÃ'), findsNothing);
     expect(find.textContaining('nÃ'), findsNothing);
+  });
+  testWidgets('keeps recommendation guidance field usable after mobile focus', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          careClaimControllerProvider.overrideWith(
+            () => _FakeCareClaimController(_claimState()),
+          ),
+        ],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final guidanceField = find.byType(TextField).last;
+    await tester.ensureVisible(guidanceField);
+    await tester.tap(guidanceField);
+    await tester.enterText(guidanceField, 'orientacao de teste');
+    await tester.pump(const Duration(milliseconds: 320));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('orientacao de teste'), findsOneWidget);
   });
 }
 

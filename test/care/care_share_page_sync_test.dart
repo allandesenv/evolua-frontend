@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
+import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_secret_store.dart';
 import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
@@ -98,6 +99,105 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'confirm reading acknowledges and moves recommendation to history',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final secret = base64UrlEncode(
+        List<int>.generate(32, (index) => index + 3),
+      );
+      final repository = _FakeCareRepository();
+      final secretStore = _FakeCareSecretStore({'share-1': secret});
+
+      await tester.pumpWidget(
+        _careSharePage(repository: repository, secretStore: secretStore),
+      );
+      await tester.pumpAndSettle();
+
+      repository.allRecommendations = [
+        await _encryptedRecommendation(tester: tester, secretBase64: secret),
+      ];
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(CareSharePage)),
+      );
+      await container.refresh(careRecommendationsProvider.future);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alongue os ombros antes de dormir.'), findsOneWidget);
+      expect(find.text('Nova'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Confirmar leitura'));
+      await tester.tap(find.text('Confirmar leitura'));
+      await tester.pumpAndSettle();
+
+      expect(repository.acknowledgedRecommendations, ['rec-widget']);
+      expect(find.text('Histórico de Orientações'), findsOneWidget);
+      expect(find.text('Leitura confirmada'), findsOneWidget);
+      expect(find.text('Alongue os ombros antes de dormir.'), findsOneWidget);
+      expect(find.text('Nova'), findsNothing);
+    },
+  );
+
+  testWidgets('renders read and opened recommendations in 30 day history', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final secret = base64UrlEncode(
+      List<int>.generate(32, (index) => index + 3),
+    );
+    final repository = _FakeCareRepository();
+    final secretStore = _FakeCareSecretStore({'share-1': secret});
+
+    await tester.pumpWidget(
+      _careSharePage(repository: repository, secretStore: secretStore),
+    );
+    await tester.pumpAndSettle();
+
+    repository.allRecommendations = [
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        recommendationId: 'rec-new',
+        guidanceText: 'Mensagem nova para hoje.',
+      ),
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        recommendationId: 'rec-read',
+        guidanceText: 'Mensagem lida continua disponivel.',
+        status: 'READ',
+        readAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        recommendationId: 'rec-opened',
+        guidanceText: 'Mensagem aberta fica no historico.',
+        status: 'OPENED',
+      ),
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        recommendationId: 'rec-old',
+        guidanceText: 'Mensagem antiga fora da janela.',
+        status: 'READ',
+        createdAt: DateTime.now().subtract(const Duration(days: 31)),
+      ),
+    ];
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CareSharePage)),
+    );
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem nova para hoje.'), findsOneWidget);
+    expect(find.text('Nova'), findsOneWidget);
+    expect(find.text('Histórico de Orientações'), findsOneWidget);
+    expect(find.text('Mensagem lida continua disponivel.'), findsOneWidget);
+    expect(find.text('Mensagem aberta fica no historico.'), findsOneWidget);
+    expect(find.text('Mensagem antiga fora da janela.'), findsNothing);
+  });
 }
 
 Widget _careSharePage({
@@ -121,6 +221,11 @@ Widget _careSharePage({
 Future<CareRecommendationEnvelope> _encryptedRecommendation({
   required WidgetTester tester,
   required String secretBase64,
+  String recommendationId = 'rec-widget',
+  String guidanceText = 'Alongue os ombros antes de dormir.',
+  String status = 'NEW',
+  DateTime? createdAt,
+  DateTime? readAt,
 }) async {
   final container = ProviderScope.containerOf(
     tester.element(find.byType(CareSharePage)),
@@ -137,17 +242,16 @@ Future<CareRecommendationEnvelope> _encryptedRecommendation({
     key: key,
     shareId: shareId,
     purpose: CareCryptoPayloadPurpose.guidance,
-    json: const {
-      'guidanceText': 'Alongue os ombros antes de dormir.',
-      'attachments': [],
-    },
+    json: {'guidanceText': guidanceText, 'attachments': []},
   );
   return CareRecommendationEnvelope(
-    recommendationId: 'rec-widget',
+    recommendationId: recommendationId,
     shareId: shareId,
     encryptedPayload: payload,
     attachments: const [],
-    createdAt: DateTime(2026, 5, 27, 10),
+    createdAt: createdAt ?? DateTime.now(),
+    status: status,
+    readAt: readAt,
     therapistLabel: 'Terapeuta',
   );
 }
@@ -158,12 +262,15 @@ class _FakeCareRepository implements CareRepository {
   List<CareRecommendationEnvelope> allRecommendations = const [];
   int pendingPrescriptionFetches = 0;
   int pendingRecommendationFetches = 0;
+  final acknowledgedRecommendations = <String>[];
 
   @override
   Future<void> acknowledgePrescription(String prescriptionId) async {}
 
   @override
-  Future<void> acknowledgeRecommendation(String recommendationId) async {}
+  Future<void> acknowledgeRecommendation(String recommendationId) async {
+    acknowledgedRecommendations.add(recommendationId);
+  }
 
   @override
   Future<CareShareSession?> currentShare() async => _session();

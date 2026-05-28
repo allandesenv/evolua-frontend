@@ -36,7 +36,7 @@ final careRecommendationsProvider = FutureProvider<List<CareRecommendation>>((
   final handler = ref.read(careRecommendationHandlerProvider);
   final envelopes = await ref.read(careRepositoryProvider).recommendations();
   final items = <CareRecommendation>[];
-  for (final envelope in envelopes) {
+  for (final envelope in handler.visibleEnvelopes(envelopes)) {
     final item = await handler.decryptEnvelope(envelope);
     if (item != null) items.add(item);
   }
@@ -51,6 +51,14 @@ class CareRecommendationHandler {
 
   final Ref _ref;
   final Set<String> _receivedRecommendationIds = <String>{};
+  final Set<String> _acknowledgedRecommendationIds = <String>{};
+
+  Iterable<CareRecommendationEnvelope> visibleEnvelopes(
+    Iterable<CareRecommendationEnvelope> envelopes,
+  ) {
+    final minCreatedAt = DateTime.now().subtract(const Duration(days: 30));
+    return envelopes.where((item) => !item.createdAt.isBefore(minCreatedAt));
+  }
 
   Future<bool> applyRealtimeEvent(CareRealtimeEvent event) async {
     if (event.recommendationId == null) return false;
@@ -154,6 +162,15 @@ class CareRecommendationHandler {
         guidanceText: json['guidanceText']?.toString().trim() ?? '',
         therapistLabel: envelope.therapistLabel,
         createdAt: envelope.createdAt,
+        status:
+            _acknowledgedRecommendationIds.contains(envelope.recommendationId)
+            ? 'READ'
+            : envelope.status,
+        readAt:
+            envelope.readAt ??
+            (_acknowledgedRecommendationIds.contains(envelope.recommendationId)
+                ? DateTime.now()
+                : null),
         attachments: (json['attachments'] as List? ?? const [])
             .whereType<Map>()
             .map((item) => _attachmentFromJson(Map<String, dynamic>.from(item)))
@@ -212,21 +229,36 @@ class CareRecommendationHandler {
       ),
       purpose: CareCryptoPayloadPurpose.attachment,
     );
-    await _ref
-        .read(careRepositoryProvider)
-        .acknowledgeRecommendation(recommendation.recommendationId);
-    await openCareAttachmentFile(
-      decrypted,
-      _safeFileName(attachment.displayName),
-    );
-    _ref.invalidate(careRecommendationsProvider);
+    _acknowledgedRecommendationIds.add(recommendation.recommendationId);
+    try {
+      await _ref
+          .read(careRepositoryProvider)
+          .acknowledgeRecommendation(recommendation.recommendationId);
+      await openCareAttachmentFile(
+        decrypted,
+        _safeFileName(attachment.displayName),
+      );
+    } catch (_) {
+      _acknowledgedRecommendationIds.remove(recommendation.recommendationId);
+      rethrow;
+    } finally {
+      _ref.invalidate(careRecommendationsProvider);
+    }
   }
 
   Future<void> acknowledge(CareRecommendation recommendation) async {
-    await _ref
-        .read(careRepositoryProvider)
-        .acknowledgeRecommendation(recommendation.recommendationId);
+    _acknowledgedRecommendationIds.add(recommendation.recommendationId);
     _ref.invalidate(careRecommendationsProvider);
+    try {
+      await _ref
+          .read(careRepositoryProvider)
+          .acknowledgeRecommendation(recommendation.recommendationId);
+    } catch (_) {
+      _acknowledgedRecommendationIds.remove(recommendation.recommendationId);
+      rethrow;
+    } finally {
+      _ref.invalidate(careRecommendationsProvider);
+    }
   }
 
   CareRecommendationAttachment _attachmentFromJson(Map<String, dynamic> json) {
