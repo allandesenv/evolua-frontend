@@ -891,7 +891,10 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
     return items.firstWhere(
       (item) => item.id == checkInId,
       orElse: () => CheckIn(
@@ -906,6 +909,18 @@ class _FakeCheckInRepository implements CheckInRepository {
       ),
     );
   }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    return generateDeepReading(checkInId);
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {}
 }
 
 class _MutableCheckInRepository implements CheckInRepository {
@@ -956,7 +971,10 @@ class _MutableCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
     final refreshed = listedAfterCreate.firstWhere(
       (item) => item.id == checkInId,
       orElse: () => created,
@@ -964,6 +982,18 @@ class _MutableCheckInRepository implements CheckInRepository {
     _items = [refreshed, ..._items.where((item) => item.id != refreshed.id)];
     return refreshed;
   }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    return generateDeepReading(checkInId);
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {}
 }
 
 class _EventuallyConsistentCheckInRepository implements CheckInRepository {
@@ -1012,9 +1042,24 @@ class _EventuallyConsistentCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
     return created;
   }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    return created;
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {}
 }
 
 class _FakeTrailRepository implements TrailRepository {

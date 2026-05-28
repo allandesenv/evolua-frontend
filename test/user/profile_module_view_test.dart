@@ -412,12 +412,12 @@ void main() {
 
     expect(find.text('Notificações'), findsOneWidget);
     expect(find.text('Marcar todas como lidas'), findsOneWidget);
-    expect(find.text('Hora de cuidar do seu registro'), findsOneWidget);
-    expect(find.text('Lembrete de check-in'), findsOneWidget);
-    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
-    await tester.pumpAndSettle();
     expect(find.text('Atualização do Evolua'), findsOneWidget);
     expect(find.text('Enviada pelo admin'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -260));
+    await tester.pumpAndSettle();
+    expect(find.text('Hora de cuidar do seu registro'), findsOneWidget);
+    expect(find.text('Lembrete de check-in'), findsOneWidget);
     expect(find.textContaining('Notificacoes'), findsNothing);
   });
 
@@ -2456,7 +2456,10 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
-  Future<CheckIn> generateDeepReading(int checkInId) async {
+  Future<CheckIn> generateDeepReading(
+    int checkInId, {
+    String style = 'deep',
+  }) async {
     return items.firstWhere(
       (item) => item.id == checkInId,
       orElse: () => CheckIn(
@@ -2471,6 +2474,18 @@ class _FakeCheckInRepository implements CheckInRepository {
       ),
     );
   }
+
+  @override
+  Future<CheckIn> saveReading(int checkInId) async {
+    return generateDeepReading(checkInId);
+  }
+
+  @override
+  Future<void> createRitualFromReading(
+    int checkInId, {
+    required DateTime localDate,
+    required String type,
+  }) async {}
 }
 
 class _FakeFutureMessageRepository implements FutureMessageRepository {

@@ -11,6 +11,7 @@ class Profile {
     required this.customGender,
     required this.avatarUrl,
     required this.createdAt,
+    this.personalGoals,
   });
 
   final int id;
@@ -24,4 +25,5 @@ class Profile {
   final String? customGender;
   final String? avatarUrl;
   final DateTime createdAt;
+  final String? personalGoals;
 }

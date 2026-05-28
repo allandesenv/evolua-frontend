@@ -19,6 +19,11 @@ class CheckInAiInsight {
     this.rewardedAdAvailable = false,
     this.upgradeRecommended = false,
     this.limitMessage,
+    this.contextSignals = const [],
+    this.readingDepth,
+    this.responseFingerprint,
+    this.usedContextSummary,
+    this.nextStep,
   });
 
   final String insight;
@@ -36,4 +41,21 @@ class CheckInAiInsight {
   final bool rewardedAdAvailable;
   final bool upgradeRecommended;
   final String? limitMessage;
+  final List<String> contextSignals;
+  final String? readingDepth;
+  final String? responseFingerprint;
+  final String? usedContextSummary;
+  final CheckInAiNextStep? nextStep;
+}
+
+class CheckInAiNextStep {
+  const CheckInAiNextStep({
+    required this.type,
+    required this.label,
+    this.target,
+  });
+
+  final String type;
+  final String label;
+  final String? target;
 }

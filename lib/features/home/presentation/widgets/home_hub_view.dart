@@ -71,8 +71,9 @@ class HomeHubView extends ConsumerStatefulWidget {
 
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool _isRewardLoading = false;
+  bool _isReadingActionLoading = false;
 
-  void _openInsightSheet(CheckInAiInsight insight) {
+  void _openInsightSheet(CheckIn checkIn, CheckInAiInsight insight) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -88,9 +89,129 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           isRewardLoading: _isRewardLoading,
           onWatchRewardedAd: _watchRewardedAd,
           onOpenPremium: widget.onOpenPremium,
+          isReadingActionLoading: _isReadingActionLoading,
+          isSaved: checkIn.savedReading,
+          onRegenerate: (style) => _regenerateReading(context, style),
+          onSaveReading: () => _saveReading(context, checkIn.id),
+          onCreateRitual: () => _createRitualFromReading(context, checkIn.id),
         ),
       ),
     );
+  }
+
+  Future<void> _regenerateReading(
+    BuildContext sheetContext,
+    String style,
+  ) async {
+    if (_isReadingActionLoading) {
+      return;
+    }
+
+    setState(() => _isReadingActionLoading = true);
+    try {
+      await ref
+          .read(checkInControllerProvider.notifier)
+          .generateDeepReadingForLatest(style: style);
+      if (!mounted) {
+        return;
+      }
+      if (sheetContext.mounted) {
+        Navigator.of(sheetContext).maybePop();
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Leitura atualizada com um novo foco.',
+        icon: Icons.auto_awesome_rounded,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Nao foi possivel gerar outra leitura agora.',
+        icon: Icons.wifi_off_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isReadingActionLoading = false);
+      }
+    }
+  }
+
+  Future<void> _saveReading(BuildContext sheetContext, int checkInId) async {
+    if (_isReadingActionLoading) {
+      return;
+    }
+
+    setState(() => _isReadingActionLoading = true);
+    try {
+      await ref.read(checkInControllerProvider.notifier).saveReading(checkInId);
+      if (!mounted) {
+        return;
+      }
+      if (sheetContext.mounted) {
+        Navigator.of(sheetContext).maybePop();
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Leitura salva para voce retomar depois.',
+        icon: Icons.bookmark_added_rounded,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Nao foi possivel salvar a leitura agora.',
+        icon: Icons.wifi_off_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isReadingActionLoading = false);
+      }
+    }
+  }
+
+  Future<void> _createRitualFromReading(
+    BuildContext sheetContext,
+    int checkInId,
+  ) async {
+    if (_isReadingActionLoading) {
+      return;
+    }
+
+    setState(() => _isReadingActionLoading = true);
+    try {
+      await ref
+          .read(checkInControllerProvider.notifier)
+          .createRitualFromReading(checkInId);
+      if (!mounted) {
+        return;
+      }
+      if (sheetContext.mounted) {
+        Navigator.of(sheetContext).maybePop();
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Ritual criado a partir da sua leitura.',
+        icon: Icons.self_improvement_rounded,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Nao foi possivel criar o ritual agora.',
+        icon: Icons.wifi_off_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isReadingActionLoading = false);
+      }
+    }
   }
 
   Future<void> _watchRewardedAd() async {
@@ -178,14 +299,12 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final isInsightUnavailable = canUseCheckInState
         ? checkInHistory?.isLatestInsightUnavailable ?? false
         : false;
-    final latestInsight =
-        latestCreatedCheckIn?.aiInsight ??
-        recentItems
-            .where((item) => item.aiInsight != null)
-            .map((item) => item.aiInsight!)
-            .firstOrNull;
+    final latestInsightCheckIn = latestCreatedCheckIn?.aiInsight != null
+        ? latestCreatedCheckIn
+        : recentItems.where((item) => item.aiInsight != null).firstOrNull;
+    final latestInsight = latestInsightCheckIn?.aiInsight;
     final latestReadingCheckIn =
-        latestCreatedCheckIn ?? recentItems.firstOrNull;
+        latestInsightCheckIn ?? latestCreatedCheckIn ?? recentItems.firstOrNull;
     final isWaitingForInsight =
         latestInsight == null &&
         latestReadingCheckIn != null &&
@@ -255,7 +374,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenReflection: widget.onOpenFeed,
           onOpenInsight: latestInsight == null
               ? widget.onOpenCheckIn
-              : () => _openInsightSheet(latestInsight),
+              : () => _openInsightSheet(latestReadingCheckIn!, latestInsight),
           onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
           onOpenCareShare: widget.onOpenCareShare,
         ),
@@ -274,7 +393,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           isUnavailable: isInsightUnavailable,
           onOpenFullAnalysis: latestInsight == null
               ? null
-              : () => _openInsightSheet(latestInsight),
+              : () => _openInsightSheet(latestReadingCheckIn!, latestInsight),
         ),
         const SizedBox(height: 24),
         _NextStepHeroCard(
