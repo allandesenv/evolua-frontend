@@ -165,7 +165,11 @@ class _CareRecommendationsPanel extends ConsumerWidget {
                   text: l10n.careRecommendationsEmpty,
                 )
               else
-                ...unread.take(10).map(_CareRecommendationTile.new),
+                ...unread
+                    .take(10)
+                    .map(
+                      (item) => _CareRecommendationTile(recommendation: item),
+                    ),
               if (history.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 Text(
@@ -176,7 +180,14 @@ class _CareRecommendationsPanel extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                ...history.take(20).map(_CareRecommendationTile.new),
+                ...history
+                    .take(20)
+                    .map(
+                      (item) => _CareRecommendationTile(
+                        recommendation: item,
+                        isHistory: true,
+                      ),
+                    ),
               ],
             ],
           );
@@ -187,9 +198,13 @@ class _CareRecommendationsPanel extends ConsumerWidget {
 }
 
 class _CareRecommendationTile extends ConsumerWidget {
-  const _CareRecommendationTile(this.recommendation);
+  const _CareRecommendationTile({
+    required this.recommendation,
+    this.isHistory = false,
+  });
 
   final CareRecommendation recommendation;
+  final bool isHistory;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -242,6 +257,23 @@ class _CareRecommendationTile extends ConsumerWidget {
                         ),
                       ),
                     ),
+                  if (isHistory)
+                    IconButton(
+                      tooltip: 'Remover do histórico',
+                      onPressed: () async {
+                        await ref
+                            .read(careRecommendationHandlerProvider)
+                            .hideFromHistory(recommendation.recommendationId);
+                        if (context.mounted) {
+                          AppSnackBar.show(
+                            context,
+                            message: 'Orientação removida do histórico.',
+                            icon: Icons.delete_outline_rounded,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded),
+                    ),
                 ],
               ),
               if (recommendation.isRead) ...[
@@ -267,18 +299,9 @@ class _CareRecommendationTile extends ConsumerWidget {
                 ...recommendation.attachments.map(
                   (attachment) => Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: OutlinedButton.icon(
-                      onPressed: () => ref
-                          .read(careRecommendationHandlerProvider)
-                          .openAttachment(
-                            recommendation: recommendation,
-                            attachment: attachment,
-                          ),
-                      icon: const Icon(Icons.download_rounded),
-                      label: Text(
-                        attachment.displayName,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    child: _CareAttachmentButton(
+                      recommendation: recommendation,
+                      attachment: attachment,
                     ),
                   ),
                 ),
@@ -298,6 +321,67 @@ class _CareRecommendationTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _CareAttachmentButton extends ConsumerStatefulWidget {
+  const _CareAttachmentButton({
+    required this.recommendation,
+    required this.attachment,
+  });
+
+  final CareRecommendation recommendation;
+  final CareRecommendationAttachment attachment;
+
+  @override
+  ConsumerState<_CareAttachmentButton> createState() =>
+      _CareAttachmentButtonState();
+}
+
+class _CareAttachmentButtonState extends ConsumerState<_CareAttachmentButton> {
+  bool _isOpening = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _isOpening ? null : _open,
+      icon: _isOpening
+          ? const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.download_rounded),
+      label: Text(
+        widget.attachment.displayName,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Future<void> _open() async {
+    if (_isOpening) return;
+    setState(() => _isOpening = true);
+    try {
+      await ref
+          .read(careRecommendationHandlerProvider)
+          .openAttachment(
+            recommendation: widget.recommendation,
+            attachment: widget.attachment,
+          );
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          message:
+              'Não foi possível abrir este anexo agora. Tente novamente em instantes.',
+          icon: Icons.info_outline_rounded,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isOpening = false);
+      }
+    }
   }
 }
 

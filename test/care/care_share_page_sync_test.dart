@@ -198,6 +198,151 @@ void main() {
     expect(find.text('Mensagem aberta fica no historico.'), findsOneWidget);
     expect(find.text('Mensagem antiga fora da janela.'), findsNothing);
   });
+
+  testWidgets('attachment button shows loading and safe failure feedback', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final secret = base64UrlEncode(
+      List<int>.generate(32, (index) => index + 3),
+    );
+    final repository = _FakeCareRepository();
+    final secretStore = _FakeCareSecretStore({'share-1': secret});
+
+    await tester.pumpWidget(
+      _careSharePage(repository: repository, secretStore: secretStore),
+    );
+    await tester.pumpAndSettle();
+
+    repository.downloadGate = Completer<void>();
+    repository.allRecommendations = [
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        attachmentId: 'att-1',
+        attachmentName: 'plano.pdf',
+      ),
+    ];
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CareSharePage)),
+    );
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('plano.pdf'));
+    await tester.tap(find.text('plano.pdf'));
+    await tester.pump();
+
+    expect(repository.downloadCalls, 1);
+    expect(find.byType(CircularProgressIndicator), findsWidgets);
+
+    await tester.tap(find.text('plano.pdf'), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(repository.downloadCalls, 1);
+
+    repository.downloadGate!.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Alongue os ombros antes de dormir.'), findsOneWidget);
+    expect(
+      find.text(
+        'Não foi possível abrir este anexo agora. Tente novamente em instantes.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('history delete hides recommendation across refreshes', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final secret = base64UrlEncode(
+      List<int>.generate(32, (index) => index + 3),
+    );
+    final repository = _FakeCareRepository();
+    final secretStore = _FakeCareSecretStore({'share-1': secret});
+
+    await tester.pumpWidget(
+      _careSharePage(repository: repository, secretStore: secretStore),
+    );
+    await tester.pumpAndSettle();
+
+    repository.allRecommendations = [
+      await _encryptedRecommendation(
+        tester: tester,
+        secretBase64: secret,
+        recommendationId: 'rec-hidden',
+        guidanceText: 'Mensagem para limpar do historico.',
+        status: 'READ',
+        readAt: DateTime.now(),
+      ),
+    ];
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CareSharePage)),
+    );
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem para limpar do historico.'), findsOneWidget);
+
+    await tester.ensureVisible(find.byTooltip('Remover do histórico'));
+    await tester.tap(find.byTooltip('Remover do histórico'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem para limpar do historico.'), findsNothing);
+    expect(find.text('Orientação removida do histórico.'), findsOneWidget);
+
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem para limpar do historico.'), findsNothing);
+  });
+
+  testWidgets('acknowledged recommendation survives temporary empty refresh', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final secret = base64UrlEncode(
+      List<int>.generate(32, (index) => index + 3),
+    );
+    final repository = _FakeCareRepository();
+    final secretStore = _FakeCareSecretStore({'share-1': secret});
+
+    await tester.pumpWidget(
+      _careSharePage(repository: repository, secretStore: secretStore),
+    );
+    await tester.pumpAndSettle();
+
+    final recommendation = await _encryptedRecommendation(
+      tester: tester,
+      secretBase64: secret,
+      recommendationId: 'rec-cache',
+      guidanceText: 'Mensagem resiliente no historico.',
+    );
+    repository.allRecommendations = [recommendation];
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CareSharePage)),
+    );
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Confirmar leitura'));
+    await tester.tap(find.text('Confirmar leitura'));
+    await tester.pumpAndSettle();
+
+    repository.allRecommendations = const [];
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem resiliente no historico.'), findsOneWidget);
+    expect(find.text('Leitura confirmada'), findsOneWidget);
+
+    repository.allRecommendations = [recommendation];
+    await container.refresh(careRecommendationsProvider.future);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mensagem resiliente no historico.'), findsOneWidget);
+  });
 }
 
 Widget _careSharePage({
@@ -226,6 +371,8 @@ Future<CareRecommendationEnvelope> _encryptedRecommendation({
   String status = 'NEW',
   DateTime? createdAt,
   DateTime? readAt,
+  String? attachmentId,
+  String? attachmentName,
 }) async {
   final container = ProviderScope.containerOf(
     tester.element(find.byType(CareSharePage)),
@@ -238,17 +385,41 @@ Future<CareRecommendationEnvelope> _encryptedRecommendation({
     shareId: shareId,
     purpose: 'care-guidance-v1',
   );
+  final attachmentJson = attachmentId == null
+      ? const <Map<String, Object?>>[]
+      : [
+          {
+            'attachmentId': attachmentId,
+            'displayName': attachmentName ?? 'anexo.pdf',
+            'contentType': 'application/pdf',
+            'sizeBytes': 128,
+          },
+        ];
   final payload = await crypto.encryptJson(
     key: key,
     shareId: shareId,
     purpose: CareCryptoPayloadPurpose.guidance,
-    json: {'guidanceText': guidanceText, 'attachments': []},
+    json: {'guidanceText': guidanceText, 'attachments': attachmentJson},
   );
   return CareRecommendationEnvelope(
     recommendationId: recommendationId,
     shareId: shareId,
     encryptedPayload: payload,
-    attachments: const [],
+    attachments: attachmentId == null
+        ? const []
+        : [
+            CareRecommendationAttachmentEnvelope(
+              attachmentId: attachmentId,
+              encryptedMetadata: const CareEncryptedPayload(
+                algorithm: 'AES-256-GCM',
+                nonceBase64: 'invalid',
+                cipherTextBase64: '',
+                macBase64: 'invalid',
+              ),
+              sizeBytes: 128,
+              contentType: 'application/pdf',
+            ),
+          ],
     createdAt: createdAt ?? DateTime.now(),
     status: status,
     readAt: readAt,
@@ -262,6 +433,8 @@ class _FakeCareRepository implements CareRepository {
   List<CareRecommendationEnvelope> allRecommendations = const [];
   int pendingPrescriptionFetches = 0;
   int pendingRecommendationFetches = 0;
+  int downloadCalls = 0;
+  Completer<void>? downloadGate;
   final acknowledgedRecommendations = <String>[];
 
   @override
@@ -282,7 +455,11 @@ class _FakeCareRepository implements CareRepository {
   Future<List<int>> downloadRecommendationAttachment({
     required String recommendationId,
     required String attachmentId,
-  }) async => const [];
+  }) async {
+    downloadCalls++;
+    await downloadGate?.future;
+    return const [1, 2, 3];
+  }
 
   @override
   Future<CareShareSession> getShareStatus(String shareId) async => _session();
