@@ -240,7 +240,6 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     );
   }
 
-
   Future<void> _showRewardConfirmationProblemMessage() async {
     debugPrint('Evolua: exibindo falha de confirmação do anúncio.');
 
@@ -294,8 +293,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       return;
     }
     var rewardLoading = false;
-    //var sheetClosedFromAd = false;
-    //final unlockSheetNavigator = Navigator.of(context);
+    var autoSubmitLoading = false;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -324,16 +322,15 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                         ? 'Assistir anúncio libera mais um check-in hoje.'
                         : '',
                     rewardedAdAvailable: rewardedAdAvailable,
-                    isRewardLoading: rewardLoading,
+                    isRewardLoading: rewardLoading || autoSubmitLoading,
                     onWatchRewardedAd: rewardedAdAvailable
                         ? () async {
-                            if (rewardLoading) {
+                            if (rewardLoading || autoSubmitLoading) {
                               return;
                             }
                             setSheetState(() => rewardLoading = true);
-                            var unlocked = false;
                             try {
-                              unlocked = await ref
+                              await ref
                                   .read(
                                     monetizationAccessControllerProvider
                                         .notifier,
@@ -350,37 +347,26 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                             if (!mounted) {
                               return;
                             }
-                            if (!unlocked) {
-                              if (sheetContext.mounted) {
-                                Navigator.of(sheetContext).pop();
-                              }
-
-                              final saved = await _submit(
-                                allowLimitUnlock: false,
-                              );
-
-                              if (!mounted || saved) {
-                                return;
-                              }
-
-                              await _showRewardConfirmationProblemMessage();
-
-                              return;
-                            }
                             if (sheetContext.mounted) {
-                              Navigator.of(sheetContext).pop();
+                              setSheetState(() => autoSubmitLoading = true);
                             }
                             final saved = await _submit(
                               allowLimitUnlock: false,
                             );
                             if (!mounted || saved) {
+                              if (sheetContext.mounted) {
+                                Navigator.of(sheetContext).pop();
+                              }
                               return;
+                            }
+                            if (sheetContext.mounted) {
+                              setSheetState(() => autoSubmitLoading = false);
                             }
                             await _showRewardConfirmationProblemMessage();
                           }
                         : null,
                     onOpenPremium: () {
-                      if (rewardLoading) {
+                      if (rewardLoading || autoSubmitLoading) {
                         return;
                       }
                       Navigator.of(sheetContext).pop();
@@ -497,6 +483,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         : _selectedMoodLabel;
     final checkInState = ref.watch(checkInControllerProvider);
     final history = checkInState.asData?.value;
+    final isCreatingCheckIn = history?.isCreatingCheckIn ?? false;
     final recentItems = history?.result.items ?? const <CheckIn>[];
     final latestInsight =
         history?.latestCreatedCheckIn?.aiInsight ??
@@ -513,7 +500,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       otherMoodController: _otherMoodController,
       quickMoodOptions: quickMoodOptions,
       isLoading:
-          _isSubmitting || (checkInState.isLoading && !checkInState.hasValue),
+          _isSubmitting ||
+          isCreatingCheckIn ||
+          (checkInState.isLoading && !checkInState.hasValue),
       onMoodSelected: (mood) => setState(() {
         _selectedMoodValue = mood.value;
         _selectedMoodLabel = mood.label;
@@ -798,8 +787,8 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
                 Text(
                   widget.l10n.checkInChooseStateTitle,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -913,34 +902,27 @@ class _MoodGroup extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: moods
-              .map(
-                (mood) {
-                  final selected = selectedMoodValue == mood.value;
-                  return ChoiceChip(
-                    label: Text(mood.label),
-                    selected: selected,
-                    showCheckmark: selected,
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 5),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    onSelected: (_) => onSelected(mood),
-                  );
-                },
-              )
-              .toList(),
+          children: moods.map((mood) {
+            final selected = selectedMoodValue == mood.value;
+            return ChoiceChip(
+              label: Text(mood.label),
+              selected: selected,
+              showCheckmark: selected,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              onSelected: (_) => onSelected(mood),
+            );
+          }).toList(),
         ),
       ],
     );

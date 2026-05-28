@@ -52,6 +52,7 @@ class CheckInHistoryState {
     this.energyRange,
     this.from,
     this.to,
+    this.isCreatingCheckIn = false,
   });
 
   final PaginatedResponse<CheckIn> result;
@@ -65,6 +66,7 @@ class CheckInHistoryState {
   final String? energyRange;
   final DateTime? from;
   final DateTime? to;
+  final bool isCreatingCheckIn;
 
   bool get isLatestInsightPending =>
       latestCreatedCheckIn != null &&
@@ -213,6 +215,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         energyRange: current.energyRange,
         from: current.from,
         to: current.to,
+        isCreatingCheckIn: current.isCreatingCheckIn,
       ),
     );
   }
@@ -223,7 +226,11 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     required int energyLevel,
   }) async {
     final repository = ref.read(checkInRepositoryProvider);
+    final previous = state.asData?.value;
     int? pendingInsightId;
+    if (previous != null) {
+      state = AsyncData(_copyState(previous, isCreatingCheckIn: true));
+    }
     try {
       final created = await repository.create(
         mood: mood,
@@ -244,18 +251,38 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
           latestCreatedCheckIn: latest,
           pendingInsightCheckInId: pendingInsightId,
           unavailableInsightCheckInId: null,
+          isCreatingCheckIn: false,
         ),
       );
       _resumeInsightPollingFromState();
     } catch (error, stackTrace) {
-      final previous = state.asData?.value;
       if (previous != null) {
-        state = AsyncData(previous);
+        state = AsyncData(_copyState(previous, isCreatingCheckIn: false));
       } else {
         state = AsyncError(error, stackTrace);
       }
       Error.throwWithStackTrace(error, stackTrace);
     }
+  }
+
+  CheckInHistoryState _copyState(
+    CheckInHistoryState source, {
+    bool? isCreatingCheckIn,
+  }) {
+    return CheckInHistoryState(
+      result: source.result,
+      selectedGrouping: source.selectedGrouping,
+      ownerUserId: source.ownerUserId,
+      latestCreatedCheckIn: source.latestCreatedCheckIn,
+      pendingInsightCheckInId: source.pendingInsightCheckInId,
+      unavailableInsightCheckInId: source.unavailableInsightCheckInId,
+      search: source.search,
+      mood: source.mood,
+      energyRange: source.energyRange,
+      from: source.from,
+      to: source.to,
+      isCreatingCheckIn: isCreatingCheckIn ?? source.isCreatingCheckIn,
+    );
   }
 
   Future<CheckIn?> generateDeepReadingForLatest({String style = 'deep'}) async {
@@ -348,6 +375,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
     CheckIn? latestCreatedCheckIn,
     int? pendingInsightCheckInId,
     int? unavailableInsightCheckInId,
+    bool isCreatingCheckIn = false,
   }) {
     final latest =
         _canonicalLatestCheckIn(
@@ -391,6 +419,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       energyRange: _energyRange,
       from: _from,
       to: _to,
+      isCreatingCheckIn: isCreatingCheckIn,
     );
   }
 
@@ -514,6 +543,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         energyRange: current.energyRange,
         from: current.from,
         to: current.to,
+        isCreatingCheckIn: false,
       ),
     );
   }
