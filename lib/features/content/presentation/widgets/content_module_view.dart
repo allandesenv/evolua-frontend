@@ -342,7 +342,7 @@ class _ContentSectionSwitcher extends StatelessWidget {
           Expanded(
             child: _ContentSectionButton(
               icon: Icons.grid_view_rounded,
-              label: 'Explorar',
+              label: 'Explorar trilhas',
               selected: selected == ContentModuleSection.catalog,
               onTap: () => onSelected(ContentModuleSection.catalog),
             ),
