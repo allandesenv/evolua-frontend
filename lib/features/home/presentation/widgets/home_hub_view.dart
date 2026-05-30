@@ -30,6 +30,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     required this.displayName,
     required this.mentorPremiumPassActive,
     required this.onOpenTrails,
+    this.onOpenSuggestedTrail,
     required this.onOpenFeed,
     required this.onOpenCommunity,
     required this.onOpenProfile,
@@ -52,6 +53,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final String? displayName;
   final bool mentorPremiumPassActive;
   final VoidCallback onOpenTrails;
+  final ValueChanged<int>? onOpenSuggestedTrail;
   final VoidCallback onOpenFeed;
   final VoidCallback onOpenCommunity;
   final VoidCallback onOpenProfile;
@@ -82,10 +84,12 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         title: 'Análise completa',
         child: CheckInAiInsightCard(
           insight: insight,
-          onOpenTrails: () {
-            Navigator.of(context).pop();
-            widget.onOpenTrails();
-          },
+          onOpenTrails: widget.onOpenSuggestedTrail == null
+              ? null
+              : (trailId) {
+                  Navigator.of(context).pop();
+                  widget.onOpenSuggestedTrail!(trailId);
+                },
           isRewardLoading: _isRewardLoading,
           onWatchRewardedAd: _watchRewardedAd,
           onOpenPremium: widget.onOpenPremium,

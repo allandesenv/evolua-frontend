@@ -292,7 +292,7 @@ void main() {
     expect(find.text('Alongue os ombros antes de dormir.'), findsOneWidget);
     expect(
       find.text(
-        'A chave de seguranÃ§a desta sessÃ£o nÃ£o estÃ¡ mais disponÃ­vel. NÃ£o Ã© possÃ­vel abrir o anexo.',
+        'A chave de segurança desta sessão não está mais disponível. Não é possível abrir o anexo.',
       ),
       findsOneWidget,
     );

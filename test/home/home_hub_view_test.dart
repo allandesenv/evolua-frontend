@@ -599,9 +599,11 @@ void main() {
     testWidgets(
       'suggested trail action closes full analysis before opening trails',
       (tester) async {
-        var openedTrails = false;
+        int? openedSuggestedTrailId;
         await tester.pumpWidget(
-          _testApp(onOpenTrails: () => openedTrails = true),
+          _testApp(
+            onOpenSuggestedTrail: (trailId) => openedSuggestedTrailId = trailId,
+          ),
         );
         await tester.pumpAndSettle();
 
@@ -614,7 +616,7 @@ void main() {
         await tester.tap(find.text('Abrir trilha sugerida'));
         await tester.pumpAndSettle();
 
-        expect(openedTrails, isTrue);
+        expect(openedSuggestedTrailId, 1);
         expect(find.text('Análise completa'), findsNothing);
       },
     );
@@ -787,6 +789,7 @@ Widget _testApp({
   ThemeData? theme,
   DateTime? now,
   VoidCallback? onOpenTrails,
+  ValueChanged<int>? onOpenSuggestedTrail,
   VoidCallback? onOpenFeed,
   VoidCallback? onOpenCommunity,
   VoidCallback? onOpenEvolutionMirror,
@@ -825,6 +828,7 @@ Widget _testApp({
             mentorPremiumPassActive: false,
             now: now,
             onOpenTrails: onOpenTrails ?? () {},
+            onOpenSuggestedTrail: onOpenSuggestedTrail ?? (_) {},
             onOpenFeed: onOpenFeed ?? () {},
             onOpenCommunity: onOpenCommunity ?? () {},
             onOpenProfile: () {},
