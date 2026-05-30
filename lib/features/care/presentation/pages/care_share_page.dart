@@ -373,7 +373,7 @@ class _CareAttachmentButtonState extends ConsumerState<_CareAttachmentButton> {
         AppSnackBar.show(
           context,
           message:
-              'A chave de seguranÃ§a desta sessÃ£o nÃ£o estÃ¡ mais disponÃ­vel. NÃ£o Ã© possÃ­vel abrir o anexo.',
+              'A chave de segurança desta sessão não está mais disponível. Não é possível abrir o anexo.',
           icon: Icons.info_outline_rounded,
         );
       }

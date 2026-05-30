@@ -28,6 +28,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('ContentModuleView mobile trails navigation', () {
+    Finder catalogTabFinder() {
+      return find
+          .ancestor(
+            of: find.text('Explorar trilhas').first,
+            matching: find.byType(InkWell),
+          )
+          .first;
+    }
+
     testWidgets('shows journey and catalog switcher on compact width', (
       tester,
     ) async {
@@ -37,8 +46,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Trilha atual'), findsOneWidget);
-      expect(find.text('Explorar'), findsOneWidget);
-      expect(find.text('Explorar trilhas'), findsOneWidget);
+      expect(find.text('Explorar trilhas'), findsWidgets);
+      expect(catalogTabFinder(), findsOneWidget);
+      expect(find.text('Explorar'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -50,7 +60,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Explorar'));
+      await tester.tap(catalogTabFinder());
       await tester.pumpAndSettle();
 
       expect(find.text('Catálogo de trilhas'), findsOneWidget);
@@ -65,7 +75,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Explorar trilhas'));
+      await tester.tap(catalogTabFinder());
       await tester.pumpAndSettle();
 
       expect(find.text('Catálogo de trilhas'), findsOneWidget);
@@ -84,7 +94,7 @@ void main() {
       expect(find.text('Sua trilha'), findsOneWidget);
       expect(find.text('Catálogo de trilhas'), findsNothing);
 
-      await tester.tap(find.text('Explorar'));
+      await tester.tap(catalogTabFinder());
       await tester.pumpAndSettle();
 
       expect(find.text('Catálogo de trilhas'), findsOneWidget);

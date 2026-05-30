@@ -41,6 +41,7 @@ class DashboardShell extends ConsumerStatefulWidget {
 class _DashboardShellState extends ConsumerState<DashboardShell> {
   int _selectedIndex = 0;
   ContentModuleSection _trailSection = ContentModuleSection.journey;
+  int? _suggestedTrailIdToOpen;
   SocialModuleTab _spaceSection = SocialModuleTab.featured;
   final SocialFeedScope _reflectionScope = SocialFeedScope.moment;
   ProfileModuleSection _profileSection = ProfileModuleSection.overview;
@@ -220,7 +221,27 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       _pushCurrentLocation();
       _selectedIndex = 1;
       _trailSection = section;
+      if (section != ContentModuleSection.catalog) {
+        _suggestedTrailIdToOpen = null;
+      }
     });
+  }
+
+  void _openSuggestedTrail(int trailId) {
+    setState(() {
+      _pushCurrentLocation();
+      _selectedIndex = 1;
+      _trailSection = ContentModuleSection.catalog;
+      _suggestedTrailIdToOpen = trailId;
+    });
+  }
+
+  void _consumeSuggestedTrailOpen() {
+    if (_suggestedTrailIdToOpen == null) {
+      return;
+    }
+
+    setState(() => _suggestedTrailIdToOpen = null);
   }
 
   void _openSpacesSection(SocialModuleTab section) {
@@ -403,11 +424,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final content = _DashboardContent(
       selectedIndex: _selectedIndex,
       trailSection: _trailSection,
+      suggestedTrailIdToOpen: _suggestedTrailIdToOpen,
       spaceSection: _spaceSection,
       reflectionScope: _reflectionScope,
       profileSection: _profileSection,
       adminSection: _adminSection,
       onNavigate: _goTo,
+      onOpenSuggestedTrail: _openSuggestedTrail,
+      onSuggestedTrailConsumed: _consumeSuggestedTrailOpen,
       onOpenSpacesSection: _openSpacesSection,
       onOpenMentor: () => _goTo(_mentorIndex),
       onOpenProfileSection: _openProfileSection,
@@ -693,11 +717,14 @@ class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({
     required this.selectedIndex,
     required this.trailSection,
+    required this.suggestedTrailIdToOpen,
     required this.spaceSection,
     required this.reflectionScope,
     required this.profileSection,
     required this.adminSection,
     required this.onNavigate,
+    required this.onOpenSuggestedTrail,
+    required this.onSuggestedTrailConsumed,
     required this.onOpenSpacesSection,
     required this.onOpenMentor,
     required this.onOpenProfileSection,
@@ -709,11 +736,14 @@ class _DashboardContent extends ConsumerWidget {
 
   final int selectedIndex;
   final ContentModuleSection trailSection;
+  final int? suggestedTrailIdToOpen;
   final SocialModuleTab spaceSection;
   final SocialFeedScope reflectionScope;
   final ProfileModuleSection profileSection;
   final AdminPanelSection adminSection;
   final void Function(int index) onNavigate;
+  final ValueChanged<int> onOpenSuggestedTrail;
+  final VoidCallback onSuggestedTrailConsumed;
   final void Function(SocialModuleTab section) onOpenSpacesSection;
   final VoidCallback onOpenMentor;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
@@ -759,6 +789,7 @@ class _DashboardContent extends ConsumerWidget {
             currentSubscription?.mentorPremiumPassActive ?? false,
         mentorPremiumPassEndsAt: currentSubscription?.mentorPremiumPassEndsAt,
         onOpenTrails: () => onNavigate(1),
+        onOpenSuggestedTrail: onOpenSuggestedTrail,
         onOpenFeed: () => onOpenSpacesSection(SocialModuleTab.reflections),
         onOpenCommunity: () => onOpenSpacesSection(SocialModuleTab.featured),
         onOpenProfile: () =>
@@ -778,6 +809,8 @@ class _DashboardContent extends ConsumerWidget {
       ContentModuleView(
         key: ValueKey('trails-${trailSection.name}'),
         section: trailSection,
+        initialTrailId: suggestedTrailIdToOpen,
+        onInitialTrailConsumed: onSuggestedTrailConsumed,
         showSectionChips: compact,
         onOpenMentor: onOpenMentor,
         onOpenPremium: () =>

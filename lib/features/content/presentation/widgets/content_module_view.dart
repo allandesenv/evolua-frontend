@@ -36,12 +36,16 @@ class ContentModuleView extends ConsumerStatefulWidget {
     this.showSectionChips = true,
     this.onOpenMentor,
     this.onOpenPremium,
+    this.initialTrailId,
+    this.onInitialTrailConsumed,
   });
 
   final ContentModuleSection section;
   final bool showSectionChips;
   final VoidCallback? onOpenMentor;
   final VoidCallback? onOpenPremium;
+  final int? initialTrailId;
+  final VoidCallback? onInitialTrailConsumed;
 
   @override
   ConsumerState<ContentModuleView> createState() => _ContentModuleViewState();
@@ -56,11 +60,16 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   bool? _premiumFilter;
   Trail? _selectedCatalogTrail;
   late ContentModuleSection _section;
+  int? _openingInitialTrailId;
 
   @override
   void initState() {
     super.initState();
     _section = widget.section;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openInitialTrailIfNeeded();
+    });
   }
 
   @override
@@ -69,10 +78,51 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     if (oldWidget.section != widget.section) {
       setState(() {
         _section = widget.section;
-        if (_section == ContentModuleSection.catalog) {
+        if (_section == ContentModuleSection.catalog &&
+            widget.initialTrailId == null) {
           _selectedCatalogTrail = null;
         }
       });
+    }
+
+    if (oldWidget.initialTrailId != widget.initialTrailId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openInitialTrailIfNeeded();
+      });
+    }
+  }
+
+  Future<void> _openInitialTrailIfNeeded() async {
+    final trailId = widget.initialTrailId;
+
+    if (trailId == null || _openingInitialTrailId == trailId) {
+      return;
+    }
+
+    _openingInitialTrailId = trailId;
+
+    try {
+      final journey = await ref.read(trailJourneyProvider(trailId).future);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _section = ContentModuleSection.catalog;
+        _selectedCatalogTrail = journey.trail;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível abrir a trilha sugerida agora.'),
+          ),
+        );
+      }
+    } finally {
+      _openingInitialTrailId = null;
+      widget.onInitialTrailConsumed?.call();
     }
   }
 
@@ -292,7 +342,7 @@ class _ContentSectionSwitcher extends StatelessWidget {
           Expanded(
             child: _ContentSectionButton(
               icon: Icons.grid_view_rounded,
-              label: 'Explorar',
+              label: 'Explorar trilhas',
               selected: selected == ContentModuleSection.catalog,
               onTap: () => onSelected(ContentModuleSection.catalog),
             ),

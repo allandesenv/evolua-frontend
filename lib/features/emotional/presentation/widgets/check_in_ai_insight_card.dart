@@ -23,7 +23,7 @@ class CheckInAiInsightCard extends ConsumerWidget {
   });
 
   final CheckInAiInsight insight;
-  final VoidCallback? onOpenTrails;
+  final ValueChanged<int>? onOpenTrails;
   final bool isRewardLoading;
   final VoidCallback? onWatchRewardedAd;
   final VoidCallback? onOpenPremium;
@@ -269,7 +269,7 @@ class CheckInAiInsightCard extends ConsumerWidget {
           if (onOpenTrails != null && insight.suggestedTrailId != null) ...[
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: onOpenTrails,
+              onPressed: () => onOpenTrails?.call(insight.suggestedTrailId!),
               icon: const Icon(Icons.auto_awesome_rounded),
               label: Text(trailLabel),
             ),
