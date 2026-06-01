@@ -161,8 +161,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'We could not connect right now. Check your connection and try again.';
 
   @override
+  String get errorNoInternet =>
+      'We could not connect right now. Check your internet and try again.';
+
+  @override
   String get errorTimeout =>
       'The response took longer than expected. Try again in a moment.';
+
+  @override
+  String get errorSessionExpired =>
+      'Your session expired. Sign in again to continue.';
+
+  @override
+  String get errorServerUnavailable =>
+      'Evolua is temporarily unavailable. Try again in a few moments.';
+
+  @override
+  String get errorCheckInQuota =>
+      'You have already used today\'s free check-in. Watch an ad, subscribe to Premium, or come back tomorrow.';
+
+  @override
+  String get errorSmartReadingUnavailable =>
+      'Your check-in is saved, but we could not prepare the reading right now.';
+
+  @override
+  String get errorRewardedAdUnavailable =>
+      'We could not load the ad right now. Try again in a moment.';
 
   @override
   String get errorUnexpected =>
@@ -1056,8 +1080,32 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
       'We could not connect right now. Check your connection and try again.';
 
   @override
+  String get errorNoInternet =>
+      'We could not connect right now. Check your internet and try again.';
+
+  @override
   String get errorTimeout =>
       'The response took longer than expected. Try again in a moment.';
+
+  @override
+  String get errorSessionExpired =>
+      'Your session expired. Sign in again to continue.';
+
+  @override
+  String get errorServerUnavailable =>
+      'Evolua is temporarily unavailable. Try again in a few moments.';
+
+  @override
+  String get errorCheckInQuota =>
+      'You have already used today\'s free check-in. Watch an ad, subscribe to Premium, or come back tomorrow.';
+
+  @override
+  String get errorSmartReadingUnavailable =>
+      'Your check-in is saved, but we could not prepare the reading right now.';
+
+  @override
+  String get errorRewardedAdUnavailable =>
+      'We could not load the ad right now. Try again in a moment.';
 
   @override
   String get errorUnexpected =>

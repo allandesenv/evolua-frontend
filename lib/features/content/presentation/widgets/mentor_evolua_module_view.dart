@@ -10,6 +10,7 @@ import 'package:evolua_frontend/features/content/domain/entities/journey_chat_me
 import 'package:evolua_frontend/features/content/domain/entities/journey_chat_reply.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/panel_skeleton.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -340,7 +341,7 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
         context,
         message: rewarded
             ? 'Crédito extra de IA liberado. Envie uma nova mensagem ao Mentor.'
-            : 'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.',
+            : context.l10n.errorRewardedAdUnavailable,
         icon: rewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
@@ -351,8 +352,7 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
       }
       AppSnackBar.show(
         context,
-        message:
-            'Não foi possível carregar o anúncio agora. Tente novamente em instantes.',
+        message: context.l10n.errorRewardedAdUnavailable,
         icon: Icons.wifi_off_rounded,
       );
     } finally {
