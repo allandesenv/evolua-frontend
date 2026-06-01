@@ -19,6 +19,11 @@ void main() {
     await tester.tap(find.text('Começar agora'));
     await tester.pumpAndSettle();
 
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).textCapitalization,
+      TextCapitalization.sentences,
+    );
+
     await _answerStep(tester, 'calmo');
     await _answerStep(tester, 'clareza');
     await _answerStep(tester, 'agir com calma');

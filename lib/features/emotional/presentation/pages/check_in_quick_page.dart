@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_speech_transcription_service.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
@@ -79,10 +80,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   double _energyLevel = 7;
   bool _isSubmitting = false;
   bool _isRewardLoading = false;
+  bool _isListeningReflection = false;
+  String _dictationBaseText = '';
+  late final CheckInSpeechTranscriptionService _speechService;
 
   @override
   void initState() {
     super.initState();
+    _speechService = ref.read(checkInSpeechTranscriptionServiceProvider);
     ref.listenManual(checkInControllerProvider, (previous, next) {
       if (!next.hasError || !mounted || _isCheckInLimitError(next.error)) {
         return;
@@ -98,9 +103,89 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
 
   @override
   void dispose() {
+    _speechService.cancel();
     _reflectionController.dispose();
     _otherMoodController.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleReflectionDictation() async {
+    if (_isSubmitting) {
+      return;
+    }
+    if (_isListeningReflection || _speechService.isListening) {
+      await _speechService.stop();
+      if (mounted) {
+        setState(() => _isListeningReflection = false);
+      }
+      return;
+    }
+
+    final localeId = _speechLocaleId(context);
+    final available = await _speechService.initialize(
+      localeId: localeId,
+      onStatus: _handleSpeechStatus,
+      onError: _handleSpeechError,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (!available) {
+      AppSnackBar.show(
+        context,
+        message:
+            'O microfone não está disponível agora. Você pode continuar digitando.',
+        icon: Icons.mic_off_rounded,
+      );
+      return;
+    }
+
+    _dictationBaseText = _reflectionController.text.trim();
+    setState(() => _isListeningReflection = true);
+    try {
+      await _speechService.listen(
+        localeId: localeId,
+        onResult: _applySpeechResult,
+      );
+    } catch (_) {
+      _handleSpeechError(_CheckInSpeechStartException());
+    }
+  }
+
+  void _applySpeechResult(String text) {
+    if (!mounted || text.trim().isEmpty) {
+      return;
+    }
+    final transcript = text.trim();
+    final nextText = _dictationBaseText.isEmpty
+        ? transcript
+        : '$_dictationBaseText $transcript';
+    _reflectionController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextText.length),
+    );
+  }
+
+  void _handleSpeechStatus(String status) {
+    if (!mounted) {
+      return;
+    }
+    if (status == 'done' || status == 'notListening') {
+      setState(() => _isListeningReflection = false);
+    }
+  }
+
+  void _handleSpeechError(Object error) {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _isListeningReflection = false);
+    AppSnackBar.show(
+      context,
+      message:
+          'Não foi possível transcrever agora. Você pode continuar digitando.',
+      icon: Icons.mic_off_rounded,
+    );
   }
 
   Future<bool> _submit({bool allowLimitUnlock = true}) async {
@@ -503,6 +588,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           _isSubmitting ||
           isCreatingCheckIn ||
           (checkInState.isLoading && !checkInState.hasValue),
+      isListeningReflection: _isListeningReflection,
       onMoodSelected: (mood) => setState(() {
         _selectedMoodValue = mood.value;
         _selectedMoodLabel = mood.label;
@@ -512,12 +598,25 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       }),
       onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
       onEnergyChanged: (value) => setState(() => _energyLevel = value),
+      onToggleReflectionDictation: _toggleReflectionDictation,
       onSubmit: () {
         _submit();
       },
       onCancel: widget.onCancel ?? () => Navigator.of(context).maybePop(),
       l10n: l10n,
     );
+  }
+
+  String _speechLocaleId(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    if (locale.languageCode.isEmpty) {
+      return 'pt_BR';
+    }
+    final countryCode = locale.countryCode;
+    if (countryCode == null || countryCode.isEmpty) {
+      return locale.languageCode == 'pt' ? 'pt_BR' : locale.languageCode;
+    }
+    return '${locale.languageCode}_$countryCode';
   }
 
   String get _submissionMood {
@@ -549,6 +648,8 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   }
 }
 
+class _CheckInSpeechStartException implements Exception {}
+
 class _CheckInBriefingCard extends StatelessWidget {
   const _CheckInBriefingCard({
     required this.selectedMoodValue,
@@ -558,9 +659,11 @@ class _CheckInBriefingCard extends StatelessWidget {
     required this.otherMoodController,
     required this.quickMoodOptions,
     required this.isLoading,
+    required this.isListeningReflection,
     required this.onMoodSelected,
     required this.onOpenMoodPicker,
     required this.onEnergyChanged,
+    required this.onToggleReflectionDictation,
     required this.onSubmit,
     required this.onCancel,
     required this.l10n,
@@ -573,9 +676,11 @@ class _CheckInBriefingCard extends StatelessWidget {
   final TextEditingController otherMoodController;
   final List<_MoodOption> quickMoodOptions;
   final bool isLoading;
+  final bool isListeningReflection;
   final ValueChanged<_MoodOption> onMoodSelected;
   final VoidCallback onOpenMoodPicker;
   final ValueChanged<double> onEnergyChanged;
+  final VoidCallback onToggleReflectionDictation;
   final VoidCallback onSubmit;
   final VoidCallback onCancel;
   final AppLocalizations l10n;
@@ -637,6 +742,7 @@ class _CheckInBriefingCard extends StatelessWidget {
             const SizedBox(height: 12),
             TextFormField(
               controller: otherMoodController,
+              textCapitalization: TextCapitalization.sentences,
               maxLength: 80,
               decoration: InputDecoration(
                 labelText: l10n.checkInOtherMoodLabel,
@@ -662,6 +768,7 @@ class _CheckInBriefingCard extends StatelessWidget {
           const SizedBox(height: 8),
           TextFormField(
             controller: reflectionController,
+            textCapitalization: TextCapitalization.sentences,
             minLines: 2,
             maxLines: 3,
             decoration: InputDecoration(
@@ -669,6 +776,17 @@ class _CheckInBriefingCard extends StatelessWidget {
               hintText: l10n.checkInReflectionHint,
               alignLabelWithHint: true,
               prefixIcon: const Icon(Icons.edit_note_rounded),
+              suffixIcon: IconButton(
+                tooltip: isListeningReflection
+                    ? 'Parar ditado'
+                    : 'Usar microfone',
+                onPressed: isLoading ? null : onToggleReflectionDictation,
+                icon: Icon(
+                  isListeningReflection
+                      ? Icons.stop_rounded
+                      : Icons.mic_none_rounded,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 16),

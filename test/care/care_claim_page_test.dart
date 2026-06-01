@@ -45,6 +45,12 @@ void main() {
     expect(find.textContaining('clÃ'), findsNothing);
     expect(find.textContaining('relatÃ'), findsNothing);
     expect(find.textContaining('nÃ'), findsNothing);
+    final freeTextFields = tester.widgetList<TextField>(find.byType(TextField));
+    expect(freeTextFields, hasLength(4));
+    expect(
+      freeTextFields.map((field) => field.textCapitalization),
+      everyElement(TextCapitalization.sentences),
+    );
   });
   testWidgets('keeps recommendation guidance field usable after mobile focus', (
     tester,

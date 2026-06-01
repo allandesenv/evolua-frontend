@@ -743,6 +743,7 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _stateController,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Contexto emocional observado',
                     hintText: 'Ex.: ansiedade ao iniciar o dia',
@@ -751,6 +752,7 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _intentionController,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Intenção terapêutica',
                     hintText: 'Ex.: começar com mais presença',
@@ -760,6 +762,7 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _microActionController,
+                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Micro-ação sugerida',
                     hintText:
@@ -921,6 +924,7 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
             child: TextField(
               controller: _guidanceController,
               focusNode: _guidanceFocusNode,
+              textCapitalization: TextCapitalization.sentences,
               minLines: 4,
               maxLines: 8,
               decoration: const InputDecoration(

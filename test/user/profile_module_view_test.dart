@@ -29,6 +29,7 @@ import 'package:evolua_frontend/features/future_message/domain/entities/future_m
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
 import 'package:evolua_frontend/features/notification/domain/repositories/notification_repository.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
@@ -269,6 +270,37 @@ void main() {
         _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
       );
       await tester.pumpAndSettle();
+      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'dashboard opens one check-in prompt when launched from reminder',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+        dailyCheckInReminderPendingPayloadKey: dailyCheckInReminderPayload,
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Agora não'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
+
+      await tester.pumpWidget(
+        _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
+      );
+      await tester.pumpAndSettle();
+
       expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
     },
   );

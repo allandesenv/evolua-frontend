@@ -1,4 +1,4 @@
-﻿import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
+import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
@@ -79,6 +79,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
       backgroundColor: context.evoluaColors.surface,
       builder: (context) => _BriefingBottomSheet(
         title: 'Análise completa',
@@ -265,6 +266,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
       backgroundColor: context.evoluaColors.surface,
       builder: (context) => _BriefingBottomSheet(
         title: 'Seu ritmo hoje',
@@ -1590,6 +1592,7 @@ class _BriefingBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sheetHeight = MediaQuery.of(context).size.height * 0.84;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -1598,21 +1601,41 @@ class _BriefingBottomSheet extends StatelessWidget {
           top: 18,
           bottom: MediaQuery.of(context).viewInsets.bottom + 20,
         ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.84,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _BottomSheetHandle(),
-                Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 16),
-                child,
-              ],
-            ),
+        child: SizedBox(
+          height: sheetHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BottomSheetHandle(),
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Voltar',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [child],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2142,4 +2165,3 @@ String _compactText(String value, {required int maxLength}) {
 String _stripTrailingSentenceMark(String value) {
   return value.replaceFirst(RegExp(r'[.!?]+$'), '');
 }
-
