@@ -161,8 +161,32 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível conectar agora. Verifique sua conexão e tente novamente.';
 
   @override
+  String get errorNoInternet =>
+      'Não conseguimos conectar agora. Verifique sua internet e tente novamente.';
+
+  @override
   String get errorTimeout =>
       'A resposta demorou mais que o esperado. Tente novamente em instantes.';
+
+  @override
+  String get errorSessionExpired =>
+      'Sua sessão expirou. Entre novamente para continuar.';
+
+  @override
+  String get errorServerUnavailable =>
+      'O Evolua está temporariamente indisponível. Tente novamente em alguns instantes.';
+
+  @override
+  String get errorCheckInQuota =>
+      'Você já fez o check-in gratuito de hoje. Assista a um anúncio, assine Premium ou volte amanhã.';
+
+  @override
+  String get errorSmartReadingUnavailable =>
+      'Seu check-in está salvo, mas não conseguimos preparar a leitura agora.';
+
+  @override
+  String get errorRewardedAdUnavailable =>
+      'Não foi possível carregar o anúncio agora. Tente novamente em instantes.';
 
   @override
   String get errorUnexpected =>
@@ -1063,8 +1087,32 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'Não foi possível conectar agora. Verifique sua conexão e tente novamente.';
 
   @override
+  String get errorNoInternet =>
+      'Não conseguimos conectar agora. Verifique sua internet e tente novamente.';
+
+  @override
   String get errorTimeout =>
       'A resposta demorou mais que o esperado. Tente novamente em instantes.';
+
+  @override
+  String get errorSessionExpired =>
+      'Sua sessão expirou. Entre novamente para continuar.';
+
+  @override
+  String get errorServerUnavailable =>
+      'O Evolua está temporariamente indisponível. Tente novamente em alguns instantes.';
+
+  @override
+  String get errorCheckInQuota =>
+      'Você já fez o check-in gratuito de hoje. Assista a um anúncio, assine Premium ou volte amanhã.';
+
+  @override
+  String get errorSmartReadingUnavailable =>
+      'Seu check-in está salvo, mas não conseguimos preparar a leitura agora.';
+
+  @override
+  String get errorRewardedAdUnavailable =>
+      'Não foi possível carregar o anúncio agora. Tente novamente em instantes.';
 
   @override
   String get errorUnexpected =>

@@ -287,26 +287,34 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
 
   Future<CheckIn?> generateDeepReadingForLatest({String style = 'deep'}) async {
     final current = state.asData?.value;
-    final latest = current?.latestCreatedCheckIn;
+    if (current == null) {
+      return null;
+    }
+    final currentState = current;
+    final latest = currentState.latestCreatedCheckIn;
     if (latest == null) {
       return null;
     }
 
     final repository = ref.read(checkInRepositoryProvider);
-    state = const AsyncLoading();
     CheckIn? refreshed;
-    state = await AsyncValue.guard(() async {
+    try {
       refreshed = await repository.generateDeepReading(latest.id, style: style);
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(trailControllerProvider);
-      final result = await _fetch(page: current?.result.page ?? 0);
-      return _stateFromResult(
-        result,
-        latestCreatedCheckIn: _canonicalLatestCheckIn(result, refreshed),
+      final result = await _fetch(page: currentState.result.page);
+      state = AsyncData(
+        _stateFromResult(
+          result,
+          latestCreatedCheckIn: _canonicalLatestCheckIn(result, refreshed),
+        ),
       );
-    });
-    _resumeInsightPollingFromState();
-    return refreshed;
+      _resumeInsightPollingFromState();
+      return refreshed;
+    } catch (error, stackTrace) {
+      state = AsyncData(currentState);
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<CheckIn?> saveReading(int checkInId) async {

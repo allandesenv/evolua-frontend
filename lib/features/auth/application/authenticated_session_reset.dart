@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
@@ -9,11 +10,14 @@ import 'package:evolua_frontend/features/content/application/trail_controller.da
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/support_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,28 +48,37 @@ final authenticatedSessionResetObserverProvider = Provider<void>((ref) {
 });
 
 Future<void> resetAuthenticatedSessionState(Ref ref) async {
-  ref.invalidate(profileControllerProvider);
-  ref.invalidate(checkInControllerProvider);
-  ref.invalidate(trailControllerProvider);
-  ref.invalidate(currentJourneyTrailProvider);
-  ref.invalidate(trailJourneyProvider);
-  ref.invalidate(journeyChatControllerProvider);
-  ref.invalidate(dailyRitualControllerProvider);
-  ref.invalidate(futureMessageControllerProvider);
-  ref.invalidate(socialPostControllerProvider);
-  ref.invalidate(communityControllerProvider);
-  ref.invalidate(subscriptionControllerProvider);
-  ref.invalidate(notificationInboxControllerProvider);
-  ref.invalidate(careShareControllerProvider);
-  ref.invalidate(careShareHistoryProvider);
-  ref.invalidate(careRecommendationsProvider);
-  ref.invalidate(chatMessageControllerProvider);
-  ref.invalidate(supportConfigProvider);
-  ref.invalidate(supportStatusProvider);
+  _invalidateAuthenticatedProviders(ref);
 
   await SocialPostController.clearOfflineCache(ref);
 }
 
 void scheduleAuthenticatedSessionReset(Ref ref) {
   unawaited(resetAuthenticatedSessionState(ref));
+}
+
+void _invalidateAuthenticatedProviders(Ref ref) {
+  ref
+    ..invalidate(profileControllerProvider)
+    ..invalidate(checkInControllerProvider)
+    ..invalidate(trailControllerProvider)
+    ..invalidate(currentJourneyTrailProvider)
+    ..invalidate(trailJourneyProvider)
+    ..invalidate(journeyChatControllerProvider)
+    ..invalidate(dailyRitualControllerProvider)
+    ..invalidate(futureMessageControllerProvider)
+    ..invalidate(socialPostControllerProvider)
+    ..invalidate(communityControllerProvider)
+    ..invalidate(subscriptionControllerProvider)
+    ..invalidate(monetizationAccessControllerProvider)
+    ..invalidate(notificationInboxControllerProvider)
+    ..invalidate(dailyCheckInReminderControllerProvider)
+    ..invalidate(careShareControllerProvider)
+    ..invalidate(careShareHistoryProvider)
+    ..invalidate(careRecommendationsProvider)
+    ..invalidate(chatMessageControllerProvider)
+    ..invalidate(settingsPrivacyPreferencesControllerProvider)
+    ..invalidate(accessibilityPreferencesControllerProvider)
+    ..invalidate(supportConfigProvider)
+    ..invalidate(supportStatusProvider);
 }

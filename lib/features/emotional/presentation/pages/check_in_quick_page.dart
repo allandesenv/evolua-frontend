@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
@@ -341,8 +342,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       return;
     }
 
-    const message =
-        'Tivemos um problema para confirmar o anúncio. Tente novamente em instantes.';
+    final message = context.l10n.checkInRewardAdNotConfirmed;
 
     await showDialog<void>(
       context: context,
@@ -350,7 +350,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       barrierDismissible: true,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Não foi possível confirmar o anúncio'),
-        content: const Text(message),
+        content: Text(message),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -495,13 +495,19 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
               return;
             }
             setState(() => _isRewardLoading = true);
-            final unlocked = await ref
-                .read(monetizationAccessControllerProvider.notifier)
-                .unlockWithRewardedAd(resource: 'DEEP_EMOTIONAL_READING');
-            if (unlocked) {
-              await ref
-                  .read(checkInControllerProvider.notifier)
-                  .generateDeepReadingForLatest();
+            var unlocked = false;
+            var readingFailed = false;
+            try {
+              unlocked = await ref
+                  .read(monetizationAccessControllerProvider.notifier)
+                  .unlockWithRewardedAd(resource: 'DEEP_EMOTIONAL_READING');
+              if (unlocked) {
+                await ref
+                    .read(checkInControllerProvider.notifier)
+                    .generateDeepReadingForLatest();
+              }
+            } catch (_) {
+              readingFailed = unlocked;
             }
             if (!mounted || !sheetContext.mounted) {
               return;
@@ -510,9 +516,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
             Navigator.of(sheetContext).pop();
             AppSnackBar.show(
               context,
-              message: unlocked
+              message: readingFailed
+                  ? context.l10n.errorSmartReadingUnavailable
+                  : unlocked
                   ? context.l10n.checkInDeepReadingUnlocked
-                  : context.l10n.checkInRewardAdNotConfirmed,
+                  : context.l10n.errorRewardedAdUnavailable,
               icon: unlocked
                   ? Icons.ondemand_video_rounded
                   : Icons.info_outline_rounded,
@@ -629,18 +637,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   }
 
   String _errorMessage(Object? error) {
-    if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map<String, dynamic>) {
-        final details = data['details'];
-        if (details is List && details.isNotEmpty) {
-          return details.join(', ');
-        }
-      }
-      return error.message ?? context.l10n.checkInSaveError;
-    }
-
-    return context.l10n.checkInSaveError;
+    return friendlyApiErrorMessage(
+      error,
+      context.l10n,
+      fallback: context.l10n.checkInSaveError,
+    );
   }
 
   bool _isCheckInLimitError(Object? error) {

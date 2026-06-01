@@ -1,16 +1,23 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/features/auth/application/authenticated_session_reset.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
+import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
+import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:evolua_frontend/features/user/application/settings_privacy_preferences_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,7 +52,7 @@ void main() {
       await container
           .read(authControllerProvider.notifier)
           .login(email: 'a@evolua.test', password: '123456');
-      await Future<void>.delayed(Duration.zero);
+      await _flushSessionReset();
 
       final firstProfile = await container.read(
         profileControllerProvider.future,
@@ -61,7 +68,7 @@ void main() {
       );
 
       await container.read(authControllerProvider.notifier).logout();
-      await Future<void>.delayed(Duration.zero);
+      await _flushSessionReset();
       expect(container.read(checkInControllerProvider).isLoading, isTrue);
 
       profileRepository.profile = _profile(
@@ -75,7 +82,7 @@ void main() {
       await container
           .read(authControllerProvider.notifier)
           .login(email: 'b@evolua.test', password: '123456');
-      await Future<void>.delayed(Duration.zero);
+      await _flushSessionReset();
 
       final secondProfile = await container.read(
         profileControllerProvider.future,
@@ -92,26 +99,181 @@ void main() {
       );
     },
   );
+
+  test(
+    'direct user switch clears authenticated cache before loading new user',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final authRepository = _FakeAuthRepository([
+        _session(userId: 'user-a', email: 'a@evolua.test'),
+        _session(userId: 'user-b', email: 'b@evolua.test'),
+      ]);
+      final profileRepository = _FakeProfileRepository(
+        _profile(userId: 'user-a', displayName: 'Usuario A'),
+      );
+      final checkInRepository = _FakeCheckInRepository(
+        _checkIn(userId: 'user-a', insight: 'Leitura do usuario A'),
+      );
+      final container = _container(
+        authRepository,
+        profileRepository,
+        checkInRepository,
+      );
+      addTearDown(container.dispose);
+
+      container.read(authenticatedSessionResetObserverProvider);
+      await container.read(authControllerProvider.future);
+      await container
+          .read(authControllerProvider.notifier)
+          .login(email: 'a@evolua.test', password: '123456');
+      await _flushSessionReset();
+
+      final firstCheckIns = await container.read(
+        checkInControllerProvider.future,
+      );
+      expect(firstCheckIns.ownerUserId, 'user-a');
+
+      profileRepository.profile = _profile(
+        userId: 'user-b',
+        displayName: 'Usuario B',
+      );
+      checkInRepository.item = _checkIn(
+        userId: 'user-b',
+        insight: 'Leitura do usuario B',
+      );
+      await container
+          .read(authControllerProvider.notifier)
+          .login(email: 'b@evolua.test', password: '123456');
+      await _flushSessionReset();
+
+      final secondCheckIns = await container.read(
+        checkInControllerProvider.future,
+      );
+      expect(secondCheckIns.ownerUserId, 'user-b');
+      expect(
+        secondCheckIns.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura do usuario B',
+      );
+    },
+  );
+
+  test(
+    'session reset invalidates monetization preferences and reminder providers',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final observer = _DisposedProviderObserver();
+      final scheduler = _FakeReminderScheduler();
+      final container = _container(
+        _FakeAuthRepository([
+          _session(userId: 'user-a', email: 'a@evolua.test'),
+        ]),
+        _FakeProfileRepository(_profile(userId: 'user-a', displayName: 'A')),
+        _FakeCheckInRepository(
+          _checkIn(userId: 'user-a', insight: 'Leitura A'),
+        ),
+        observer: observer,
+        reminderScheduler: scheduler,
+      );
+      addTearDown(container.dispose);
+
+      container.read(authenticatedSessionResetObserverProvider);
+      await container.read(authControllerProvider.future);
+      await container
+          .read(authControllerProvider.notifier)
+          .login(email: 'a@evolua.test', password: '123456');
+      await _flushSessionReset();
+
+      await container.read(monetizationAccessControllerProvider.future);
+      await container.read(dailyCheckInReminderControllerProvider.future);
+      await container.read(settingsPrivacyPreferencesControllerProvider.future);
+      await container.read(accessibilityPreferencesControllerProvider.future);
+      observer.disposedProviders.clear();
+
+      await container.read(authControllerProvider.notifier).logout();
+      await _flushSessionReset();
+
+      expect(
+        observer.disposedProviders,
+        containsAll(<Object>[
+          monetizationAccessControllerProvider,
+          dailyCheckInReminderControllerProvider,
+          settingsPrivacyPreferencesControllerProvider,
+          accessibilityPreferencesControllerProvider,
+        ]),
+      );
+    },
+  );
+
+  test(
+    'same-user refresh does not invalidate authenticated providers',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final session = _session(userId: 'user-a', email: 'a@evolua.test');
+      final observer = _DisposedProviderObserver();
+      final authRepository = _FakeAuthRepository([
+        session,
+      ], refreshSession: session);
+      final container = _container(
+        authRepository,
+        _FakeProfileRepository(_profile(userId: 'user-a', displayName: 'A')),
+        _FakeCheckInRepository(
+          _checkIn(userId: 'user-a', insight: 'Leitura A'),
+        ),
+        observer: observer,
+      );
+      addTearDown(container.dispose);
+
+      container.read(authenticatedSessionResetObserverProvider);
+      await container.read(authControllerProvider.future);
+      await container
+          .read(authControllerProvider.notifier)
+          .login(email: 'a@evolua.test', password: '123456');
+      await _flushSessionReset();
+
+      await container.read(checkInControllerProvider.future);
+      observer.disposedProviders.clear();
+
+      await container.read(authControllerProvider.notifier).refreshSession();
+      await _flushSessionReset();
+
+      expect(
+        observer.disposedProviders,
+        isNot(contains(checkInControllerProvider)),
+      );
+    },
+  );
 }
 
 ProviderContainer _container(
   AuthRepository authRepository,
   ProfileRepository profileRepository,
-  CheckInRepository checkInRepository,
-) {
+  CheckInRepository checkInRepository, {
+  ProviderObserver? observer,
+  DailyCheckInReminderScheduler? reminderScheduler,
+}) {
   return ProviderContainer(
+    observers: [?observer],
     overrides: [
       authRepositoryProvider.overrideWithValue(authRepository),
       profileRepositoryProvider.overrideWithValue(profileRepository),
       checkInRepositoryProvider.overrideWithValue(checkInRepository),
+      authenticatedDioProvider(
+        AppConfig.userBaseUrl,
+      ).overrideWithValue(_fakeUserDio()),
+      if (reminderScheduler != null)
+        dailyCheckInReminderSchedulerProvider.overrideWithValue(
+          reminderScheduler,
+        ),
     ],
   );
 }
 
 class _FakeAuthRepository implements AuthRepository {
-  _FakeAuthRepository(this._loginSessions);
+  _FakeAuthRepository(this._loginSessions, {AuthSession? refreshSession})
+    : _refreshSession = refreshSession;
 
   final List<AuthSession> _loginSessions;
+  final AuthSession? _refreshSession;
 
   @override
   Future<AuthSession> exchangeGoogleCode({required String code}) async {
@@ -135,7 +297,7 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<AuthSession> refresh({required String refreshToken}) async {
-    return _loginSessions.first;
+    return _refreshSession ?? _loginSessions.first;
   }
 
   @override
@@ -146,6 +308,72 @@ class _FakeAuthRepository implements AuthRepository {
     required String token,
     required String newPassword,
   }) async {}
+}
+
+final class _DisposedProviderObserver extends ProviderObserver {
+  final disposedProviders = <Object>[];
+
+  @override
+  void didDisposeProvider(ProviderObserverContext context) {
+    disposedProviders.add(context.provider);
+  }
+}
+
+class _FakeReminderScheduler implements DailyCheckInReminderScheduler {
+  @override
+  Future<void> cancel() async {}
+
+  @override
+  Future<bool> consumePendingCheckInPayload() async => false;
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<void> scheduleDaily({
+    required int hour,
+    required int minute,
+    required String title,
+    required String body,
+    required String payload,
+  }) async {}
+}
+
+Dio _fakeUserDio() {
+  return Dio()..httpClientAdapter = _FakeUserAdapter();
+}
+
+class _FakeUserAdapter implements HttpClientAdapter {
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final path = options.path;
+    final data = switch (path) {
+      '/v1/profiles/me/privacy-settings' =>
+        SettingsPrivacyPreferences.defaults().toJson(),
+      '/v1/profiles/me/accessibility-settings' =>
+        AccessibilityPreferences.defaults().toJson(),
+      _ => <String, Object?>{},
+    };
+    return ResponseBody.fromString(
+      jsonEncode({'data': data}),
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
+    );
+  }
+}
+
+Future<void> _flushSessionReset() async {
+  await Future<void>.delayed(Duration.zero);
+  await Future<void>.delayed(Duration.zero);
 }
 
 class _FakeCheckInRepository implements CheckInRepository {

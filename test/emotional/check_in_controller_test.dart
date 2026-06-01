@@ -279,6 +279,43 @@ void main() {
     },
   );
 
+  test('deep reading failure keeps current check-in visible', () async {
+    final original = _checkIn(
+      id: 71,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(insight: 'Leitura original.'),
+    );
+    final requestOptions = RequestOptions(
+      path: '/v1/check-ins/71/deep-reading',
+    );
+    final repository = _FakeCheckInRepository(
+      lists: [
+        [original],
+      ],
+      deepReadingError: DioException(
+        requestOptions: requestOptions,
+        response: Response(requestOptions: requestOptions, statusCode: 503),
+      ),
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await expectLater(
+      container
+          .read(checkInControllerProvider.notifier)
+          .generateDeepReadingForLatest(style: 'deep'),
+      throwsA(isA<DioException>()),
+    );
+
+    final state = container.read(checkInControllerProvider).asData?.value;
+    expect(state?.latestCreatedCheckIn?.id, 71);
+    expect(
+      state?.latestCreatedCheckIn?.aiInsight?.insight,
+      'Leitura original.',
+    );
+  });
+
   test('save reading updates latest saved flag', () async {
     final original = _checkIn(
       id: 80,
@@ -339,6 +376,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     this.createResult,
     this.createError,
     this.deepReadingResult,
+    this.deepReadingError,
     this.savedReadingResult,
   }) : _lists = List<List<CheckIn>>.from(lists);
 
@@ -346,6 +384,7 @@ class _FakeCheckInRepository implements CheckInRepository {
   final CheckIn? createResult;
   final Object? createError;
   final CheckIn? deepReadingResult;
+  final Object? deepReadingError;
   final CheckIn? savedReadingResult;
   final List<String> deepReadingStyles = [];
   final List<int> savedReadingIds = [];
@@ -398,6 +437,10 @@ class _FakeCheckInRepository implements CheckInRepository {
     String style = 'deep',
   }) async {
     deepReadingStyles.add(style);
+    final error = deepReadingError;
+    if (error != null) {
+      throw error;
+    }
     return deepReadingResult ??
         (_lists.isNotEmpty && _lists.first.isNotEmpty
             ? _lists.first.first
