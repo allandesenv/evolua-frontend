@@ -179,9 +179,10 @@ void main() {
       final forgotButton = tester.widget<TextButton>(
         find.widgetWithText(TextButton, 'Esqueci minha senha'),
       );
+      expect(forgotButton.style?.tapTargetSize, MaterialTapTargetSize.padded);
       expect(
-        forgotButton.style?.tapTargetSize,
-        MaterialTapTargetSize.shrinkWrap,
+        forgotButton.style?.minimumSize?.resolve(const <WidgetState>{}),
+        const Size(48, 48),
       );
     });
 

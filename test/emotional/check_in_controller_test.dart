@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -71,6 +73,89 @@ void main() {
   });
 
   test(
+    'create ignores parallel duplicate submissions while in flight',
+    () async {
+      final gate = Completer<void>();
+      final initial = _checkIn(
+        id: 60,
+        createdAt: DateTime(2026, 5, 4, 10),
+        aiInsight: _insight(insight: 'Leitura anterior.'),
+      );
+      final created = _checkIn(
+        id: 61,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura nova.'),
+      );
+      final repository = _FakeCheckInRepository(
+        createGate: gate,
+        createResult: created,
+        lists: [
+          [initial],
+          [created, initial],
+        ],
+      );
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
+
+      final first = container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: 'um', energyLevel: 7);
+      final second = container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: 'dois', energyLevel: 7);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.createCalls, 1);
+      expect(
+        container.read(checkInControllerProvider).value?.isCreatingCheckIn,
+        isTrue,
+      );
+
+      gate.complete();
+      await Future.wait([first, second]);
+
+      final state = container.read(checkInControllerProvider).asData?.value;
+      expect(repository.createCalls, 1);
+      expect(state?.isCreatingCheckIn, isFalse);
+      expect(state?.latestCreatedCheckIn?.id, 61);
+    },
+  );
+
+  test('create releases duplicate guard after failure', () async {
+    final requestOptions = RequestOptions(path: '/v1/check-ins');
+    final repository = _FakeCheckInRepository(
+      lists: [const <CheckIn>[], const <CheckIn>[]],
+      createErrors: [
+        DioException(
+          requestOptions: requestOptions,
+          response: Response(requestOptions: requestOptions, statusCode: 503),
+        ),
+      ],
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await expectLater(
+      container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 7),
+      throwsA(isA<DioException>()),
+    );
+
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: null, energyLevel: 7);
+
+    expect(repository.createCalls, 2);
+    expect(
+      container.read(checkInControllerProvider).value?.isCreatingCheckIn,
+      isFalse,
+    );
+  });
+
+  test(
     'polling updates latest created check-in when insight arrives later',
     () async {
       final createdWithoutInsight = _checkIn(
@@ -119,6 +204,49 @@ void main() {
         'Leitura chegou depois.',
       );
       expect(state?.isLatestInsightPending, isFalse);
+    },
+  );
+
+  test(
+    'polling marks insight unavailable after attempts are exhausted',
+    () async {
+      final createdWithoutInsight = _checkIn(
+        id: 41,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: null,
+      );
+      final repository = _FakeCheckInRepository(
+        createResult: createdWithoutInsight,
+        lists: [
+          const <CheckIn>[],
+          [createdWithoutInsight],
+          [createdWithoutInsight],
+        ],
+      );
+      final container = _container(
+        repository,
+        pollingConfig: const CheckInInsightPollingConfig(
+          attempts: 1,
+          delay: Duration(milliseconds: 1),
+        ),
+      );
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
+
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 7);
+
+      var state = container.read(checkInControllerProvider).asData?.value;
+      expect(state?.isLatestInsightPending, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      state = container.read(checkInControllerProvider).asData?.value;
+      expect(state?.pendingInsightCheckInId, isNull);
+      expect(state?.unavailableInsightCheckInId, 41);
+      expect(state?.isLatestInsightPending, isFalse);
+      expect(state?.isLatestInsightUnavailable, isTrue);
     },
   );
 
@@ -375,6 +503,8 @@ class _FakeCheckInRepository implements CheckInRepository {
     required List<List<CheckIn>> lists,
     this.createResult,
     this.createError,
+    this.createErrors = const [],
+    this.createGate,
     this.deepReadingResult,
     this.deepReadingError,
     this.savedReadingResult,
@@ -383,12 +513,15 @@ class _FakeCheckInRepository implements CheckInRepository {
   final List<List<CheckIn>> _lists;
   final CheckIn? createResult;
   final Object? createError;
+  final List<Object> createErrors;
+  final Completer<void>? createGate;
   final CheckIn? deepReadingResult;
   final Object? deepReadingError;
   final CheckIn? savedReadingResult;
   final List<String> deepReadingStyles = [];
   final List<int> savedReadingIds = [];
   final List<int> ritualReadingIds = [];
+  int createCalls = 0;
 
   @override
   Future<PaginatedResponse<CheckIn>> list({
@@ -423,9 +556,14 @@ class _FakeCheckInRepository implements CheckInRepository {
     String? reflection,
     required int energyLevel,
   }) async {
+    createCalls++;
+    await createGate?.future;
     final error = createError;
     if (error != null) {
       throw error;
+    }
+    if (createErrors.length >= createCalls) {
+      throw createErrors[createCalls - 1];
     }
     return createResult ??
         _checkIn(id: 99, createdAt: DateTime(2026, 5, 5, 10), aiInsight: null);

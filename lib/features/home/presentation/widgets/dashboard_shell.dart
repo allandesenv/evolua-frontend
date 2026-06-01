@@ -53,6 +53,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   bool _checkInOpening = false;
   bool _initialCheckInPromptOpening = false;
   String? _initialCheckInPromptKey;
+  bool _firstExperienceOpening = false;
+  String? _firstExperienceKey;
   bool _openingReminderCheckIn = false;
   ProviderSubscription<AsyncValue<String>>? _reminderTapSubscription;
   ProviderSubscription<AsyncValue<CareShareState>>? _careShareSubscription;
@@ -190,6 +192,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
         backgroundColor: AppColors.surface,
         builder: (sheetContext) => SafeArea(
           child: Padding(
@@ -333,6 +337,23 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       return;
     }
 
+    final hasAnyCheckIn =
+        history.latestCreatedCheckIn != null || history.result.items.isNotEmpty;
+    if (!hasAnyCheckIn) {
+      final firstExperienceKey = _firstExperienceStorageKey(session.userId);
+      if (_firstExperienceKey == firstExperienceKey) {
+        return;
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openFirstExperienceIfNeeded(
+          firstExperienceKey: firstExperienceKey,
+          initialPromptKey: _initialCheckInPromptStorageKey(session.userId),
+        );
+      });
+      return;
+    }
+
     final key = _initialCheckInPromptStorageKey(session.userId);
     if (_initialCheckInPromptKey == key) {
       return;
@@ -350,8 +371,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     if (session == null || _openingReminderCheckIn || _checkInOpening) {
       return;
     }
-    _openingReminderCheckIn = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _openingReminderCheckIn || _checkInOpening) {
+        return;
+      }
+      _openingReminderCheckIn = true;
       try {
         final shouldOpen = await ref
             .read(dailyCheckInReminderControllerProvider.notifier)
@@ -393,6 +417,96 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _initialCheckInPromptKey = key;
   }
 
+  Future<void> _markFirstExperienceHandled(String key) async {
+    final preferences = await ref.read(sharedPreferencesProvider.future);
+    await preferences.setBool(key, true);
+    _firstExperienceKey = key;
+  }
+
+  Future<void> _openFirstExperienceIfNeeded({
+    required String firstExperienceKey,
+    required String initialPromptKey,
+  }) async {
+    if (!mounted ||
+        _firstExperienceOpening ||
+        _openingReminderCheckIn ||
+        _checkInOpening) {
+      return;
+    }
+
+    _firstExperienceOpening = true;
+    try {
+      _openingReminderCheckIn = true;
+      late final bool shouldOpenReminder;
+      try {
+        shouldOpenReminder = await ref
+            .read(dailyCheckInReminderControllerProvider.notifier)
+            .consumePendingCheckInPayload();
+      } finally {
+        _openingReminderCheckIn = false;
+      }
+      if (!mounted) {
+        return;
+      }
+      if (shouldOpenReminder) {
+        _openingReminderCheckIn = true;
+        try {
+          await _markFirstExperienceHandled(firstExperienceKey);
+          await _markInitialCheckInPromptKeyHandled(initialPromptKey);
+          await _openCheckIn(compact: true);
+        } finally {
+          _openingReminderCheckIn = false;
+        }
+        return;
+      }
+      final preferences = await ref.read(sharedPreferencesProvider.future);
+      if (preferences.getBool(firstExperienceKey) == true || !mounted) {
+        _firstExperienceKey = firstExperienceKey;
+        return;
+      }
+
+      final startCheckIn = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
+        backgroundColor: AppColors.surface,
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 18,
+              right: 18,
+              top: 18,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 18,
+            ),
+            child: Center(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: _FirstExperienceSheet(
+                  onStart: () => Navigator.of(sheetContext).pop(true),
+                  onDismiss: () => Navigator.of(sheetContext).pop(false),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      if (!mounted || startCheckIn == null) {
+        return;
+      }
+
+      await _markFirstExperienceHandled(firstExperienceKey);
+      await _markInitialCheckInPromptKeyHandled(initialPromptKey);
+      if (startCheckIn) {
+        await _openCheckIn(compact: true);
+      }
+    } finally {
+      _firstExperienceOpening = false;
+    }
+  }
+
   Future<void> _openInitialCheckInPromptIfNeeded(String key) async {
     if (!mounted || _initialCheckInPromptOpening) {
       return;
@@ -417,6 +531,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final date =
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     return 'evolua.initial_checkin_prompt.$userId.$date';
+  }
+
+  String _firstExperienceStorageKey(String userId) {
+    return 'evolua.first_experience.$userId.v1';
   }
 
   @override
@@ -448,15 +566,25 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
     final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
+    final historyForFirstExperience = checkInState.asData?.value;
+    final shouldFirstExperienceHandleCheckIn =
+        isCompact &&
+        session != null &&
+        historyForFirstExperience != null &&
+        historyForFirstExperience.belongsToUser(session.userId) &&
+        historyForFirstExperience.latestCreatedCheckIn == null &&
+        historyForFirstExperience.result.items.isEmpty;
     _scheduleInitialCheckInPrompt(
       isCompact: isCompact,
       session: session,
       checkInState: checkInState,
     );
-    _consumePendingReminderCheckInIfNeeded(
-      isCompact: isCompact,
-      session: session,
-    );
+    if (!shouldFirstExperienceHandleCheckIn) {
+      _consumePendingReminderCheckInIfNeeded(
+        isCompact: isCompact,
+        session: session,
+      );
+    }
     final isAdmin = session?.isAdmin ?? false;
     final l10n = context.l10n;
     final destinations = [
@@ -1449,6 +1577,85 @@ class _AccountMenuButton extends StatelessWidget {
         imageUrl: avatarUrl,
         fallbackText: displayName,
         radius: 22,
+      ),
+    );
+  }
+}
+
+class _FirstExperienceSheet extends StatelessWidget {
+  const _FirstExperienceSheet({required this.onStart, required this.onDismiss});
+
+  final VoidCallback onStart;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return PrimaryPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.favorite_rounded,
+                  color: AppColors.accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  l10n.firstExperienceTitle,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            l10n.firstExperienceMainMessage,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            l10n.firstExperienceDescription,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: context.evoluaColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: onStart,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: Text(l10n.firstExperienceStart),
+              ),
+              OutlinedButton(
+                onPressed: onDismiss,
+                child: Text(l10n.firstExperienceNotNow),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -63,10 +63,12 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         return;
       }
 
-      final message = extractApiErrorMessage(
-        error,
-        fallback: context.l10n.authLoginFallbackError,
-      );
+      final message = _isPublicLoginAuthError(error)
+          ? context.l10n.authLoginFallbackError
+          : extractApiErrorMessage(
+              error,
+              fallback: context.l10n.authLoginFallbackError,
+            );
 
       AppSnackBar.show(
         context,
@@ -80,6 +82,17 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  bool _isPublicLoginAuthError(Object error) {
+    if (error is! DioException) {
+      return false;
+    }
+    final statusCode = error.response?.statusCode;
+    if (statusCode != 401 && statusCode != 403) {
+      return false;
+    }
+    return error.requestOptions.path.contains('/v1/public/auth/login');
   }
 
   @override
@@ -528,12 +541,12 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           child: TextButton(
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.textSecondary,
-                              minimumSize: Size.zero,
+                              minimumSize: const Size(48, 48),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 2,
-                                vertical: 2,
+                                horizontal: 8,
+                                vertical: 8,
                               ),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              tapTargetSize: MaterialTapTargetSize.padded,
                               textStyle: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),

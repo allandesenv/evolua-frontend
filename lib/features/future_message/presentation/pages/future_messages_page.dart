@@ -180,6 +180,10 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 980),
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

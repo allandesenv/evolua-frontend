@@ -189,8 +189,20 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     );
   }
 
+  void _showSavingInProgressMessage() {
+    if (!mounted) {
+      return;
+    }
+    AppSnackBar.show(
+      context,
+      message: context.l10n.checkInSavingInProgress,
+      icon: Icons.hourglass_top_rounded,
+    );
+  }
+
   Future<bool> _submit({bool allowLimitUnlock = true}) async {
     if (_isSubmitting) {
+      _showSavingInProgressMessage();
       return false;
     }
 
@@ -252,7 +264,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       }
       AppSnackBar.show(
         context,
-        message: context.l10n.checkInSavedSnack,
+        message: insight == null
+            ? context.l10n.checkInSavedReadingPending
+            : context.l10n.checkInSavedSnack,
         icon: Icons.check_circle_outline_rounded,
       );
       await _maybeInviteDailyReminder();
@@ -577,6 +591,10 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     final checkInState = ref.watch(checkInControllerProvider);
     final history = checkInState.asData?.value;
     final isCreatingCheckIn = history?.isCreatingCheckIn ?? false;
+    final isSavingCheckIn =
+        _isSubmitting ||
+        isCreatingCheckIn ||
+        (checkInState.isLoading && !checkInState.hasValue);
     final recentItems = history?.result.items ?? const <CheckIn>[];
     final latestInsight =
         history?.latestCreatedCheckIn?.aiInsight ??
@@ -585,33 +603,52 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
             .map((item) => item.aiInsight!)
             .firstOrNull;
 
-    return _CheckInBriefingCard(
-      selectedMoodValue: _selectedMoodValue,
-      selectedMoodLabel: selectedMoodLabel,
-      energyLevel: _energyLevel,
-      reflectionController: _reflectionController,
-      otherMoodController: _otherMoodController,
-      quickMoodOptions: quickMoodOptions,
-      isLoading:
-          _isSubmitting ||
-          isCreatingCheckIn ||
-          (checkInState.isLoading && !checkInState.hasValue),
-      isListeningReflection: _isListeningReflection,
-      onMoodSelected: (mood) => setState(() {
-        _selectedMoodValue = mood.value;
-        _selectedMoodLabel = mood.label;
-        if (mood.value != _otherMoodValue) {
-          _otherMoodController.clear();
+    return PopScope<void>(
+      canPop: !isSavingCheckIn,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !isSavingCheckIn) {
+          return;
         }
-      }),
-      onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
-      onEnergyChanged: (value) => setState(() => _energyLevel = value),
-      onToggleReflectionDictation: _toggleReflectionDictation,
-      onSubmit: () {
-        _submit();
+        _showSavingInProgressMessage();
       },
-      onCancel: widget.onCancel ?? () => Navigator.of(context).maybePop(),
-      l10n: l10n,
+      child: _CheckInBriefingCard(
+        selectedMoodValue: _selectedMoodValue,
+        selectedMoodLabel: selectedMoodLabel,
+        energyLevel: _energyLevel,
+        reflectionController: _reflectionController,
+        otherMoodController: _otherMoodController,
+        quickMoodOptions: quickMoodOptions,
+        isLoading: isSavingCheckIn,
+        isListeningReflection: _isListeningReflection,
+        onMoodSelected: (mood) => setState(() {
+          _selectedMoodValue = mood.value;
+          _selectedMoodLabel = mood.label;
+          if (mood.value != _otherMoodValue) {
+            _otherMoodController.clear();
+          }
+        }),
+        onOpenMoodPicker: () => _openMoodPicker(recentItems, latestInsight),
+        onEnergyChanged: (value) => setState(() => _energyLevel = value),
+        onToggleReflectionDictation: _toggleReflectionDictation,
+        onSubmit: () {
+          if (isSavingCheckIn) {
+            _showSavingInProgressMessage();
+            return;
+          }
+          _submit();
+        },
+        onCancel: () {
+          if (isSavingCheckIn) {
+            _showSavingInProgressMessage();
+            return;
+          }
+          (widget.onCancel ?? () => Navigator.of(context).maybePop())();
+        },
+        submitLabel: isSavingCheckIn
+            ? l10n.checkInSavingLabel
+            : l10n.checkInSubmit,
+        l10n: l10n,
+      ),
     );
   }
 
@@ -667,6 +704,7 @@ class _CheckInBriefingCard extends StatelessWidget {
     required this.onToggleReflectionDictation,
     required this.onSubmit,
     required this.onCancel,
+    required this.submitLabel,
     required this.l10n,
   });
 
@@ -684,6 +722,7 @@ class _CheckInBriefingCard extends StatelessWidget {
   final VoidCallback onToggleReflectionDictation;
   final VoidCallback onSubmit;
   final VoidCallback onCancel;
+  final String submitLabel;
   final AppLocalizations l10n;
 
   @override
@@ -715,20 +754,20 @@ class _CheckInBriefingCard extends StatelessWidget {
                 (mood) => ChoiceChip(
                   label: Text(mood.label),
                   selected: selectedMoodValue == mood.value,
-                  onSelected: (_) => onMoodSelected(mood),
+                  onSelected: isLoading ? null : (_) => onMoodSelected(mood),
                 ),
               ),
               if (shouldShowSelectedMoodChip)
                 ChoiceChip(
                   label: Text(selectedMoodLabel),
                   selected: true,
-                  onSelected: (_) {},
+                  onSelected: isLoading ? null : (_) {},
                 ),
               ActionChip(
                 tooltip: l10n.checkInMoreStatesTooltip,
                 avatar: const Icon(Icons.add_rounded, size: 18),
                 label: Text(l10n.checkInMoreStates),
-                onPressed: onOpenMoodPicker,
+                onPressed: isLoading ? null : onOpenMoodPicker,
               ),
             ],
           ),
@@ -743,6 +782,7 @@ class _CheckInBriefingCard extends StatelessWidget {
             const SizedBox(height: 12),
             TextFormField(
               controller: otherMoodController,
+              enabled: !isLoading,
               textCapitalization: TextCapitalization.sentences,
               maxLength: 80,
               decoration: InputDecoration(
@@ -764,11 +804,12 @@ class _CheckInBriefingCard extends StatelessWidget {
             max: 10,
             divisions: 9,
             value: energyLevel,
-            onChanged: onEnergyChanged,
+            onChanged: isLoading ? null : onEnergyChanged,
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: reflectionController,
+            enabled: !isLoading,
             textCapitalization: TextCapitalization.sentences,
             minLines: 2,
             maxLines: 3,
@@ -803,7 +844,7 @@ class _CheckInBriefingCard extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.favorite_rounded),
-                label: Text(l10n.checkInSubmit),
+                label: Text(submitLabel),
               ),
               OutlinedButton.icon(
                 onPressed: isLoading ? null : onCancel,
@@ -1035,8 +1076,7 @@ class _MoodGroup extends StatelessWidget {
               label: Text(mood.label),
               selected: selected,
               showCheckmark: selected,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              materialTapTargetSize: MaterialTapTargetSize.padded,
               labelPadding: const EdgeInsets.symmetric(horizontal: 5),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               onSelected: (_) => onSelected(mood),

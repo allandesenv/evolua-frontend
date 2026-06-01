@@ -778,6 +778,36 @@ abstract class AppLocalizations {
   /// **'Ver meu ritual'**
   String get homeDailyViewRitual;
 
+  /// No description provided for @firstExperienceTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Bem-vindo ao Evolua'**
+  String get firstExperienceTitle;
+
+  /// No description provided for @firstExperienceMainMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Vamos começar com um check-in simples. Leva menos de um minuto.'**
+  String get firstExperienceMainMessage;
+
+  /// No description provided for @firstExperienceDescription.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'A partir dele, o Evolua prepara sua leitura inteligente e sugere um próximo passo leve para hoje.'**
+  String get firstExperienceDescription;
+
+  /// No description provided for @firstExperienceStart.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Começar check-in'**
+  String get firstExperienceStart;
+
+  /// No description provided for @firstExperienceNotNow.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Agora não'**
+  String get firstExperienceNotNow;
+
   /// No description provided for @homeFutureLetter.
   ///
   /// In pt_BR, this message translates to:
@@ -820,11 +850,65 @@ abstract class AppLocalizations {
   /// **'Depois do próximo check-in, a IA resume o momento e transforma a leitura em uma ação simples.'**
   String get homeIntelligentReadingEmpty;
 
+  /// No description provided for @homeSmartReadingGeneratingTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Gerando leitura...'**
+  String get homeSmartReadingGeneratingTitle;
+
+  /// No description provided for @homeSmartReadingGeneratingBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Você já pode continuar. Estamos preparando a leitura para este momento.'**
+  String get homeSmartReadingGeneratingBody;
+
+  /// No description provided for @homeSmartReadingUnavailableTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Leitura indisponível agora'**
+  String get homeSmartReadingUnavailableTitle;
+
+  /// No description provided for @homeSmartReadingUnavailableBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos gerar a leitura agora, mas seu check-in foi salvo.'**
+  String get homeSmartReadingUnavailableBody;
+
   /// No description provided for @homeFullAnalysis.
   ///
   /// In pt_BR, this message translates to:
   /// **'Ver análise completa'**
   String get homeFullAnalysis;
+
+  /// No description provided for @homeMirrorRewardTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu check-in já conta para o seu Espelho'**
+  String get homeMirrorRewardTitle;
+
+  /// No description provided for @homeMirrorRewardDescription.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Quanto mais você registra, mais seu Espelho revela padrões.'**
+  String get homeMirrorRewardDescription;
+
+  /// No description provided for @homeMirrorRewardAnalysis.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ver análise'**
+  String get homeMirrorRewardAnalysis;
+
+  /// No description provided for @homeMirrorRewardTrail.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Continuar trilha'**
+  String get homeMirrorRewardTrail;
+
+  /// No description provided for @homeMirrorRewardMirror.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ver meu Espelho'**
+  String get homeMirrorRewardMirror;
 
   /// No description provided for @homeEnergyBullet.
   ///
@@ -1072,6 +1156,12 @@ abstract class AppLocalizations {
   /// **'Fazer check-in'**
   String get checkInSubmit;
 
+  /// No description provided for @checkInSavingLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Salvando check-in...'**
+  String get checkInSavingLabel;
+
   /// No description provided for @checkInNotNow.
   ///
   /// In pt_BR, this message translates to:
@@ -1083,6 +1173,18 @@ abstract class AppLocalizations {
   /// In pt_BR, this message translates to:
   /// **'Check-in registrado. Continue no seu ritmo.'**
   String get checkInSavedSnack;
+
+  /// No description provided for @checkInSavedReadingPending.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Check-in salvo. Você já pode continuar, a leitura aparecerá em instantes.'**
+  String get checkInSavedReadingPending;
+
+  /// No description provided for @checkInSavingInProgress.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Estamos salvando seu check-in. Aguarde alguns instantes.'**
+  String get checkInSavingInProgress;
 
   /// No description provided for @checkInSaveError.
   ///
