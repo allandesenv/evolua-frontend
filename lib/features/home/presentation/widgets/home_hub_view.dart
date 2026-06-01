@@ -309,6 +309,9 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final isInsightUnavailable = canUseCheckInState
         ? checkInHistory?.isLatestInsightUnavailable ?? false
         : false;
+    final isSavingCheckIn = canUseCheckInState
+        ? checkInHistory?.isCreatingCheckIn ?? false
+        : false;
     final latestInsightCheckIn = latestCreatedCheckIn?.aiInsight != null
         ? latestCreatedCheckIn
         : recentItems.where((item) => item.aiInsight != null).firstOrNull;
@@ -356,6 +359,9 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       currentJourneySummary: currentJourney?.summary,
     );
     final currentTime = widget.now ?? DateTime.now();
+    final showMirrorReward =
+        latestCreatedCheckIn != null &&
+        _isSameLocalDay(latestCreatedCheckIn.createdAt, currentTime);
     final readyFutureMessage =
         futureMessageState.asData?.value.readyToRead.firstOrNull;
     final showFutureMessage =
@@ -399,12 +405,25 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         _InsightBriefingCard(
           insight: latestInsight,
           checkIn: latestReadingCheckIn,
-          isLoading: isInsightPending || isWaitingForInsight,
+          isSavingCheckIn: isSavingCheckIn,
+          isGeneratingReading:
+              !isSavingCheckIn && (isInsightPending || isWaitingForInsight),
           isUnavailable: isInsightUnavailable,
           onOpenFullAnalysis: latestInsight == null
               ? null
               : () => _openInsightSheet(latestReadingCheckIn!, latestInsight),
         ),
+        if (showMirrorReward) ...[
+          const SizedBox(height: 14),
+          _CheckInMirrorRewardCard(
+            hasInsight: latestInsight != null,
+            onOpenAnalysis: latestInsight == null
+                ? null
+                : () => _openInsightSheet(latestReadingCheckIn!, latestInsight),
+            onOpenTrails: widget.onOpenTrails,
+            onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
+          ),
+        ],
         const SizedBox(height: 24),
         _NextStepHeroCard(
           compact: compact,
@@ -441,6 +460,12 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         mood.contains('cans') ||
         mood.contains('trist') ||
         mood.contains('desanim');
+  }
+
+  bool _isSameLocalDay(DateTime first, DateTime second) {
+    final a = first.toLocal();
+    final b = second.toLocal();
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 
@@ -839,14 +864,16 @@ class _InsightBriefingCard extends StatelessWidget {
   const _InsightBriefingCard({
     required this.insight,
     required this.checkIn,
-    required this.isLoading,
+    required this.isSavingCheckIn,
+    required this.isGeneratingReading,
     required this.isUnavailable,
     required this.onOpenFullAnalysis,
   });
 
   final CheckInAiInsight? insight;
   final CheckIn? checkIn;
-  final bool isLoading;
+  final bool isSavingCheckIn;
+  final bool isGeneratingReading;
   final bool isUnavailable;
   final VoidCallback? onOpenFullAnalysis;
 
@@ -854,7 +881,7 @@ class _InsightBriefingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final summary = _summaryFromInsight(context, insight);
-    final showPreparingState = isLoading;
+    final showLoadingState = isSavingCheckIn || isGeneratingReading;
 
     return PrimaryPanel(
       semanticLabel: l10n.homeIntelligentReadingTitle,
@@ -868,7 +895,7 @@ class _InsightBriefingCard extends StatelessWidget {
             subtitle: summary,
             accentColor: AppColors.accentWarm,
           ),
-          if (showPreparingState) ...[
+          if (showLoadingState) ...[
             const SizedBox(height: 16),
             Row(
               children: [
@@ -879,7 +906,30 @@ class _InsightBriefingCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Preparando sua leitura inteligente...',
+                    isSavingCheckIn
+                        ? l10n.checkInSavingLabel
+                        : l10n.homeSmartReadingGeneratingTitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.evoluaColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (isUnavailable) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 20,
+                  color: context.evoluaColors.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    l10n.homeSmartReadingUnavailableTitle,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: context.evoluaColors.textSecondary,
                       fontWeight: FontWeight.w700,
@@ -921,14 +971,17 @@ class _InsightBriefingCard extends StatelessWidget {
   }
 
   String _summaryFromInsight(BuildContext context, CheckInAiInsight? insight) {
-    if (isLoading) {
-      return 'Seu check-in foi salvo. Estamos atualizando a leitura para este momento.';
+    if (isSavingCheckIn) {
+      return context.l10n.checkInSavingLabel;
+    }
+    if (isGeneratingReading) {
+      return context.l10n.homeSmartReadingGeneratingBody;
     }
     if (isUnavailable) {
-      return 'Seu check-in foi salvo, mas a leitura ainda não ficou disponível. Tente atualizar em instantes.';
+      return context.l10n.homeSmartReadingUnavailableBody;
     }
     if (insight == null && checkIn != null) {
-      return 'Seu check-in foi salvo. A leitura inteligente aparece aqui assim que estiver pronta.';
+      return context.l10n.checkInSavedReadingPending;
     }
     if (insight == null) {
       return context.l10n.homeIntelligentReadingEmpty;
@@ -1219,6 +1272,98 @@ class _NextStepHeroCard extends StatelessWidget {
                 onPressed: onOpenCommunity,
                 icon: const Icon(Icons.groups_rounded),
                 label: const Text('Espaços'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckInMirrorRewardCard extends StatelessWidget {
+  const _CheckInMirrorRewardCard({
+    required this.hasInsight,
+    required this.onOpenAnalysis,
+    required this.onOpenTrails,
+    required this.onOpenEvolutionMirror,
+  });
+
+  final bool hasInsight;
+  final VoidCallback? onOpenAnalysis;
+  final VoidCallback onOpenTrails;
+  final VoidCallback onOpenEvolutionMirror;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return PrimaryPanel(
+      semanticLabel: l10n.homeMirrorRewardTitle,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.auto_graph_rounded,
+                  color: AppColors.accent,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.homeMirrorRewardTitle,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: context.evoluaColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      l10n.homeMirrorRewardDescription,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: context.evoluaColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (hasInsight)
+                TextButton.icon(
+                  onPressed: onOpenAnalysis,
+                  icon: const Icon(Icons.open_in_full_rounded),
+                  label: Text(l10n.homeMirrorRewardAnalysis),
+                ),
+              OutlinedButton.icon(
+                onPressed: onOpenTrails,
+                icon: const Icon(Icons.auto_stories_rounded),
+                label: Text(l10n.homeMirrorRewardTrail),
+              ),
+              FilledButton.icon(
+                onPressed: onOpenEvolutionMirror,
+                icon: const Icon(Icons.auto_graph_rounded),
+                label: Text(l10n.homeMirrorRewardMirror),
               ),
             ],
           ),

@@ -129,6 +129,129 @@ void main() {
       expect(find.textContaining('Depois do'), findsNothing);
     });
 
+    testWidgets(
+      'shows mirror reward actions after today check-in with insight',
+      (tester) async {
+        var openedTrails = false;
+        var openedMirror = false;
+
+        await tester.pumpWidget(
+          _testApp(
+            now: DateTime(2026, 5, 7, 13),
+            onOpenTrails: () => openedTrails = true,
+            onOpenEvolutionMirror: () => openedMirror = true,
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                CheckIn(
+                  id: 31,
+                  userId: 'user-123',
+                  mood: 'calmo',
+                  reflection: 'consegui observar melhor',
+                  energyLevel: 7,
+                  recommendedPractice: 'Respirar por dois minutos.',
+                  aiInsight: _insight(insight: 'Sua leitura esta pronta.'),
+                  createdAt: DateTime(2026, 5, 7, 9),
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Seu check-in já conta para o seu Espelho'),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            'Quanto mais você registra, mais seu Espelho revela padrões.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Ver análise'), findsOneWidget);
+        expect(find.text('Continuar trilha'), findsAtLeastNWidgets(1));
+        expect(find.text('Ver meu Espelho'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Ver análise'));
+        await tester.tap(find.text('Ver análise'));
+        await tester.pumpAndSettle();
+        expect(find.text('Análise completa'), findsOneWidget);
+
+        await tester.tap(find.byTooltip('Voltar'));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Continuar trilha').first);
+        await tester.tap(find.text('Continuar trilha').first);
+        expect(openedTrails, isTrue);
+
+        await tester.ensureVisible(find.text('Ver meu Espelho'));
+        await tester.tap(find.text('Ver meu Espelho'));
+        expect(openedMirror, isTrue);
+      },
+    );
+
+    testWidgets('keeps mirror reward visible while reading is pending', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [
+              CheckIn(
+                id: 32,
+                userId: 'user-123',
+                mood: 'calmo',
+                reflection: 'registro rapido',
+                energyLevel: 7,
+                recommendedPractice: 'Respirar por dois minutos.',
+                aiInsight: null,
+                createdAt: DateTime(2026, 5, 7, 9),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Seu check-in já conta para o seu Espelho'),
+        findsOneWidget,
+      );
+      expect(find.text('Ver análise'), findsNothing);
+      expect(find.text('Ver meu Espelho'), findsOneWidget);
+    });
+
+    testWidgets('does not show mirror reward without today check-in', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [
+              CheckIn(
+                id: 33,
+                userId: 'user-123',
+                mood: 'calmo',
+                reflection: 'ontem',
+                energyLevel: 7,
+                recommendedPractice: 'Respirar por dois minutos.',
+                aiInsight: _insight(),
+                createdAt: DateTime(2026, 5, 6, 9),
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Seu check-in já conta para o seu Espelho'),
+        findsNothing,
+      );
+    });
+
     testWidgets('does not render stale intelligent reading from another user', (
       tester,
     ) async {
@@ -345,14 +468,8 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('Depois do'), findsNothing);
-      expect(
-        find.text('Preparando sua leitura inteligente...'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('Estamos atualizando a leitura'),
-        findsOneWidget,
-      );
+      expect(find.text('Gerando leitura...'), findsOneWidget);
+      expect(find.textContaining('Você já pode continuar'), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 60));
       await tester.pumpAndSettle();
@@ -369,7 +486,61 @@ void main() {
         find.textContaining('Estado: Energizado', findRichText: true),
         findsOneWidget,
       );
-      expect(find.textContaining('Ver an'), findsOneWidget);
+      expect(find.text('Ver análise completa'), findsOneWidget);
+    });
+
+    testWidgets('shows unavailable reading state after polling is exhausted', (
+      tester,
+    ) async {
+      final pending = CheckIn(
+        id: 89,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 6,
+        recommendedPractice: '',
+        aiInsight: null,
+        createdAt: DateTime(2026, 5, 7, 9),
+      );
+      final repository = _EventuallyConsistentCheckInRepository(
+        created: pending,
+        lists: [
+          const <CheckIn>[],
+          [pending],
+          [pending],
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          pollingConfig: const CheckInInsightPollingConfig(
+            attempts: 1,
+            delay: Duration(milliseconds: 20),
+          ),
+          now: DateTime(2026, 5, 7, 13),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(HomeHubView));
+      final container = ProviderScope.containerOf(context);
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 6);
+      await tester.pump();
+
+      expect(find.text('Gerando leitura...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 30));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Leitura indisponível agora'), findsOneWidget);
+      expect(find.textContaining('check-in foi salvo'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Ver análise'), findsNothing);
+      expect(find.text('Ver análise completa'), findsNothing);
     });
 
     testWidgets('shows contextual mini cards and opens direct actions', (
@@ -602,15 +773,16 @@ void main() {
         await tester.pumpWidget(_testApp());
         await tester.pumpAndSettle();
 
-        final openAnalysisButton = find.byIcon(Icons.open_in_full_rounded);
         final analysisTitle = find.byWidgetPredicate((widget) {
           return widget is Text &&
               (widget.data ?? '').startsWith('An') &&
               (widget.data ?? '').contains('completa');
         });
 
-        await tester.ensureVisible(openAnalysisButton);
-        await tester.tap(openAnalysisButton);
+        Finder fullAnalysisButton() => find.text('Ver análise completa').first;
+
+        await tester.ensureVisible(fullAnalysisButton());
+        await tester.tap(fullAnalysisButton());
         await tester.pumpAndSettle();
 
         expect(analysisTitle, findsOneWidget);
@@ -621,8 +793,8 @@ void main() {
 
         expect(analysisTitle, findsNothing);
 
-        await tester.ensureVisible(openAnalysisButton);
-        await tester.tap(openAnalysisButton);
+        await tester.ensureVisible(fullAnalysisButton());
+        await tester.tap(fullAnalysisButton());
         await tester.pumpAndSettle();
 
         expect(analysisTitle, findsOneWidget);

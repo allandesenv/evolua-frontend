@@ -95,6 +95,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   int? _activeInsightPollId;
   Timer? _pollDelayTimer;
   Completer<void>? _pollDelayCompleter;
+  Future<void>? _createInFlight;
   bool _disposeRegistered = false;
   bool _disposed = false;
 
@@ -221,6 +222,32 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   }
 
   Future<void> create({
+    required String mood,
+    String? reflection,
+    required int energyLevel,
+  }) async {
+    final activeCreate = _createInFlight;
+    if (activeCreate != null) {
+      return activeCreate;
+    }
+
+    late final Future<void> operation;
+    operation = _create(
+      mood: mood,
+      reflection: reflection,
+      energyLevel: energyLevel,
+    );
+    _createInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_createInFlight, operation)) {
+        _createInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _create({
     required String mood,
     String? reflection,
     required int energyLevel,

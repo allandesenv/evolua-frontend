@@ -199,6 +199,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          minimumSize: const Size(48, 48),
+          tapTargetSize: MaterialTapTargetSize.padded,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         ),
       ),
@@ -210,7 +212,17 @@ class AppTheme {
             borderRadius: BorderRadius.circular(16),
           ),
           side: BorderSide(color: accent.withValues(alpha: 0.26)),
+          minimumSize: const Size(48, 48),
+          tapTargetSize: MaterialTapTargetSize.padded,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: textPrimary,
+          minimumSize: const Size(48, 48),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -218,7 +230,8 @@ class AppTheme {
           backgroundColor: accent,
           foregroundColor: background,
           elevation: 0,
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(48, 52),
+          tapTargetSize: MaterialTapTargetSize.padded,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -230,6 +243,8 @@ class AppTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: textPrimary,
+          minimumSize: const Size.square(48),
+          tapTargetSize: MaterialTapTargetSize.padded,
           hoverColor: accent.withValues(alpha: 0.12),
           highlightColor: accent.withValues(alpha: 0.18),
         ),

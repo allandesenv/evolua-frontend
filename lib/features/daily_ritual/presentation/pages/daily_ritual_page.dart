@@ -33,6 +33,10 @@ class DailyRitualPage extends StatelessWidget {
         ),
         child: Center(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
               child: DailyRitualView(type: type),

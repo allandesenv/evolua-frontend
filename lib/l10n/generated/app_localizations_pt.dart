@@ -377,6 +377,23 @@ class AppLocalizationsPt extends AppLocalizations {
   String get homeDailyViewRitual => 'Ver meu ritual';
 
   @override
+  String get firstExperienceTitle => 'Bem-vindo ao Evolua';
+
+  @override
+  String get firstExperienceMainMessage =>
+      'Vamos começar com um check-in simples. Leva menos de um minuto.';
+
+  @override
+  String get firstExperienceDescription =>
+      'A partir dele, o Evolua prepara sua leitura inteligente e sugere um próximo passo leve para hoje.';
+
+  @override
+  String get firstExperienceStart => 'Começar check-in';
+
+  @override
+  String get firstExperienceNotNow => 'Agora não';
+
+  @override
   String get homeFutureLetter => 'Carta para o futuro';
 
   @override
@@ -399,7 +416,38 @@ class AppLocalizationsPt extends AppLocalizations {
       'Depois do próximo check-in, a IA resume o momento e transforma a leitura em uma ação simples.';
 
   @override
+  String get homeSmartReadingGeneratingTitle => 'Gerando leitura...';
+
+  @override
+  String get homeSmartReadingGeneratingBody =>
+      'Você já pode continuar. Estamos preparando a leitura para este momento.';
+
+  @override
+  String get homeSmartReadingUnavailableTitle => 'Leitura indisponível agora';
+
+  @override
+  String get homeSmartReadingUnavailableBody =>
+      'Não conseguimos gerar a leitura agora, mas seu check-in foi salvo.';
+
+  @override
   String get homeFullAnalysis => 'Ver análise completa';
+
+  @override
+  String get homeMirrorRewardTitle =>
+      'Seu check-in já conta para o seu Espelho';
+
+  @override
+  String get homeMirrorRewardDescription =>
+      'Quanto mais você registra, mais seu Espelho revela padrões.';
+
+  @override
+  String get homeMirrorRewardAnalysis => 'Ver análise';
+
+  @override
+  String get homeMirrorRewardTrail => 'Continuar trilha';
+
+  @override
+  String get homeMirrorRewardMirror => 'Ver meu Espelho';
 
   @override
   String homeEnergyBullet(Object value) {
@@ -539,10 +587,21 @@ class AppLocalizationsPt extends AppLocalizations {
   String get checkInSubmit => 'Fazer check-in';
 
   @override
+  String get checkInSavingLabel => 'Salvando check-in...';
+
+  @override
   String get checkInNotNow => 'Agora não';
 
   @override
   String get checkInSavedSnack => 'Check-in registrado. Continue no seu ritmo.';
+
+  @override
+  String get checkInSavedReadingPending =>
+      'Check-in salvo. Você já pode continuar, a leitura aparecerá em instantes.';
+
+  @override
+  String get checkInSavingInProgress =>
+      'Estamos salvando seu check-in. Aguarde alguns instantes.';
 
   @override
   String get checkInSaveError => 'Não foi possível salvar o check-in.';
@@ -1303,6 +1362,23 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get homeDailyViewRitual => 'Ver meu ritual';
 
   @override
+  String get firstExperienceTitle => 'Bem-vindo ao Evolua';
+
+  @override
+  String get firstExperienceMainMessage =>
+      'Vamos começar com um check-in simples. Leva menos de um minuto.';
+
+  @override
+  String get firstExperienceDescription =>
+      'A partir dele, o Evolua prepara sua leitura inteligente e sugere um próximo passo leve para hoje.';
+
+  @override
+  String get firstExperienceStart => 'Começar check-in';
+
+  @override
+  String get firstExperienceNotNow => 'Agora não';
+
+  @override
   String get homeFutureLetter => 'Carta para o futuro';
 
   @override
@@ -1325,7 +1401,38 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
       'Depois do próximo check-in, a IA resume o momento e transforma a leitura em uma ação simples.';
 
   @override
+  String get homeSmartReadingGeneratingTitle => 'Gerando leitura...';
+
+  @override
+  String get homeSmartReadingGeneratingBody =>
+      'Você já pode continuar. Estamos preparando a leitura para este momento.';
+
+  @override
+  String get homeSmartReadingUnavailableTitle => 'Leitura indisponível agora';
+
+  @override
+  String get homeSmartReadingUnavailableBody =>
+      'Não conseguimos gerar a leitura agora, mas seu check-in foi salvo.';
+
+  @override
   String get homeFullAnalysis => 'Ver análise completa';
+
+  @override
+  String get homeMirrorRewardTitle =>
+      'Seu check-in já conta para o seu Espelho';
+
+  @override
+  String get homeMirrorRewardDescription =>
+      'Quanto mais você registra, mais seu Espelho revela padrões.';
+
+  @override
+  String get homeMirrorRewardAnalysis => 'Ver análise';
+
+  @override
+  String get homeMirrorRewardTrail => 'Continuar trilha';
+
+  @override
+  String get homeMirrorRewardMirror => 'Ver meu Espelho';
 
   @override
   String homeEnergyBullet(Object value) {
@@ -1465,10 +1572,21 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get checkInSubmit => 'Fazer check-in';
 
   @override
+  String get checkInSavingLabel => 'Salvando check-in...';
+
+  @override
   String get checkInNotNow => 'Agora não';
 
   @override
   String get checkInSavedSnack => 'Check-in registrado. Continue no seu ritmo.';
+
+  @override
+  String get checkInSavedReadingPending =>
+      'Check-in salvo. Você já pode continuar, a leitura aparecerá em instantes.';
+
+  @override
+  String get checkInSavingInProgress =>
+      'Estamos salvando seu check-in. Aguarde alguns instantes.';
 
   @override
   String get checkInSaveError => 'Não foi possível salvar o check-in.';
