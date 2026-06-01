@@ -283,6 +283,7 @@ class _DailyRitualFlow extends StatelessWidget {
           const SizedBox(height: 16),
           TextField(
             controller: controller,
+            textCapitalization: TextCapitalization.sentences,
             minLines: 3,
             maxLines: 5,
             decoration: InputDecoration(

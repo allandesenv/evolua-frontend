@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dar
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/application/check_in_speech_transcription_service.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
@@ -69,6 +70,12 @@ void main() {
 
       expect(find.text('Estado selecionado: Outro estado'), findsOneWidget);
       expect(find.text('Descreva com suas palavras'), findsOneWidget);
+      expect(
+        tester
+            .widgetList<TextField>(find.byType(TextField))
+            .map((field) => field.textCapitalization),
+        everyElement(TextCapitalization.sentences),
+      );
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Descreva com suas palavras'),
@@ -80,6 +87,92 @@ void main() {
 
       expect(repository.createdMood, 'saudade tranquila');
     });
+
+    testWidgets('free text fields start sentences with capitalization', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      final reflectionField = tester.widget<TextField>(find.byType(TextField));
+
+      expect(reflectionField.textCapitalization, TextCapitalization.sentences);
+    });
+
+    testWidgets('microphone fills reflection without auto-saving', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository();
+      final speech = _FakeCheckInSpeechTranscriptionService();
+
+      await tester.pumpWidget(
+        _testApp(checkInRepository: repository, speechService: speech),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Usar microfone'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Usar microfone'));
+      await tester.pumpAndSettle();
+
+      expect(speech.initializeCalls, 1);
+      expect(speech.listenCalls, 1);
+      expect(find.byTooltip('Parar ditado'), findsOneWidget);
+
+      speech.emitResult('preciso de calma');
+      await tester.pump();
+
+      expect(find.text('preciso de calma'), findsOneWidget);
+      expect(repository.createCalls, 0);
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'texto revisado',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(repository.createdReflection, 'texto revisado');
+    });
+
+    testWidgets('microphone unavailable shows friendly snackbar', (
+      tester,
+    ) async {
+      final speech = _FakeCheckInSpeechTranscriptionService(available: false);
+
+      await tester.pumpWidget(_testApp(speechService: speech));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Usar microfone'));
+      await tester.pumpAndSettle();
+
+      expect(speech.initializeCalls, 1);
+      expect(speech.listenCalls, 0);
+      expect(
+        find.textContaining('O microfone não está disponível'),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Usar microfone'), findsOneWidget);
+    });
+
+    testWidgets(
+      'active dictation is cancelled when check-in view is disposed',
+      (tester) async {
+        final speech = _FakeCheckInSpeechTranscriptionService();
+
+        await tester.pumpWidget(_testApp(speechService: speech));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byTooltip('Usar microfone'));
+        await tester.pumpAndSettle();
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+
+        expect(speech.cancelCalls, 1);
+      },
+    );
 
     testWidgets('creates check-in and calls completion callback', (
       tester,
@@ -482,6 +575,7 @@ Widget _testApp({
   SubscriptionRepository? subscriptionRepository,
   DailyCheckInReminderScheduler? reminderScheduler,
   SharedPreferences? sharedPreferences,
+  CheckInSpeechTranscriptionService? speechService,
   VoidCallback? onCompleted,
 }) {
   return ProviderScope(
@@ -502,6 +596,10 @@ Widget _testApp({
       if (reminderScheduler != null)
         dailyCheckInReminderSchedulerProvider.overrideWithValue(
           reminderScheduler,
+        ),
+      if (speechService != null)
+        checkInSpeechTranscriptionServiceProvider.overrideWithValue(
+          speechService,
         ),
     ],
     child: MaterialApp(
@@ -542,6 +640,67 @@ class _FakeDailyReminderScheduler implements DailyCheckInReminderScheduler {
     scheduledTimes.add(
       '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
     );
+  }
+}
+
+class _FakeCheckInSpeechTranscriptionService
+    implements CheckInSpeechTranscriptionService {
+  _FakeCheckInSpeechTranscriptionService({this.available = true});
+
+  final bool available;
+  int initializeCalls = 0;
+  int listenCalls = 0;
+  int stopCalls = 0;
+  int cancelCalls = 0;
+  bool _isListening = false;
+  void Function(String text)? _onResult;
+  void Function(String status)? _onStatus;
+  void Function(Object error)? _onError;
+
+  @override
+  bool get isListening => _isListening;
+
+  @override
+  Future<bool> initialize({
+    required String localeId,
+    required void Function(String status) onStatus,
+    required void Function(Object error) onError,
+  }) async {
+    initializeCalls++;
+    _onStatus = onStatus;
+    _onError = onError;
+    return available;
+  }
+
+  @override
+  Future<void> listen({
+    required String localeId,
+    required void Function(String text) onResult,
+  }) async {
+    listenCalls++;
+    _onResult = onResult;
+    _isListening = true;
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCalls++;
+    _isListening = false;
+    _onStatus?.call('notListening');
+  }
+
+  @override
+  Future<void> cancel() async {
+    cancelCalls++;
+    _isListening = false;
+  }
+
+  void emitResult(String text) {
+    _onResult?.call(text);
+  }
+
+  void emitError(Object error) {
+    _onError?.call(error);
   }
 }
 

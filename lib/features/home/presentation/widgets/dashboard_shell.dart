@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
@@ -48,6 +50,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   AdminPanelSection _adminSection = AdminPanelSection.overview;
   final List<_DashboardLocation> _history = [];
   bool _handledBillingReturn = false;
+  bool _checkInOpening = false;
   bool _initialCheckInPromptOpening = false;
   String? _initialCheckInPromptKey;
   bool _openingReminderCheckIn = false;
@@ -75,7 +78,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           if (!mounted) {
             return;
           }
-          _openCheckIn(compact: ResponsiveBreakpoints.isCompact(context));
+          unawaited(
+            _openReminderCheckIn(
+              isCompact: ResponsiveBreakpoints.isCompact(context),
+            ),
+          );
         });
       },
     );
@@ -168,48 +175,56 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 
   Future<void> _openCheckIn({required bool compact}) async {
-    if (!compact) {
-      await context.push('/check-in');
+    if (_checkInOpening) {
       return;
     }
-    if (!mounted) {
-      return;
-    }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
-          ),
-          child: SingleChildScrollView(
-            child: CheckInQuickView(
-              onCompleted: () {
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-              },
-              onCancel: () {
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-              },
-              onOpenPremium: () {
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-                _openProfileSection(ProfileModuleSection.plansSubscriptions);
-              },
+    _checkInOpening = true;
+    try {
+      if (!compact) {
+        await context.push('/check-in');
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.surface,
+        builder: (sheetContext) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+            ),
+            child: SingleChildScrollView(
+              child: CheckInQuickView(
+                onCompleted: () {
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                },
+                onCancel: () {
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                },
+                onOpenPremium: () {
+                  if (sheetContext.mounted) {
+                    Navigator.of(sheetContext).pop();
+                  }
+                  _openProfileSection(ProfileModuleSection.plansSubscriptions);
+                },
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _checkInOpening = false;
+    }
   }
 
   void _setTrailSection(ContentModuleSection section) {
@@ -300,7 +315,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     required AuthSession? session,
     required AsyncValue<CheckInHistoryState> checkInState,
   }) {
-    if (!isCompact || session == null || _initialCheckInPromptOpening) {
+    if (!isCompact ||
+        session == null ||
+        _checkInOpening ||
+        _openingReminderCheckIn ||
+        _initialCheckInPromptOpening) {
       return;
     }
 
@@ -328,7 +347,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     required bool isCompact,
     required AuthSession? session,
   }) {
-    if (session == null || _openingReminderCheckIn) {
+    if (session == null || _openingReminderCheckIn || _checkInOpening) {
       return;
     }
     _openingReminderCheckIn = true;
@@ -340,11 +359,38 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         if (!mounted || !shouldOpen) {
           return;
         }
+        await _markInitialCheckInPromptHandled(session.userId);
         await _openCheckIn(compact: isCompact);
       } finally {
         _openingReminderCheckIn = false;
       }
     });
+  }
+
+  Future<void> _openReminderCheckIn({required bool isCompact}) async {
+    final session = ref.read(authControllerProvider).asData?.value;
+    if (session == null || _openingReminderCheckIn || _checkInOpening) {
+      return;
+    }
+    _openingReminderCheckIn = true;
+    try {
+      await _markInitialCheckInPromptHandled(session.userId);
+      await _openCheckIn(compact: isCompact);
+    } finally {
+      _openingReminderCheckIn = false;
+    }
+  }
+
+  Future<void> _markInitialCheckInPromptHandled(String userId) async {
+    await _markInitialCheckInPromptKeyHandled(
+      _initialCheckInPromptStorageKey(userId),
+    );
+  }
+
+  Future<void> _markInitialCheckInPromptKeyHandled(String key) async {
+    final preferences = await ref.read(sharedPreferencesProvider.future);
+    await preferences.setBool(key, true);
+    _initialCheckInPromptKey = key;
   }
 
   Future<void> _openInitialCheckInPromptIfNeeded(String key) async {
@@ -359,8 +405,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         return;
       }
 
-      await preferences.setBool(key, true);
-      _initialCheckInPromptKey = key;
+      await _markInitialCheckInPromptKeyHandled(key);
       await _openCheckIn(compact: true);
     } finally {
       _initialCheckInPromptOpening = false;

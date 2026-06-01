@@ -597,6 +597,44 @@ void main() {
     });
 
     testWidgets(
+      'full analysis sheet closes with header back and Android back',
+      (tester) async {
+        await tester.pumpWidget(_testApp());
+        await tester.pumpAndSettle();
+
+        final openAnalysisButton = find.byIcon(Icons.open_in_full_rounded);
+        final analysisTitle = find.byWidgetPredicate((widget) {
+          return widget is Text &&
+              (widget.data ?? '').startsWith('An') &&
+              (widget.data ?? '').contains('completa');
+        });
+
+        await tester.ensureVisible(openAnalysisButton);
+        await tester.tap(openAnalysisButton);
+        await tester.pumpAndSettle();
+
+        expect(analysisTitle, findsOneWidget);
+        expect(find.byTooltip('Voltar'), findsOneWidget);
+
+        await tester.tap(find.byTooltip('Voltar'));
+        await tester.pumpAndSettle();
+
+        expect(analysisTitle, findsNothing);
+
+        await tester.ensureVisible(openAnalysisButton);
+        await tester.tap(openAnalysisButton);
+        await tester.pumpAndSettle();
+
+        expect(analysisTitle, findsOneWidget);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+
+        expect(analysisTitle, findsNothing);
+      },
+    );
+
+    testWidgets(
       'suggested trail action closes full analysis before opening trails',
       (tester) async {
         int? openedSuggestedTrailId;

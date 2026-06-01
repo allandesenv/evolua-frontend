@@ -18,6 +18,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('Mentor message field capitalizes sentences', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          journeyChatRepositoryProvider.overrideWithValue(
+            _FakeJourneyChatRepository(),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MentorEvoluaChatCard(trail: null),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).textCapitalization,
+      TextCapitalization.sentences,
+    );
+  });
+
   testWidgets('Mentor sends only previous messages as conversation history', (
     tester,
   ) async {

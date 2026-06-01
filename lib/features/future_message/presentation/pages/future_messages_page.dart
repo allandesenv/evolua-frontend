@@ -385,6 +385,7 @@ class _FutureMessageComposer extends StatelessWidget {
           const SizedBox(height: 14),
           TextField(
             controller: bodyController,
+            textCapitalization: TextCapitalization.sentences,
             maxLines: 6,
             decoration: const InputDecoration(
               labelText: 'Sua mensagem',
@@ -507,6 +508,7 @@ class _GuidedQuestionField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      textCapitalization: TextCapitalization.sentences,
       maxLines: 2,
       decoration: InputDecoration(
         labelText: label,

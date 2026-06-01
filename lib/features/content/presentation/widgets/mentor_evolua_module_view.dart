@@ -448,6 +448,7 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
               Expanded(
                 child: TextField(
                   controller: _messageController,
+                  textCapitalization: TextCapitalization.sentences,
                   minLines: 1,
                   maxLines: 3,
                   enabled: !_isSending,
