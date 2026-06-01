@@ -88,6 +88,52 @@ void main() {
       expect(repository.createdMood, 'saudade tranquila');
     });
 
+    testWidgets('saves check-in even when intelligent reading is pending', (
+      tester,
+    ) async {
+      var completed = false;
+      final repository = _FakeCheckInRepository(createWithoutInsight: true);
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          onCompleted: () => completed = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'quero registrar antes da leitura',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(repository.createCalls, 1);
+      expect(repository.createdReflection, 'quero registrar antes da leitura');
+      expect(completed, isTrue);
+      expect(find.textContaining('Check-in registrado'), findsOneWidget);
+    });
+
+    testWidgets('network failure shows friendly server message', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository(failCreateCallWithNetwork: 1);
+
+      await tester.pumpWidget(_testApp(checkInRepository: repository));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(
+        find.textContaining('temporariamente indisponível'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('free text fields start sentences with capitalization', (
       tester,
     ) async {
@@ -711,6 +757,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     this.blockCreateCountWith402 = 0,
     this.createGate,
     this.failCreateCallWithNetwork,
+    this.createWithoutInsight = false,
   }) : items = items ?? _checkIns();
 
   final List<CheckIn> items;
@@ -718,6 +765,7 @@ class _FakeCheckInRepository implements CheckInRepository {
   final int blockCreateCountWith402;
   final Completer<void>? createGate;
   final int? failCreateCallWithNetwork;
+  final bool createWithoutInsight;
   int createCalls = 0;
   String? createdMood;
   String? createdReflection;
@@ -796,7 +844,7 @@ class _FakeCheckInRepository implements CheckInRepository {
       reflection: reflection ?? '',
       energyLevel: energyLevel,
       recommendedPractice: 'Respire por dois minutos.',
-      aiInsight: _insight(),
+      aiInsight: createWithoutInsight ? null : _insight(),
       createdAt: DateTime.now(),
     );
   }

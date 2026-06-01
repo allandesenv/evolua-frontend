@@ -388,11 +388,47 @@ abstract class AppLocalizations {
   /// **'Não foi possível conectar agora. Verifique sua conexão e tente novamente.'**
   String get errorNetwork;
 
+  /// No description provided for @errorNoInternet.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos conectar agora. Verifique sua internet e tente novamente.'**
+  String get errorNoInternet;
+
   /// No description provided for @errorTimeout.
   ///
   /// In pt_BR, this message translates to:
   /// **'A resposta demorou mais que o esperado. Tente novamente em instantes.'**
   String get errorTimeout;
+
+  /// No description provided for @errorSessionExpired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sua sessão expirou. Entre novamente para continuar.'**
+  String get errorSessionExpired;
+
+  /// No description provided for @errorServerUnavailable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O Evolua está temporariamente indisponível. Tente novamente em alguns instantes.'**
+  String get errorServerUnavailable;
+
+  /// No description provided for @errorCheckInQuota.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Você já fez o check-in gratuito de hoje. Assista a um anúncio, assine Premium ou volte amanhã.'**
+  String get errorCheckInQuota;
+
+  /// No description provided for @errorSmartReadingUnavailable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu check-in está salvo, mas não conseguimos preparar a leitura agora.'**
+  String get errorSmartReadingUnavailable;
+
+  /// No description provided for @errorRewardedAdUnavailable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível carregar o anúncio agora. Tente novamente em instantes.'**
+  String get errorRewardedAdUnavailable;
 
   /// No description provided for @errorUnexpected.
   ///

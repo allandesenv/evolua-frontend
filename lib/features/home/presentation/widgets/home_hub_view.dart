@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
+import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
@@ -128,13 +129,17 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: 'Leitura atualizada com um novo foco.',
         icon: Icons.auto_awesome_rounded,
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       AppSnackBar.show(
         context,
-        message: 'Nao foi possivel gerar outra leitura agora.',
+        message: friendlyApiErrorMessage(
+          error,
+          context.l10n,
+          fallback: context.l10n.errorSmartReadingUnavailable,
+        ),
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -240,7 +245,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         context,
         message: rewarded
             ? 'Crédito extra de IA liberado. Faça um novo check-in quando quiser.'
-            : 'Anúncio indisponível neste dispositivo. Você ainda pode assinar Premium.',
+            : context.l10n.errorRewardedAdUnavailable,
         icon: rewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
@@ -251,8 +256,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message:
-            'Não foi possível carregar o anúncio agora. Tente novamente em instantes.',
+        message: context.l10n.errorRewardedAdUnavailable,
         icon: Icons.wifi_off_rounded,
       );
     } finally {
