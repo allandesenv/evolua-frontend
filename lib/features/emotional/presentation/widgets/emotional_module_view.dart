@@ -203,6 +203,7 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
                   children: [
                     TextFormField(
                       controller: _moodController,
+                      textCapitalization: TextCapitalization.sentences,
                       decoration: const InputDecoration(
                         labelText: 'Como voce esta agora?',
                         prefixIcon: Icon(Icons.mood_rounded),
@@ -215,6 +216,7 @@ class _EmotionalModuleViewState extends ConsumerState<EmotionalModuleView> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _reflectionController,
+                      textCapitalization: TextCapitalization.sentences,
                       maxLines: 3,
                       decoration: const InputDecoration(
                         labelText:
