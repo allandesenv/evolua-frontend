@@ -274,6 +274,29 @@ void main() {
     },
   );
 
+  testWidgets('dashboard first experience starts exactly one check-in prompt', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Começar check-in'), findsOneWidget);
+
+    await tester.tap(find.text('Começar check-in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Começar check-in'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsOneWidget);
+  });
+
   testWidgets(
     'dashboard opens one check-in prompt when launched from reminder',
     (tester) async {

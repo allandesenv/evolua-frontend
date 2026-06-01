@@ -113,7 +113,7 @@ void main() {
       expect(repository.createCalls, 1);
       expect(repository.createdReflection, 'quero registrar antes da leitura');
       expect(completed, isTrue);
-      expect(find.textContaining('Check-in registrado'), findsOneWidget);
+      expect(find.textContaining('leitura aparecer'), findsOneWidget);
     });
 
     testWidgets('network failure shows friendly server message', (
@@ -132,6 +132,56 @@ void main() {
         find.textContaining('temporariamente indisponível'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('blocks repeated save taps and back while saving', (
+      tester,
+    ) async {
+      final gate = Completer<void>();
+      final repository = _FakeCheckInRepository(createGate: gate);
+      var completed = false;
+      var canceled = false;
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          onCompleted: () => completed = true,
+          onCancel: () => canceled = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'preciso registrar sem duplicar',
+      );
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.tap(find.text('Fazer check-in'), warnIfMissed: false);
+      await tester.tap(find.text('Fazer check-in'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(repository.createCalls, 1);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.tap(find.textContaining('Agora'), warnIfMissed: false);
+      await tester.pump();
+      expect(canceled, isFalse);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(
+        find.textContaining('Estamos salvando seu check-in'),
+        findsOneWidget,
+      );
+      expect(completed, isFalse);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(repository.createCalls, 1);
+      expect(completed, isTrue);
+      expect(canceled, isFalse);
     });
 
     testWidgets('free text fields start sentences with capitalization', (
@@ -623,6 +673,7 @@ Widget _testApp({
   SharedPreferences? sharedPreferences,
   CheckInSpeechTranscriptionService? speechService,
   VoidCallback? onCompleted,
+  VoidCallback? onCancel,
 }) {
   return ProviderScope(
     overrides: [
@@ -652,7 +703,7 @@ Widget _testApp({
       theme: AppTheme.dark(),
       home: Scaffold(
         body: SingleChildScrollView(
-          child: CheckInQuickView(onCompleted: onCompleted),
+          child: CheckInQuickView(onCompleted: onCompleted, onCancel: onCancel),
         ),
       ),
     ),
@@ -819,7 +870,15 @@ class _FakeCheckInRepository implements CheckInRepository {
         ),
       );
     }
-    if (createCalls == 2) {
+    final shouldWaitForGate =
+        createGate != null &&
+        ((blockFirstCreateWith402 && createCalls == 2) ||
+            (blockCreateCountWith402 > 0 &&
+                createCalls == blockCreateCountWith402 + 1) ||
+            (!blockFirstCreateWith402 &&
+                blockCreateCountWith402 == 0 &&
+                createCalls == 1));
+    if (shouldWaitForGate) {
       await createGate?.future;
     }
     if (createCalls == failCreateCallWithNetwork) {

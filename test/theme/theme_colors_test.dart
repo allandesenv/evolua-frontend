@@ -21,6 +21,61 @@ void main() {
     expect(colors.textSecondary, AppColors.textSecondary);
   });
 
+  test('interactive controls keep accessible tap targets', () {
+    final theme = AppTheme.dark(accessibleFont: true);
+    final states = const <WidgetState>{};
+
+    expect(
+      theme.filledButtonTheme.style?.minimumSize?.resolve(states),
+      const Size(48, 48),
+    );
+    expect(
+      theme.outlinedButtonTheme.style?.minimumSize?.resolve(states),
+      const Size(48, 48),
+    );
+    expect(
+      theme.textButtonTheme.style?.minimumSize?.resolve(states),
+      const Size(48, 48),
+    );
+    expect(
+      theme.elevatedButtonTheme.style?.minimumSize?.resolve(states),
+      const Size(48, 52),
+    );
+    expect(
+      theme.iconButtonTheme.style?.minimumSize?.resolve(states),
+      const Size.square(48),
+    );
+    expect(theme.materialTapTargetSize, MaterialTapTargetSize.padded);
+  });
+
+  test('dark theme semantic text colors pass AA contrast on surfaces', () {
+    final colors = AppTheme.dark(
+      accessibleFont: true,
+    ).extension<EvoluaThemeColors>()!;
+
+    expect(
+      _contrastRatio(colors.textPrimary, colors.background),
+      greaterThan(4.5),
+    );
+    expect(
+      _contrastRatio(colors.textPrimary, colors.surface),
+      greaterThan(4.5),
+    );
+    expect(
+      _contrastRatio(colors.textSecondary, colors.background),
+      greaterThan(4.5),
+    );
+    expect(
+      _contrastRatio(colors.textSecondary, colors.surface),
+      greaterThan(4.5),
+    );
+    expect(_contrastRatio(colors.accent, colors.background), greaterThan(4.5));
+    expect(
+      _contrastRatio(colors.accentWarm, colors.background),
+      greaterThan(4.5),
+    );
+  });
+
   testWidgets('PrimaryPanel uses light semantic surface in light mode', (
     tester,
   ) async {
@@ -68,3 +123,14 @@ void main() {
   });
 }
 
+double _contrastRatio(Color foreground, Color background) {
+  final foregroundLuminance = foreground.computeLuminance();
+  final backgroundLuminance = background.computeLuminance();
+  final lighter = foregroundLuminance > backgroundLuminance
+      ? foregroundLuminance
+      : backgroundLuminance;
+  final darker = foregroundLuminance > backgroundLuminance
+      ? backgroundLuminance
+      : foregroundLuminance;
+  return (lighter + 0.05) / (darker + 0.05);
+}

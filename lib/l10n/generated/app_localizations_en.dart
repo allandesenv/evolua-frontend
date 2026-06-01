@@ -377,6 +377,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeDailyViewRitual => 'View my ritual';
 
   @override
+  String get firstExperienceTitle => 'Welcome to Evolua';
+
+  @override
+  String get firstExperienceMainMessage =>
+      'Let\'s start with a simple check-in. It takes less than a minute.';
+
+  @override
+  String get firstExperienceDescription =>
+      'From there, Evolua prepares your intelligent reading and suggests one gentle next step for today.';
+
+  @override
+  String get firstExperienceStart => 'Start check-in';
+
+  @override
+  String get firstExperienceNotNow => 'Not now';
+
+  @override
   String get homeFutureLetter => 'Letter to the future';
 
   @override
@@ -399,7 +416,39 @@ class AppLocalizationsEn extends AppLocalizations {
       'After your next check-in, AI will summarize the moment and turn the reading into one simple action.';
 
   @override
+  String get homeSmartReadingGeneratingTitle => 'Generating reading...';
+
+  @override
+  String get homeSmartReadingGeneratingBody =>
+      'You can keep going. We are preparing the reading for this moment.';
+
+  @override
+  String get homeSmartReadingUnavailableTitle =>
+      'Reading unavailable right now';
+
+  @override
+  String get homeSmartReadingUnavailableBody =>
+      'We could not generate the reading right now, but your check-in was saved.';
+
+  @override
   String get homeFullAnalysis => 'View full analysis';
+
+  @override
+  String get homeMirrorRewardTitle =>
+      'Your check-in already counts toward your Mirror';
+
+  @override
+  String get homeMirrorRewardDescription =>
+      'The more you record, the more your Mirror reveals patterns.';
+
+  @override
+  String get homeMirrorRewardAnalysis => 'View analysis';
+
+  @override
+  String get homeMirrorRewardTrail => 'Continue trail';
+
+  @override
+  String get homeMirrorRewardMirror => 'View my Mirror';
 
   @override
   String homeEnergyBullet(Object value) {
@@ -537,10 +586,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkInSubmit => 'Check in';
 
   @override
+  String get checkInSavingLabel => 'Saving check-in...';
+
+  @override
   String get checkInNotNow => 'Not now';
 
   @override
   String get checkInSavedSnack => 'Check-in saved. Continue at your pace.';
+
+  @override
+  String get checkInSavedReadingPending =>
+      'Check-in saved. You can keep going, the reading will appear shortly.';
+
+  @override
+  String get checkInSavingInProgress =>
+      'We are saving your check-in. Please wait a moment.';
 
   @override
   String get checkInSaveError => 'We could not save your check-in.';
@@ -1296,6 +1356,23 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   String get homeDailyViewRitual => 'View my ritual';
 
   @override
+  String get firstExperienceTitle => 'Welcome to Evolua';
+
+  @override
+  String get firstExperienceMainMessage =>
+      'Let\'s start with a simple check-in. It takes less than a minute.';
+
+  @override
+  String get firstExperienceDescription =>
+      'From there, Evolua prepares your intelligent reading and suggests one gentle next step for today.';
+
+  @override
+  String get firstExperienceStart => 'Start check-in';
+
+  @override
+  String get firstExperienceNotNow => 'Not now';
+
+  @override
   String get homeFutureLetter => 'Letter to the future';
 
   @override
@@ -1318,7 +1395,39 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
       'After your next check-in, AI will summarize the moment and turn the reading into one simple action.';
 
   @override
+  String get homeSmartReadingGeneratingTitle => 'Generating reading...';
+
+  @override
+  String get homeSmartReadingGeneratingBody =>
+      'You can keep going. We are preparing the reading for this moment.';
+
+  @override
+  String get homeSmartReadingUnavailableTitle =>
+      'Reading unavailable right now';
+
+  @override
+  String get homeSmartReadingUnavailableBody =>
+      'We could not generate the reading right now, but your check-in was saved.';
+
+  @override
   String get homeFullAnalysis => 'View full analysis';
+
+  @override
+  String get homeMirrorRewardTitle =>
+      'Your check-in already counts toward your Mirror';
+
+  @override
+  String get homeMirrorRewardDescription =>
+      'The more you record, the more your Mirror reveals patterns.';
+
+  @override
+  String get homeMirrorRewardAnalysis => 'View analysis';
+
+  @override
+  String get homeMirrorRewardTrail => 'Continue trail';
+
+  @override
+  String get homeMirrorRewardMirror => 'View my Mirror';
 
   @override
   String homeEnergyBullet(Object value) {
@@ -1456,10 +1565,21 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   String get checkInSubmit => 'Check in';
 
   @override
+  String get checkInSavingLabel => 'Saving check-in...';
+
+  @override
   String get checkInNotNow => 'Not now';
 
   @override
   String get checkInSavedSnack => 'Check-in saved. Continue at your pace.';
+
+  @override
+  String get checkInSavedReadingPending =>
+      'Check-in saved. You can keep going, the reading will appear shortly.';
+
+  @override
+  String get checkInSavingInProgress =>
+      'We are saving your check-in. Please wait a moment.';
 
   @override
   String get checkInSaveError => 'We could not save your check-in.';
