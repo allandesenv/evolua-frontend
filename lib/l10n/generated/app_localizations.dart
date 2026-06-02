@@ -841,7 +841,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeIntelligentReadingTitle.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Leitura inteligente'**
+  /// **'Olhar do Evolua'**
   String get homeIntelligentReadingTitle;
 
   /// No description provided for @homeIntelligentReadingEmpty.
@@ -1087,19 +1087,19 @@ abstract class AppLocalizations {
   /// No description provided for @checkInEyebrow.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Como estou?'**
+  /// **''**
   String get checkInEyebrow;
 
   /// No description provided for @checkInPromptTitle.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Comece pelo seu estado agora'**
+  /// **'Como você está se sentindo agora?'**
   String get checkInPromptTitle;
 
   /// No description provided for @checkInPromptSubtitle.
   ///
   /// In pt_BR, this message translates to:
-  /// **'Um check-in curto já dá contexto para o seu registro breve do dia.'**
+  /// **'Escolha a opção que mais combina com este momento.'**
   String get checkInPromptSubtitle;
 
   /// No description provided for @checkInMoreStatesTooltip.

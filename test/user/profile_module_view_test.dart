@@ -1009,6 +1009,64 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('renders weekly mirror summary responsively on narrow screens', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: false,
+      surfaceSize: const Size(360, 1200),
+      textScaleFactor: 1.25,
+    );
+
+    expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.text('Check-ins esta semana'), findsOneWidget);
+    expect(find.text('Emocao predominante'), findsOneWidget);
+    expect(find.text('Energia média'), findsOneWidget);
+    expect(find.text('Consistência'), findsAtLeastNWidgets(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders weekly mirror summary on medium width', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: false,
+      surfaceSize: const Size(560, 1200),
+    );
+
+    expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.text('Check-ins esta semana'), findsOneWidget);
+    expect(find.text('Emocao predominante'), findsOneWidget);
+    expect(find.text('Energia média'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders weekly mirror summary on wide width', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: false,
+      surfaceSize: const Size(760, 1200),
+    );
+
+    expect(find.text('Resumo da semana'), findsOneWidget);
+    expect(find.text('Check-ins esta semana'), findsOneWidget);
+    expect(find.text('Emocao predominante'), findsOneWidget);
+    expect(find.text('Energia média'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders evolution mirror with journey and insight data', (
     tester,
   ) async {
@@ -1569,8 +1627,10 @@ Future<void> _pumpEvolutionMirror(
   CheckInRepository? checkInRepository,
   FutureMessageRepository? futureMessageRepository,
   bool premium = false,
+  Size surfaceSize = const Size(390, 1100),
+  double textScaleFactor = 1,
 }) async {
-  await tester.binding.setSurfaceSize(const Size(390, 1100));
+  await tester.binding.setSurfaceSize(surfaceSize);
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
   await tester.pumpWidget(
@@ -1599,10 +1659,16 @@ Future<void> _pumpEvolutionMirror(
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: const Scaffold(
-          body: SingleChildScrollView(
-            child: ProfileModuleView(
-              section: ProfileModuleSection.evolutionMirror,
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: surfaceSize,
+            textScaler: TextScaler.linear(textScaleFactor),
+          ),
+          child: const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(
+                section: ProfileModuleSection.evolutionMirror,
+              ),
             ),
           ),
         ),

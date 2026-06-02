@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/care/application/care_claim_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/keyboard_aware_form_scroll_view.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -25,7 +26,7 @@ class CareClaimPage extends ConsumerWidget {
     });
 
     return GradientScaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final padding = _pagePadding(constraints.maxWidth);
@@ -67,83 +68,48 @@ class _CareDashboard extends ConsumerStatefulWidget {
   ConsumerState<_CareDashboard> createState() => _CareDashboardState();
 }
 
-class _CareDashboardState extends ConsumerState<_CareDashboard>
-    with WidgetsBindingObserver {
+class _CareDashboardState extends ConsumerState<_CareDashboard> {
   final _scrollController = ScrollController();
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeMetrics() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) {
-        return;
-      }
-      final position = _scrollController.position;
-      final max = position.maxScrollExtent;
-      if (position.pixels > max) {
-        _scrollController.jumpTo(max);
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-    final safeBottom = bottomInset > 0 ? bottomInset : bottomPadding;
     return LayoutBuilder(
       builder: (context, constraints) {
-        return ColoredBox(
-          color: context.evoluaColors.background,
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            padding: EdgeInsets.only(bottom: safeBottom + 24),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _CareClaimHeader(state: widget.state),
-                  const SizedBox(height: 20),
-                  _ClinicalSummaryPanel(report: widget.state.report),
-                  const SizedBox(height: 20),
-                  _ResponsivePair(
-                    primary: _MoodChartPanel(
-                      checkIns: widget.state.report.checkIns,
-                    ),
-                    secondary: _AttentionPointsPanel(report: widget.state.report),
-                  ),
-                  const SizedBox(height: 20),
-                  _ResponsivePair(
-                    primary: _InsightPanel(report: widget.state.report),
-                    secondary: _RitualAdherencePanel(
-                      rituals: widget.state.report.rituals,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _PrescriptionPanel(
-                    isSending: widget.state.isSendingPrescription,
-                  ),
-                  const SizedBox(height: 20),
-                  _RecommendationPanel(
-                    isSending: widget.state.isSendingRecommendation,
-                  ),
-                ],
+        return KeyboardAwareFormScrollView(
+          controller: _scrollController,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _CareClaimHeader(state: widget.state),
+              const SizedBox(height: 20),
+              _ClinicalSummaryPanel(report: widget.state.report),
+              const SizedBox(height: 20),
+              _ResponsivePair(
+                primary: _MoodChartPanel(
+                  checkIns: widget.state.report.checkIns,
+                ),
+                secondary: _AttentionPointsPanel(report: widget.state.report),
               ),
-            ),
+              const SizedBox(height: 20),
+              _ResponsivePair(
+                primary: _InsightPanel(report: widget.state.report),
+                secondary: _RitualAdherencePanel(
+                  rituals: widget.state.report.rituals,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _PrescriptionPanel(isSending: widget.state.isSendingPrescription),
+              const SizedBox(height: 20),
+              _RecommendationPanel(
+                isSending: widget.state.isSendingRecommendation,
+              ),
+            ],
           ),
         );
       },
@@ -713,14 +679,59 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
   final _stateController = TextEditingController();
   final _intentionController = TextEditingController();
   final _microActionController = TextEditingController();
+  final _stateFocusNode = FocusNode();
+  final _intentionFocusNode = FocusNode();
+  final _microActionFocusNode = FocusNode();
   String _type = DailyRitualType.morning;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateFocusNode.addListener(() => _handleFieldFocus(_stateFocusNode));
+    _intentionFocusNode.addListener(
+      () => _handleFieldFocus(_intentionFocusNode),
+    );
+    _microActionFocusNode.addListener(
+      () => _handleFieldFocus(_microActionFocusNode),
+    );
+  }
 
   @override
   void dispose() {
+    _stateFocusNode.dispose();
+    _intentionFocusNode.dispose();
+    _microActionFocusNode.dispose();
     _stateController.dispose();
     _intentionController.dispose();
     _microActionController.dispose();
     super.dispose();
+  }
+
+  void _handleFieldFocus(FocusNode focusNode) {
+    if (!focusNode.hasFocus) return;
+    _scheduleFocusScroll(focusNode);
+  }
+
+  void _scheduleFocusScroll(FocusNode focusNode) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureFocusVisible(focusNode);
+    });
+    Future<void>.delayed(const Duration(milliseconds: 260), () {
+      _ensureFocusVisible(focusNode);
+    });
+  }
+
+  void _ensureFocusVisible(FocusNode focusNode) {
+    if (!mounted || !focusNode.hasFocus) return;
+    final fieldContext = focusNode.context;
+    if (fieldContext == null) return;
+    Scrollable.ensureVisible(
+      fieldContext,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      alignment: 0.2,
+    );
   }
 
   @override
@@ -728,6 +739,7 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final mobile = constraints.maxWidth < 520;
+        final isBusy = widget.isSending || _isSubmitting;
         return PrimaryPanel(
           padding: _panelPadding(constraints.maxWidth),
           child: Form(
@@ -761,22 +773,29 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                     ),
                   ],
                   selected: {_type},
-                  onSelectionChanged: widget.isSending
+                  onSelectionChanged: isBusy
                       ? null
                       : (value) => setState(() => _type = value.first),
                 ),
                 const SizedBox(height: 14),
-                TextFormField(
-                  controller: _stateController,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Contexto emocional observado',
-                    hintText: 'Ex.: ansiedade ao iniciar o dia',
+                EnsureVisibleOnFocus(
+                  focusNode: _stateFocusNode,
+                  child: TextFormField(
+                    controller: _stateController,
+                    focusNode: _stateFocusNode,
+                    enabled: !isBusy,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Contexto emocional observado',
+                      hintText: 'Ex.: ansiedade ao iniciar o dia',
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _intentionController,
+                  focusNode: _intentionFocusNode,
+                  enabled: !isBusy,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Intenção terapêutica',
@@ -787,6 +806,8 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _microActionController,
+                  focusNode: _microActionFocusNode,
+                  enabled: !isBusy,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Micro-ação sugerida',
@@ -801,8 +822,8 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                 SizedBox(
                   width: mobile ? double.infinity : null,
                   child: FilledButton.icon(
-                    onPressed: widget.isSending ? null : _submit,
-                    icon: widget.isSending
+                    onPressed: isBusy ? null : _submit,
+                    icon: isBusy
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -810,7 +831,7 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
                           )
                         : const Icon(Icons.lock_outline_rounded),
                     label: Text(
-                      widget.isSending
+                      isBusy
                           ? 'Enviando...'
                           : 'Prescrever ritual personalizado',
                     ),
@@ -831,7 +852,9 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting || widget.isSending) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
     try {
       await ref
           .read(careClaimControllerProvider.notifier)
@@ -842,6 +865,7 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
             intention: _intentionController.text,
             microAction: _microActionController.text,
           );
+      _stateController.clear();
       _intentionController.clear();
       _microActionController.clear();
     } catch (_) {
@@ -852,6 +876,10 @@ class _PrescriptionPanelState extends ConsumerState<_PrescriptionPanel> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
       }
     }
   }
@@ -870,52 +898,27 @@ class _RecommendationPanel extends ConsumerStatefulWidget {
 class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
   final _guidanceController = TextEditingController();
   final _guidanceFocusNode = FocusNode();
-  final _guidanceFieldKey = GlobalKey();
-  final List<PlatformFile> _attachments = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _guidanceFocusNode.addListener(_handleGuidanceFocusChanged);
-  }
+  final List<_CareAttachmentItem> _attachments = [];
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _guidanceFocusNode.removeListener(_handleGuidanceFocusChanged);
     _guidanceFocusNode.dispose();
     _guidanceController.dispose();
     super.dispose();
   }
 
-  void _handleGuidanceFocusChanged() {
-    if (_guidanceFocusNode.hasFocus) {
-      _scheduleGuidanceScroll();
-    }
-  }
-
-  void _scheduleGuidanceScroll() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensureGuidanceVisible();
-    });
-    Future<void>.delayed(const Duration(milliseconds: 260), () {
-      _ensureGuidanceVisible();
-    });
-  }
-
-  void _ensureGuidanceVisible() {
-    if (!mounted) return;
-    final fieldContext = _guidanceFieldKey.currentContext;
-    if (fieldContext == null) return;
-    Scrollable.ensureVisible(
-      fieldContext,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-      alignment: 0.2,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isBusy = widget.isSending || _isSubmitting;
+    final hasFailedAttachment = _attachments.any(
+      (item) => item.status == _CareAttachmentStatus.failed,
+    );
+    final canSubmit =
+        !isBusy &&
+        !hasFailedAttachment &&
+        (_guidanceController.text.trim().isNotEmpty || _attachments.isNotEmpty);
+
     return PrimaryPanel(
       padding: _panelPadding(MediaQuery.sizeOf(context).width),
       child: Column(
@@ -944,11 +947,13 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
             ),
           ),
           const SizedBox(height: 16),
-          KeyedSubtree(
-            key: _guidanceFieldKey,
+          EnsureVisibleOnFocus(
+            focusNode: _guidanceFocusNode,
             child: TextField(
               controller: _guidanceController,
               focusNode: _guidanceFocusNode,
+              enabled: !isBusy,
+              onChanged: (_) => setState(() {}),
               textCapitalization: TextCapitalization.sentences,
               minLines: 4,
               maxLines: 8,
@@ -966,7 +971,7 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               OutlinedButton.icon(
-                onPressed: widget.isSending ? null : _pickFiles,
+                onPressed: isBusy ? null : _pickFiles,
                 icon: const Icon(Icons.attach_file_rounded),
                 label: const Text('Adicionar anexos'),
               ),
@@ -983,25 +988,17 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
             ..._attachments.map(
               (file) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.insert_drive_file_outlined, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        file.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Remover anexo',
-                      onPressed: widget.isSending
-                          ? null
-                          : () => setState(() => _attachments.remove(file)),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
+                child: _CareAttachmentTile(
+                  item: file,
+                  isBusy: isBusy,
+                  onRemove: () => setState(() => _attachments.remove(file)),
+                  onRetry: () {
+                    setState(() {
+                      file.status = _CareAttachmentStatus.waiting;
+                      file.errorMessage = null;
+                    });
+                    _submit();
+                  },
                 ),
               ),
             ),
@@ -1010,8 +1007,8 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: widget.isSending ? null : _submit,
-              icon: widget.isSending
+              onPressed: canSubmit ? _submit : null,
+              icon: isBusy
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -1019,9 +1016,7 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
                     )
                   : const Icon(Icons.lock_outline_rounded),
               label: Text(
-                widget.isSending
-                    ? 'Enviando...'
-                    : 'Enviar orientação segura ao paciente',
+                isBusy ? 'Enviando...' : 'Enviar orientação segura ao paciente',
               ),
             ),
           ),
@@ -1040,24 +1035,67 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
       allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
     );
     if (result == null) return;
-    final selected = result.files
-        .where((file) => file.bytes != null && file.size <= 10 * 1024 * 1024)
-        .take(remaining);
+    final selected = <_CareAttachmentItem>[];
+    for (final file in result.files.take(remaining)) {
+      final error = _attachmentValidationError(file);
+      if (error != null) {
+        _showMessage(error);
+        continue;
+      }
+      selected.add(_CareAttachmentItem(file: file));
+    }
+    if (selected.isEmpty) return;
     setState(() => _attachments.addAll(selected));
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting || widget.isSending) return;
+    if (_attachments.any(
+      (item) => item.status == _CareAttachmentStatus.failed,
+    )) {
+      _showMessage(
+        'Revise os anexos com falha antes de enviar a orientaÃ§Ã£o.',
+      );
+      return;
+    }
+    final guidance = _guidanceController.text;
+    if (guidance.trim().isEmpty && _attachments.isEmpty) return;
+    setState(() {
+      _isSubmitting = true;
+      for (final item in _attachments) {
+        item
+          ..status = _CareAttachmentStatus.sending
+          ..errorMessage = null;
+      }
+    });
     try {
       await ref
           .read(careClaimControllerProvider.notifier)
           .sendRecommendation(
-            guidanceText: _guidanceController.text,
-            attachments: List<PlatformFile>.from(_attachments),
+            guidanceText: guidance,
+            attachments: _attachments.map((item) => item.file).toList(),
           );
+      if (!mounted) return;
+      setState(() {
+        for (final item in _attachments) {
+          item.status = _CareAttachmentStatus.attached;
+        }
+      });
+      if (_attachments.isNotEmpty) {
+        _showMessage('Anexo enviado com seguranÃ§a.');
+      }
       _guidanceController.clear();
       setState(_attachments.clear);
     } catch (_) {
       if (mounted) {
+        setState(() {
+          for (final item in _attachments) {
+            item
+              ..status = _CareAttachmentStatus.failed
+              ..errorMessage =
+                  'Não foi possível anexar agora. Verifique sua conexão e tente novamente.';
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Não foi possível enviar a orientação agora.'),
@@ -1065,8 +1103,163 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
+
+  String? _attachmentValidationError(PlatformFile file) {
+    if (!_isSupportedAttachment(file.name)) {
+      return 'Formato não suportado. Envie uma imagem ou PDF.';
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return 'Esse arquivo é muito grande. Escolha um arquivo menor.';
+    }
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      return 'Não foi possível anexar agora. Verifique sua conexão e tente novamente.';
+    }
+    return null;
+  }
+
+  bool _isSupportedAttachment(String fileName) {
+    final lower = fileName.toLowerCase();
+    return lower.endsWith('.pdf') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp');
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+}
+
+enum _CareAttachmentStatus { waiting, sending, attached, failed }
+
+class _CareAttachmentItem {
+  _CareAttachmentItem({required this.file});
+
+  final PlatformFile file;
+  _CareAttachmentStatus status = _CareAttachmentStatus.waiting;
+  String? errorMessage;
+}
+
+class _CareAttachmentTile extends StatelessWidget {
+  const _CareAttachmentTile({
+    required this.item,
+    required this.isBusy,
+    required this.onRemove,
+    required this.onRetry,
+  });
+
+  final _CareAttachmentItem item;
+  final bool isBusy;
+  final VoidCallback onRemove;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = switch (item.status) {
+      _CareAttachmentStatus.waiting => 'Aguardando envio',
+      _CareAttachmentStatus.sending => 'Enviando...',
+      _CareAttachmentStatus.attached => 'Anexado',
+      _CareAttachmentStatus.failed => 'Falha no envio',
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        child: Row(
+          children: [
+            const Icon(Icons.insert_drive_file_outlined, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.file.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: context.evoluaColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${_formatFileSize(item.file.size)} · $status',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: item.status == _CareAttachmentStatus.failed
+                          ? Theme.of(context).colorScheme.error
+                          : context.evoluaColors.textSecondary,
+                    ),
+                  ),
+                  if (item.errorMessage != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      item.errorMessage!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  if (item.status == _CareAttachmentStatus.failed) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: isBusy ? null : onRetry,
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (item.status == _CareAttachmentStatus.sending)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              const SizedBox(width: 6),
+            IconButton(
+              tooltip: 'Remover anexo',
+              onPressed: isBusy ? null : onRemove,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatFileSize(int size) {
+  if (size >= 1024 * 1024) {
+    return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+  if (size >= 1024) {
+    return '${(size / 1024).toStringAsFixed(1)} KB';
+  }
+  return '$size B';
 }
 
 class _MetricPill extends StatelessWidget {

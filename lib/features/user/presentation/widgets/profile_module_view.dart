@@ -1,4 +1,4 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
@@ -1985,53 +1985,153 @@ class _EvolutionMetricGrid extends StatelessWidget {
 
   final List<_EvolutionMetric> metrics;
 
+  static const _compactBreakpoint = 430.0;
+  static const _wideBreakpoint = 680.0;
+  static const _spacing = 12.0;
+
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: metrics
-          .map(
-            (metric) => SizedBox(
-              width: 168,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: context.evoluaColors.surfaceStrong.withValues(
-                    alpha: 0.28,
-                  ),
-                  border: Border.all(
-                    color: context.evoluaColors.outline.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(metric.icon, color: AppColors.accent),
-                    const SizedBox(height: 10),
-                    Text(
-                      metric.value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: context.evoluaColors.textPrimary,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      metric.label,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        if (width < _compactBreakpoint) {
+          return Column(
+            children: [
+              for (var index = 0; index < metrics.length; index++) ...[
+                _EvolutionMetricListTile(metric: metrics[index]),
+                if (index < metrics.length - 1) const SizedBox(height: 10),
+              ],
+            ],
+          );
+        }
+
+        if (width < _wideBreakpoint) {
+          final secondaryWidth = (width - _spacing) / 2;
+          return Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: _EvolutionMetricCard(metric: metrics.first),
               ),
-            ),
-          )
-          .toList(),
+              const SizedBox(height: _spacing),
+              Wrap(
+                spacing: _spacing,
+                runSpacing: _spacing,
+                children: metrics
+                    .skip(1)
+                    .map(
+                      (metric) => SizedBox(
+                        width: secondaryWidth,
+                        child: _EvolutionMetricCard(metric: metric),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          );
+        }
+
+        final cardWidth = (width - _spacing) / 2;
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: _spacing,
+          children: metrics
+              .map(
+                (metric) => SizedBox(
+                  width: cardWidth,
+                  child: _EvolutionMetricCard(metric: metric),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
+}
+
+class _EvolutionMetricCard extends StatelessWidget {
+  const _EvolutionMetricCard({required this.metric});
+
+  final _EvolutionMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 128),
+      padding: const EdgeInsets.all(14),
+      decoration: _metricDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(metric.icon, color: AppColors.accent),
+          const SizedBox(height: 10),
+          Text(
+            metric.value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: context.evoluaColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(metric.label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _EvolutionMetricListTile extends StatelessWidget {
+  const _EvolutionMetricListTile({required this.metric});
+
+  final _EvolutionMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: _metricDecoration(context),
+      child: Row(
+        children: [
+          Icon(metric.icon, color: AppColors.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              metric.label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              metric.value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+BoxDecoration _metricDecoration(BuildContext context) {
+  return BoxDecoration(
+    borderRadius: BorderRadius.circular(16),
+    color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
+    border: Border.all(
+      color: context.evoluaColors.outline.withValues(alpha: 0.18),
+    ),
+  );
 }
 
 class _PatternPanel extends StatelessWidget {
@@ -4509,4 +4609,3 @@ String _sectionLabel(ProfileModuleSection section) {
     ProfileModuleSection.evolutionMirror => 'Espelho da Evolução',
   };
 }
-
