@@ -11,6 +11,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.resetViewInsets);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -72,8 +73,16 @@ void main() {
 
     final guidanceField = find.byType(TextField).last;
     await tester.ensureVisible(guidanceField);
+    tester.view.viewInsets = FakeViewPadding(bottom: 320);
     await tester.tap(guidanceField);
     await tester.enterText(guidanceField, 'orientacao de teste');
+    await tester.pump(const Duration(milliseconds: 320));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('orientacao de teste'), findsOneWidget);
+
+    tester.view.resetViewInsets();
     await tester.pump(const Duration(milliseconds: 320));
     await tester.pumpAndSettle();
 
