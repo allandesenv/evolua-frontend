@@ -40,7 +40,13 @@ void main() {
 
         final session = await container.read(authControllerProvider.future);
 
-        expect(session?.refreshToken, 'new-refresh-token');
+        expect(session?.refreshToken, 'old-refresh-token');
+        await Future<void>.delayed(Duration.zero);
+        final refreshedSession = container
+            .read(authControllerProvider)
+            .asData
+            ?.value;
+        expect(refreshedSession?.refreshToken, 'new-refresh-token');
         expect(repository.refreshCalls, 1);
         final preferences = await SharedPreferences.getInstance();
         expect(preferences.getString(_sessionStorageKey), isNotNull);
@@ -93,7 +99,13 @@ void main() {
 
       final session = await container.read(authControllerProvider.future);
 
-      expect(session, isNull);
+      expect(session?.refreshToken, 'old-refresh-token');
+      await Future<void>.delayed(Duration.zero);
+      final rejectedSession = container
+          .read(authControllerProvider)
+          .asData
+          ?.value;
+      expect(rejectedSession, isNull);
       expect(repository.refreshCalls, 1);
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(_sessionStorageKey), isNull);
