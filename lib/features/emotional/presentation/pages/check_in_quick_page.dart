@@ -1103,17 +1103,20 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final safeEyebrow = eyebrow.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          eyebrow,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: accentColor,
-            fontWeight: FontWeight.w800,
+        if (safeEyebrow.isNotEmpty) ...[
+          Text(
+            safeEyebrow,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: accentColor,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
-        const SizedBox(height: 7),
+          const SizedBox(height: 7),
+        ],
         Text(
           title,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(

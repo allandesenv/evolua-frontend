@@ -955,7 +955,7 @@ void main() {
       await tester.pumpWidget(_testApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('Leitura inteligente'), findsOneWidget);
+      expect(find.text('Olhar do Evolua'), findsOneWidget);
       expect(find.text('Próximo passo'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
