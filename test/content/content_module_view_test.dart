@@ -41,6 +41,15 @@ void main() {
           .first;
     }
 
+    Finder journeyTabFinder() {
+      return find
+          .ancestor(
+            of: find.text('Trilha').first,
+            matching: find.byType(InkWell),
+          )
+          .first;
+    }
+
     testWidgets('shows journey and catalog switcher on compact width', (
       tester,
     ) async {
@@ -53,6 +62,41 @@ void main() {
       expect(find.text('Explorar trilhas'), findsWidgets);
       expect(catalogTabFinder(), findsOneWidget);
       expect(find.text('Explorar'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('opens catalog by default when there is no active journey', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(
+        _testApp(trailRepository: _FakeTrailRepository(hasActiveTrail: false)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Catálogo de trilhas'), findsOneWidget);
+      expect(find.text('Respiracao breve'), findsOneWidget);
+      expect(find.text('Sua trilha'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('keeps catalog focused when journey tab has no active trail', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(
+        _testApp(trailRepository: _FakeTrailRepository(hasActiveTrail: false)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(journeyTabFinder());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Catálogo de trilhas'), findsOneWidget);
+      expect(find.text('Respiracao breve'), findsOneWidget);
+      expect(find.text('Sua trilha'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -519,6 +563,152 @@ void main() {
       expect(find.text('Novas trilhas premium em breve.'), findsOneWidget);
     });
 
+    testWidgets('mobile catalog hides manual pagination and loads next page', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        catalogTrails: _catalogTrailSet(6),
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Anterior'), findsNothing);
+      expect(find.text('Proxima'), findsNothing);
+      expect(find.textContaining('Pagina'), findsNothing);
+      expect(find.text('Trilha catalogo 1'), findsOneWidget);
+      expect(find.text('Trilha catalogo 6'), findsNothing);
+
+      await tester.fling(
+        find.byType(SingleChildScrollView).first,
+        const Offset(0, -1400),
+        1800,
+      );
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.requestedPages, containsAllInOrder([0, 1]));
+      expect(find.text('Trilha catalogo 6'), findsOneWidget);
+      expect(
+        find.text('Você viu todas as trilhas disponíveis.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('mobile infinite catalog deduplicates repeated trail ids', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        catalogTrails: [
+          ..._catalogTrailSet(4),
+          _trail(
+            id: 6,
+            title: 'Trilha duplicada que nao deve aparecer',
+            summary: 'Duplicada',
+            activeJourney: false,
+            generatedByAi: false,
+          ),
+          _trail(
+            id: 6,
+            title: 'Trilha duplicada que nao deve aparecer',
+            summary: 'Duplicada',
+            activeJourney: false,
+            generatedByAi: false,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.fling(
+        find.byType(SingleChildScrollView).first,
+        const Offset(0, -1400),
+        1800,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Trilha duplicada que nao deve aparecer'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('mobile load more error keeps current catalog and retries', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final failingPages = <int>{1};
+      final trailRepository = _FakeTrailRepository(
+        catalogTrails: _catalogTrailSet(6),
+        failingPages: failingPages,
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.fling(
+        find.byType(SingleChildScrollView).first,
+        const Offset(0, -1400),
+        1800,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trilha catalogo 1'), findsOneWidget);
+      expect(find.text('Trilha catalogo 6'), findsNothing);
+      expect(
+        find.text('Não foi possível carregar mais trilhas.'),
+        findsOneWidget,
+      );
+
+      failingPages.clear();
+      await tester.tap(find.text('Tentar novamente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trilha catalogo 6'), findsOneWidget);
+    });
+
+    testWidgets('mobile catalog pull-to-refresh reloads first page', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        catalogTrails: _catalogTrailSet(6),
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          section: ContentModuleSection.catalog,
+          trailRepository: trailRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(RefreshIndicator), const Offset(0, 420));
+      await tester.pumpAndSettle();
+
+      expect(
+        trailRepository.requestedPages.where((page) => page == 0).length,
+        2,
+      );
+    });
+
     testWidgets('uses light surfaces and readable text in light theme', (
       tester,
     ) async {
@@ -785,6 +975,7 @@ class _FakeAuthController extends AuthController {
 
 class _FakeTrailRepository implements TrailRepository {
   _FakeTrailRepository({
+    bool hasActiveTrail = true,
     Trail? activeTrail,
     Trail? catalogTrail,
     List<Trail>? catalogTrails,
@@ -793,15 +984,17 @@ class _FakeTrailRepository implements TrailRepository {
     bool failLoadingResponse = false,
     bool failSavingResponse = false,
     Completer<void>? saveGate,
-  }) : _activeTrail =
-           activeTrail ??
-           _trail(
-             id: 1,
-             title: 'Clareza em 8 minutos',
-             summary: 'Uma trilha ativa para organizar o momento.',
-             activeJourney: true,
-             generatedByAi: true,
-           ),
+    Set<int> failingPages = const {},
+  }) : _activeTrail = hasActiveTrail
+           ? activeTrail ??
+                 _trail(
+                   id: 1,
+                   title: 'Clareza em 8 minutos',
+                   summary: 'Uma trilha ativa para organizar o momento.',
+                   activeJourney: true,
+                   generatedByAi: true,
+                 )
+           : null,
        _catalogTrails =
            catalogTrails ??
            [
@@ -818,18 +1011,21 @@ class _FakeTrailRepository implements TrailRepository {
        _journeyBuilder = journeyBuilder,
        _failLoadingResponse = failLoadingResponse,
        _failSavingResponse = failSavingResponse,
-       _saveGate = saveGate;
+       _saveGate = saveGate,
+       _failingPages = failingPages;
 
-  final Trail _activeTrail;
+  final Trail? _activeTrail;
   final List<Trail> _catalogTrails;
   final Map<({int trailId, int stepIndex}), String> savedResponses;
   final TrailJourney Function(Trail trail)? _journeyBuilder;
   final bool _failLoadingResponse;
   final bool _failSavingResponse;
   final Completer<void>? _saveGate;
+  final Set<int> _failingPages;
   int listCallCount = 0;
   int completeStepCallCount = 0;
   int saveStepResponseCallCount = 0;
+  final requestedPages = <int>[];
   String? lastSearch;
   bool? lastPremium;
 
@@ -847,6 +1043,10 @@ class _FakeTrailRepository implements TrailRepository {
     bool? premium,
   }) async {
     listCallCount++;
+    requestedPages.add(page);
+    if (_failingPages.contains(page)) {
+      throw Exception('page unavailable');
+    }
     lastSearch = search;
     lastPremium = premium;
     var items = _catalogTrails;
@@ -864,14 +1064,19 @@ class _FakeTrailRepository implements TrailRepository {
           )
           .toList();
     }
+    final totalPages = items.isEmpty ? 1 : (items.length / size).ceil();
+    final start = page * size;
+    final pageItems = start >= items.length
+        ? <Trail>[]
+        : items.skip(start).take(size).toList();
     return PaginatedResponse(
-      items: items,
+      items: pageItems,
       page: page,
       size: size,
       totalItems: items.length,
-      totalPages: 1,
-      hasNext: false,
-      hasPrevious: false,
+      totalPages: totalPages,
+      hasNext: page < totalPages - 1,
+      hasPrevious: page > 0,
       sortBy: sortBy,
       sortDir: sortDir,
       filters: const {},
@@ -880,8 +1085,9 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<TrailJourney> journey(int trailId) async {
-    final trail = trailId == _activeTrail.id
-        ? _activeTrail
+    final activeTrail = _activeTrail;
+    final trail = activeTrail != null && trailId == activeTrail.id
+        ? activeTrail
         : _catalogTrails.firstWhere((trail) => trail.id == trailId);
     return (_journeyBuilder ?? _journey)(trail);
   }
@@ -1141,6 +1347,19 @@ Trail _trail({
     mediaLinks: const [],
     steps: const [],
     createdAt: DateTime(2026, 1, 1),
+  );
+}
+
+List<Trail> _catalogTrailSet(int count) {
+  return List.generate(
+    count,
+    (index) => _trail(
+      id: index + 2,
+      title: 'Trilha catalogo ${index + 1}',
+      summary: 'Resumo da trilha ${index + 1}.',
+      activeJourney: false,
+      generatedByAi: false,
+    ),
   );
 }
 

@@ -158,8 +158,22 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _adminSection = location.adminSection;
   }
 
+  ContentModuleSection _trailSectionForNavigation() {
+    final currentJourney = ref.read(currentJourneyTrailProvider);
+    if (currentJourney.hasValue && currentJourney.asData?.value == null) {
+      return ContentModuleSection.catalog;
+    }
+    return _trailSection;
+  }
+
   void _goTo(int index, {bool recordHistory = true}) {
     if (_selectedIndex == index) {
+      if (index == 1) {
+        final targetTrailSection = _trailSectionForNavigation();
+        if (_trailSection != targetTrailSection) {
+          setState(() => _trailSection = targetTrailSection);
+        }
+      }
       return;
     }
 
@@ -170,6 +184,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         _pushCurrentLocation();
       }
       _selectedIndex = index;
+      if (index == 1) {
+        _trailSection = _trailSectionForNavigation();
+      }
       if (index == _mirrorIndex) {
         _profileSection = ProfileModuleSection.evolutionMirror;
       }

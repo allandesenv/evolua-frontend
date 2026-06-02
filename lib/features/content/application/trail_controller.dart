@@ -20,6 +20,38 @@ final trailControllerProvider =
       TrailController.new,
     );
 
+final trailCatalogLoadMoreStateProvider =
+    NotifierProvider<TrailCatalogLoadMoreController, TrailCatalogLoadMoreState>(
+      TrailCatalogLoadMoreController.new,
+    );
+
+class TrailCatalogLoadMoreState {
+  const TrailCatalogLoadMoreState({
+    this.isLoadingMore = false,
+    this.loadMoreError = false,
+  });
+
+  final bool isLoadingMore;
+  final bool loadMoreError;
+}
+
+class TrailCatalogLoadMoreController extends Notifier<TrailCatalogLoadMoreState> {
+  @override
+  TrailCatalogLoadMoreState build() => const TrailCatalogLoadMoreState();
+
+  void loading() {
+    state = const TrailCatalogLoadMoreState(isLoadingMore: true);
+  }
+
+  void error() {
+    state = const TrailCatalogLoadMoreState(loadMoreError: true);
+  }
+
+  void reset() {
+    state = const TrailCatalogLoadMoreState();
+  }
+}
+
 final currentJourneyTrailProvider = FutureProvider<Trail?>((ref) async {
   return ref.watch(trailRepositoryProvider).currentJourney();
 });
@@ -127,10 +159,9 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
   }
 
   Future<void> refresh() async {
+    _resetLoadMoreState();
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () async => _fetch(page: state.asData?.value.page ?? 0),
-    );
+    state = await AsyncValue.guard(() async => _fetch(page: 0));
   }
 
   Future<void> applyFilters({
@@ -141,13 +172,41 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
     _search = search;
     _premium = premium;
     _category = category;
+    _resetLoadMoreState();
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async => _fetch(page: 0));
   }
 
   Future<void> goToPage(int page) async {
+    _resetLoadMoreState();
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async => _fetch(page: page));
+  }
+
+  Future<void> loadNextPage() async {
+    final current = state.asData?.value;
+    final loadMoreState = ref.read(trailCatalogLoadMoreStateProvider);
+    if (current == null ||
+        !current.hasNext ||
+        loadMoreState.isLoadingMore) {
+      return;
+    }
+
+    ref.read(trailCatalogLoadMoreStateProvider.notifier).loading();
+
+    try {
+      final next = await _fetch(page: current.page + 1);
+      final merged = <int, Trail>{
+        for (final trail in current.items) trail.id: trail,
+      };
+      for (final trail in next.items) {
+        merged.putIfAbsent(trail.id, () => trail);
+      }
+      state = AsyncData(next.copyWith(items: merged.values.toList()));
+      _resetLoadMoreState();
+    } catch (_) {
+      ref.read(trailCatalogLoadMoreStateProvider.notifier).error();
+    }
   }
 
   Future<void> create({
@@ -229,5 +288,9 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
           premium: _premium,
           category: _category,
         );
+  }
+
+  void _resetLoadMoreState() {
+    ref.read(trailCatalogLoadMoreStateProvider.notifier).reset();
   }
 }
