@@ -320,7 +320,7 @@ class AccessibilityPreferencesController
     if (ref.watch(authControllerProvider).asData?.value == null) {
       return repository.loadLocal();
     }
-    return repository.load();
+    return repository.loadLocal();
   }
 
   void updatePreferences(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/app/startup/startup_diagnostics.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
@@ -50,24 +51,37 @@ class AuthController extends AsyncNotifier<AuthSession?> {
   @override
   Future<AuthSession?> build() async {
     final storage = ref.watch(authSessionStorageProvider);
-    final session = await _readStoredSession(storage);
+    final session = await StartupDiagnostics.measure(
+      'auth local session read',
+      () => _readStoredSession(storage),
+    );
 
     if (session == null) {
+      StartupDiagnostics.mark('auth local session empty');
       return null;
     }
 
     if (!session.isExpired) {
+      StartupDiagnostics.mark('auth local session valid');
       return session;
     }
 
-    final future = _refreshStoredSession(session, updateState: false);
+    if (session.refreshToken == null || session.refreshToken!.isEmpty) {
+      await _clearSession();
+      StartupDiagnostics.mark('auth expired session without refresh token');
+      return null;
+    }
+
+    final future = _refreshStoredSession(session, updateState: true);
     _refreshInFlight = future;
     future.whenComplete(() {
       if (identical(_refreshInFlight, future)) {
         _refreshInFlight = null;
       }
     });
-    return future;
+    unawaited(future);
+    StartupDiagnostics.mark('auth expired session accepted locally');
+    return session;
   }
 
   Future<void> login({required String email, required String password}) async {
@@ -206,14 +220,26 @@ class AuthController extends AsyncNotifier<AuthSession?> {
       final refreshed = await ref
           .read(authRepositoryProvider)
           .refresh(refreshToken: refreshToken);
+      if (!ref.mounted) {
+        return refreshed;
+      }
       await _saveSession(refreshed);
+      if (!ref.mounted) {
+        return refreshed;
+      }
       if (updateState) {
         state = AsyncData(refreshed);
       }
       return refreshed;
     } catch (error) {
       if (_isInvalidRefreshFailure(error)) {
+        if (!ref.mounted) {
+          return null;
+        }
         await _clearSession();
+        if (!ref.mounted) {
+          return null;
+        }
         if (updateState) {
           state = const AsyncData(null);
         }
@@ -223,6 +249,9 @@ class AuthController extends AsyncNotifier<AuthSession?> {
         return null;
       }
 
+      if (!ref.mounted) {
+        return session;
+      }
       if (updateState && session != null) {
         state = AsyncData(session);
       }
@@ -240,7 +269,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
       final status = error.response?.statusCode;
       return status == 400 || status == 401 || status == 403;
     }
-    return true;
+    return false;
   }
 
   Future<AuthSession?> _readStoredSession(AuthSessionStorage storage) async {

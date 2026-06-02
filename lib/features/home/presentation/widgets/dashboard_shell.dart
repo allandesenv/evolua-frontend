@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:evolua_frontend/app/startup/app_startup_controller.dart';
+import 'package:evolua_frontend/app/startup/startup_diagnostics.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
@@ -7,7 +9,6 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
 import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
-import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
@@ -17,8 +18,6 @@ import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_q
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
-import 'package:evolua_frontend/features/social/application/community_controller.dart';
-import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/admin_panel_view.dart';
@@ -57,9 +56,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   String? _firstExperienceKey;
   bool _openingReminderCheckIn = false;
   ProviderSubscription<AsyncValue<String>>? _reminderTapSubscription;
-  ProviderSubscription<AsyncValue<CareShareState>>? _careShareSubscription;
   ProviderSubscription<int>? _carePrescriptionSubscription;
   ProviderSubscription<int>? _careRecommendationSubscription;
+  String? _startupWarmupUserId;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -87,10 +86,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           );
         });
       },
-    );
-    _careShareSubscription = ref.listenManual(
-      careShareControllerProvider,
-      (_, _) {},
     );
     _carePrescriptionSubscription = ref.listenManual<int>(
       carePrescriptionAppliedEventProvider,
@@ -127,7 +122,6 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void dispose() {
     _reminderTapSubscription?.close();
-    _careShareSubscription?.close();
     _carePrescriptionSubscription?.close();
     _careRecommendationSubscription?.close();
     super.dispose();
@@ -579,9 +573,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
   @override
   Widget build(BuildContext context) {
+    StartupDiagnostics.mark('home dashboard first build');
     final isCompact = ResponsiveBreakpoints.isCompact(context);
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
     final session = ref.watch(authControllerProvider).asData?.value;
+    _schedulePostLoginWarmup(session);
     final checkInState = ref.watch(checkInControllerProvider);
     final historyForFirstExperience = checkInState.asData?.value;
     final shouldFirstExperienceHandleCheckIn =
@@ -866,6 +862,23 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       ),
     );
   }
+
+  void _schedulePostLoginWarmup(AuthSession? session) {
+    if (session == null || _startupWarmupUserId == session.userId) {
+      return;
+    }
+    _startupWarmupUserId = session.userId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref
+          .read(appStartupControllerProvider)
+          .warmUpAfterFirstFrame(
+            ref.read(authControllerProvider).asData?.value,
+          );
+    });
+  }
 }
 
 class _DashboardLocation {
@@ -944,28 +957,25 @@ class _DashboardContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(currentProfileProvider);
     final session = ref.watch(authControllerProvider).asData?.value;
-    final currentSubscription = ref
-        .watch(subscriptionControllerProvider)
-        .asData
-        ?.value
-        .current;
-    final trailsCount =
-        ref.watch(trailControllerProvider).asData?.value.totalItems ?? 0;
-    final checkInsCount =
-        ref.watch(checkInControllerProvider).asData?.value.result.totalItems ??
-        0;
-    final postsCount =
-        ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
-    final communitiesCount =
-        ref
-            .watch(communityControllerProvider)
-            .asData
-            ?.value
-            .result
-            .totalItems ??
-        0;
+    final isHomeSelected = selectedIndex == 0;
+    final shouldReadProfile = selectedIndex == 3 || selectedIndex == 4;
+    final profile = shouldReadProfile
+        ? ref.watch(currentProfileProvider)
+        : null;
+    final currentSubscription = null;
+    final trailsCount = 0;
+    final checkInsCount = isHomeSelected
+        ? ref
+                  .watch(checkInControllerProvider)
+                  .asData
+                  ?.value
+                  .result
+                  .totalItems ??
+              0
+        : 0;
+    final postsCount = 0;
+    final communitiesCount = 0;
     final compact = ResponsiveBreakpoints.isCompact(context);
     final pageTitle = _pageTitleFor(context, selectedIndex);
     final preferences =
@@ -980,10 +990,11 @@ class _DashboardContent extends ConsumerWidget {
         checkInsCount: checkInsCount,
         postsCount: postsCount,
         communitiesCount: communitiesCount,
-        displayName: profile?.displayName,
+        displayName: profile?.displayName ?? session?.displayName,
         mentorPremiumPassActive:
             currentSubscription?.mentorPremiumPassActive ?? false,
         mentorPremiumPassEndsAt: currentSubscription?.mentorPremiumPassEndsAt,
+        deferSecondaryProviders: true,
         onOpenTrails: () => onNavigate(1),
         onOpenSuggestedTrail: onOpenSuggestedTrail,
         onOpenFeed: () => onOpenSpacesSection(SocialModuleTab.reflections),
