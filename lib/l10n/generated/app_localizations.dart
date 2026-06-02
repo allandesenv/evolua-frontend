@@ -640,6 +640,18 @@ abstract class AppLocalizations {
   /// **'Sair'**
   String get avatarLogout;
 
+  /// No description provided for @avatarSignatureCreatedBy.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Criado com cuidado pela Zenith IT'**
+  String get avatarSignatureCreatedBy;
+
+  /// No description provided for @avatarSignatureVersion.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Evolua v1.0.0'**
+  String get avatarSignatureVersion;
+
   /// No description provided for @languageSectionTitle.
   ///
   /// In pt_BR, this message translates to:

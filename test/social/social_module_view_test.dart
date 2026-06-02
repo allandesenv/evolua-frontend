@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
@@ -33,6 +35,26 @@ void main() {
       expect(find.text('Sair do espaço'), findsNothing);
       expect(find.text('PUBLIC'), findsNothing);
       expect(find.text('joined'), findsNothing);
+    });
+
+    testWidgets('renders spaces structure before communities finish loading', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final gate = Completer<PaginatedResponse<Community>>();
+      final communities = _FakeCommunityRepository(firstListGate: gate);
+
+      await tester.pumpWidget(_testApp(communities: communities));
+      await tester.pump();
+
+      expect(find.text('Espaços'), findsOneWidget);
+      expect(find.text('Buscar espaço'), findsOneWidget);
+      expect(find.text('Entrar'), findsNothing);
+
+      gate.complete(_response(_communities(), page: 0, size: 8));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entrar'), findsOneWidget);
     });
 
     testWidgets('joining a space uses the card primary action', (tester) async {
@@ -123,7 +145,11 @@ Widget _testApp({
 }
 
 class _FakeCommunityRepository implements CommunityRepository {
+  _FakeCommunityRepository({this.firstListGate});
+
   final joinedIds = <String>[];
+  final Completer<PaginatedResponse<Community>>? firstListGate;
+  var _listCalls = 0;
 
   @override
   Future<PaginatedResponse<Community>> list({
@@ -136,6 +162,10 @@ class _FakeCommunityRepository implements CommunityRepository {
     String? category,
     bool? joined,
   }) async {
+    _listCalls += 1;
+    if (_listCalls == 1 && firstListGate != null) {
+      return firstListGate!.future;
+    }
     final items = _communities()
         .where((community) => joined == null || community.joined == joined)
         .toList();

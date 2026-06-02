@@ -959,7 +959,13 @@ class _DashboardContent extends ConsumerWidget {
     final postsCount =
         ref.watch(socialPostControllerProvider).asData?.value.totalItems ?? 0;
     final communitiesCount =
-        ref.watch(communityControllerProvider).asData?.value.totalItems ?? 0;
+        ref
+            .watch(communityControllerProvider)
+            .asData
+            ?.value
+            .result
+            .totalItems ??
+        0;
     final compact = ResponsiveBreakpoints.isCompact(context);
     final pageTitle = _pageTitleFor(context, selectedIndex);
     final preferences =
@@ -1563,6 +1569,11 @@ class _AccountMenuButton extends StatelessWidget {
             label: l10n.avatarLogout,
           ),
         ),
+        const PopupMenuItem<_AccountMenuAction>(
+          enabled: false,
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: _AccountMenuSignature(),
+        ),
       ],
       onSelected: (value) {
         switch (value) {
@@ -1756,6 +1767,25 @@ class _MenuLabel extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Text(label)),
       ],
+    );
+  }
+}
+
+class _AccountMenuSignature extends StatelessWidget {
+  const _AccountMenuSignature();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.only(left: 36),
+      child: Text(
+        '${l10n.avatarSignatureCreatedBy}\n${l10n.avatarSignatureVersion}',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: context.evoluaColors.textSecondary.withValues(alpha: 0.72),
+          height: 1.35,
+        ),
+      ),
     );
   }
 }
