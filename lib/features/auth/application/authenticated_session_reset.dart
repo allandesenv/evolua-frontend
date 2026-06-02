@@ -64,6 +64,8 @@ void _invalidateAuthenticatedProviders(Ref ref) {
     ..invalidate(trailControllerProvider)
     ..invalidate(currentJourneyTrailProvider)
     ..invalidate(trailJourneyProvider)
+    ..invalidate(trailStepResponseProvider)
+    ..invalidate(trailStepResponsesProvider)
     ..invalidate(journeyChatControllerProvider)
     ..invalidate(dailyRitualControllerProvider)
     ..invalidate(futureMessageControllerProvider)
