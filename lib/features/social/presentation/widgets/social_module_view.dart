@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
@@ -307,9 +308,11 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
     final communitiesState = ref.watch(communityControllerProvider);
     final session = ref.watch(authControllerProvider).asData?.value;
     final canCreateCommunity = session?.isAdmin ?? false;
+    final communityCatalog = communitiesState.asData?.value;
+    final communityResult = communityCatalog?.result;
     final categories = <String>{
       'TODAS',
-      ...?communitiesState.asData?.value.items.map((item) => item.category),
+      ...?communityResult?.items.map((item) => item.category),
     }.toList();
 
     final selectedCommunity = _selectedCommunity;
@@ -330,9 +333,22 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
       );
     }
 
-    return communitiesState.when(
-      data: (result) => SocialCommunitiesArea(
-        result: result,
+    final loadingWithoutData =
+        communitiesState.isLoading && communityCatalog == null;
+    if (communityCatalog != null || loadingWithoutData) {
+      return SocialCommunitiesArea(
+        result:
+            communityResult ??
+            PaginatedResponse.empty(
+              page: 0,
+              size: CommunityController.pageSize,
+            ),
+        isInitialLoading: loadingWithoutData,
+        isRefreshing: communityCatalog?.isRefreshing ?? false,
+        isLoadingMore: communityCatalog?.isLoadingMore ?? false,
+        isFromCache: communityCatalog?.isFromCache ?? false,
+        loadMoreError: communityCatalog?.loadMoreError,
+        refreshError: communityCatalog?.refreshError,
         searchController: _communitySearchController,
         visibilityFilter: _communityVisibilityFilter,
         categoryFilter: _communityCategoryFilter,
@@ -353,6 +369,10 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
         },
         onPageChanged: (page) =>
             ref.read(communityControllerProvider.notifier).goToPage(page),
+        onLoadMore: () =>
+            ref.read(communityControllerProvider.notifier).loadNextPage(),
+        onRetryLoadMore: () =>
+            ref.read(communityControllerProvider.notifier).retryLoadMore(),
         onView: _openCommunityDetail,
         onJoin: (community) async {
           final currentContext = context;
@@ -375,12 +395,11 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
             'Encontre ambientes de troca para entrar, ler e compartilhar reflexões com mais contexto.',
         onRefresh: () =>
             ref.read(communityControllerProvider.notifier).refresh(),
-      ),
-      error: (error, stackTrace) => SocialActionableErrorState(
-        title: 'Não conseguimos abrir os espaços agora.',
-        onRetry: () => ref.read(communityControllerProvider.notifier).refresh(),
-      ),
-      loading: () => const SocialLoadingState(label: 'Carregando espaços...'),
+      );
+    }
+    return SocialActionableErrorState(
+      title: 'Não conseguimos abrir os espaços agora.',
+      onRetry: () => ref.read(communityControllerProvider.notifier).refresh(),
     );
   }
 }

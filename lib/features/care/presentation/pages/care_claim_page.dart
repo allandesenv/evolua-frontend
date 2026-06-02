@@ -32,9 +32,8 @@ class CareClaimPage extends ConsumerWidget {
           final padding = _pagePadding(constraints.maxWidth);
           return ColoredBox(
             color: context.evoluaColors.background,
-            child: SizedBox(
-              width: double.infinity,
-              height: double.infinity,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(

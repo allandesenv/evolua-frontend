@@ -228,6 +228,10 @@ void main() {
     expect(find.text('Ajuda e suporte'), findsOneWidget);
     expect(find.text('Tela e acessibilidade'), findsOneWidget);
     expect(find.text('Dar feedback'), findsOneWidget);
+    expect(
+      find.text('Criado com cuidado pela Zenith IT\nEvolua v1.0.0'),
+      findsOneWidget,
+    );
 
     final settingsTop = tester
         .getTopLeft(find.textContaining('privacidade'))
@@ -245,6 +249,16 @@ void main() {
 
     expect(plansTop, greaterThan(settingsTop));
     expect(mirrorTop, greaterThan(plansTop));
+
+    await tester.tap(
+      find.text('Criado com cuidado pela Zenith IT\nEvolua v1.0.0'),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Criado com cuidado pela Zenith IT\nEvolua v1.0.0'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

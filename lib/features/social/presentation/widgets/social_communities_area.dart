@@ -2,6 +2,7 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_shared_widgets.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
@@ -11,6 +12,12 @@ class SocialCommunitiesArea extends StatelessWidget {
   const SocialCommunitiesArea({
     super.key,
     required this.result,
+    required this.isInitialLoading,
+    required this.isRefreshing,
+    required this.isLoadingMore,
+    required this.isFromCache,
+    this.loadMoreError,
+    this.refreshError,
     required this.searchController,
     required this.visibilityFilter,
     required this.categoryFilter,
@@ -21,6 +28,8 @@ class SocialCommunitiesArea extends StatelessWidget {
     required this.onCategoryChanged,
     required this.onMembershipChanged,
     required this.onPageChanged,
+    required this.onLoadMore,
+    required this.onRetryLoadMore,
     required this.onView,
     required this.onJoin,
     required this.canCreate,
@@ -31,6 +40,12 @@ class SocialCommunitiesArea extends StatelessWidget {
   });
 
   final PaginatedResponse<Community> result;
+  final bool isInitialLoading;
+  final bool isRefreshing;
+  final bool isLoadingMore;
+  final bool isFromCache;
+  final Object? loadMoreError;
+  final Object? refreshError;
   final TextEditingController searchController;
   final String visibilityFilter;
   final String categoryFilter;
@@ -41,6 +56,8 @@ class SocialCommunitiesArea extends StatelessWidget {
   final ValueChanged<String> onCategoryChanged;
   final ValueChanged<String> onMembershipChanged;
   final ValueChanged<int> onPageChanged;
+  final VoidCallback onLoadMore;
+  final VoidCallback onRetryLoadMore;
   final ValueChanged<Community> onView;
   final Future<void> Function(Community community) onJoin;
   final bool canCreate;
@@ -51,129 +68,195 @@ class SocialCommunitiesArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        PrimaryPanel(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 560;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          color: AppColors.accent.withValues(alpha: 0.12),
-                          border: Border.all(
-                            color: AppColors.accent.withValues(alpha: 0.22),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.groups_rounded,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: compact
-                              ? constraints.maxWidth
-                              : constraints.maxWidth - 180,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, outerConstraints) {
+        final compactCatalog = outerConstraints.maxWidth < 680;
+        return NotificationListener<ScrollNotification>(
+          onNotification: (notification) =>
+              _handleScrollNotification(notification, compactCatalog),
+          child: Column(
+            children: [
+              PrimaryPanel(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 560;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text(
-                              headline,
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w800,
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: AppColors.accent.withValues(alpha: 0.12),
+                                border: Border.all(
+                                  color: AppColors.accent.withValues(
+                                    alpha: 0.22,
                                   ),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.groups_rounded,
+                                color: AppColors.accent,
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              description,
-                              style: Theme.of(context).textTheme.bodyMedium,
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: compact
+                                    ? constraints.maxWidth
+                                    : constraints.maxWidth - 180,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    headline,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    description,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
                             ),
+                            if (canCreate)
+                              OutlinedButton.icon(
+                                onPressed: onCreate,
+                                icon: const Icon(
+                                  Icons.add_circle_outline_rounded,
+                                ),
+                                label: const Text('Criar espaço'),
+                              ),
+                            if (onRefresh != null)
+                              OutlinedButton.icon(
+                                onPressed: isRefreshing ? null : onRefresh,
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: Text(
+                                  isRefreshing ? 'Atualizando...' : 'Atualizar',
+                                ),
+                              ),
                           ],
                         ),
-                      ),
-                      if (canCreate)
-                        OutlinedButton.icon(
-                          onPressed: onCreate,
-                          icon: const Icon(Icons.add_circle_outline_rounded),
-                          label: const Text('Criar espaço'),
+                        const SizedBox(height: 12),
+                        SocialMetaPill(
+                          label: _resultCountLabel(result.totalItems),
                         ),
-                      if (onRefresh != null)
-                        OutlinedButton.icon(
-                          onPressed: onRefresh,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Atualizar'),
+                        if (isRefreshing ||
+                            isFromCache ||
+                            refreshError != null) ...[
+                          const SizedBox(height: 12),
+                          _CommunityCatalogNotice(
+                            isRefreshing: isRefreshing,
+                            isFromCache: isFromCache,
+                            hasRefreshError: refreshError != null,
+                            onRefresh: onRefresh,
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: searchController,
+                          onChanged: onSearchChanged,
+                          decoration: const InputDecoration(
+                            labelText: 'Buscar espaço',
+                            hintText: 'Nome, descrição ou tema',
+                            prefixIcon: Icon(Icons.search_rounded),
+                          ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SocialMetaPill(label: _resultCountLabel(result.totalItems)),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: searchController,
-                    onChanged: onSearchChanged,
-                    decoration: const InputDecoration(
-                      labelText: 'Buscar espaço',
-                      hintText: 'Nome, descrição ou tema',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (result.items.isEmpty)
-          GuidedEmptyState(
-            icon: Icons.groups_rounded,
-            title: 'Nenhum espaço encontrado.',
-            subtitle:
-                'Tente buscar por outro tema ou volte mais tarde para descobrir novos espaços.',
-            actionLabel: 'Ver todos',
-            onAction: () {
-              searchController.clear();
-              onSearchChanged('');
-              onMembershipChanged('TODAS');
-              onVisibilityChanged('TODAS');
-              onCategoryChanged('TODAS');
-            },
-          )
-        else
-          Column(
-            children: [
-              ...result.items.map(
-                (community) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _CommunityCard(
-                    community: community,
-                    onView: () => onView(community),
-                    onJoin: () => onJoin(community),
-                  ),
+                      ],
+                    );
+                  },
                 ),
               ),
-              PaginationControls(
-                page: result.page,
-                totalPages: result.totalPages,
-                onPageChanged: onPageChanged,
-              ),
+              const SizedBox(height: 16),
+              if (isInitialLoading)
+                const FeedSkeleton(cards: 3)
+              else if (result.items.isEmpty)
+                GuidedEmptyState(
+                  icon: Icons.groups_rounded,
+                  title: 'Nenhum espaço encontrado.',
+                  subtitle:
+                      'Tente buscar por outro tema ou volte mais tarde para descobrir novos espaços.',
+                  actionLabel: 'Ver todos',
+                  onAction: () {
+                    searchController.clear();
+                    onSearchChanged('');
+                    onMembershipChanged('TODAS');
+                    onVisibilityChanged('TODAS');
+                    onCategoryChanged('TODAS');
+                  },
+                )
+              else
+                Column(
+                  children: [
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: result.items.length,
+                      itemBuilder: (context, index) {
+                        final community = result.items[index];
+                        return Padding(
+                          key: ValueKey(community.id),
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _CommunityCard(
+                            community: community,
+                            onView: () => onView(community),
+                            onJoin: () => onJoin(community),
+                          ),
+                        );
+                      },
+                    ),
+                    if (compactCatalog)
+                      _CommunityLoadMoreFooter(
+                        result: result,
+                        isLoadingMore: isLoadingMore,
+                        loadMoreError: loadMoreError,
+                        onRetry: onRetryLoadMore,
+                      )
+                    else
+                      PaginationControls(
+                        page: result.page,
+                        totalPages: result.totalPages,
+                        onPageChanged: onPageChanged,
+                      ),
+                  ],
+                ),
             ],
           ),
-      ],
+        );
+      },
     );
+  }
+
+  bool _handleScrollNotification(
+    ScrollNotification notification,
+    bool compactCatalog,
+  ) {
+    if (!compactCatalog ||
+        isInitialLoading ||
+        isLoadingMore ||
+        loadMoreError != null ||
+        !result.hasNext) {
+      return false;
+    }
+    if (notification.metrics.extentAfter < 480) {
+      onLoadMore();
+    }
+    return false;
   }
 
   String _resultCountLabel(int total) {
@@ -181,6 +264,122 @@ class SocialCommunitiesArea extends StatelessWidget {
       return '1 espaço disponível';
     }
     return '$total espaços disponíveis';
+  }
+}
+
+class _CommunityCatalogNotice extends StatelessWidget {
+  const _CommunityCatalogNotice({
+    required this.isRefreshing,
+    required this.isFromCache,
+    required this.hasRefreshError,
+    required this.onRefresh,
+  });
+
+  final bool isRefreshing;
+  final bool isFromCache;
+  final bool hasRefreshError;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = hasRefreshError
+        ? 'Não foi possível atualizar agora. Mostrando os espaços já carregados.'
+        : isRefreshing
+        ? 'Atualizando espaços em segundo plano...'
+        : isFromCache
+        ? 'Mostrando espaços já carregados.'
+        : '';
+    if (message.isEmpty) return const SizedBox.shrink();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            if (isRefreshing && !hasRefreshError)
+              const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(Icons.info_outline_rounded, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            if (hasRefreshError && onRefresh != null)
+              TextButton(
+                onPressed: onRefresh,
+                child: const Text('Tentar novamente'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommunityLoadMoreFooter extends StatelessWidget {
+  const _CommunityLoadMoreFooter({
+    required this.result,
+    required this.isLoadingMore,
+    required this.loadMoreError,
+    required this.onRetry,
+  });
+
+  final PaginatedResponse<Community> result;
+  final bool isLoadingMore;
+  final Object? loadMoreError;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loadMoreError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 12),
+        child: Column(
+          children: [
+            Text(
+              'Não foi possível carregar mais espaços.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 18),
+        child: SizedBox.square(
+          dimension: 22,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    if (!result.hasNext) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        child: Text(
+          'Você viu todos os espaços disponíveis.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
+      );
+    }
+    return const SizedBox(height: 16);
   }
 }
 
