@@ -1090,7 +1090,7 @@ class _JourneyTimelineNode extends StatelessWidget {
   }
 }
 
-class _JourneyStepDetailCard extends StatelessWidget {
+class _JourneyStepDetailCard extends ConsumerWidget {
   const _JourneyStepDetailCard({
     required this.trailId,
     required this.step,
@@ -1104,7 +1104,7 @@ class _JourneyStepDetailCard extends StatelessWidget {
   final bool isCompleted;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1166,7 +1166,165 @@ class _JourneyStepDetailCard extends StatelessWidget {
                   ).textTheme.bodyMedium?.copyWith(color: activeColor),
                 ),
           ),
+          if (_supportsStepResponse(step.type)) ...[
+            const SizedBox(height: 18),
+            _TrailStepResponseEditor(trailId: trailId, step: step),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _TrailStepResponseEditor extends ConsumerStatefulWidget {
+  const _TrailStepResponseEditor({required this.trailId, required this.step});
+
+  final int trailId;
+  final TrailJourneyStep step;
+
+  @override
+  ConsumerState<_TrailStepResponseEditor> createState() =>
+      _TrailStepResponseEditorState();
+}
+
+class _TrailStepResponseEditorState
+    extends ConsumerState<_TrailStepResponseEditor> {
+  final _controller = TextEditingController();
+  DateTime? _loadedUpdatedAt;
+  bool _isSaving = false;
+
+  TrailStepResponseKey get _key =>
+      (trailId: widget.trailId, stepIndex: widget.step.index);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) {
+      return;
+    }
+    setState(() => _isSaving = true);
+    try {
+      final saved = await ref
+          .read(trailJourneyActionProvider)
+          .saveStepResponse(
+            trailId: widget.trailId,
+            stepIndex: widget.step.index,
+            responseText: _controller.text,
+          );
+      _loadedUpdatedAt = saved.updatedAt;
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resposta salva no seu diário.')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível salvar sua resposta agora. Tente novamente em instantes.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final responseState = ref.watch(trailStepResponseProvider(_key));
+    final response = responseState.asData?.value;
+    if (response != null && response.updatedAt != _loadedUpdatedAt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _isSaving || response.updatedAt == _loadedUpdatedAt) {
+          return;
+        }
+        _loadedUpdatedAt = response.updatedAt;
+        _controller.text = response.responseText;
+      });
+    }
+
+    return Semantics(
+      container: true,
+      label: 'Sua resposta',
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.evoluaColors.surface.withValues(alpha: 0.64),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: context.evoluaColors.outline.withValues(alpha: 0.46),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sua resposta',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Escreva do seu jeito. Você poderá rever isso no seu diário.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+            if (responseState.isLoading) ...[
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(),
+            ],
+            if (responseState.hasError) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Não conseguimos carregar sua resposta agora, mas você ainda pode escrever e salvar normalmente.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              enabled: !_isSaving,
+              textCapitalization: TextCapitalization.sentences,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                hintText: 'Toque para responder ao exercício...',
+                alignLabelWithHint: true,
+                prefixIcon: Icon(Icons.edit_note_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: _isSaving ? null : _save,
+                icon: _isSaving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(_isSaving ? 'Salvando...' : 'Salvar resposta'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1993,6 +2151,13 @@ String _stepTypeLabel(String type) {
   };
 }
 
+bool _supportsStepResponse(String type) {
+  return switch (type.toUpperCase()) {
+    'EXERCISE' || 'REFLECTION' => true,
+    _ => false,
+  };
+}
+
 bool _isMentorPremiumTrail(Trail trail) {
   final category = trail.category.trim().toLowerCase();
   final sourceStyle = trail.sourceStyle?.trim().toLowerCase() ?? '';
@@ -2073,6 +2238,10 @@ class _JourneyStepSheetState extends State<_JourneyStepSheet> {
         child: Padding(
           padding: const EdgeInsets.all(22),
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+            ),
             child: _JourneyStepDetailCard(
               trailId: widget.journey.trail.id,
               step: step,

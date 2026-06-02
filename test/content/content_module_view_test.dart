@@ -13,6 +13,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey_s
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_progress.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/content_module_view.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
@@ -104,6 +105,146 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('exercise step response can be saved and edited', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua resposta'), findsOneWidget);
+      expect(find.text('Salvar resposta'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        'Eu começo querendo clareza.',
+      );
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(
+        trailRepository.savedResponses[(trailId: 1, stepIndex: 0)],
+        'Eu começo querendo clareza.',
+      );
+      expect(find.text('Resposta salva no seu diário.'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        'Depois eu costumo escolher uma ação pequena.',
+      );
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(
+        trailRepository.savedResponses[(trailId: 1, stepIndex: 0)],
+        'Depois eu costumo escolher uma ação pequena.',
+      );
+    });
+
+    testWidgets('save failure keeps typed step response visible', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(failSavingResponse: true);
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      final field = find.widgetWithText(
+        TextField,
+        'Toque para responder ao exercício...',
+      );
+      await tester.enterText(field, 'Texto que nao pode se perder.');
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Não foi possível salvar sua resposta agora. Tente novamente em instantes.',
+        ),
+        findsOneWidget,
+      );
+      final editableText = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editableText.controller.text, 'Texto que nao pode se perder.');
+    });
+
+    testWidgets('load failure keeps step response field editable', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(failLoadingResponse: true);
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua resposta'), findsOneWidget);
+      expect(
+        find.text(
+          'Não conseguimos carregar sua resposta agora, mas você ainda pode escrever e salvar normalmente.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        'Consigo responder mesmo assim.',
+      );
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(
+        trailRepository.savedResponses[(trailId: 1, stepIndex: 0)],
+        'Consigo responder mesmo assim.',
+      );
+    });
+
+    testWidgets('saved step response is loaded when returning to journey', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        initialResponses: {
+          (trailId: 1, stepIndex: 0): 'Resposta guardada no diario.',
+        },
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      final field = find.widgetWithText(
+        TextField,
+        'Toque para responder ao exercício...',
+      );
+      final editableText = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editableText.controller.text, 'Resposta guardada no diario.');
+    });
+
+    testWidgets('video step does not render editable response block', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        journeyBuilder: _videoJourney,
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua resposta'), findsNothing);
+      expect(find.text('Salvar resposta'), findsNothing);
     });
 
     testWidgets('premium filters send explicit premium values', (tester) async {
@@ -481,6 +622,10 @@ class _FakeTrailRepository implements TrailRepository {
     Trail? activeTrail,
     Trail? catalogTrail,
     List<Trail>? catalogTrails,
+    Map<({int trailId, int stepIndex}), String>? initialResponses,
+    TrailJourney Function(Trail trail)? journeyBuilder,
+    bool failLoadingResponse = false,
+    bool failSavingResponse = false,
   }) : _activeTrail =
            activeTrail ??
            _trail(
@@ -501,10 +646,18 @@ class _FakeTrailRepository implements TrailRepository {
                    activeJourney: false,
                    generatedByAi: false,
                  ),
-           ];
+           ],
+       savedResponses = Map.of(initialResponses ?? const {}),
+       _journeyBuilder = journeyBuilder,
+       _failLoadingResponse = failLoadingResponse,
+       _failSavingResponse = failSavingResponse;
 
   final Trail _activeTrail;
   final List<Trail> _catalogTrails;
+  final Map<({int trailId, int stepIndex}), String> savedResponses;
+  final TrailJourney Function(Trail trail)? _journeyBuilder;
+  final bool _failLoadingResponse;
+  final bool _failSavingResponse;
   int listCallCount = 0;
   String? lastSearch;
   bool? lastPremium;
@@ -559,7 +712,7 @@ class _FakeTrailRepository implements TrailRepository {
     final trail = trailId == _activeTrail.id
         ? _activeTrail
         : _catalogTrails.firstWhere((trail) => trail.id == trailId);
-    return _journey(trail);
+    return (_journeyBuilder ?? _journey)(trail);
   }
 
   @override
@@ -580,6 +733,49 @@ class _FakeTrailRepository implements TrailRepository {
     required int durationSeconds,
   }) async {
     return journey(trailId);
+  }
+
+  @override
+  Future<TrailStepResponse?> stepResponse({
+    required int trailId,
+    required int stepIndex,
+  }) async {
+    if (_failLoadingResponse) {
+      throw Exception('response unavailable');
+    }
+    final text = savedResponses[(trailId: trailId, stepIndex: stepIndex)];
+    if (text == null) {
+      return null;
+    }
+    return _stepResponse(trailId: trailId, stepIndex: stepIndex, text: text);
+  }
+
+  @override
+  Future<TrailStepResponse> saveStepResponse({
+    required int trailId,
+    required int stepIndex,
+    required String responseText,
+  }) async {
+    if (_failSavingResponse) {
+      throw Exception('save unavailable');
+    }
+    final text = responseText.trim();
+    savedResponses[(trailId: trailId, stepIndex: stepIndex)] = text;
+    return _stepResponse(trailId: trailId, stepIndex: stepIndex, text: text);
+  }
+
+  @override
+  Future<List<TrailStepResponse>> listStepResponses({int limit = 20}) async {
+    return savedResponses.entries
+        .take(limit)
+        .map(
+          (entry) => _stepResponse(
+            trailId: entry.key.trailId,
+            stepIndex: entry.key.stepIndex,
+            text: entry.value,
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -810,5 +1006,53 @@ TrailJourney _journey(Trail trail) {
     ),
     progressPercent: 0,
     nextStep: steps.first,
+  );
+}
+
+TrailJourney _videoJourney(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Assistir',
+      summary: 'Uma prática em vídeo.',
+      content: 'Assista ao vídeo com calma.',
+      type: 'VIDEO',
+      status: 'current',
+      estimatedMinutes: 5,
+      mediaLinks: [],
+    ),
+  ];
+
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 0,
+      completedStepIndexes: const [],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      completedAt: null,
+    ),
+    progressPercent: 0,
+    nextStep: steps.first,
+  );
+}
+
+TrailStepResponse _stepResponse({
+  required int trailId,
+  required int stepIndex,
+  required String text,
+}) {
+  final now = DateTime(2026, 1, 2, 9);
+  return TrailStepResponse(
+    id: stepIndex + 1,
+    trailId: trailId,
+    journeyKey: 'clareza',
+    stepIndex: stepIndex,
+    stepTitle: stepIndex == 0 ? 'Respirar' : 'Escolher',
+    stepType: stepIndex == 0 ? 'EXERCISE' : 'REFLECTION',
+    responseText: text,
+    createdAt: now,
+    updatedAt: now,
   );
 }
