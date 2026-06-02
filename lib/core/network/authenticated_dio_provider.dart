@@ -29,7 +29,15 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
+        if (!ref.mounted) {
+          handler.next(options);
+          return;
+        }
         final preferences = await ref.read(sharedPreferencesProvider.future);
+        if (!ref.mounted) {
+          handler.next(options);
+          return;
+        }
         options.headers['Accept-Language'] = _aiLanguageTag(
           preferences.getString(_localePreferenceStorageKey),
         );
@@ -51,9 +59,17 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
 
         final original = error.requestOptions;
         final originalAuthorization = _authorizationHeader(original);
+        if (!ref.mounted) {
+          handler.next(error);
+          return;
+        }
         final refreshed = await ref
             .read(authControllerProvider.notifier)
             .refreshSession();
+        if (!ref.mounted) {
+          handler.next(error);
+          return;
+        }
         final refreshedAuthorization = refreshed?.accessToken == null
             ? null
             : 'Bearer ${refreshed!.accessToken}';

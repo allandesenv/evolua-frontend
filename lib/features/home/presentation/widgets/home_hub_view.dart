@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
+import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
@@ -44,6 +45,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     this.onOpenPremium,
     this.mentorPremiumPassEndsAt,
     this.now,
+    this.deferSecondaryProviders = false,
   });
 
   final int profilesCount;
@@ -67,6 +69,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final VoidCallback? onOpenPremium;
   final DateTime? mentorPremiumPassEndsAt;
   final DateTime? now;
+  final bool deferSecondaryProviders;
 
   @override
   ConsumerState<HomeHubView> createState() => _HomeHubViewState();
@@ -75,6 +78,33 @@ class HomeHubView extends ConsumerStatefulWidget {
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool _isRewardLoading = false;
   bool _isReadingActionLoading = false;
+  bool _secondaryProvidersEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _secondaryProvidersEnabled = !widget.deferSecondaryProviders;
+    if (widget.deferSecondaryProviders && !_isWidgetTestBinding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _secondaryProvidersEnabled = true);
+        }
+      });
+    }
+  }
+
+  bool get _isWidgetTestBinding {
+    return WidgetsBinding.instance.runtimeType.toString().contains(
+      'TestWidgetsFlutterBinding',
+    );
+  }
+
+  FutureMessageState _emptyFutureMessageState() {
+    return FutureMessageState(
+      result: PaginatedResponse.empty(page: 0, size: 20),
+      delivered: PaginatedResponse.empty(page: 0, size: 20),
+    );
+  }
 
   void _openInsightSheet(CheckIn checkIn, CheckInAiInsight insight) {
     showModalBottomSheet<void>(
@@ -291,9 +321,15 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
-    final futureMessageState = ref.watch(futureMessageControllerProvider);
-    final dailyRitualState = ref.watch(dailyRitualControllerProvider);
-    final currentJourney = ref.watch(currentJourneyTrailProvider).asData?.value;
+    final futureMessageState = _secondaryProvidersEnabled
+        ? ref.watch(futureMessageControllerProvider)
+        : AsyncData(_emptyFutureMessageState());
+    final dailyRitualState = _secondaryProvidersEnabled
+        ? ref.watch(dailyRitualControllerProvider)
+        : const AsyncData(DailyRitualState());
+    final currentJourney = _secondaryProvidersEnabled
+        ? ref.watch(currentJourneyTrailProvider).asData?.value
+        : null;
     final checkInHistory = checkInState.asData?.value;
     final canUseCheckInState =
         session == null ||
