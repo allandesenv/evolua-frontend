@@ -9,6 +9,13 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
+import 'package:evolua_frontend/features/content/application/trail_controller.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
+import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
@@ -187,6 +194,10 @@ void main() {
       await container.read(dailyCheckInReminderControllerProvider.future);
       await container.read(settingsPrivacyPreferencesControllerProvider.future);
       await container.read(accessibilityPreferencesControllerProvider.future);
+      await container.read(trailStepResponsesProvider.future);
+      await container.read(
+        trailStepResponseProvider((trailId: 1, stepIndex: 0)).future,
+      );
       observer.disposedProviders.clear();
 
       await container.read(authControllerProvider.notifier).logout();
@@ -199,6 +210,8 @@ void main() {
           dailyCheckInReminderControllerProvider,
           settingsPrivacyPreferencesControllerProvider,
           accessibilityPreferencesControllerProvider,
+          trailStepResponsesProvider,
+          trailStepResponseProvider((trailId: 1, stepIndex: 0)),
         ]),
       );
     },
@@ -257,6 +270,7 @@ ProviderContainer _container(
       authRepositoryProvider.overrideWithValue(authRepository),
       profileRepositoryProvider.overrideWithValue(profileRepository),
       checkInRepositoryProvider.overrideWithValue(checkInRepository),
+      trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
       ).overrideWithValue(_fakeUserDio()),
@@ -308,6 +322,113 @@ class _FakeAuthRepository implements AuthRepository {
     required String token,
     required String newPassword,
   }) async {}
+}
+
+class _FakeTrailRepository implements TrailRepository {
+  @override
+  Future<Trail?> currentJourney() async => null;
+
+  @override
+  Future<TrailJourney> journey(int trailId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailJourney> startJourney(int trailId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailJourney> completeStep(int trailId, int stepIndex) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailJourney> updateVideoProgress({
+    required int trailId,
+    required int stepIndex,
+    required int watchedSeconds,
+    required int durationSeconds,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailStepResponse?> stepResponse({
+    required int trailId,
+    required int stepIndex,
+  }) async {
+    return TrailStepResponse(
+      id: 1,
+      trailId: trailId,
+      journeyKey: 'teste',
+      stepIndex: stepIndex,
+      stepTitle: 'Etapa',
+      stepType: 'EXERCISE',
+      responseText: 'Resposta',
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+    );
+  }
+
+  @override
+  Future<TrailStepResponse> saveStepResponse({
+    required int trailId,
+    required int stepIndex,
+    required String responseText,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<TrailStepResponse>> listStepResponses({int limit = 20}) async {
+    return const [];
+  }
+
+  @override
+  Future<PaginatedResponse<Trail>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? category,
+    bool? premium,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Trail> create({
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<Trail> update({
+    required int id,
+    required String title,
+    required String summary,
+    required String content,
+    required String category,
+    required bool premium,
+    required List<TrailMediaLink> mediaLinks,
+    required List<TrailStep> steps,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> delete(int id) {
+    throw UnimplementedError();
+  }
 }
 
 final class _DisposedProviderObserver extends ProviderObserver {
