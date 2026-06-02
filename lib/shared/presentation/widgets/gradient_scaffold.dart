@@ -17,38 +17,48 @@ class GradientScaffold extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.background,
-              colors.backgroundSecondary,
-              isDark ? const Color(0xFF0F1828) : colors.surfaceStrong,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomCenter,
+      backgroundColor: colors.background,
+      body: ColoredBox(
+        color: colors.background,
+        child: SizedBox.expand(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colors.background,
+                  colors.backgroundSecondary,
+                  isDark ? const Color(0xFF0F1828) : colors.surfaceStrong,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: -140,
+                  left: -60,
+                  child: _GlowOrb(
+                    color: colors.accent.withValues(
+                      alpha: isDark ? 0.12 : 0.1,
+                    ),
+                    size: 300,
+                  ),
+                ),
+                Positioned(
+                  bottom: -120,
+                  right: -40,
+                  child: _GlowOrb(
+                    color: colors.accentWarm.withValues(
+                      alpha: isDark ? 0.1 : 0.08,
+                    ),
+                    size: 260,
+                  ),
+                ),
+                SafeArea(child: child),
+              ],
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -140,
-              left: -60,
-              child: _GlowOrb(
-                color: colors.accent.withValues(alpha: isDark ? 0.12 : 0.1),
-                size: 300,
-              ),
-            ),
-            Positioned(
-              bottom: -120,
-              right: -40,
-              child: _GlowOrb(
-                color: colors.accentWarm.withValues(alpha: isDark ? 0.1 : 0.08),
-                size: 260,
-              ),
-            ),
-            SafeArea(child: child),
-          ],
         ),
       ),
     );

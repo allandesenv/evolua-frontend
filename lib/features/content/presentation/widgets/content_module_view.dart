@@ -53,6 +53,7 @@ class ContentModuleView extends ConsumerStatefulWidget {
 
 class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   final _searchController = TextEditingController();
+  final _catalogScrollController = ScrollController();
   static const _minimumSearchLength = 4;
   static const _searchDebounceDuration = Duration(milliseconds: 450);
   Timer? _searchDebounce;
@@ -61,15 +62,41 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   Trail? _selectedCatalogTrail;
   late ContentModuleSection _section;
   int? _openingInitialTrailId;
+  bool _catalogIsCompact = false;
 
   @override
   void initState() {
     super.initState();
     _section = widget.section;
+    _catalogScrollController.addListener(_handleCatalogScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openInitialTrailIfNeeded();
     });
+  }
+
+  @override
+  void dispose() {
+    _catalogScrollController
+      ..removeListener(_handleCatalogScroll)
+      ..dispose();
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleCatalogScroll() {
+    if (!mounted ||
+        _section != ContentModuleSection.catalog ||
+        _selectedCatalogTrail != null ||
+        !_catalogIsCompact ||
+        !_catalogScrollController.hasClients) {
+      return;
+    }
+    final position = _catalogScrollController.position;
+    if (position.extentAfter < 420) {
+      ref.read(trailControllerProvider.notifier).loadNextPage();
+    }
   }
 
   @override
@@ -124,13 +151,6 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
       _openingInitialTrailId = null;
       widget.onInitialTrailConsumed?.call();
     }
-  }
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
   }
 
   Future<void> _applyFilters({String? searchOverride}) {
@@ -195,9 +215,16 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   }
 
   void _selectSection(ContentModuleSection section) {
+    final currentJourney = ref.read(currentJourneyTrailProvider);
+    final targetSection =
+        section == ContentModuleSection.journey &&
+            currentJourney.hasValue &&
+            currentJourney.asData?.value == null
+        ? ContentModuleSection.catalog
+        : section;
     setState(() {
-      _section = section;
-      if (section == ContentModuleSection.catalog) {
+      _section = targetSection;
+      if (targetSection == ContentModuleSection.catalog) {
         _selectedCatalogTrail = null;
       }
     });
@@ -214,18 +241,35 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         .asData
         ?.value
         .current;
+    final loadMoreState = ref.watch(trailCatalogLoadMoreStateProvider);
     final hasPremiumAccess =
         (session?.isPremium ?? false) ||
         (profile?.premium ?? false) ||
         (currentSubscription?.premium ?? false);
 
     return LayoutBuilder(
-      builder: (context, _) {
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 720;
+        _catalogIsCompact = compact;
         final currentTrail = currentJourney.asData?.value;
+        final hasNoActiveJourney =
+            currentJourney.hasValue && currentTrail == null;
+        final effectiveSection =
+            _section == ContentModuleSection.journey && hasNoActiveJourney
+            ? ContentModuleSection.catalog
+            : _section;
+        if (effectiveSection != _section) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _section == ContentModuleSection.journey) {
+              setState(() => _section = effectiveSection);
+            }
+          });
+        }
         final showingActiveJourney =
-            currentTrail != null && _section == ContentModuleSection.journey;
+            currentTrail != null &&
+            effectiveSection == ContentModuleSection.journey;
         final showingCatalogJourney =
-            _section == ContentModuleSection.catalog &&
+            effectiveSection == ContentModuleSection.catalog &&
             _selectedCatalogTrail != null;
 
         final Widget body = switch ((
@@ -250,46 +294,59 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
             onOpenMentor: widget.onOpenMentor,
           ),
           (false, _)
-              when _section == ContentModuleSection.journey &&
+              when effectiveSection == ContentModuleSection.journey &&
                   currentJourney.isLoading =>
             const PanelSkeleton(rows: 4, tileHeight: 92),
           (false, _)
-              when _section == ContentModuleSection.journey &&
+              when effectiveSection == ContentModuleSection.journey &&
                   currentJourney.hasValue =>
             _EmptyJourneyPanel(
               onOpenCatalog: () => _selectSection(ContentModuleSection.catalog),
             ),
-          _ => SingleChildScrollView(
-            child: Column(
-              children: [
-                trailsState.when(
-                  data: (result) => _TrailExplorer(
-                    result: result,
-                    hasPremiumAccess: hasPremiumAccess,
-                    searchController: _searchController,
-                    premiumFilter: _premiumFilter,
-                    searchHelperText: _searchHelperText,
-                    onSearchChanged: _handleSearchChanged,
-                    onPremiumFilterChanged: _handlePremiumFilterChanged,
-                    onClearFilters: _clearCatalogFilters,
-                    onOpenTrail: (trail) => setState(() {
-                      _section = ContentModuleSection.catalog;
-                      _selectedCatalogTrail = trail;
-                    }),
-                    onOpenPremium: widget.onOpenPremium,
-                    onPageChanged: (page) {
-                      _searchDebounce?.cancel();
-                      setState(() => _selectedCatalogTrail = null);
-                      ref.read(trailControllerProvider.notifier).goToPage(page);
-                    },
+          _ => RefreshIndicator(
+            onRefresh: () =>
+                ref.read(trailControllerProvider.notifier).refresh(),
+            child: SingleChildScrollView(
+              controller: compact ? _catalogScrollController : null,
+              physics: compact ? const AlwaysScrollableScrollPhysics() : null,
+              child: Column(
+                children: [
+                  trailsState.when(
+                    data: (result) => _TrailExplorer(
+                      result: result,
+                      hasPremiumAccess: hasPremiumAccess,
+                      searchController: _searchController,
+                      premiumFilter: _premiumFilter,
+                      searchHelperText: _searchHelperText,
+                      showPagination: !compact,
+                      loadMoreState: loadMoreState,
+                      onSearchChanged: _handleSearchChanged,
+                      onPremiumFilterChanged: _handlePremiumFilterChanged,
+                      onClearFilters: _clearCatalogFilters,
+                      onOpenTrail: (trail) => setState(() {
+                        _section = ContentModuleSection.catalog;
+                        _selectedCatalogTrail = trail;
+                      }),
+                      onOpenPremium: widget.onOpenPremium,
+                      onPageChanged: (page) {
+                        _searchDebounce?.cancel();
+                        setState(() => _selectedCatalogTrail = null);
+                        ref
+                            .read(trailControllerProvider.notifier)
+                            .goToPage(page);
+                      },
+                      onLoadMoreRetry: () => ref
+                          .read(trailControllerProvider.notifier)
+                          .loadNextPage(),
+                    ),
+                    error: (error, stackTrace) => _ContentErrorState(
+                      onRetry: () =>
+                          ref.read(trailControllerProvider.notifier).refresh(),
+                    ),
+                    loading: () => const _ContentLoadingState(),
                   ),
-                  error: (error, stackTrace) => _ContentErrorState(
-                    onRetry: () =>
-                        ref.read(trailControllerProvider.notifier).refresh(),
-                  ),
-                  loading: () => const _ContentLoadingState(),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         };
@@ -298,7 +355,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
           children: [
             if (widget.showSectionChips) ...[
               _ContentSectionSwitcher(
-                selected: _section,
+                selected: effectiveSection,
                 hasActiveJourney: currentTrail != null,
                 onSelected: _selectSection,
               ),
@@ -1225,7 +1282,7 @@ class _TrailStepResponseEditorState
             trailId: widget.trailId,
             stepIndex: widget.step.index,
             responseText: _controller.text,
-      );
+          );
       _loadedUpdatedAt = saved.updatedAt;
       await _clearDraft();
       if (!mounted) {
@@ -2434,6 +2491,9 @@ class _TrailExplorer extends ConsumerWidget {
     required this.onOpenTrail,
     required this.onOpenPremium,
     required this.onPageChanged,
+    required this.showPagination,
+    required this.loadMoreState,
+    required this.onLoadMoreRetry,
   });
 
   final PaginatedResponse<Trail> result;
@@ -2447,6 +2507,9 @@ class _TrailExplorer extends ConsumerWidget {
   final ValueChanged<Trail> onOpenTrail;
   final VoidCallback? onOpenPremium;
   final ValueChanged<int> onPageChanged;
+  final bool showPagination;
+  final TrailCatalogLoadMoreState loadMoreState;
+  final VoidCallback onLoadMoreRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2670,11 +2733,18 @@ class _TrailExplorer extends ConsumerWidget {
                   ),
                 );
               }),
-              PaginationControls(
-                page: result.page,
-                totalPages: result.totalPages,
-                onPageChanged: onPageChanged,
-              ),
+              if (showPagination)
+                PaginationControls(
+                  page: result.page,
+                  totalPages: result.totalPages,
+                  onPageChanged: onPageChanged,
+                )
+              else
+                _InfiniteTrailFooter(
+                  result: result,
+                  state: loadMoreState,
+                  onRetry: onLoadMoreRetry,
+                ),
             ],
           ),
       ],
@@ -2763,6 +2833,69 @@ class _TrailExplorer extends ConsumerWidget {
         },
       ),
     );
+  }
+}
+
+class _InfiniteTrailFooter extends StatelessWidget {
+  const _InfiniteTrailFooter({
+    required this.result,
+    required this.state,
+    required this.onRetry,
+  });
+
+  final PaginatedResponse<Trail> result;
+  final TrailCatalogLoadMoreState state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 18),
+        child: SizedBox.square(
+          dimension: 24,
+          child: CircularProgressIndicator(strokeWidth: 2.4),
+        ),
+      );
+    }
+
+    if (state.loadMoreError) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 20),
+        child: Column(
+          children: [
+            Text(
+              'Não foi possível carregar mais trilhas.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.evoluaColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!result.hasNext) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 20),
+        child: Text(
+          'Você viu todas as trilhas disponíveis.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: context.evoluaColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox(height: 24);
   }
 }
 

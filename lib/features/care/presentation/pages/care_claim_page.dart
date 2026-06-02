@@ -31,15 +31,22 @@ class CareClaimPage extends ConsumerWidget {
           final padding = _pagePadding(constraints.maxWidth);
           return ColoredBox(
             color: context.evoluaColors.background,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1180),
-                child: Padding(
-                  padding: padding,
-                  child: state.when(
-                    loading: () => const _CareClaimLoading(),
-                    error: (error, _) => _CareClaimError(error: error),
-                    data: (value) => _CareDashboard(state: value),
+            child: SizedBox(
+              width: double.infinity,
+              height: double.infinity,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 1180,
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Padding(
+                    padding: padding,
+                    child: state.when(
+                      loading: () => const _CareClaimLoading(),
+                      error: (error, _) => _CareClaimError(error: error),
+                      data: (value) => _CareDashboard(state: value),
+                    ),
                   ),
                 ),
               ),
@@ -94,34 +101,52 @@ class _CareDashboardState extends ConsumerState<_CareDashboard>
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: EdgeInsets.only(bottom: bottomInset + 20),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _CareClaimHeader(state: widget.state),
-          const SizedBox(height: 20),
-          _ClinicalSummaryPanel(report: widget.state.report),
-          const SizedBox(height: 20),
-          _ResponsivePair(
-            primary: _MoodChartPanel(checkIns: widget.state.report.checkIns),
-            secondary: _AttentionPointsPanel(report: widget.state.report),
-          ),
-          const SizedBox(height: 20),
-          _ResponsivePair(
-            primary: _InsightPanel(report: widget.state.report),
-            secondary: _RitualAdherencePanel(
-              rituals: widget.state.report.rituals,
+    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final safeBottom = bottomInset > 0 ? bottomInset : bottomPadding;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ColoredBox(
+          color: context.evoluaColors.background,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: EdgeInsets.only(bottom: safeBottom + 24),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _CareClaimHeader(state: widget.state),
+                  const SizedBox(height: 20),
+                  _ClinicalSummaryPanel(report: widget.state.report),
+                  const SizedBox(height: 20),
+                  _ResponsivePair(
+                    primary: _MoodChartPanel(
+                      checkIns: widget.state.report.checkIns,
+                    ),
+                    secondary: _AttentionPointsPanel(report: widget.state.report),
+                  ),
+                  const SizedBox(height: 20),
+                  _ResponsivePair(
+                    primary: _InsightPanel(report: widget.state.report),
+                    secondary: _RitualAdherencePanel(
+                      rituals: widget.state.report.rituals,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _PrescriptionPanel(
+                    isSending: widget.state.isSendingPrescription,
+                  ),
+                  const SizedBox(height: 20),
+                  _RecommendationPanel(
+                    isSending: widget.state.isSendingRecommendation,
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 20),
-          _PrescriptionPanel(isSending: widget.state.isSendingPrescription),
-          const SizedBox(height: 20),
-          _RecommendationPanel(isSending: widget.state.isSendingRecommendation),
-        ],
-      ),
+        );
+      },
     );
   }
 }
