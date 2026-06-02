@@ -130,6 +130,43 @@ void main() {
     }
   });
 
+  testWidgets('keeps dark background after native keyboard dismiss', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          careClaimControllerProvider.overrideWith(
+            () => _FakeCareClaimController(_claimState()),
+          ),
+        ],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final microActionField = find.byType(TextField).at(2);
+    tester.view.viewInsets = FakeViewPadding(bottom: 320);
+    await tester.ensureVisible(microActionField);
+    await tester.tap(microActionField);
+    await tester.enterText(microActionField, 'respirar antes de mensagens');
+    await tester.pump(const Duration(milliseconds: 320));
+
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 160));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('respirar antes de mensagens'), findsOneWidget);
+    expect(find.text('Prescrever ritual personalizado'), findsOneWidget);
+    expect(find.byType(CareClaimPage), findsOneWidget);
+  });
+
   testWidgets('valid attachment appears and can be removed', (tester) async {
     final picker = _installFakeFilePicker();
 

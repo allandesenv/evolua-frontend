@@ -301,6 +301,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get avatarLogout => 'Sign out';
 
   @override
+  String get avatarSignatureCreatedBy => 'Created with care by Zenith IT';
+
+  @override
+  String get avatarSignatureVersion => 'Evolua v1.0.0';
+
+  @override
   String get languageSectionTitle => 'Language';
 
   @override
@@ -1278,6 +1284,12 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get avatarLogout => 'Sign out';
+
+  @override
+  String get avatarSignatureCreatedBy => 'Created with care by Zenith IT';
+
+  @override
+  String get avatarSignatureVersion => 'Evolua v1.0.0';
 
   @override
   String get languageSectionTitle => 'Language';

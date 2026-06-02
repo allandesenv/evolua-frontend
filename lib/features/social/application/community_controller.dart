@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
@@ -12,23 +14,119 @@ final communityRepositoryProvider = Provider<CommunityRepository>((ref) {
 });
 
 final communityControllerProvider =
-    AsyncNotifierProvider<CommunityController, PaginatedResponse<Community>>(CommunityController.new);
+    AsyncNotifierProvider<CommunityController, CommunityCatalogState>(
+      CommunityController.new,
+    );
 
-class CommunityController extends AsyncNotifier<PaginatedResponse<Community>> {
-  static const _pageSize = 8;
+class CommunityCatalogState {
+  const CommunityCatalogState({
+    required this.result,
+    this.isRefreshing = false,
+    this.isLoadingMore = false,
+    this.isFromCache = false,
+    this.loadMoreError,
+    this.refreshError,
+  });
+
+  final PaginatedResponse<Community> result;
+  final bool isRefreshing;
+  final bool isLoadingMore;
+  final bool isFromCache;
+  final Object? loadMoreError;
+  final Object? refreshError;
+
+  bool get hasItems => result.items.isNotEmpty;
+
+  CommunityCatalogState copyWith({
+    PaginatedResponse<Community>? result,
+    bool? isRefreshing,
+    bool? isLoadingMore,
+    bool? isFromCache,
+    Object? loadMoreError,
+    bool clearLoadMoreError = false,
+    Object? refreshError,
+    bool clearRefreshError = false,
+  }) {
+    return CommunityCatalogState(
+      result: result ?? this.result,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isFromCache: isFromCache ?? this.isFromCache,
+      loadMoreError: clearLoadMoreError
+          ? null
+          : loadMoreError ?? this.loadMoreError,
+      refreshError: clearRefreshError
+          ? null
+          : refreshError ?? this.refreshError,
+    );
+  }
+
+  factory CommunityCatalogState.initial() {
+    return CommunityCatalogState(
+      result: PaginatedResponse.empty(
+        page: 0,
+        size: CommunityController.pageSize,
+      ),
+    );
+  }
+}
+
+class CommunityController extends AsyncNotifier<CommunityCatalogState> {
+  static const pageSize = 8;
   String? _search;
   String? _visibility;
   String? _category;
   bool? _joined;
+  CommunityCatalogState? _lastState;
 
   @override
-  Future<PaginatedResponse<Community>> build() async {
-    return _fetch(page: 0);
+  Future<CommunityCatalogState> build() async {
+    final cached = _lastState;
+    if (cached != null) {
+      unawaited(_refreshInBackground());
+      return cached.copyWith(isFromCache: true, clearRefreshError: true);
+    }
+    final result = await _fetch(page: 0);
+    final next = CommunityCatalogState(result: result);
+    _lastState = next;
+    return next;
   }
 
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: state.asData?.value.page ?? 0));
+    final current = state.asData?.value;
+    if (current == null || !current.hasItems) {
+      state = const AsyncLoading();
+      state = await AsyncValue.guard(() async {
+        final result = await _fetch(page: current?.result.page ?? 0);
+        final next = CommunityCatalogState(result: result);
+        _lastState = next;
+        return next;
+      });
+      return;
+    }
+
+    state = AsyncData(
+      current.copyWith(
+        isRefreshing: true,
+        clearRefreshError: true,
+        clearLoadMoreError: true,
+      ),
+    );
+    try {
+      final result = await _fetch(page: current.result.page);
+      final next = current.copyWith(
+        result: result,
+        isRefreshing: false,
+        isFromCache: false,
+        clearRefreshError: true,
+      );
+      _lastState = next;
+      state = AsyncData(next);
+    } catch (error) {
+      final next = current.copyWith(isRefreshing: false, refreshError: error);
+      _lastState = next;
+      state = AsyncData(next);
+    }
   }
 
   Future<void> applyFilters({
@@ -37,17 +135,133 @@ class CommunityController extends AsyncNotifier<PaginatedResponse<Community>> {
     String? category,
     bool? joined,
   }) async {
-    _search = search;
+    final trimmedSearch = search?.trim();
+    final normalizedSearch = trimmedSearch == null || trimmedSearch.isEmpty
+        ? null
+        : trimmedSearch;
+    if (_search == normalizedSearch &&
+        _visibility == visibility &&
+        _category == category &&
+        _joined == joined) {
+      return;
+    }
+    _search = normalizedSearch;
     _visibility = visibility;
     _category = category;
     _joined = joined;
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: 0));
+    final current = state.asData?.value;
+    if (current == null || !current.hasItems) {
+      state = const AsyncLoading();
+      state = await AsyncValue.guard(() async {
+        final result = await _fetch(page: 0);
+        final next = CommunityCatalogState(result: result);
+        _lastState = next;
+        return next;
+      });
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(
+        isRefreshing: true,
+        clearRefreshError: true,
+        clearLoadMoreError: true,
+      ),
+    );
+    try {
+      final result = await _fetch(page: 0);
+      final next = CommunityCatalogState(result: result);
+      _lastState = next;
+      state = AsyncData(next);
+    } catch (error) {
+      final next = current.copyWith(isRefreshing: false, refreshError: error);
+      _lastState = next;
+      state = AsyncData(next);
+    }
   }
 
   Future<void> goToPage(int page) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: page));
+    final current = state.asData?.value;
+    if (current == null || !current.hasItems) {
+      state = const AsyncLoading();
+      state = await AsyncValue.guard(() async {
+        final result = await _fetch(page: page);
+        final next = CommunityCatalogState(result: result);
+        _lastState = next;
+        return next;
+      });
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(isRefreshing: true, clearRefreshError: true),
+    );
+    try {
+      final result = await _fetch(page: page);
+      final next = CommunityCatalogState(result: result);
+      _lastState = next;
+      state = AsyncData(next);
+    } catch (error) {
+      final next = current.copyWith(isRefreshing: false, refreshError: error);
+      _lastState = next;
+      state = AsyncData(next);
+    }
+  }
+
+  Future<void> loadNextPage() async {
+    final current = state.asData?.value;
+    if (current == null ||
+        current.isLoadingMore ||
+        current.isRefreshing ||
+        !current.result.hasNext) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(isLoadingMore: true, clearLoadMoreError: true),
+    );
+    try {
+      final nextPage = await _fetch(page: current.result.page + 1);
+      final itemsById = <String, Community>{
+        for (final item in current.result.items) item.id: item,
+      };
+      for (final item in nextPage.items) {
+        itemsById[item.id] = item;
+      }
+      final merged = nextPage.copyWith(items: itemsById.values.toList());
+      final next = current.copyWith(
+        result: merged,
+        isLoadingMore: false,
+        isFromCache: false,
+        clearLoadMoreError: true,
+      );
+      _lastState = next;
+      state = AsyncData(next);
+    } catch (error) {
+      final next = current.copyWith(isLoadingMore: false, loadMoreError: error);
+      _lastState = next;
+      state = AsyncData(next);
+    }
+  }
+
+  Future<void> retryLoadMore() => loadNextPage();
+
+  Future<void> _refreshInBackground() async {
+    final current = state.asData?.value ?? _lastState;
+    if (current == null || current.isRefreshing) return;
+    state = AsyncData(current.copyWith(isRefreshing: true));
+    try {
+      final result = await _fetch(page: current.result.page);
+      final next = current.copyWith(
+        result: result,
+        isRefreshing: false,
+        isFromCache: false,
+        clearRefreshError: true,
+      );
+      _lastState = next;
+      state = AsyncData(next);
+    } catch (error) {
+      final next = current.copyWith(isRefreshing: false, refreshError: error);
+      _lastState = next;
+      state = AsyncData(next);
+    }
   }
 
   Future<void> create({
@@ -58,7 +272,13 @@ class CommunityController extends AsyncNotifier<PaginatedResponse<Community>> {
     required String category,
   }) async {
     final repository = ref.read(communityRepositoryProvider);
-    state = const AsyncLoading();
+    final current = state.asData?.value;
+    state = AsyncData(
+      (current ?? CommunityCatalogState.initial()).copyWith(
+        isRefreshing: true,
+        clearRefreshError: true,
+      ),
+    );
     state = await AsyncValue.guard(() async {
       await repository.create(
         name: name,
@@ -67,32 +287,55 @@ class CommunityController extends AsyncNotifier<PaginatedResponse<Community>> {
         visibility: visibility,
         category: category,
       );
-      return _fetch(page: 0);
+      final result = await _fetch(page: 0);
+      final next = CommunityCatalogState(result: result);
+      _lastState = next;
+      return next;
     });
   }
 
   Future<void> join(String id) async {
     final repository = ref.read(communityRepositoryProvider);
-    state = const AsyncLoading();
+    final current = state.asData?.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(isRefreshing: true));
+    } else {
+      state = const AsyncLoading();
+    }
     state = await AsyncValue.guard(() async {
       await repository.join(id);
-      return _fetch(page: state.asData?.value.page ?? 0);
+      final page = current?.result.page ?? 0;
+      final result = await _fetch(page: page);
+      final next = CommunityCatalogState(result: result);
+      _lastState = next;
+      return next;
     });
   }
 
   Future<void> leave(String id) async {
     final repository = ref.read(communityRepositoryProvider);
-    state = const AsyncLoading();
+    final current = state.asData?.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(isRefreshing: true));
+    } else {
+      state = const AsyncLoading();
+    }
     state = await AsyncValue.guard(() async {
       await repository.leave(id);
-      return _fetch(page: state.asData?.value.page ?? 0);
+      final page = current?.result.page ?? 0;
+      final result = await _fetch(page: page);
+      final next = CommunityCatalogState(result: result);
+      _lastState = next;
+      return next;
     });
   }
 
   Future<PaginatedResponse<Community>> _fetch({required int page}) {
-    return ref.read(communityRepositoryProvider).list(
+    return ref
+        .read(communityRepositoryProvider)
+        .list(
           page: page,
-          size: _pageSize,
+          size: pageSize,
           search: _search,
           visibility: _visibility,
           category: _category,

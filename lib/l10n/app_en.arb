@@ -90,6 +90,8 @@
   "avatarPlans": "Plans and subscriptions",
   "avatarEvolutionMirror": "Evolution Mirror",
   "avatarLogout": "Sign out",
+  "avatarSignatureCreatedBy": "Created with care by Zenith IT",
+  "avatarSignatureVersion": "Evolua v1.0.0",
   "languageSectionTitle": "Language",
   "languageSectionSubtitle": "Choose how Evolua should appear to you.",
   "languagePortuguese": "Português (Brasil)",
