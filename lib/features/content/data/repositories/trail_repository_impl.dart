@@ -4,10 +4,12 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/network/pagination_query.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_journey_dto.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
+import 'package:evolua_frontend/features/content/data/models/trail_step_response_dto.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 
 class TrailRepositoryImpl implements TrailRepository {
@@ -212,5 +214,48 @@ class TrailRepositoryImpl implements TrailRepository {
     return TrailJourneyDto.fromJson(
       ApiPayloadParser.dataMap(response.data),
     ).toEntity();
+  }
+
+  @override
+  Future<TrailStepResponse?> stepResponse({
+    required int trailId,
+    required int stepIndex,
+  }) async {
+    final response = await _dio.get<dynamic>(
+      '/v1/trails/$trailId/journey/steps/$stepIndex/response',
+    );
+    final raw = response.data;
+    if (raw is Map<String, dynamic> && raw['data'] == null) {
+      return null;
+    }
+    return TrailStepResponseDto.fromJson(
+      ApiPayloadParser.dataMap(raw),
+    ).toEntity();
+  }
+
+  @override
+  Future<TrailStepResponse> saveStepResponse({
+    required int trailId,
+    required int stepIndex,
+    required String responseText,
+  }) async {
+    final response = await _dio.put<dynamic>(
+      '/v1/trails/$trailId/journey/steps/$stepIndex/response',
+      data: {'responseText': responseText},
+    );
+    return TrailStepResponseDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<List<TrailStepResponse>> listStepResponses({int limit = 20}) async {
+    final response = await _dio.get<dynamic>(
+      '/v1/trails/step-responses',
+      queryParameters: {'limit': limit},
+    );
+    return ApiPayloadParser.dataList(
+      response.data,
+    ).map((item) => TrailStepResponseDto.fromJson(item).toEntity()).toList();
   }
 }

@@ -3,6 +3,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 
 abstract class TrailRepository {
   Future<PaginatedResponse<Trail>> list({
@@ -52,4 +53,17 @@ abstract class TrailRepository {
     required int watchedSeconds,
     required int durationSeconds,
   });
+
+  Future<TrailStepResponse?> stepResponse({
+    required int trailId,
+    required int stepIndex,
+  });
+
+  Future<TrailStepResponse> saveStepResponse({
+    required int trailId,
+    required int stepIndex,
+    required String responseText,
+  });
+
+  Future<List<TrailStepResponse>> listStepResponses({int limit = 20});
 }

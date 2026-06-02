@@ -7,6 +7,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/journey_chat_repository.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/content/presentation/widgets/mentor_evolua_module_view.dart';
@@ -374,6 +375,28 @@ class _FakeTrailRepository implements TrailRepository {
     required int durationSeconds,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<TrailStepResponse?> stepResponse({
+    required int trailId,
+    required int stepIndex,
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<TrailStepResponse> saveStepResponse({
+    required int trailId,
+    required int stepIndex,
+    required String responseText,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<TrailStepResponse>> listStepResponses({int limit = 20}) async {
+    return const [];
   }
 
   @override
