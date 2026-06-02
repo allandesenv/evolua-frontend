@@ -1190,14 +1190,25 @@ class _TrailStepResponseEditor extends ConsumerStatefulWidget {
 class _TrailStepResponseEditorState
     extends ConsumerState<_TrailStepResponseEditor> {
   final _controller = TextEditingController();
+  Timer? _draftSaveTimer;
   DateTime? _loadedUpdatedAt;
+  bool _draftLoaded = false;
   bool _isSaving = false;
 
   TrailStepResponseKey get _key =>
       (trailId: widget.trailId, stepIndex: widget.step.index);
 
+  String? get _draftKey {
+    final userId = ref.read(authControllerProvider).asData?.value?.userId;
+    if (userId == null || userId.trim().isEmpty) {
+      return null;
+    }
+    return 'trail_step_response_draft:$userId:${widget.trailId}:${widget.step.index}';
+  }
+
   @override
   void dispose() {
+    _draftSaveTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -1214,8 +1225,9 @@ class _TrailStepResponseEditorState
             trailId: widget.trailId,
             stepIndex: widget.step.index,
             responseText: _controller.text,
-          );
+      );
       _loadedUpdatedAt = saved.updatedAt;
+      await _clearDraft();
       if (!mounted) {
         return;
       }
@@ -1240,6 +1252,49 @@ class _TrailStepResponseEditorState
     }
   }
 
+  Future<void> _loadDraftIfNeeded() async {
+    if (_draftLoaded || _controller.text.isNotEmpty) {
+      return;
+    }
+    _draftLoaded = true;
+    final key = _draftKey;
+    if (key == null) {
+      return;
+    }
+    final preferences = await ref.read(sharedPreferencesProvider.future);
+    final draft = preferences.getString(key);
+    if (!mounted || draft == null || _controller.text.isNotEmpty) {
+      return;
+    }
+    _controller.text = draft;
+  }
+
+  void _scheduleDraftSave(String value) {
+    _draftSaveTimer?.cancel();
+    final key = _draftKey;
+    if (key == null) {
+      return;
+    }
+    _draftSaveTimer = Timer(const Duration(milliseconds: 350), () async {
+      final preferences = await ref.read(sharedPreferencesProvider.future);
+      if (value.trim().isEmpty) {
+        await preferences.remove(key);
+      } else {
+        await preferences.setString(key, value);
+      }
+    });
+  }
+
+  Future<void> _clearDraft() async {
+    _draftSaveTimer?.cancel();
+    final key = _draftKey;
+    if (key == null) {
+      return;
+    }
+    final preferences = await ref.read(sharedPreferencesProvider.future);
+    await preferences.remove(key);
+  }
+
   @override
   Widget build(BuildContext context) {
     final responseState = ref.watch(trailStepResponseProvider(_key));
@@ -1250,7 +1305,17 @@ class _TrailStepResponseEditorState
           return;
         }
         _loadedUpdatedAt = response.updatedAt;
+        _draftLoaded = true;
         _controller.text = response.responseText;
+        unawaited(_clearDraft());
+      });
+    } else if (!_draftLoaded &&
+        (responseState.hasError ||
+            (responseState.hasValue && response == null))) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_loadDraftIfNeeded());
+        }
       });
     }
 
@@ -1300,6 +1365,7 @@ class _TrailStepResponseEditorState
             TextField(
               controller: _controller,
               enabled: !_isSaving,
+              onChanged: _scheduleDraftSave,
               textCapitalization: TextCapitalization.sentences,
               minLines: 3,
               maxLines: 6,

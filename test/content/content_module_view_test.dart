@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:evolua_frontend/core/network/paginated_response.dart';
@@ -6,6 +7,8 @@ import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -209,6 +212,102 @@ void main() {
       );
     });
 
+    testWidgets('double tapping save sends only one step response request', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final saveGate = Completer<void>();
+      final trailRepository = _FakeTrailRepository(saveGate: saveGate);
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        'Uma resposta com rede lenta.',
+      );
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pump();
+
+      expect(trailRepository.saveStepResponseCallCount, 1);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      saveGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(
+        trailRepository.savedResponses[(trailId: 1, stepIndex: 0)],
+        'Uma resposta com rede lenta.',
+      );
+    });
+
+    testWidgets('local draft is loaded and cleared after confirmed save', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      const draftKey = 'trail_step_response_draft:user-1:1:0';
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(
+        _testApp(
+          trailRepository: trailRepository,
+          initialPreferences: const {draftKey: 'Rascunho local guardado.'},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final field = find.widgetWithText(
+        TextField,
+        'Toque para responder ao exercício...',
+      );
+      var editableText = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editableText.controller.text, 'Rascunho local guardado.');
+
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString(draftKey), isNull);
+      expect(
+        trailRepository.savedResponses[(trailId: 1, stepIndex: 0)],
+        'Rascunho local guardado.',
+      );
+    });
+
+    testWidgets('server response prevails over local draft', (tester) async {
+      await _setCompactSurface(tester);
+      const draftKey = 'trail_step_response_draft:user-1:1:0';
+
+      await tester.pumpWidget(
+        _testApp(
+          trailRepository: _FakeTrailRepository(
+            initialResponses: {
+              (trailId: 1, stepIndex: 0): 'Resposta salva no servidor.',
+            },
+          ),
+          initialPreferences: const {draftKey: 'Rascunho antigo.'},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final field = find.widgetWithText(
+        TextField,
+        'Toque para responder ao exercício...',
+      );
+      final editableText = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editableText.controller.text, 'Resposta salva no servidor.');
+
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString(draftKey), isNull);
+    });
+
     testWidgets('saved step response is loaded when returning to journey', (
       tester,
     ) async {
@@ -232,12 +331,59 @@ void main() {
       expect(editableText.controller.text, 'Resposta guardada no diario.');
     });
 
+    testWidgets('journey advances without requiring a step response', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.textContaining('Fazer'));
+      await tester.tap(find.textContaining('Fazer'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.completeStepCallCount, 1);
+      expect(trailRepository.savedResponses, isEmpty);
+    });
+
     testWidgets('video step does not render editable response block', (
       tester,
     ) async {
       await _setCompactSurface(tester);
       final trailRepository = _FakeTrailRepository(
         journeyBuilder: _videoJourney,
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua resposta'), findsNothing);
+      expect(find.text('Salvar resposta'), findsNothing);
+    });
+
+    testWidgets('audio step does not render editable response block', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        journeyBuilder: _audioJourney,
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sua resposta'), findsNothing);
+      expect(find.text('Salvar resposta'), findsNothing);
+    });
+
+    testWidgets('reading step does not render editable response block', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        journeyBuilder: _readingJourney,
       );
 
       await tester.pumpWidget(_testApp(trailRepository: trailRepository));
@@ -587,11 +733,15 @@ Widget _testApp({
   SubscriptionRepository? subscriptionRepository,
   RewardedAdService? rewardedAdService,
   VoidCallback? onOpenPremium,
+  Map<String, Object> initialPreferences = const {},
 }) {
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues(initialPreferences);
 
   return ProviderScope(
     overrides: [
+      authControllerProvider.overrideWith(
+        () => _FakeAuthController(userId: 'user-1'),
+      ),
       trailRepositoryProvider.overrideWithValue(
         trailRepository ?? _FakeTrailRepository(),
       ),
@@ -617,6 +767,22 @@ Widget _testApp({
   );
 }
 
+class _FakeAuthController extends AuthController {
+  _FakeAuthController({required this.userId});
+
+  final String userId;
+
+  @override
+  Future<AuthSession?> build() async {
+    return AuthSession(
+      userId: userId,
+      email: '$userId@evolua.test',
+      roles: const ['ROLE_USER'],
+      accessToken: 'test-token',
+    );
+  }
+}
+
 class _FakeTrailRepository implements TrailRepository {
   _FakeTrailRepository({
     Trail? activeTrail,
@@ -626,6 +792,7 @@ class _FakeTrailRepository implements TrailRepository {
     TrailJourney Function(Trail trail)? journeyBuilder,
     bool failLoadingResponse = false,
     bool failSavingResponse = false,
+    Completer<void>? saveGate,
   }) : _activeTrail =
            activeTrail ??
            _trail(
@@ -650,7 +817,8 @@ class _FakeTrailRepository implements TrailRepository {
        savedResponses = Map.of(initialResponses ?? const {}),
        _journeyBuilder = journeyBuilder,
        _failLoadingResponse = failLoadingResponse,
-       _failSavingResponse = failSavingResponse;
+       _failSavingResponse = failSavingResponse,
+       _saveGate = saveGate;
 
   final Trail _activeTrail;
   final List<Trail> _catalogTrails;
@@ -658,7 +826,10 @@ class _FakeTrailRepository implements TrailRepository {
   final TrailJourney Function(Trail trail)? _journeyBuilder;
   final bool _failLoadingResponse;
   final bool _failSavingResponse;
+  final Completer<void>? _saveGate;
   int listCallCount = 0;
+  int completeStepCallCount = 0;
+  int saveStepResponseCallCount = 0;
   String? lastSearch;
   bool? lastPremium;
 
@@ -722,6 +893,7 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<TrailJourney> completeStep(int trailId, int stepIndex) async {
+    completeStepCallCount++;
     return journey(trailId);
   }
 
@@ -756,6 +928,8 @@ class _FakeTrailRepository implements TrailRepository {
     required int stepIndex,
     required String responseText,
   }) async {
+    saveStepResponseCallCount++;
+    await _saveGate?.future;
     if (_failSavingResponse) {
       throw Exception('save unavailable');
     }
@@ -1017,6 +1191,64 @@ TrailJourney _videoJourney(Trail trail) {
       summary: 'Uma prática em vídeo.',
       content: 'Assista ao vídeo com calma.',
       type: 'VIDEO',
+      status: 'current',
+      estimatedMinutes: 5,
+      mediaLinks: [],
+    ),
+  ];
+
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 0,
+      completedStepIndexes: const [],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      completedAt: null,
+    ),
+    progressPercent: 0,
+    nextStep: steps.first,
+  );
+}
+
+TrailJourney _audioJourney(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Ouvir',
+      summary: 'Uma prática em áudio.',
+      content: 'Ouça a orientação com calma.',
+      type: 'AUDIO',
+      status: 'current',
+      estimatedMinutes: 5,
+      mediaLinks: [],
+    ),
+  ];
+
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 0,
+      completedStepIndexes: const [],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      completedAt: null,
+    ),
+    progressPercent: 0,
+    nextStep: steps.first,
+  );
+}
+
+TrailJourney _readingJourney(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Ler',
+      summary: 'Uma leitura breve.',
+      content: 'Leia o conteúdo com calma.',
+      type: 'READING',
       status: 'current',
       estimatedMinutes: 5,
       mediaLinks: [],
