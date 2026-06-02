@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:evolua_frontend/features/care/application/care_claim_controller.dart';
 import 'package:evolua_frontend/features/care/presentation/pages/care_claim_page.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +62,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.resetViewInsets);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -89,12 +94,241 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('orientacao de teste'), findsOneWidget);
   });
+
+  testWidgets('keeps prescription fields visible with keyboard insets', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          careClaimControllerProvider.overrideWith(
+            () => _FakeCareClaimController(_claimState()),
+          ),
+        ],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.view.viewInsets = FakeViewPadding(bottom: 320);
+    await tester.pump(const Duration(milliseconds: 320));
+
+    final fields = find.byType(TextField);
+    for (var index = 0; index < 3; index++) {
+      final field = fields.at(index);
+      await tester.ensureVisible(field);
+      await tester.tap(field);
+      await tester.enterText(field, 'texto de teste $index');
+      await tester.pump(const Duration(milliseconds: 360));
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('texto de teste $index'), findsOneWidget);
+    }
+  });
+
+  testWidgets('valid attachment appears and can be removed', (tester) async {
+    final picker = _installFakeFilePicker();
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    picker.nextResult = FilePickerResult([
+      PlatformFile(
+        name: 'plano.pdf',
+        size: 128,
+        bytes: Uint8List.fromList(List.filled(128, 1)),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          careClaimControllerProvider.overrideWith(
+            () => _FakeCareClaimController(_claimState()),
+          ),
+        ],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Adicionar anexos'));
+    await tester.tap(find.text('Adicionar anexos'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('plano.pdf'), findsOneWidget);
+    expect(find.textContaining('Aguardando envio'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remover anexo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('plano.pdf'), findsNothing);
+  });
+
+  testWidgets('invalid attachments show friendly messages and are not listed', (
+    tester,
+  ) async {
+    final picker = _installFakeFilePicker();
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          careClaimControllerProvider.overrideWith(
+            () => _FakeCareClaimController(_claimState()),
+          ),
+        ],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    picker.nextResult = FilePickerResult([
+      PlatformFile(
+        name: 'notas.txt',
+        size: 10,
+        bytes: Uint8List.fromList(List.filled(10, 1)),
+      ),
+    ]);
+    await tester.ensureVisible(find.text('Adicionar anexos'));
+    await tester.tap(find.text('Adicionar anexos'));
+    await tester.pump();
+
+    expect(
+      find.text('Formato não suportado. Envie uma imagem ou PDF.'),
+      findsOneWidget,
+    );
+    expect(find.text('notas.txt'), findsNothing);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    picker.nextResult = FilePickerResult([
+      PlatformFile(
+        name: 'foto.png',
+        size: 10 * 1024 * 1024 + 1,
+        bytes: Uint8List(1),
+      ),
+    ]);
+    await tester.ensureVisible(find.text('Adicionar anexos'));
+    await tester.tap(find.text('Adicionar anexos'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('foto.png'), findsNothing);
+  });
+
+  testWidgets('attachment submit shows loading and blocks duplicate submit', (
+    tester,
+  ) async {
+    final picker = _installFakeFilePicker();
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final gate = Completer<void>();
+    final controller = _FakeCareClaimController(
+      _claimState(),
+      recommendationGate: gate,
+    );
+    picker.nextResult = FilePickerResult([
+      PlatformFile(
+        name: 'orientacao.pdf',
+        size: 256,
+        bytes: Uint8List.fromList(List.filled(256, 2)),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [careClaimControllerProvider.overrideWith(() => controller)],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Adicionar anexos'));
+    await tester.tap(find.text('Adicionar anexos'));
+    await tester.pumpAndSettle();
+    final submitButton = find.textContaining('Enviar orient');
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.tap(submitButton);
+    await tester.pump();
+
+    expect(controller.recommendationCalls, 1);
+    expect(find.textContaining('Enviando...'), findsWidgets);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(controller.recommendationCalls, 1);
+    expect(find.text('orientacao.pdf'), findsNothing);
+  });
+
+  testWidgets('attachment failure preserves text and retry state', (
+    tester,
+  ) async {
+    final picker = _installFakeFilePicker();
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final controller = _FakeCareClaimController(
+      _claimState(),
+      failRecommendation: true,
+    );
+    picker.nextResult = FilePickerResult([
+      PlatformFile(
+        name: 'relatorio.webp',
+        size: 64,
+        bytes: Uint8List.fromList(List.filled(64, 3)),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [careClaimControllerProvider.overrideWith(() => controller)],
+        child: const MaterialApp(home: CareClaimPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Adicionar anexos'));
+    await tester.tap(find.text('Adicionar anexos'));
+    await tester.pumpAndSettle();
+
+    final guidanceField = find.byType(TextField).last;
+    await tester.ensureVisible(guidanceField);
+    await tester.enterText(guidanceField, 'orientacao mantida');
+    final submitButton = find.textContaining('Enviar orient');
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(controller.recommendationCalls, 1);
+    expect(find.text('orientacao mantida'), findsOneWidget);
+    expect(find.text('relatorio.webp'), findsOneWidget);
+    expect(find.textContaining('Falha no envio'), findsOneWidget);
+    expect(find.text('Tentar novamente'), findsOneWidget);
+  });
 }
 
 class _FakeCareClaimController extends CareClaimController {
-  _FakeCareClaimController(this._state);
+  _FakeCareClaimController(
+    this._state, {
+    this.failRecommendation = false,
+    this.recommendationGate,
+  });
 
   final CareClaimState _state;
+  final bool failRecommendation;
+  final Completer<void>? recommendationGate;
+  int recommendationCalls = 0;
 
   @override
   Future<CareClaimState> build() async => _state;
@@ -107,6 +341,46 @@ class _FakeCareClaimController extends CareClaimController {
     required String intention,
     required String microAction,
   }) async {}
+
+  @override
+  Future<void> sendRecommendation({
+    required String guidanceText,
+    required List<PlatformFile> attachments,
+  }) async {
+    recommendationCalls += 1;
+    await recommendationGate?.future;
+    if (failRecommendation) {
+      throw Exception('upload failed');
+    }
+  }
+}
+
+_FakeFilePicker _installFakeFilePicker() {
+  final picker = _FakeFilePicker();
+  FilePicker.platform = picker;
+  return picker;
+}
+
+class _FakeFilePicker extends FilePicker {
+  FilePickerResult? nextResult;
+
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = false,
+    int compressionQuality = 0,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async {
+    return nextResult;
+  }
 }
 
 CareClaimState _claimState() {

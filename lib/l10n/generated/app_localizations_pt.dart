@@ -409,7 +409,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get homeIntelligentReadingEyebrow => 'O que isso significa?';
 
   @override
-  String get homeIntelligentReadingTitle => 'Leitura inteligente';
+  String get homeIntelligentReadingTitle => 'Olhar do Evolua';
 
   @override
   String get homeIntelligentReadingEmpty =>
@@ -543,14 +543,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get checkInSemanticLabel => 'Check-in do dia';
 
   @override
-  String get checkInEyebrow => 'Como estou?';
+  String get checkInEyebrow => '';
 
   @override
-  String get checkInPromptTitle => 'Comece pelo seu estado agora';
+  String get checkInPromptTitle => 'Como você está se sentindo agora?';
 
   @override
   String get checkInPromptSubtitle =>
-      'Um check-in curto já dá contexto para o seu registro breve do dia.';
+      'Escolha a opção que mais combina com este momento.';
 
   @override
   String get checkInMoreStatesTooltip => 'Ver mais estados';
@@ -1394,7 +1394,7 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get homeIntelligentReadingEyebrow => 'O que isso significa?';
 
   @override
-  String get homeIntelligentReadingTitle => 'Leitura inteligente';
+  String get homeIntelligentReadingTitle => 'Olhar do Evolua';
 
   @override
   String get homeIntelligentReadingEmpty =>
@@ -1528,14 +1528,14 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   String get checkInSemanticLabel => 'Check-in do dia';
 
   @override
-  String get checkInEyebrow => 'Como estou?';
+  String get checkInEyebrow => '';
 
   @override
-  String get checkInPromptTitle => 'Comece pelo seu estado agora';
+  String get checkInPromptTitle => 'Como você está se sentindo agora?';
 
   @override
   String get checkInPromptSubtitle =>
-      'Um check-in curto já dá contexto para o seu registro breve do dia.';
+      'Escolha a opção que mais combina com este momento.';
 
   @override
   String get checkInMoreStatesTooltip => 'Ver mais estados';
