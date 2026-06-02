@@ -6,6 +6,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,6 +29,24 @@ final trailJourneyProvider = FutureProvider.family<TrailJourney, int>((
   trailId,
 ) async {
   return ref.watch(trailRepositoryProvider).journey(trailId);
+});
+
+typedef TrailStepResponseKey = ({int trailId, int stepIndex});
+
+final trailStepResponseProvider =
+    FutureProvider.family<TrailStepResponse?, TrailStepResponseKey>((
+      ref,
+      key,
+    ) async {
+      return ref
+          .watch(trailRepositoryProvider)
+          .stepResponse(trailId: key.trailId, stepIndex: key.stepIndex);
+    });
+
+final trailStepResponsesProvider = FutureProvider<List<TrailStepResponse>>((
+  ref,
+) async {
+  return ref.watch(trailRepositoryProvider).listStepResponses();
 });
 
 final trailJourneyActionProvider = Provider<TrailJourneyActions>((ref) {
@@ -74,6 +93,25 @@ class TrailJourneyActions {
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
     return journey;
+  }
+
+  Future<TrailStepResponse> saveStepResponse({
+    required int trailId,
+    required int stepIndex,
+    required String responseText,
+  }) async {
+    final response = await _ref
+        .read(trailRepositoryProvider)
+        .saveStepResponse(
+          trailId: trailId,
+          stepIndex: stepIndex,
+          responseText: responseText,
+        );
+    _ref.invalidate(
+      trailStepResponseProvider((trailId: trailId, stepIndex: stepIndex)),
+    );
+    _ref.invalidate(trailStepResponsesProvider);
+    return response;
   }
 }
 
