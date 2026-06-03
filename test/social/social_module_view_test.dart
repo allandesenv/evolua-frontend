@@ -107,6 +107,128 @@ void main() {
         'Hoje percebi que respirar mudou meu ritmo.',
       );
     });
+
+    testWidgets(
+      'compact spaces auto-loads paginated items from parent scroll',
+      (tester) async {
+        await _setCompactSurface(tester);
+        final communities = _FakeCommunityRepository(
+          pages: {
+            0: _response(
+              _manyCommunities(start: 1, count: 8),
+              page: 0,
+              size: 8,
+              totalItems: 24,
+              totalPages: 3,
+              hasNext: true,
+            ),
+            1: _response(
+              _manyCommunities(start: 9, count: 8),
+              page: 1,
+              size: 8,
+              totalItems: 24,
+              totalPages: 3,
+              hasNext: true,
+            ),
+            2: _response(
+              _manyCommunities(start: 17, count: 8),
+              page: 2,
+              size: 8,
+              totalItems: 24,
+              totalPages: 3,
+            ),
+          },
+        );
+
+        await tester.pumpWidget(_testApp(communities: communities));
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('24'), findsOneWidget);
+        expect(find.text('Space 01'), findsOneWidget);
+        expect(find.text('Space 09'), findsNothing);
+
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(0, -2200),
+        );
+        await tester.pumpAndSettle();
+
+        expect(communities.requestedPages, containsAllInOrder([0, 1]));
+        expect(find.text('Space 09'), findsOneWidget);
+
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(0, -3200),
+        );
+        await tester.pumpAndSettle();
+
+        expect(communities.requestedPages, containsAllInOrder([0, 1, 2]));
+        expect(find.text('Space 24'), findsOneWidget);
+        expect(find.textContaining('todos os'), findsOneWidget);
+      },
+    );
+
+    testWidgets('compact spaces ignores repeated scrolls while loading more', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final nextPageGate = Completer<PaginatedResponse<Community>>();
+      final communities = _FakeCommunityRepository(
+        nextPageGate: nextPageGate,
+        pages: {
+          0: _response(
+            _manyCommunities(start: 1, count: 8),
+            page: 0,
+            size: 8,
+            totalItems: 16,
+            totalPages: 2,
+            hasNext: true,
+          ),
+          1: _response(
+            _manyCommunities(start: 9, count: 8),
+            page: 1,
+            size: 8,
+            totalItems: 16,
+            totalPages: 2,
+          ),
+        },
+      );
+
+      await tester.pumpWidget(_testApp(communities: communities));
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -2400),
+      );
+      await tester.pump();
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -200),
+      );
+      await tester.pump();
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -200),
+      );
+      await tester.pump();
+
+      expect(communities.requestedPages, [0, 1]);
+
+      nextPageGate.complete(
+        _response(
+          _manyCommunities(start: 9, count: 8),
+          page: 1,
+          size: 8,
+          totalItems: 16,
+          totalPages: 2,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Space 16'), findsOneWidget);
+      expect(communities.requestedPages, [0, 1]);
+    });
   });
 }
 
@@ -145,10 +267,17 @@ Widget _testApp({
 }
 
 class _FakeCommunityRepository implements CommunityRepository {
-  _FakeCommunityRepository({this.firstListGate});
+  _FakeCommunityRepository({
+    this.firstListGate,
+    this.nextPageGate,
+    Map<int, PaginatedResponse<Community>>? pages,
+  }) : pages = pages ?? const {};
 
   final joinedIds = <String>[];
   final Completer<PaginatedResponse<Community>>? firstListGate;
+  final Completer<PaginatedResponse<Community>>? nextPageGate;
+  final Map<int, PaginatedResponse<Community>> pages;
+  final requestedPages = <int>[];
   var _listCalls = 0;
 
   @override
@@ -163,8 +292,16 @@ class _FakeCommunityRepository implements CommunityRepository {
     bool? joined,
   }) async {
     _listCalls += 1;
+    requestedPages.add(page);
     if (_listCalls == 1 && firstListGate != null) {
       return firstListGate!.future;
+    }
+    if (page > 0 && nextPageGate != null) {
+      return nextPageGate!.future;
+    }
+    final paged = pages[page];
+    if (paged != null) {
+      return paged;
     }
     final items = _communities()
         .where((community) => joined == null || community.joined == joined)
@@ -261,19 +398,40 @@ PaginatedResponse<Community> _response(
   List<Community> items, {
   required int page,
   required int size,
+  int? totalItems,
+  int totalPages = 1,
+  bool hasNext = false,
 }) {
   return PaginatedResponse(
     items: items,
     page: page,
     size: size,
-    totalItems: items.length,
-    totalPages: 1,
-    hasNext: false,
-    hasPrevious: false,
+    totalItems: totalItems ?? items.length,
+    totalPages: totalPages,
+    hasNext: hasNext,
+    hasPrevious: page > 0,
     sortBy: 'createdAt',
     sortDir: 'desc',
     filters: const {},
   );
+}
+
+List<Community> _manyCommunities({required int start, required int count}) {
+  return List.generate(count, (index) {
+    final number = start + index;
+    final id = 'space-${number.toString().padLeft(2, '0')}';
+    return Community(
+      id: id,
+      slug: id,
+      name: 'Space ${number.toString().padLeft(2, '0')}',
+      description: 'Community $number for pagination coverage.',
+      visibility: 'PUBLIC',
+      category: 'acolhimento',
+      memberCount: number,
+      joined: false,
+      createdAt: DateTime(2026, 5, number),
+    );
+  });
 }
 
 List<Community> _communities() {

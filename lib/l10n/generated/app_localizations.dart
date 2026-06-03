@@ -136,6 +136,18 @@ abstract class AppLocalizations {
   /// **'Não foi possível autenticar. Revise os dados e tente novamente.'**
   String get authLoginFallbackError;
 
+  /// No description provided for @authRegisterFallbackError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível criar sua conta agora. Verifique os dados e tente novamente.'**
+  String get authRegisterFallbackError;
+
+  /// No description provided for @authRegisterEmailExistsError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Este e-mail já está cadastrado. Entre com sua conta ou use outro e-mail.'**
+  String get authRegisterEmailExistsError;
+
   /// No description provided for @authGoogleStartError.
   ///
   /// In pt_BR, this message translates to:

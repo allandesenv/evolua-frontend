@@ -167,6 +167,250 @@ void main() {
     expect(find.byType(CareClaimPage), findsOneWidget);
   });
 
+  testWidgets(
+    'keyboard hide chevron preserves focused form and valid scroll bounds',
+    (tester) async {
+      final picker = _installFakeFilePicker();
+      final controller = _FakeCareClaimController(_claimState());
+      picker.nextResult = FilePickerResult([
+        PlatformFile(
+          name: 'plano.pdf',
+          size: 128,
+          bytes: Uint8List.fromList(List.filled(128, 1)),
+        ),
+      ]);
+
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(tester.view.resetViewInsets);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            careClaimControllerProvider.overrideWith(() => controller),
+          ],
+          child: const MaterialApp(home: CareClaimPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Adicionar anexos'));
+      await tester.tap(find.text('Adicionar anexos'));
+      await tester.pumpAndSettle();
+
+      tester.view.viewInsets = FakeViewPadding(bottom: 320);
+      final microActionField = find.byType(TextField).at(2);
+      await tester.ensureVisible(microActionField);
+      await tester.tap(microActionField);
+      await tester.enterText(microActionField, 'respirar antes de mensagens');
+
+      final guidanceField = find.byType(TextField).last;
+      await tester.ensureVisible(guidanceField);
+      await tester.tap(guidanceField);
+      await tester.enterText(guidanceField, 'orientacao mantida');
+      await tester.pump(const Duration(milliseconds: 320));
+
+      final guidanceWidget = tester.widget<TextField>(guidanceField);
+      expect(guidanceWidget.focusNode?.hasFocus, isTrue);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      final scrollView = tester.widget<SingleChildScrollView>(
+        find.byType(SingleChildScrollView),
+      );
+      final position = scrollView.controller!.position;
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CareClaimPage), findsOneWidget);
+      expect(find.text('Abrindo acesso seguro...'), findsNothing);
+      expect(find.text('respirar antes de mensagens'), findsOneWidget);
+      expect(find.text('orientacao mantida'), findsOneWidget);
+      expect(find.text('plano.pdf'), findsOneWidget);
+      expect(find.textContaining('Recomenda'), findsWidgets);
+      expect(guidanceWidget.focusNode?.hasFocus, isTrue);
+      expect(
+        position.pixels,
+        inInclusiveRange(position.minScrollExtent, position.maxScrollExtent),
+      );
+      expect(controller.buildCalls, 1);
+      expect(controller.recommendationCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'native keyboard back only dismisses focused prescription field',
+    (tester) async {
+      final controller = _FakeCareClaimController(_claimState());
+
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(tester.view.resetViewInsets);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            careClaimControllerProvider.overrideWith(() => controller),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: Builder(
+                  builder: (context) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const CareClaimPage(),
+                          ),
+                        );
+                      },
+                      child: const Text('open claim'),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('open claim'));
+      await tester.pumpAndSettle();
+
+      final microActionField = find.byType(TextField).at(2);
+      tester.view.viewInsets = FakeViewPadding(bottom: 320);
+      await tester.ensureVisible(microActionField);
+      await tester.tap(microActionField);
+      await tester.enterText(microActionField, 'respirar antes de mensagens');
+      await tester.pump(const Duration(milliseconds: 320));
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.byType(CareClaimPage), findsOneWidget);
+      expect(find.text('Abrindo acesso seguro...'), findsNothing);
+      expect(find.text('respirar antes de mensagens'), findsOneWidget);
+      expect(controller.buildCalls, 1);
+      expect(controller.recommendationCalls, 0);
+
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('open claim'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'native keyboard back preserves guidance text and selected attachment',
+    (tester) async {
+      final picker = _installFakeFilePicker();
+      final controller = _FakeCareClaimController(_claimState());
+      picker.nextResult = FilePickerResult([
+        PlatformFile(
+          name: 'plano.pdf',
+          size: 128,
+          bytes: Uint8List.fromList(List.filled(128, 1)),
+        ),
+      ]);
+
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(tester.view.resetViewInsets);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            careClaimControllerProvider.overrideWith(() => controller),
+          ],
+          child: const MaterialApp(home: CareClaimPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Adicionar anexos'));
+      await tester.tap(find.text('Adicionar anexos'));
+      await tester.pumpAndSettle();
+
+      final guidanceField = find.byType(TextField).last;
+      tester.view.viewInsets = FakeViewPadding(bottom: 320);
+      await tester.ensureVisible(guidanceField);
+      await tester.tap(guidanceField);
+      await tester.enterText(guidanceField, 'orientacao mantida');
+      await tester.pump(const Duration(milliseconds: 320));
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(find.byType(CareClaimPage), findsOneWidget);
+      expect(find.text('Abrindo acesso seguro...'), findsNothing);
+      expect(find.text('orientacao mantida'), findsOneWidget);
+      expect(find.text('plano.pdf'), findsOneWidget);
+      expect(controller.buildCalls, 1);
+      expect(controller.recommendationCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'keeps loaded form state during transient claim loading after keyboard metrics',
+    (tester) async {
+      final picker = _installFakeFilePicker();
+      final controller = _FakeCareClaimController(_claimState());
+      picker.nextResult = FilePickerResult([
+        PlatformFile(
+          name: 'plano.pdf',
+          size: 128,
+          bytes: Uint8List.fromList(List.filled(128, 1)),
+        ),
+      ]);
+
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(tester.view.resetViewInsets);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            careClaimControllerProvider.overrideWith(() => controller),
+          ],
+          child: const MaterialApp(home: CareClaimPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final microActionField = find.byType(TextField).at(2);
+      await tester.ensureVisible(microActionField);
+      tester.view.viewInsets = FakeViewPadding(bottom: 320);
+      await tester.tap(microActionField);
+      await tester.enterText(microActionField, 'respirar antes de mensagens');
+      await tester.pump(const Duration(milliseconds: 320));
+
+      final guidanceField = find.byType(TextField).last;
+      await tester.ensureVisible(guidanceField);
+      await tester.enterText(guidanceField, 'orientacao mantida');
+
+      await tester.ensureVisible(find.text('Adicionar anexos'));
+      await tester.tap(find.text('Adicionar anexos'));
+      await tester.pumpAndSettle();
+      expect(find.text('plano.pdf'), findsOneWidget);
+
+      tester.view.resetViewInsets();
+      controller.showTransientLoading();
+      await tester.pump();
+
+      expect(find.text('Abrindo acesso seguro...'), findsNothing);
+      expect(find.text('Prescrever ritual personalizado'), findsOneWidget);
+      expect(find.text('respirar antes de mensagens'), findsOneWidget);
+      expect(find.text('orientacao mantida'), findsOneWidget);
+      expect(find.text('plano.pdf'), findsOneWidget);
+      expect(controller.buildCalls, 1);
+      expect(controller.recommendationCalls, 0);
+    },
+  );
+
   testWidgets('valid attachment appears and can be removed', (tester) async {
     final picker = _installFakeFilePicker();
 
@@ -365,10 +609,18 @@ class _FakeCareClaimController extends CareClaimController {
   final CareClaimState _state;
   final bool failRecommendation;
   final Completer<void>? recommendationGate;
+  int buildCalls = 0;
   int recommendationCalls = 0;
 
   @override
-  Future<CareClaimState> build() async => _state;
+  Future<CareClaimState> build() async {
+    buildCalls += 1;
+    return _state;
+  }
+
+  void showTransientLoading() {
+    state = const AsyncLoading();
+  }
 
   @override
   Future<void> sendPrescription({

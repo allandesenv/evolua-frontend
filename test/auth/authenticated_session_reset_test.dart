@@ -196,7 +196,11 @@ void main() {
       await container.read(accessibilityPreferencesControllerProvider.future);
       await container.read(trailStepResponsesProvider.future);
       await container.read(
-        trailStepResponseProvider((trailId: 1, stepIndex: 0)).future,
+        trailStepResponseProvider((
+          userId: 'user-a',
+          trailId: 1,
+          stepIndex: 0,
+        )).future,
       );
       observer.disposedProviders.clear();
 
@@ -211,7 +215,11 @@ void main() {
           settingsPrivacyPreferencesControllerProvider,
           accessibilityPreferencesControllerProvider,
           trailStepResponsesProvider,
-          trailStepResponseProvider((trailId: 1, stepIndex: 0)),
+          trailStepResponseProvider((
+            userId: 'user-a',
+            trailId: 1,
+            stepIndex: 0,
+          )),
         ]),
       );
     },
