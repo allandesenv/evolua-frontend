@@ -21,75 +21,7 @@ class CareClaimPage extends ConsumerStatefulWidget {
 class _CareClaimPageState extends ConsumerState<CareClaimPage>
     with WidgetsBindingObserver {
   CareClaimState? _lastLoadedState;
-  bool _hasFocusedInput = false;
-  bool _hasKeyboardInsets = false;
 
-  bool get _shouldInterceptKeyboardBack =>
-      _hasFocusedInput || _hasKeyboardInsets;
-
-  @override
-  void initState() {
-    super.initState();
-    if (!kIsWeb) {
-      WidgetsBinding.instance.addObserver(this);
-      FocusManager.instance.addListener(_handleFocusChanged);
-    }
-  }
-
-  @override
-  void dispose() {
-    if (!kIsWeb) {
-      FocusManager.instance.removeListener(_handleFocusChanged);
-      WidgetsBinding.instance.removeObserver(this);
-    }
-    super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() {
-    if (kIsWeb) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      _updateKeyboardBackState();
-    });
-  }
-
-  void _handleFocusChanged() {
-    if (kIsWeb) {
-      return;
-    }
-    _updateKeyboardBackState();
-  }
-
-  void _updateKeyboardBackState() {
-    if (kIsWeb || !mounted) {
-      return;
-    }
-    final view = View.of(context);
-    final nextHasKeyboardInsets = view.viewInsets.bottom > 0;
-    final nextHasFocusedInput = _hasFocusedTextInput();
-    if (_hasKeyboardInsets == nextHasKeyboardInsets &&
-        _hasFocusedInput == nextHasFocusedInput) {
-      return;
-    }
-    setState(() {
-      _hasKeyboardInsets = nextHasKeyboardInsets;
-      _hasFocusedInput = nextHasFocusedInput;
-    });
-  }
-
-  bool _hasFocusedTextInput() {
-    final focusContext = FocusManager.instance.primaryFocus?.context;
-    if (focusContext == null) {
-      return false;
-    }
-    return focusContext.widget is EditableText ||
-        focusContext.findAncestorWidgetOfExactType<EditableText>() != null;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,19 +68,31 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
       return page;
     }
 
-    return PopScope<void>(
-      canPop: !_shouldInterceptKeyboardBack,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop || !_shouldInterceptKeyboardBack) {
-          return;
-        }
-        FocusManager.instance.primaryFocus?.unfocus();
-        _updateKeyboardBackState();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _updateKeyboardBackState();
-        });
-      },
-      child: page,
+    return GradientScaffold(
+      resizeToAvoidBottomInset: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final padding = _pagePadding(constraints.maxWidth);
+          return ColoredBox(
+            color: context.evoluaColors.background,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 1180,
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Padding(
+                    padding: padding,
+                    child: _buildBody(state),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
