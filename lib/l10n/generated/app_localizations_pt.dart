@@ -28,6 +28,14 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível autenticar. Revise os dados e tente novamente.';
 
   @override
+  String get authRegisterFallbackError =>
+      'Não foi possível criar sua conta agora. Verifique os dados e tente novamente.';
+
+  @override
+  String get authRegisterEmailExistsError =>
+      'Este e-mail já está cadastrado. Entre com sua conta ou use outro e-mail.';
+
+  @override
   String get authGoogleStartError =>
       'Não foi possível iniciar o login com Google. Tente novamente.';
 
@@ -1017,6 +1025,14 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get authLoginFallbackError =>
       'Não foi possível autenticar. Revise os dados e tente novamente.';
+
+  @override
+  String get authRegisterFallbackError =>
+      'Não foi possível criar sua conta agora. Verifique os dados e tente novamente.';
+
+  @override
+  String get authRegisterEmailExistsError =>
+      'Este e-mail já está cadastrado. Entre com sua conta ou use outro e-mail.';
 
   @override
   String get authGoogleStartError =>

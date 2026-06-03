@@ -203,8 +203,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        isDismissible: false,
-        enableDrag: false,
+        isDismissible: true,
+        enableDrag: true,
         backgroundColor: AppColors.surface,
         builder: (sheetContext) => SafeArea(
           child: Padding(
@@ -958,6 +958,7 @@ class _DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authControllerProvider).asData?.value;
+    final sessionUserId = session?.userId ?? 'anonymous';
     final isHomeSelected = selectedIndex == 0;
     final shouldReadProfile = selectedIndex == 3 || selectedIndex == 4;
     final profile = shouldReadProfile
@@ -1014,7 +1015,7 @@ class _DashboardContent extends ConsumerWidget {
             onOpenProfileSection(ProfileModuleSection.plansSubscriptions),
       ),
       ContentModuleView(
-        key: ValueKey('trails-${trailSection.name}'),
+        key: ValueKey('trails-$sessionUserId-${trailSection.name}'),
         section: trailSection,
         initialTrailId: suggestedTrailIdToOpen,
         onInitialTrailConsumed: onSuggestedTrailConsumed,
@@ -1119,12 +1120,12 @@ class _DashboardContent extends ConsumerWidget {
             },
             child: selectedIndex == 1
                 ? KeyedSubtree(
-                    key: ValueKey(_sectionKey()),
+                    key: ValueKey(_sectionKey(sessionUserId)),
                     child:
                         sections[selectedIndex.clamp(0, sections.length - 1)],
                   )
                 : SingleChildScrollView(
-                    key: ValueKey(_sectionKey()),
+                    key: ValueKey(_sectionKey(sessionUserId)),
                     child:
                         sections[selectedIndex.clamp(0, sections.length - 1)],
                   ),
@@ -1152,15 +1153,15 @@ class _DashboardContent extends ConsumerWidget {
     };
   }
 
-  String _sectionKey() {
+  String _sectionKey(String userId) {
     return switch (selectedIndex) {
-      1 => 'trails-${trailSection.name}',
-      2 => 'spaces-${spaceSection.name}-${reflectionScope.name}',
-      3 => 'profile-${ProfileModuleSection.evolutionMirror.name}',
-      4 => 'profile-${profileSection.name}',
-      5 => 'mentor',
-      6 => 'admin-${adminSection.name}',
-      _ => 'main-$selectedIndex',
+      1 => 'trails-$userId-${trailSection.name}',
+      2 => 'spaces-$userId-${spaceSection.name}-${reflectionScope.name}',
+      3 => 'profile-$userId-${ProfileModuleSection.evolutionMirror.name}',
+      4 => 'profile-$userId-${profileSection.name}',
+      5 => 'mentor-$userId',
+      6 => 'admin-$userId-${adminSection.name}',
+      _ => 'main-$userId-$selectedIndex',
     };
   }
 }

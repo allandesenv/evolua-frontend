@@ -1162,6 +1162,8 @@ class _JourneyStepDetailCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userId = ref.watch(authControllerProvider).asData?.value?.userId;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1225,7 +1227,13 @@ class _JourneyStepDetailCard extends ConsumerWidget {
           ),
           if (_supportsStepResponse(step.type)) ...[
             const SizedBox(height: 18),
-            _TrailStepResponseEditor(trailId: trailId, step: step),
+            if (userId != null && userId.trim().isNotEmpty)
+              _TrailStepResponseEditor(
+                key: ValueKey('step-response-$userId-$trailId-${step.index}'),
+                userId: userId,
+                trailId: trailId,
+                step: step,
+              ),
           ],
         ],
       ),
@@ -1234,8 +1242,14 @@ class _JourneyStepDetailCard extends ConsumerWidget {
 }
 
 class _TrailStepResponseEditor extends ConsumerStatefulWidget {
-  const _TrailStepResponseEditor({required this.trailId, required this.step});
+  const _TrailStepResponseEditor({
+    super.key,
+    required this.userId,
+    required this.trailId,
+    required this.step,
+  });
 
+  final String userId;
   final int trailId;
   final TrailJourneyStep step;
 
@@ -1252,15 +1266,22 @@ class _TrailStepResponseEditorState
   bool _draftLoaded = false;
   bool _isSaving = false;
 
-  TrailStepResponseKey get _key =>
-      (trailId: widget.trailId, stepIndex: widget.step.index);
+  TrailStepResponseKey get _key => (
+    userId: widget.userId,
+    trailId: widget.trailId,
+    stepIndex: widget.step.index,
+  );
 
   String? get _draftKey {
-    final userId = ref.read(authControllerProvider).asData?.value?.userId;
-    if (userId == null || userId.trim().isEmpty) {
+    if (widget.userId.trim().isEmpty) {
       return null;
     }
-    return 'trail_step_response_draft:$userId:${widget.trailId}:${widget.step.index}';
+    return 'trail_step_response_draft:${widget.userId}:${widget.trailId}:${widget.step.index}';
+  }
+
+  bool get _hasCurrentSession {
+    return ref.read(authControllerProvider).asData?.value?.userId ==
+        widget.userId;
   }
 
   @override
@@ -1271,7 +1292,7 @@ class _TrailStepResponseEditorState
   }
 
   Future<void> _save() async {
-    if (_isSaving) {
+    if (_isSaving || !_hasCurrentSession) {
       return;
     }
     setState(() => _isSaving = true);
@@ -1279,6 +1300,7 @@ class _TrailStepResponseEditorState
       final saved = await ref
           .read(trailJourneyActionProvider)
           .saveStepResponse(
+            userId: widget.userId,
             trailId: widget.trailId,
             stepIndex: widget.step.index,
             responseText: _controller.text,
@@ -1310,7 +1332,7 @@ class _TrailStepResponseEditorState
   }
 
   Future<void> _loadDraftIfNeeded() async {
-    if (_draftLoaded || _controller.text.isNotEmpty) {
+    if (_draftLoaded || _controller.text.isNotEmpty || !_hasCurrentSession) {
       return;
     }
     _draftLoaded = true;
@@ -1320,7 +1342,10 @@ class _TrailStepResponseEditorState
     }
     final preferences = await ref.read(sharedPreferencesProvider.future);
     final draft = preferences.getString(key);
-    if (!mounted || draft == null || _controller.text.isNotEmpty) {
+    if (!mounted ||
+        !_hasCurrentSession ||
+        draft == null ||
+        _controller.text.isNotEmpty) {
       return;
     }
     _controller.text = draft;
@@ -1333,6 +1358,9 @@ class _TrailStepResponseEditorState
       return;
     }
     _draftSaveTimer = Timer(const Duration(milliseconds: 350), () async {
+      if (!_hasCurrentSession) {
+        return;
+      }
       final preferences = await ref.read(sharedPreferencesProvider.future);
       if (value.trim().isEmpty) {
         await preferences.remove(key);
@@ -1354,11 +1382,19 @@ class _TrailStepResponseEditorState
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(authControllerProvider).asData?.value?.userId !=
+        widget.userId) {
+      return const SizedBox.shrink();
+    }
+
     final responseState = ref.watch(trailStepResponseProvider(_key));
     final response = responseState.asData?.value;
     if (response != null && response.updatedAt != _loadedUpdatedAt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _isSaving || response.updatedAt == _loadedUpdatedAt) {
+        if (!mounted ||
+            !_hasCurrentSession ||
+            _isSaving ||
+            response.updatedAt == _loadedUpdatedAt) {
           return;
         }
         _loadedUpdatedAt = response.updatedAt;

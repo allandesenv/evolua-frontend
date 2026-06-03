@@ -104,16 +104,35 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     required String password,
   }) async {
     final repository = ref.read(authRepositoryProvider);
-    await repository.register(
-      email: email,
-      password: password,
-      displayName: displayName,
-    );
-
     state = const AsyncLoading();
-    final session = await repository.login(email: email, password: password);
-    await _saveSession(session);
-    state = AsyncData(session);
+
+    AuthSession session;
+    try {
+      if (kDebugMode) {
+        debugPrint('Auth register started.');
+      }
+      await repository.register(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      if (kDebugMode) {
+        debugPrint('Auth register succeeded.');
+        debugPrint('Auth post-register login started.');
+      }
+      session = await repository.login(email: email, password: password);
+      await _saveSession(session);
+      state = AsyncData(session);
+      if (kDebugMode) {
+        debugPrint('Auth post-register login succeeded.');
+      }
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      if (kDebugMode) {
+        debugPrint('Auth register failed: ${error.runtimeType}.');
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
 
     try {
       await ref
@@ -128,7 +147,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
           );
       ref.invalidate(profileControllerProvider);
       return null;
-    } on DioException catch (_) {
+    } catch (_) {
       ref.invalidate(profileControllerProvider);
       return 'Sua conta foi criada, mas nao foi possivel concluir o perfil inicial agora. Voce pode completar isso no Perfil.';
     }

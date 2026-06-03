@@ -8,7 +8,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 
-class SocialCommunitiesArea extends StatelessWidget {
+class SocialCommunitiesArea extends StatefulWidget {
   const SocialCommunitiesArea({
     super.key,
     required this.result,
@@ -67,13 +67,64 @@ class SocialCommunitiesArea extends StatelessWidget {
   final VoidCallback? onRefresh;
 
   @override
+  State<SocialCommunitiesArea> createState() => _SocialCommunitiesAreaState();
+}
+
+class _SocialCommunitiesAreaState extends State<SocialCommunitiesArea> {
+  ScrollPosition? _scrollPosition;
+  bool _compactCatalog = false;
+  bool _postFrameCheckScheduled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _schedulePostFrameCheck();
+  }
+
+  @override
+  void didUpdateWidget(SocialCommunitiesArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _schedulePostFrameCheck();
+  }
+
+  @override
+  void dispose() {
+    _scrollPosition?.removeListener(_maybeLoadMore);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final result = widget.result;
+    final isInitialLoading = widget.isInitialLoading;
+    final isRefreshing = widget.isRefreshing;
+    final isLoadingMore = widget.isLoadingMore;
+    final isFromCache = widget.isFromCache;
+    final loadMoreError = widget.loadMoreError;
+    final refreshError = widget.refreshError;
+    final searchController = widget.searchController;
+    final onSearchChanged = widget.onSearchChanged;
+    final onVisibilityChanged = widget.onVisibilityChanged;
+    final onCategoryChanged = widget.onCategoryChanged;
+    final onMembershipChanged = widget.onMembershipChanged;
+    final onPageChanged = widget.onPageChanged;
+    final onRetryLoadMore = widget.onRetryLoadMore;
+    final onView = widget.onView;
+    final onJoin = widget.onJoin;
+    final canCreate = widget.canCreate;
+    final onCreate = widget.onCreate;
+    final headline = widget.headline;
+    final description = widget.description;
+    final onRefresh = widget.onRefresh;
+
     return LayoutBuilder(
       builder: (context, outerConstraints) {
         final compactCatalog = outerConstraints.maxWidth < 680;
+        _compactCatalog = compactCatalog;
+        _schedulePostFrameCheck();
         return NotificationListener<ScrollNotification>(
           onNotification: (notification) =>
-              _handleScrollNotification(notification, compactCatalog),
+              _handleScrollNotification(notification.metrics, compactCatalog),
           child: Column(
             children: [
               PrimaryPanel(
@@ -242,21 +293,55 @@ class SocialCommunitiesArea extends StatelessWidget {
     );
   }
 
-  bool _handleScrollNotification(
-    ScrollNotification notification,
-    bool compactCatalog,
-  ) {
-    if (!compactCatalog ||
-        isInitialLoading ||
-        isLoadingMore ||
-        loadMoreError != null ||
-        !result.hasNext) {
-      return false;
-    }
-    if (notification.metrics.extentAfter < 480) {
-      onLoadMore();
-    }
+  bool _handleScrollNotification(ScrollMetrics metrics, bool compactCatalog) {
+    _tryLoadMore(metrics.extentAfter, compactCatalog);
     return false;
+  }
+
+  void _schedulePostFrameCheck() {
+    if (_postFrameCheckScheduled) {
+      return;
+    }
+    _postFrameCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _postFrameCheckScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      _syncAncestorScrollPosition();
+      _maybeLoadMore();
+    });
+  }
+
+  void _syncAncestorScrollPosition() {
+    final nextPosition = Scrollable.maybeOf(context)?.position;
+    if (_scrollPosition == nextPosition) {
+      return;
+    }
+    _scrollPosition?.removeListener(_maybeLoadMore);
+    _scrollPosition = nextPosition;
+    _scrollPosition?.addListener(_maybeLoadMore);
+  }
+
+  void _maybeLoadMore() {
+    final position = _scrollPosition;
+    if (position == null || !position.hasPixels) {
+      return;
+    }
+    _tryLoadMore(position.extentAfter, _compactCatalog);
+  }
+
+  void _tryLoadMore(double extentAfter, bool compactCatalog) {
+    if (!compactCatalog ||
+        widget.isInitialLoading ||
+        widget.isLoadingMore ||
+        widget.loadMoreError != null ||
+        !widget.result.hasNext) {
+      return;
+    }
+    if (extentAfter < 480) {
+      widget.onLoadMore();
+    }
   }
 
   String _resultCountLabel(int total) {

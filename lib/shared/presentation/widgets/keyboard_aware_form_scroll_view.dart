@@ -25,7 +25,7 @@ class _KeyboardAwareFormScrollViewState
     extends State<KeyboardAwareFormScrollView>
     with WidgetsBindingObserver {
   double _lastKeyboardBottom = 0;
-  Timer? _clampTimer;
+  bool _clampScheduled = false;
 
   @override
   void initState() {
@@ -35,7 +35,6 @@ class _KeyboardAwareFormScrollViewState
 
   @override
   void dispose() {
-    _clampTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -47,15 +46,17 @@ class _KeyboardAwareFormScrollViewState
       final keyboardBottom = MediaQuery.viewInsetsOf(context).bottom;
       final closedKeyboard = _lastKeyboardBottom > 0 && keyboardBottom == 0;
       _lastKeyboardBottom = keyboardBottom;
-      setState(() {});
       if (closedKeyboard) {
-        _clampScrollAfterKeyboardClose();
+        _scheduleClampToScrollBounds();
       }
     });
   }
 
-  void _clampScrollAfterKeyboardClose() {
-    void clamp() {
+  void _scheduleClampToScrollBounds() {
+    if (_clampScheduled) return;
+    _clampScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _clampScheduled = false;
       final controller = widget.controller;
       if (!mounted || controller == null || !controller.hasClients) return;
       final position = controller.position;
@@ -66,11 +67,7 @@ class _KeyboardAwareFormScrollViewState
       if (target != position.pixels) {
         controller.jumpTo(target.toDouble());
       }
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => clamp());
-    _clampTimer?.cancel();
-    _clampTimer = Timer(const Duration(milliseconds: 120), clamp);
+    });
   }
 
   @override
@@ -82,12 +79,6 @@ class _KeyboardAwareFormScrollViewState
     final safeBottom = keyboardBottom > 0 ? keyboardBottom : viewPadding.bottom;
     final padding = EdgeInsets.only(bottom: safeBottom + widget.bottomSpacing);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _lastKeyboardBottom != keyboardBottom) {
-        _lastKeyboardBottom = keyboardBottom;
-      }
-    });
-
     return LayoutBuilder(
       builder: (context, constraints) {
         return ColoredBox(
@@ -97,12 +88,20 @@ class _KeyboardAwareFormScrollViewState
             child: _KeyboardPadding(
               padding: padding,
               animate: !isClosingKeyboard,
-              child: SingleChildScrollView(
-                controller: widget.controller,
-                keyboardDismissBehavior: widget.keyboardDismissBehavior,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: widget.child,
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: (_) {
+                  _scheduleClampToScrollBounds();
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: widget.controller,
+                  keyboardDismissBehavior: widget.keyboardDismissBehavior,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: widget.child,
+                  ),
                 ),
               ),
             ),
