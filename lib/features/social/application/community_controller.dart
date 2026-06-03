@@ -302,14 +302,21 @@ class CommunityController extends AsyncNotifier<CommunityCatalogState> {
     } else {
       state = const AsyncLoading();
     }
-    state = await AsyncValue.guard(() async {
+    try {
       await repository.join(id);
       final page = current?.result.page ?? 0;
       final result = await _fetch(page: page);
       final next = CommunityCatalogState(result: result);
       _lastState = next;
-      return next;
-    });
+      state = AsyncData(next);
+    } catch (error, stackTrace) {
+      if (current != null) {
+        state = AsyncData(current.copyWith(isRefreshing: false));
+      } else {
+        state = AsyncError(error, stackTrace);
+      }
+      rethrow;
+    }
   }
 
   Future<void> leave(String id) async {

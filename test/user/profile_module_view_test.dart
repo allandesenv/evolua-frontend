@@ -643,6 +643,46 @@ void main() {
     expect(find.text('Como anda meu ritmo?'), findsOneWidget);
   });
 
+  testWidgets(
+    'dashboard mobile back closes space detail before leaving spaces',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(
+          communityRepository: _FakeCommunityRepository(
+            items: [_joinedCommunity()],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Espaços'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sair do espaço'), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sair do espaço'), findsNothing);
+      expect(find.text('Ver espaço'), findsOneWidget);
+      expect(find.text('Espaços'), findsAtLeastNWidgets(1));
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Como anda meu ritmo?'), findsOneWidget);
+    },
+  );
+
   testWidgets('dashboard mobile swipe ignores hidden internal sections', (
     tester,
   ) async {
@@ -1041,7 +1081,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, 'Trocar foto'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Atualizar'), findsNothing);
     expect(find.text('Padroes percebidos'), findsOneWidget);
-    expect(find.text('Mensagem da IA'), findsOneWidget);
+    expect(find.text('Leitura do seu momento'), findsOneWidget);
     expect(find.text('Assistir anúncio'), findsNothing);
     expect(find.textContaining('Veja padr'), findsNothing);
     expect(find.textContaining('Espelho avançado'), findsNothing);
@@ -1234,7 +1274,7 @@ void main() {
     expect(find.text('Clareza pratica'), findsAtLeastNWidgets(1));
     expect(find.textContaining('50% concluído'), findsOneWidget);
     expect(find.text('Próximo passo: Escolher'), findsOneWidget);
-    expect(find.text('Mensagem da IA'), findsOneWidget);
+    expect(find.text('Leitura do seu momento'), findsOneWidget);
     expect(
       find.text('Você tende a registrar mais ansiedade à noite.'),
       findsAtLeastNWidgets(1),
@@ -1246,6 +1286,69 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Ansioso'), findsOneWidget);
+  });
+
+  testWidgets('renders all active journeys in evolution mirror', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    final firstTrail = _testTrail();
+    final secondTrail = _testTrail(
+      id: 8,
+      title: 'Relações com mais calma',
+      summary: 'Uma trilha ativa para cuidar dos limites.',
+      activeJourney: false,
+    );
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: true,
+      trailRepository: _FakeTrailRepository(
+        currentJourney: firstTrail,
+        trailPages: {
+          0: [firstTrail],
+          1: [secondTrail],
+        },
+        journeys: {
+          firstTrail.id: _testJourney(firstTrail),
+          secondTrail.id: _testJourney(secondTrail),
+        },
+      ),
+    );
+
+    expect(find.text('Clareza pratica'), findsAtLeastNWidgets(1));
+    expect(find.text('Relações com mais calma'), findsOneWidget);
+    expect(find.textContaining('50% concluído'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows friendly message when in-progress journeys fail', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: true,
+      trailRepository: _FakeTrailRepository(
+        inProgressError: Exception('network unavailable'),
+      ),
+    );
+
+    expect(
+      find.text('Não foi possível carregar suas trilhas em andamento agora.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Quando uma trilha estiver ativa, ela aparece aqui como mapa de progresso.',
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('renders previous-self messages in mirror only when delivered', (
@@ -1833,6 +1936,7 @@ Widget _dashboardShell({
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
   NotificationRepository? notificationRepository,
+  CommunityRepository? communityRepository,
 }) {
   return ProviderScope(
     overrides: [
@@ -1853,7 +1957,9 @@ Widget _dashboardShell({
       socialPostRepositoryProvider.overrideWithValue(
         _FakeSocialPostRepository(),
       ),
-      communityRepositoryProvider.overrideWithValue(_FakeCommunityRepository()),
+      communityRepositoryProvider.overrideWithValue(
+        communityRepository ?? _FakeCommunityRepository(),
+      ),
       notificationRepositoryProvider.overrideWithValue(
         notificationRepository ?? _FakeNotificationRepository(),
       ),
@@ -2117,17 +2223,22 @@ Map<String, dynamic> _defaultRemoteAccessibility() => {
   'comfortMode': false,
 };
 
-Trail _testTrail() {
+Trail _testTrail({
+  int id = 7,
+  String title = 'Clareza pratica',
+  String summary = 'Uma trilha ativa para organizar o momento.',
+  bool activeJourney = true,
+}) {
   return Trail(
-    id: 7,
+    id: id,
     userId: 'user-123',
-    title: 'Clareza pratica',
-    summary: 'Uma trilha ativa para organizar o momento.',
+    title: title,
+    summary: summary,
     content: 'Conteudo da trilha.',
     category: 'foco',
     premium: false,
     privateTrail: true,
-    activeJourney: true,
+    activeJourney: activeJourney,
     generatedByAi: true,
     journeyKey: 'clareza-pratica',
     sourceStyle: 'briefing',
@@ -2606,12 +2717,26 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
 }
 
 class _FakeTrailRepository implements TrailRepository {
-  const _FakeTrailRepository({Trail? currentJourney, TrailJourney? journey})
-    : _currentJourney = currentJourney,
-      _journey = journey;
+  const _FakeTrailRepository({
+    Trail? currentJourney,
+    TrailJourney? journey,
+    List<Trail>? trails,
+    Map<int, List<Trail>>? trailPages,
+    Map<int, TrailJourney>? journeys,
+    Object? inProgressError,
+  }) : _currentJourney = currentJourney,
+       _journey = journey,
+       _trails = trails,
+       _trailPages = trailPages,
+       _journeys = journeys,
+       _inProgressError = inProgressError;
 
   final Trail? _currentJourney;
   final TrailJourney? _journey;
+  final List<Trail>? _trails;
+  final Map<int, List<Trail>>? _trailPages;
+  final Map<int, TrailJourney>? _journeys;
+  final Object? _inProgressError;
 
   @override
   Future<PaginatedResponse<Trail>> list({
@@ -2623,15 +2748,24 @@ class _FakeTrailRepository implements TrailRepository {
     String? category,
     bool? premium,
   }) async {
-    final items = _currentJourney == null ? const <Trail>[] : [_currentJourney];
+    final items =
+        _trailPages?[page] ??
+        _trails ??
+        (_currentJourney == null ? const <Trail>[] : [_currentJourney]);
+    final totalPages = _trailPages?.length ?? 1;
     return PaginatedResponse<Trail>(
       items: items,
       page: page,
       size: size,
-      totalItems: items.length,
-      totalPages: 1,
-      hasNext: false,
-      hasPrevious: false,
+      totalItems:
+          _trailPages?.values.fold<int>(
+            0,
+            (total, pageItems) => total + pageItems.length,
+          ) ??
+          items.length,
+      totalPages: totalPages,
+      hasNext: page + 1 < totalPages,
+      hasPrevious: page > 0,
       sortBy: sortBy,
       sortDir: sortDir,
       filters: const {},
@@ -2640,6 +2774,19 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<Trail?> currentJourney() async => _currentJourney;
+
+  @override
+  Future<List<TrailJourney>> listInProgressJourneys() async {
+    if (_inProgressError != null) {
+      throw _inProgressError;
+    }
+    final journeys = _journeys;
+    if (journeys != null) {
+      return journeys.values.toList();
+    }
+    final journey = _journey;
+    return journey == null ? const [] : [journey];
+  }
 
   @override
   Future<Trail> create({
@@ -2661,7 +2808,7 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<TrailJourney> journey(int trailId) async {
-    final journey = _journey;
+    final journey = _journeys?[trailId] ?? _journey;
     if (journey == null) {
       throw StateError('Sem jornada ativa.');
     }
@@ -2909,6 +3056,10 @@ class _FakeSocialPostRepository implements SocialPostRepository {
 }
 
 class _FakeCommunityRepository implements CommunityRepository {
+  _FakeCommunityRepository({this.items = const []});
+
+  final List<Community> items;
+
   @override
   Future<PaginatedResponse<Community>> list({
     required int page,
@@ -2920,7 +3071,18 @@ class _FakeCommunityRepository implements CommunityRepository {
     String? category,
     bool? joined,
   }) async {
-    return PaginatedResponse<Community>.empty(page: page, size: size);
+    return PaginatedResponse<Community>(
+      items: items,
+      page: page,
+      size: size,
+      totalItems: items.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      filters: const {},
+    );
   }
 
   @override
@@ -2943,6 +3105,20 @@ class _FakeCommunityRepository implements CommunityRepository {
   Future<Community> leave(String id) {
     throw UnimplementedError();
   }
+}
+
+Community _joinedCommunity() {
+  return Community(
+    id: 'community-joined',
+    slug: 'relacoes-e-limites',
+    name: 'Relações e Limites',
+    description: 'Um espaço para compartilhar reflexões com cuidado.',
+    visibility: 'PUBLIC',
+    category: 'relacionamentos',
+    memberCount: 12,
+    joined: true,
+    createdAt: DateTime(2026, 6, 3),
+  );
 }
 
 class _FakeNotificationRepository implements NotificationRepository {

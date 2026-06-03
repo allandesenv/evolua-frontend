@@ -11,6 +11,9 @@ class NotificationBellButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final notificationsState = ref.watch(notificationInboxControllerProvider);
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -22,8 +25,42 @@ class NotificationBellButton extends ConsumerWidget {
               builder: (context) => const _NotificationInboxDialog(),
             );
           },
-          icon: const Icon(Icons.notifications_none_rounded),
+          icon: Icon(
+            unreadCount > 0
+                ? Icons.notifications_active_rounded
+                : Icons.notifications_none_rounded,
+          ),
         ),
+        if (unreadCount > 0)
+          Positioned(
+            right: 4,
+            top: 2,
+            child: Container(
+              key: const ValueKey('notification-unread-badge'),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.danger,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                unreadCount > 9 ? '9+' : '$unreadCount',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        if (notificationsState.isLoading && !notificationsState.hasValue)
+          const Positioned(
+            right: -2,
+            bottom: -2,
+            child: SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
       ],
     );
   }

@@ -32,6 +32,7 @@ class SocialCommunitiesArea extends StatefulWidget {
     required this.onRetryLoadMore,
     required this.onView,
     required this.onJoin,
+    this.joiningCommunityId,
     required this.canCreate,
     required this.onCreate,
     required this.headline,
@@ -60,6 +61,7 @@ class SocialCommunitiesArea extends StatefulWidget {
   final VoidCallback onRetryLoadMore;
   final ValueChanged<Community> onView;
   final Future<void> Function(Community community) onJoin;
+  final String? joiningCommunityId;
   final bool canCreate;
   final VoidCallback onCreate;
   final String headline;
@@ -260,6 +262,8 @@ class _SocialCommunitiesAreaState extends State<SocialCommunitiesArea> {
                       itemCount: result.items.length,
                       itemBuilder: (context, index) {
                         final community = result.items[index];
+                        final isJoining =
+                            widget.joiningCommunityId == community.id;
                         return Padding(
                           key: ValueKey(community.id),
                           padding: const EdgeInsets.only(bottom: 12),
@@ -267,6 +271,7 @@ class _SocialCommunitiesAreaState extends State<SocialCommunitiesArea> {
                             community: community,
                             onView: () => onView(community),
                             onJoin: () => onJoin(community),
+                            isJoining: isJoining,
                           ),
                         );
                       },
@@ -473,11 +478,13 @@ class _CommunityCard extends StatelessWidget {
     required this.community,
     required this.onView,
     required this.onJoin,
+    required this.isJoining,
   });
 
   final Community community;
   final VoidCallback onView;
   final VoidCallback onJoin;
+  final bool isJoining;
 
   @override
   Widget build(BuildContext context) {
@@ -555,9 +562,14 @@ class _CommunityCard extends StatelessWidget {
                     label: const Text('Ver espaço'),
                   )
                 : FilledButton.icon(
-                    onPressed: onJoin,
-                    icon: const Icon(Icons.group_add_rounded),
-                    label: const Text('Entrar'),
+                    onPressed: isJoining ? null : onJoin,
+                    icon: isJoining
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.group_add_rounded),
+                    label: Text(isJoining ? 'Entrando...' : 'Entrar'),
                   ),
           ),
         ],

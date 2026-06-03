@@ -58,6 +58,12 @@ final currentJourneyTrailProvider = FutureProvider<Trail?>((ref) async {
   return ref.watch(trailRepositoryProvider).currentJourney();
 });
 
+final inProgressTrailJourneysProvider = FutureProvider<List<TrailJourney>>((
+  ref,
+) async {
+  return ref.watch(trailRepositoryProvider).listInProgressJourneys();
+});
+
 final trailJourneyProvider = FutureProvider.family<TrailJourney, int>((
   ref,
   trailId,
@@ -98,6 +104,7 @@ class TrailJourneyActions {
         .startJourney(trailId);
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
+    _ref.invalidate(inProgressTrailJourneysProvider);
     return journey;
   }
 
@@ -107,6 +114,7 @@ class TrailJourneyActions {
         .completeStep(trailId, stepIndex);
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
+    _ref.invalidate(inProgressTrailJourneysProvider);
     return journey;
   }
 
@@ -126,6 +134,7 @@ class TrailJourneyActions {
         );
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
+    _ref.invalidate(inProgressTrailJourneysProvider);
     return journey;
   }
 
@@ -272,6 +281,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
 
       ref.invalidate(trailJourneyProvider(id));
       ref.invalidate(currentJourneyTrailProvider);
+      ref.invalidate(inProgressTrailJourneysProvider);
       return _fetch(page: currentPage);
     });
   }
@@ -284,6 +294,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
       await repository.delete(id);
       ref.invalidate(trailJourneyProvider(id));
       ref.invalidate(currentJourneyTrailProvider);
+      ref.invalidate(inProgressTrailJourneysProvider);
       return _fetch(page: currentPage);
     });
   }
