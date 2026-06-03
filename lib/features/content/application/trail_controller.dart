@@ -1,6 +1,7 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/data/repositories/trail_repository_impl.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -35,7 +36,8 @@ class TrailCatalogLoadMoreState {
   final bool loadMoreError;
 }
 
-class TrailCatalogLoadMoreController extends Notifier<TrailCatalogLoadMoreState> {
+class TrailCatalogLoadMoreController
+    extends Notifier<TrailCatalogLoadMoreState> {
   @override
   TrailCatalogLoadMoreState build() => const TrailCatalogLoadMoreState();
 
@@ -63,7 +65,7 @@ final trailJourneyProvider = FutureProvider.family<TrailJourney, int>((
   return ref.watch(trailRepositoryProvider).journey(trailId);
 });
 
-typedef TrailStepResponseKey = ({int trailId, int stepIndex});
+typedef TrailStepResponseKey = ({String userId, int trailId, int stepIndex});
 
 final trailStepResponseProvider =
     FutureProvider.family<TrailStepResponse?, TrailStepResponseKey>((
@@ -128,10 +130,16 @@ class TrailJourneyActions {
   }
 
   Future<TrailStepResponse> saveStepResponse({
+    required String userId,
     required int trailId,
     required int stepIndex,
     required String responseText,
   }) async {
+    final session = _ref.read(authControllerProvider).asData?.value;
+    if (session == null || session.userId != userId) {
+      throw StateError('Sessao invalida para salvar resposta da trilha.');
+    }
+
     final response = await _ref
         .read(trailRepositoryProvider)
         .saveStepResponse(
@@ -140,7 +148,11 @@ class TrailJourneyActions {
           responseText: responseText,
         );
     _ref.invalidate(
-      trailStepResponseProvider((trailId: trailId, stepIndex: stepIndex)),
+      trailStepResponseProvider((
+        userId: userId,
+        trailId: trailId,
+        stepIndex: stepIndex,
+      )),
     );
     _ref.invalidate(trailStepResponsesProvider);
     return response;
@@ -186,9 +198,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
   Future<void> loadNextPage() async {
     final current = state.asData?.value;
     final loadMoreState = ref.read(trailCatalogLoadMoreStateProvider);
-    if (current == null ||
-        !current.hasNext ||
-        loadMoreState.isLoadingMore) {
+    if (current == null || !current.hasNext || loadMoreState.isLoadingMore) {
       return;
     }
 

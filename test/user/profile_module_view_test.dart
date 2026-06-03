@@ -8,6 +8,9 @@ import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
+import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
+import 'package:evolua_frontend/features/care/domain/entities/care_access_status.dart';
+import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -120,7 +123,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
-    await tester.binding.setSurfaceSize(const Size(390, 900));
+    await tester.binding.setSurfaceSize(const Size(390, 780));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -288,6 +291,34 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
     },
   );
+
+  testWidgets('dashboard dismisses compact check-in by tapping outside', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        checkInRepository: _FakeCheckInRepository(items: [_pastCheckIn()]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsOneWidget);
+    final barrier = tester.widget<ModalBarrier>(find.byType(ModalBarrier).last);
+    expect(barrier.dismissible, isTrue);
+    final sheetTop = tester.getTopLeft(find.byType(BottomSheet)).dy;
+    expect(sheetTop, greaterThan(0));
+
+    await tester.tapAt(Offset(195, sheetTop / 2));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
+  });
 
   testWidgets('dashboard first experience starts exactly one check-in prompt', (
     tester,
@@ -1081,6 +1112,107 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('shows Evolua Care callout in evolution mirror', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(tester, premium: false);
+
+    expect(find.text('Compartilhe sua evolução com segurança'), findsOneWidget);
+    expect(find.text('Conectar terapeuta'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows care management copy when secure access exists', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: false,
+      careShareState: CareShareState.fromSession(
+        CareShareSession(
+          shareId: 'share-1',
+          numericCode: '123456',
+          status: CareAccessStatus.connected,
+          createdAt: DateTime(2026, 1, 1),
+          expiresAt: DateTime(2026, 1, 8),
+          claimedAt: DateTime(2026, 1, 2),
+        ),
+      ),
+    );
+
+    expect(find.text('Gerencie seu Evolua Care'), findsOneWidget);
+    expect(find.text('Gerenciar Evolua Care'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('care callout opens existing care share route', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Scaffold(
+            body: SingleChildScrollView(
+              child: ProfileModuleView(
+                section: ProfileModuleSection.evolutionMirror,
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/care/share',
+          builder: (context, state) =>
+              const Scaffold(body: Text('Care share route')),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
+          checkInRepositoryProvider.overrideWithValue(_FakeCheckInRepository()),
+          futureMessageRepositoryProvider.overrideWithValue(
+            _FakeFutureMessageRepository(),
+          ),
+          careShareControllerProvider.overrideWith(
+            () => _FakeCareShareController(const CareShareState.idle()),
+          ),
+          authenticatedDioProvider(
+            AppConfig.userBaseUrl,
+          ).overrideWithValue(_fakeUserDio()),
+        ],
+        child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Conectar terapeuta'));
+    await tester.tap(find.text('Conectar terapeuta'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Care share route'), findsOneWidget);
+  });
+
   testWidgets('renders evolution mirror with journey and insight data', (
     tester,
   ) async {
@@ -1640,6 +1772,7 @@ Future<void> _pumpEvolutionMirror(
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
   FutureMessageRepository? futureMessageRepository,
+  CareShareState careShareState = const CareShareState.idle(),
   bool premium = false,
   Size surfaceSize = const Size(390, 1100),
   double textScaleFactor = 1,
@@ -1666,6 +1799,9 @@ Future<void> _pumpEvolutionMirror(
         ),
         futureMessageRepositoryProvider.overrideWithValue(
           futureMessageRepository ?? _FakeFutureMessageRepository(),
+        ),
+        careShareControllerProvider.overrideWith(
+          () => _FakeCareShareController(careShareState),
         ),
         authenticatedDioProvider(
           AppConfig.userBaseUrl,
@@ -1723,6 +1859,9 @@ Widget _dashboardShell({
       ),
       futureMessageRepositoryProvider.overrideWithValue(
         _FakeFutureMessageRepository(),
+      ),
+      careShareControllerProvider.overrideWith(
+        () => _FakeCareShareController(const CareShareState.idle()),
       ),
       dailyRitualRepositoryProvider.overrideWithValue(
         const _FakeDailyRitualRepository(),
@@ -2158,6 +2297,19 @@ CheckIn _todayCheckIn() {
   );
 }
 
+CheckIn _pastCheckIn() {
+  return CheckIn(
+    id: 998,
+    userId: 'user-123',
+    mood: 'calmo',
+    reflection: '',
+    energyLevel: 7,
+    recommendedPractice: 'Respire por alguns minutos.',
+    aiInsight: null,
+    createdAt: DateTime.now().subtract(const Duration(days: 1)),
+  );
+}
+
 List<CheckIn> _evolutionRichCheckIns() {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -2229,6 +2381,15 @@ class _SharedPreferencesAuthSessionStorage implements AuthSessionStorage {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_key);
   }
+}
+
+class _FakeCareShareController extends CareShareController {
+  _FakeCareShareController(this._state);
+
+  final CareShareState _state;
+
+  @override
+  Future<CareShareState> build() async => _state;
 }
 
 class _FakeAuthRepository implements AuthRepository {

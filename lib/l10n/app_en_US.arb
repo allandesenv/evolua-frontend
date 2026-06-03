@@ -6,6 +6,8 @@
   "authRegisterTab": "Create account",
   "authGoogleContinue": "Continue with Google",
   "authLoginFallbackError": "We could not authenticate you. Review your details and try again.",
+  "authRegisterFallbackError": "We could not create your account right now. Check your details and try again.",
+  "authRegisterEmailExistsError": "This email is already registered. Sign in to your account or use another email.",
   "authGoogleStartError": "We could not start Google sign-in. Try again.",
   "authDisplayNameLabel": "Name",
   "authDisplayNameHint": "How would you like to be called?",

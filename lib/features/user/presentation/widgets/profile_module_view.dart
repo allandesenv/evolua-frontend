@@ -5,6 +5,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/utils/auth_form_validators.dart';
+import 'package:evolua_frontend/features/care/application/care_share_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
@@ -1760,6 +1761,8 @@ class _EvolutionMirrorSection extends ConsumerWidget {
     final activeTrail = currentJourneyState.asData?.value;
     final journey = journeyState?.asData?.value;
     final futureMessages = futureMessageState.asData?.value;
+    final careShareState = ref.watch(careShareControllerProvider).asData?.value;
+    final hasCareAccess = careShareState?.hasActiveAccess ?? false;
     final shouldShowFutureMessages =
         futureMessages != null &&
         (futureMessages.readyToRead.isNotEmpty ||
@@ -1862,7 +1865,101 @@ class _EvolutionMirrorSection extends ConsumerWidget {
               'Uma leitura de continuidade para ajudar você a voltar sem peso quando o ritmo oscilar.',
           child: _ConsistencyPanel(stats: stats),
         ),
+        const SizedBox(height: 16),
+        _EvolutionCareShareCard(hasActiveAccess: hasCareAccess),
       ],
+    );
+  }
+}
+
+class _EvolutionCareShareCard extends StatelessWidget {
+  const _EvolutionCareShareCard({required this.hasActiveAccess});
+
+  final bool hasActiveAccess;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = hasActiveAccess
+        ? 'Gerencie seu Evolua Care'
+        : 'Compartilhe sua evolução com segurança';
+    final description = hasActiveAccess
+        ? 'Seu acesso seguro do Evolua Care está disponível para acompanhar o que você autorizou compartilhar com seu terapeuta.'
+        : 'Com o Evolua Care, você pode gerar um acesso seguro para que seu terapeuta acompanhe seus registros autorizados e envie orientações personalizadas.';
+    final actionLabel = hasActiveAccess
+        ? 'Gerenciar Evolua Care'
+        : 'Conectar terapeuta';
+
+    return PrimaryPanel(
+      semanticLabel: 'Evolua Care no Espelho da Evolução',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final icon = Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.22),
+              ),
+            ),
+            child: const Icon(
+              Icons.health_and_safety_outlined,
+              color: AppColors.accent,
+            ),
+          );
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                  height: 1.42,
+                ),
+              ),
+            ],
+          );
+          final action = OutlinedButton.icon(
+            onPressed: () => context.push('/care/share'),
+            icon: const Icon(Icons.shield_outlined),
+            label: Text(actionLabel),
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                icon,
+                const SizedBox(height: 12),
+                copy,
+                const SizedBox(height: 14),
+                SizedBox(width: double.infinity, child: action),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              icon,
+              const SizedBox(width: 14),
+              Expanded(child: copy),
+              const SizedBox(width: 16),
+              action,
+            ],
+          );
+        },
+      ),
     );
   }
 }

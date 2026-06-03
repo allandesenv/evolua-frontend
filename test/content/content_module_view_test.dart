@@ -375,6 +375,60 @@ void main() {
       expect(editableText.controller.text, 'Resposta guardada no diario.');
     });
 
+    testWidgets('step response editor clears immediately when user changes', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final authController = _MutableFakeAuthController(userId: 'user-a');
+      final trailRepository = _FakeTrailRepository(
+        initialResponses: {
+          (trailId: 1, stepIndex: 0): 'Resposta privada do usuario A.',
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(() => authController),
+          trailRepositoryProvider.overrideWithValue(trailRepository),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(
+              body: SizedBox.expand(
+                child: ContentModuleView(showSectionChips: true),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final field = find.byType(TextField).first;
+      var editableText = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editableText.controller.text, 'Resposta privada do usuario A.');
+
+      trailRepository.savedResponses.clear();
+      authController.switchUser('user-b');
+      await tester.pump();
+
+      editableText = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(editableText.controller.text, isEmpty);
+      expect(find.text('Resposta privada do usuario A.'), findsNothing);
+    });
+
     testWidgets('journey advances without requiring a step response', (
       tester,
     ) async {
@@ -967,6 +1021,29 @@ class _FakeAuthController extends AuthController {
     return AuthSession(
       userId: userId,
       email: '$userId@evolua.test',
+      roles: const ['ROLE_USER'],
+      accessToken: 'test-token',
+    );
+  }
+}
+
+class _MutableFakeAuthController extends AuthController {
+  _MutableFakeAuthController({required String userId}) : _userId = userId;
+
+  String _userId;
+
+  @override
+  Future<AuthSession?> build() async => _session();
+
+  void switchUser(String userId) {
+    _userId = userId;
+    state = AsyncData(_session());
+  }
+
+  AuthSession _session() {
+    return AuthSession(
+      userId: _userId,
+      email: '$_userId@evolua.test',
       roles: const ['ROLE_USER'],
       accessToken: 'test-token',
     );

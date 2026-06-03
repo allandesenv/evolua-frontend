@@ -42,6 +42,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   bool _isPasswordVisible = false;
   bool _isSubmitting = false;
   bool _isOAuthStarting = false;
+  bool _authErrorSnackBarShown = false;
   bool _submitted = false;
   DateTime? _birthDate;
   String? _birthDateError;
@@ -63,18 +64,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         return;
       }
 
-      final message = _isPublicLoginAuthError(error)
-          ? context.l10n.authLoginFallbackError
-          : extractApiErrorMessage(
-              error,
-              fallback: context.l10n.authLoginFallbackError,
-            );
-
-      AppSnackBar.show(
-        context,
-        message: message,
-        icon: Icons.info_outline_rounded,
-      );
+      _showAuthErrorSnackBar(error);
     });
   }
 
@@ -93,6 +83,113 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       return false;
     }
     return error.requestOptions.path.contains('/v1/public/auth/login');
+  }
+
+  bool _isConnectionOrTimeout(Object error) {
+    if (error is! DioException) {
+      return false;
+    }
+
+    return error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.receiveTimeout;
+  }
+
+  bool _isEmailAlreadyRegistered(Object error) {
+    if (error is! DioException) {
+      return false;
+    }
+
+    final data = error.response?.data;
+    final text = <String>[
+      error.response?.statusCode.toString() ?? '',
+      if (data is Map<String, dynamic>) ...[
+        data['code']?.toString() ?? '',
+        data['error']?.toString() ?? '',
+        data['message']?.toString() ?? '',
+        if (data['details'] is List)
+          ...(data['details'] as List).map((detail) => detail.toString()),
+      ] else if (data != null)
+        data.toString(),
+    ].join(' ').toLowerCase();
+
+    final mentionsEmail = text.contains('email') || text.contains('e-mail');
+    final mentionsDuplicate =
+        text.contains('already') ||
+        text.contains('registered') ||
+        text.contains('exists') ||
+        text.contains('taken') ||
+        text.contains('duplicate') ||
+        text.contains('cadastrad') ||
+        text.contains('existe') ||
+        text.contains('uso');
+
+    return mentionsEmail && mentionsDuplicate;
+  }
+
+  String _authErrorMessage(Object error) {
+    if (_isRegisterMode) {
+      return _registerErrorMessage(error);
+    }
+
+    if (_isPublicLoginAuthError(error)) {
+      return context.l10n.authLoginFallbackError;
+    }
+
+    return extractApiErrorMessage(
+      error,
+      fallback: context.l10n.authLoginFallbackError,
+    );
+  }
+
+  String _registerErrorMessage(Object error) {
+    if (_isConnectionOrTimeout(error)) {
+      return context.l10n.errorNoInternet;
+    }
+
+    if (_isEmailAlreadyRegistered(error)) {
+      return context.l10n.authRegisterEmailExistsError;
+    }
+
+    final message = extractApiErrorMessage(
+      error,
+      fallback: context.l10n.authRegisterFallbackError,
+    );
+
+    if (_looksLikeEmailAlreadyRegistered(message)) {
+      return context.l10n.authRegisterEmailExistsError;
+    }
+
+    return message;
+  }
+
+  bool _looksLikeEmailAlreadyRegistered(String message) {
+    final lower = message.toLowerCase();
+    final mentionsEmail = lower.contains('email') || lower.contains('e-mail');
+    final mentionsDuplicate =
+        lower.contains('already') ||
+        lower.contains('registered') ||
+        lower.contains('exists') ||
+        lower.contains('taken') ||
+        lower.contains('duplicate') ||
+        lower.contains('cadastrad') ||
+        lower.contains('existe') ||
+        lower.contains('uso');
+    return mentionsEmail && mentionsDuplicate;
+  }
+
+  void _showAuthErrorSnackBar(Object error) {
+    if (!mounted || _authErrorSnackBarShown) {
+      return;
+    }
+
+    _authErrorSnackBarShown = true;
+    AppSnackBar.show(
+      context,
+      message: _authErrorMessage(error),
+      icon: Icons.info_outline_rounded,
+    );
   }
 
   @override
@@ -135,6 +232,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
 
     final controller = ref.read(authControllerProvider.notifier);
     setState(() => _isSubmitting = true);
+    _authErrorSnackBarShown = false;
 
     try {
       if (_isRegisterMode) {
@@ -162,6 +260,8 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         email: normalizeEmail(_emailController.text),
         password: _passwordController.text,
       );
+    } catch (error) {
+      _showAuthErrorSnackBar(error);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);

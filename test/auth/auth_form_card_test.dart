@@ -365,6 +365,105 @@ void main() {
       expect(repository.loginCalls, 1);
     });
 
+    testWidgets('shows register connection error and releases submit button', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = _FakeAuthRepository(
+        registerHandler:
+            ({required displayName, required email, required password}) async {
+              throw DioException(
+                type: DioExceptionType.connectionError,
+                requestOptions: RequestOptions(
+                  path: '/v1/public/auth/register',
+                ),
+                error: 'offline',
+              );
+            },
+      );
+      final container = _buildContainer(repository);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [Locale('pt', 'BR'), Locale('en', 'US')],
+            home: const Scaffold(
+              body: SingleChildScrollView(
+                child: AuthFormCard(initialRegisterMode: true),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await _fillValidRegisterForm(tester);
+      await _tapSubmit(tester, 'Criar conta');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Não conseguimos conectar agora. Verifique sua internet e tente novamente.',
+        ),
+        findsOneWidget,
+      );
+      expect(container.read(authControllerProvider).isLoading, isFalse);
+      expect(container.read(authControllerProvider).hasError, isTrue);
+      expect(
+        tester
+            .widget<ElevatedButton>(find.byType(ElevatedButton).last)
+            .onPressed,
+        isNotNull,
+      );
+      expect(find.text('novo@evolua.app'), findsOneWidget);
+      expect(repository.loginCalls, 0);
+    });
+
+    testWidgets('shows friendly register error when email already exists', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final repository = _FakeAuthRepository(
+        registerHandler:
+            ({required displayName, required email, required password}) async {
+              throw DioException(
+                requestOptions: RequestOptions(
+                  path: '/v1/public/auth/register',
+                ),
+                response: Response(
+                  requestOptions: RequestOptions(
+                    path: '/v1/public/auth/register',
+                  ),
+                  statusCode: 409,
+                  data: {'message': 'Email already registered.'},
+                ),
+              );
+            },
+      );
+
+      await tester.pumpWidget(
+        _testApp(repository: repository, initialRegisterMode: true),
+      );
+
+      await _fillValidRegisterForm(tester);
+      await _tapSubmit(tester, 'Criar conta');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Este e-mail já está cadastrado. Entre com sua conta ou use outro e-mail.',
+        ),
+        findsOneWidget,
+      );
+      expect(repository.loginCalls, 0);
+    });
+
     testWidgets('date picker fills masked birth date field', (tester) async {
       SharedPreferences.setMockInitialValues({});
       await tester.pumpWidget(
@@ -506,6 +605,18 @@ Future<void> _startGoogleOAuth(WidgetTester tester) async {
   final onPressed = widget.onPressed;
   expect(onPressed, isNotNull);
   onPressed!();
+}
+
+Future<void> _fillValidRegisterForm(WidgetTester tester) async {
+  await tester.enterText(find.byType(TextFormField).at(0), 'Novo Usuario');
+  await tester.enterText(
+    find.byKey(const Key('auth-birth-date-field')),
+    '01011990',
+  );
+  await tester.enterText(find.byType(TextFormField).at(2), 'novo@evolua.app');
+  await tester.enterText(find.byType(TextFormField).at(3), '123456');
+  await tester.enterText(find.byType(TextFormField).at(4), '123456');
+  await tester.pump();
 }
 
 ProviderContainer _buildContainer(_FakeAuthRepository repository) {

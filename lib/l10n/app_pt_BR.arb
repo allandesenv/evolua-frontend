@@ -6,6 +6,8 @@
   "authRegisterTab": "Criar conta",
   "authGoogleContinue": "Continuar com Google",
   "authLoginFallbackError": "Não foi possível autenticar. Revise os dados e tente novamente.",
+  "authRegisterFallbackError": "Não foi possível criar sua conta agora. Verifique os dados e tente novamente.",
+  "authRegisterEmailExistsError": "Este e-mail já está cadastrado. Entre com sua conta ou use outro e-mail.",
   "authGoogleStartError": "Não foi possível iniciar o login com Google. Tente novamente.",
   "authDisplayNameLabel": "Nome",
   "authDisplayNameHint": "Como você quer ser chamado",

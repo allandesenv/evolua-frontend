@@ -28,6 +28,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'We could not authenticate you. Review your details and try again.';
 
   @override
+  String get authRegisterFallbackError =>
+      'We could not create your account right now. Check your details and try again.';
+
+  @override
+  String get authRegisterEmailExistsError =>
+      'This email is already registered. Sign in to your account or use another email.';
+
+  @override
   String get authGoogleStartError =>
       'We could not start Google sign-in. Try again.';
 
@@ -1011,6 +1019,14 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   @override
   String get authLoginFallbackError =>
       'We could not authenticate you. Review your details and try again.';
+
+  @override
+  String get authRegisterFallbackError =>
+      'We could not create your account right now. Check your details and try again.';
+
+  @override
+  String get authRegisterEmailExistsError =>
+      'This email is already registered. Sign in to your account or use another email.';
 
   @override
   String get authGoogleStartError =>
