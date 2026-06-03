@@ -170,6 +170,27 @@ class TrailRepositoryImpl implements TrailRepository {
   }
 
   @override
+  Future<List<TrailJourney>> listInProgressJourneys() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/v1/trails/journeys/in-progress',
+      );
+      return ApiPayloadParser.dataList(
+        response.data,
+      ).map((item) => TrailJourneyDto.fromJson(item).toEntity()).toList();
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 404) {
+        rethrow;
+      }
+      final trail = await currentJourney();
+      if (trail == null) {
+        return const [];
+      }
+      return [await journey(trail.id)];
+    }
+  }
+
+  @override
   Future<TrailJourney> journey(int trailId) async {
     final response = await _dio.get<dynamic>('/v1/trails/$trailId/journey');
     return TrailJourneyDto.fromJson(

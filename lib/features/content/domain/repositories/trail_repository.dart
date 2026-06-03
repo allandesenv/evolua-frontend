@@ -41,6 +41,8 @@ abstract class TrailRepository {
 
   Future<Trail?> currentJourney();
 
+  Future<List<TrailJourney>> listInProgressJourneys();
+
   Future<TrailJourney> journey(int trailId);
 
   Future<TrailJourney> startJourney(int trailId);

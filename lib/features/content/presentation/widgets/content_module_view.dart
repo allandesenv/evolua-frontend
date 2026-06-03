@@ -2345,21 +2345,32 @@ String _categoryLabel(String category) {
   return category.trim().toLowerCase();
 }
 
-void _showStepSheet(
+bool _isStepSheetOpen = false;
+
+Future<void> _showStepSheet(
   BuildContext context,
   TrailJourney journey,
   TrailJourneyStep initialStep,
-) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: context.evoluaColors.backgroundSecondary,
-    builder: (context) => _JourneyStepSheet(
-      journey: journey,
-      initialStep: initialStep,
-      activeColor: _journeyAccentColor(journey.trail),
-    ),
-  );
+) async {
+  if (_isStepSheetOpen) {
+    return;
+  }
+
+  _isStepSheetOpen = true;
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.evoluaColors.backgroundSecondary,
+      builder: (context) => _JourneyStepSheet(
+        journey: journey,
+        initialStep: initialStep,
+        activeColor: _journeyAccentColor(journey.trail),
+      ),
+    );
+  } finally {
+    _isStepSheetOpen = false;
+  }
 }
 
 class _JourneyStepSheet extends StatefulWidget {

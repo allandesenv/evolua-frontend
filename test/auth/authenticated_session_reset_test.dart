@@ -337,6 +337,9 @@ class _FakeTrailRepository implements TrailRepository {
   Future<Trail?> currentJourney() async => null;
 
   @override
+  Future<List<TrailJourney>> listInProgressJourneys() async => const [];
+
+  @override
   Future<TrailJourney> journey(int trailId) {
     throw UnimplementedError();
   }

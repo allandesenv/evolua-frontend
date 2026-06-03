@@ -871,6 +871,10 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
     final checkInState = ref.watch(checkInControllerProvider);
     final futureMessageState = ref.watch(futureMessageControllerProvider);
     final currentJourneyState = ref.watch(currentJourneyTrailProvider);
+    final inProgressTrailJourneysState =
+        _section == ProfileModuleSection.evolutionMirror
+        ? ref.watch(inProgressTrailJourneysProvider)
+        : const AsyncData(<TrailJourney>[]);
     final activeJourney = currentJourneyState.asData?.value;
     final journeyState = activeJourney == null
         ? null
@@ -1034,6 +1038,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
               checkInState: checkInState,
               futureMessageState: futureMessageState,
               currentJourneyState: currentJourneyState,
+              inProgressTrailJourneysState: inProgressTrailJourneysState,
               journeyState: journeyState,
               onOpenFutureMessages: () => context.push('/future-messages'),
             )
@@ -1737,6 +1742,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
     required this.checkInState,
     required this.futureMessageState,
     required this.currentJourneyState,
+    required this.inProgressTrailJourneysState,
     required this.journeyState,
     required this.onOpenFutureMessages,
   });
@@ -1744,6 +1750,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
   final AsyncValue<CheckInHistoryState> checkInState;
   final AsyncValue<FutureMessageState> futureMessageState;
   final AsyncValue<Trail?> currentJourneyState;
+  final AsyncValue<List<TrailJourney>> inProgressTrailJourneysState;
   final AsyncValue<TrailJourney>? journeyState;
   final VoidCallback onOpenFutureMessages;
 
@@ -1818,7 +1825,7 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
-          title: 'Mensagem da IA',
+          title: 'Leitura do seu momento',
           description:
               'Uma leitura curta a partir do último insight salvo, sem gerar nova análise.',
           child: _AiInsightMirrorPanel(insight: latestInsight, stats: stats),
@@ -1839,10 +1846,9 @@ class _EvolutionMirrorSection extends ConsumerWidget {
         _EvolutionSectionGroup(
           title: 'Trilhas em andamento',
           description:
-              'Acompanhe a trilha que está guiando seus próximos passos.',
+              'Acompanhe as trilhas que estão guiando seus próximos passos.',
           child: _TrailEvolutionPanel(
-            currentJourneyState: currentJourneyState,
-            journeyState: journeyState,
+            inProgressTrailJourneysState: inProgressTrailJourneysState,
           ),
         ),
         const SizedBox(height: 16),
@@ -2317,30 +2323,55 @@ class _EvolutionSignalRow extends StatelessWidget {
 }
 
 class _TrailEvolutionPanel extends StatelessWidget {
-  const _TrailEvolutionPanel({
-    required this.currentJourneyState,
-    required this.journeyState,
-  });
+  const _TrailEvolutionPanel({required this.inProgressTrailJourneysState});
 
-  final AsyncValue<Trail?> currentJourneyState;
-  final AsyncValue<TrailJourney>? journeyState;
+  final AsyncValue<List<TrailJourney>> inProgressTrailJourneysState;
 
   @override
   Widget build(BuildContext context) {
-    final trail = currentJourneyState.asData?.value;
-    if (currentJourneyState.isLoading && trail == null) {
+    final journeys = inProgressTrailJourneysState.asData?.value;
+    if (inProgressTrailJourneysState.isLoading && journeys == null) {
       return const LinearProgressIndicator();
     }
-    if (trail == null) {
+    if (inProgressTrailJourneysState.hasError && journeys == null) {
+      return Text(
+        'Não foi possível carregar suas trilhas em andamento agora.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+    if (journeys == null || journeys.isEmpty) {
       return Text(
         'Quando uma trilha estiver ativa, ela aparece aqui como mapa de progresso.',
         style: Theme.of(context).textTheme.bodyMedium,
       );
     }
 
-    final journey = journeyState?.asData?.value;
-    final progress = (journey?.progressPercent ?? 0).clamp(0, 100);
-    final nextStep = journey?.nextStep?.title ?? 'Retomar no seu ritmo';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var index = 0; index < journeys.length; index++) ...[
+          _TrailEvolutionItem(journey: journeys[index]),
+          if (index < journeys.length - 1) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _TrailEvolutionItem extends StatelessWidget {
+  const _TrailEvolutionItem({required this.journey});
+
+  final TrailJourney journey;
+
+  @override
+  Widget build(BuildContext context) {
+    final trail = journey.trail;
+    final progress = journey.progressPercent.clamp(0, 100);
+    final nextStep = journey.nextStep?.title ?? 'Retomar no seu ritmo';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2362,11 +2393,9 @@ class _TrailEvolutionPanel extends StatelessWidget {
           runSpacing: 8,
           children: [
             _MiniStatusPill(label: '$progress% concluído'),
-            if (journey != null)
-              _MiniStatusPill(
-                label:
-                    '${journey.completedSteps}/${journey.steps.length} etapas',
-              ),
+            _MiniStatusPill(
+              label: '${journey.completedSteps}/${journey.steps.length} etapas',
+            ),
           ],
         ),
         const SizedBox(height: 8),
