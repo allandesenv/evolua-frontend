@@ -7,6 +7,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.da
 import 'package:evolua_frontend/shared/presentation/widgets/keyboard_aware_form_scroll_view.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -29,19 +30,26 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    FocusManager.instance.addListener(_handleFocusChanged);
+    if (!kIsWeb) {
+      WidgetsBinding.instance.addObserver(this);
+      FocusManager.instance.addListener(_handleFocusChanged);
+    }
   }
 
   @override
   void dispose() {
-    FocusManager.instance.removeListener(_handleFocusChanged);
-    WidgetsBinding.instance.removeObserver(this);
+    if (!kIsWeb) {
+      FocusManager.instance.removeListener(_handleFocusChanged);
+      WidgetsBinding.instance.removeObserver(this);
+    }
     super.dispose();
   }
 
   @override
   void didChangeMetrics() {
+    if (kIsWeb) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -51,11 +59,14 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
   }
 
   void _handleFocusChanged() {
+    if (kIsWeb) {
+      return;
+    }
     _updateKeyboardBackState();
   }
 
   void _updateKeyboardBackState() {
-    if (!mounted) {
+    if (kIsWeb || !mounted) {
       return;
     }
     final view = View.of(context);
@@ -97,6 +108,34 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
       }
     });
 
+    final page = GradientScaffold(
+      resizeToAvoidBottomInset: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final padding = _pagePadding(constraints.maxWidth);
+          return ColoredBox(
+            color: context.evoluaColors.background,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 1180,
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Padding(padding: padding, child: _buildBody(state)),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if (kIsWeb) {
+      return page;
+    }
+
     return PopScope<void>(
       canPop: !_shouldInterceptKeyboardBack,
       onPopInvokedWithResult: (didPop, _) {
@@ -109,29 +148,7 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
           _updateKeyboardBackState();
         });
       },
-      child: GradientScaffold(
-        resizeToAvoidBottomInset: true,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final padding = _pagePadding(constraints.maxWidth);
-            return ColoredBox(
-              color: context.evoluaColors.background,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 1180,
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: Padding(padding: padding, child: _buildBody(state)),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+      child: page,
     );
   }
 

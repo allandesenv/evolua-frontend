@@ -13,6 +13,93 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('notification bell shows unread badge and active icon', (
+    tester,
+  ) async {
+    final repository = _FakeNotificationRepository([_notification(id: 'n-1')]);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.notifications_active_rounded), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notification-unread-badge')),
+      findsOneWidget,
+    );
+    expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets('notification bell caps unread badge at nine plus', (
+    tester,
+  ) async {
+    final repository = _FakeNotificationRepository(
+      List.generate(10, (index) => _notification(id: 'n-$index')),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.notifications_active_rounded), findsOneWidget);
+    expect(find.text('9+'), findsOneWidget);
+  });
+
+  testWidgets('notification bell hides badge when inbox has no unread items', (
+    tester,
+  ) async {
+    final repository = _FakeNotificationRepository([
+      _notification(id: 'n-1', read: true),
+    ]);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('notification-unread-badge')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('reading notification removes bell badge', (tester) async {
+    final repository = _FakeNotificationRepository([_notification(id: 'n-1')]);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Notificações'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Notificação n-1'));
+    await tester.pumpAndSettle();
+
+    expect(repository.readIds, ['n-1']);
+    expect(
+      find.byKey(const ValueKey('notification-unread-badge')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('marking all notifications as read removes bell badge', (
+    tester,
+  ) async {
+    final repository = _FakeNotificationRepository([
+      _notification(id: 'n-1'),
+      _notification(id: 'n-2'),
+    ]);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Notificações'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Marcar todas como lidas'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('notification-unread-badge')),
+      findsNothing,
+    );
+  });
+
   testWidgets('notification tap opens prescribed ritual route', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final repository = _FakeNotificationRepository([
@@ -67,6 +154,36 @@ void main() {
     expect(repository.readIds, isEmpty);
     expect(find.text('ritual-morning'), findsOneWidget);
   });
+}
+
+Widget _testApp(_FakeNotificationRepository repository) {
+  SharedPreferences.setMockInitialValues({});
+  return ProviderScope(
+    overrides: [
+      notificationRepositoryProvider.overrideWithValue(repository),
+      authControllerProvider.overrideWith(
+        () => _FakeAuthController(userId: 'user-1'),
+      ),
+    ],
+    child: const MaterialApp(
+      home: Scaffold(body: Center(child: NotificationBellButton())),
+    ),
+  );
+}
+
+NotificationJob _notification({required String id, bool read = false}) {
+  return NotificationJob(
+    id: id,
+    userId: 'user-1',
+    type: 'ADMIN_MESSAGE',
+    title: 'Notificação $id',
+    message: 'Mensagem $id',
+    actionTarget: null,
+    source: 'ADMIN',
+    createdBy: 'admin',
+    createdAt: DateTime(2026, 6, 3, 9),
+    readAt: read ? DateTime(2026, 6, 3, 9, 5) : null,
+  );
 }
 
 class _FakeAuthController extends AuthController {

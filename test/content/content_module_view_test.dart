@@ -154,6 +154,52 @@ void main() {
       );
     });
 
+    testWidgets('rapid step taps never stack journey bottom sheets', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      final respirarNode = tester.widget<InkWell>(
+        find
+            .ancestor(
+              of: find.text('Respirar').first,
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
+      final escolherNode = tester.widget<InkWell>(
+        find
+            .ancestor(
+              of: find.text('Escolher').first,
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
+
+      respirarNode.onTap!.call();
+      escolherNode.onTap!.call();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text('Sua trilha'), findsOneWidget);
+
+      escolherNode.onTap!.call();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomSheet), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('exercise step response can be saved and edited', (
       tester,
     ) async {
@@ -1108,6 +1154,15 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<Trail?> currentJourney() async => _activeTrail;
+
+  @override
+  Future<List<TrailJourney>> listInProgressJourneys() async {
+    final activeTrail = _activeTrail;
+    if (activeTrail == null) {
+      return const [];
+    }
+    return [await journey(activeTrail.id)];
+  }
 
   @override
   Future<PaginatedResponse<Trail>> list({

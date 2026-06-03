@@ -71,6 +71,59 @@ void main() {
       expect(communities.joinedIds, contains('community-open'));
     });
 
+    testWidgets(
+      'joining a space disables the action and prevents duplicate taps',
+      (tester) async {
+        await _setCompactSurface(tester);
+        final joinGate = Completer<void>();
+        final communities = _FakeCommunityRepository(joinGate: joinGate);
+
+        await tester.pumpWidget(_testApp(communities: communities));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Entrar'));
+        await tester.tap(find.text('Entrar'));
+        await tester.pump();
+
+        expect(find.text('Entrando...'), findsOneWidget);
+        expect(communities.joinedIds, ['community-open']);
+
+        await tester.tap(find.text('Entrando...'));
+        await tester.pump();
+        expect(communities.joinedIds, ['community-open']);
+
+        joinGate.complete();
+        await tester.pumpAndSettle();
+
+        expect(find.text('Sair do espaço'), findsOneWidget);
+      },
+    );
+
+    testWidgets('failed join restores the action and shows friendly feedback', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final communities = _FakeCommunityRepository(
+        joinError: Exception('join failed'),
+      );
+
+      await tester.pumpWidget(_testApp(communities: communities));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Entrar'));
+      await tester.tap(find.text('Entrar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entrar'), findsOneWidget);
+      expect(find.text('Entrando...'), findsNothing);
+      expect(
+        find.text(
+          'Não foi possível entrar neste espaço agora. Tente novamente.',
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('space detail writes reflection without space dropdown', (
       tester,
     ) async {
@@ -270,12 +323,16 @@ class _FakeCommunityRepository implements CommunityRepository {
   _FakeCommunityRepository({
     this.firstListGate,
     this.nextPageGate,
+    this.joinGate,
+    this.joinError,
     Map<int, PaginatedResponse<Community>>? pages,
   }) : pages = pages ?? const {};
 
   final joinedIds = <String>[];
   final Completer<PaginatedResponse<Community>>? firstListGate;
   final Completer<PaginatedResponse<Community>>? nextPageGate;
+  final Completer<void>? joinGate;
+  final Object? joinError;
   final Map<int, PaginatedResponse<Community>> pages;
   final requestedPages = <int>[];
   var _listCalls = 0;
@@ -323,6 +380,10 @@ class _FakeCommunityRepository implements CommunityRepository {
   @override
   Future<Community> join(String id) async {
     joinedIds.add(id);
+    await joinGate?.future;
+    if (joinError != null) {
+      throw joinError!;
+    }
     return _communities().firstWhere((item) => item.id == id);
   }
 

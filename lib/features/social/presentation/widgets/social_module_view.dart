@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
@@ -31,6 +33,7 @@ class SocialModuleView extends ConsumerStatefulWidget {
     this.showScopeChips = true,
     this.onTabChanged,
     this.onOpenFutureMessages,
+    this.onInternalBackChanged,
   });
 
   final SocialModuleTab initialTab;
@@ -40,6 +43,7 @@ class SocialModuleView extends ConsumerStatefulWidget {
   final bool showScopeChips;
   final ValueChanged<SocialModuleTab>? onTabChanged;
   final VoidCallback? onOpenFutureMessages;
+  final ValueChanged<VoidCallback?>? onInternalBackChanged;
 
   @override
   ConsumerState<SocialModuleView> createState() => _SocialModuleViewState();
@@ -55,10 +59,12 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
   String _communityMembershipFilter = 'TODAS';
   String _communityPostVisibility = 'PUBLIC';
   Community? _selectedCommunity;
+  String? _joiningCommunityId;
 
   @override
   void initState() {
     super.initState();
+    widget.onInternalBackChanged?.call(null);
 
     ref.listenManual(socialPostControllerProvider, (previous, next) {
       if (next.hasError) {
@@ -117,12 +123,16 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
       _communityPostContentController.clear();
       _communityPostVisibility = 'PUBLIC';
     });
+    widget.onInternalBackChanged?.call(
+      () => unawaited(_closeCommunityDetail()),
+    );
     await ref
         .read(socialPostControllerProvider.notifier)
         .applyFilters(community: community.slug, visibility: null, mine: null);
   }
 
   Future<void> _closeCommunityDetail() async {
+    widget.onInternalBackChanged?.call(null);
     setState(() => _selectedCommunity = null);
     await _applyCommunityFilters();
   }
@@ -302,6 +312,57 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
     return slug.isEmpty ? 'novo-espaco' : slug;
   }
 
+  Future<void> _joinCommunity(Community community) async {
+    if (_joiningCommunityId != null) {
+      return;
+    }
+
+    setState(() => _joiningCommunityId = community.id);
+    try {
+      await ref.read(communityControllerProvider.notifier).join(community.id);
+      if (!mounted) {
+        return;
+      }
+
+      final state = ref.read(communityControllerProvider);
+      if (state.hasError) {
+        return;
+      }
+
+      Community? joinedCommunity;
+      for (final item
+          in state.asData?.value.result.items ?? const <Community>[]) {
+        if (item.id == community.id) {
+          joinedCommunity = item;
+          break;
+        }
+      }
+      if (joinedCommunity == null) {
+        return;
+      }
+
+      AppSnackBar.show(
+        context,
+        message: 'Você entrou em ${community.name}.',
+        icon: Icons.check_circle_outline_rounded,
+      );
+      await _openCommunityDetail(joinedCommunity);
+    } catch (_) {
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          message:
+              'Não foi possível entrar neste espaço agora. Tente novamente.',
+          icon: Icons.info_outline_rounded,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _joiningCommunityId = null);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final postsState = ref.watch(socialPostControllerProvider);
@@ -374,20 +435,8 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
         onRetryLoadMore: () =>
             ref.read(communityControllerProvider.notifier).retryLoadMore(),
         onView: _openCommunityDetail,
-        onJoin: (community) async {
-          final currentContext = context;
-          await ref
-              .read(communityControllerProvider.notifier)
-              .join(community.id);
-          if (!currentContext.mounted) {
-            return;
-          }
-          AppSnackBar.show(
-            currentContext,
-            message: 'Você entrou em ${community.name}.',
-            icon: Icons.check_circle_outline_rounded,
-          );
-        },
+        joiningCommunityId: _joiningCommunityId,
+        onJoin: _joinCommunity,
         canCreate: canCreateCommunity,
         onCreate: _openCreateCommunityModal,
         headline: 'Espaços',

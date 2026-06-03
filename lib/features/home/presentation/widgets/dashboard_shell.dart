@@ -59,6 +59,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ProviderSubscription<int>? _carePrescriptionSubscription;
   ProviderSubscription<int>? _careRecommendationSubscription;
   String? _startupWarmupUserId;
+  VoidCallback? _spacesInternalBackAction;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -314,6 +315,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 
   void _handleMobileBack() {
+    final spacesInternalBackAction = _spacesInternalBackAction;
+    if (_selectedIndex == _spacesIndex && spacesInternalBackAction != null) {
+      spacesInternalBackAction();
+      return;
+    }
+
     setState(() {
       if (_history.isNotEmpty) {
         _restoreLocation(_history.removeLast());
@@ -619,6 +626,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenSuggestedTrail: _openSuggestedTrail,
       onSuggestedTrailConsumed: _consumeSuggestedTrailOpen,
       onOpenSpacesSection: _openSpacesSection,
+      onSpacesInternalBackChanged: (action) {
+        _spacesInternalBackAction = action;
+      },
       onOpenMentor: () => _goTo(_mentorIndex),
       onOpenProfileSection: _openProfileSection,
       onOpenAdminSection: _openAdminSection,
@@ -929,6 +939,7 @@ class _DashboardContent extends ConsumerWidget {
     required this.onOpenSuggestedTrail,
     required this.onSuggestedTrailConsumed,
     required this.onOpenSpacesSection,
+    required this.onSpacesInternalBackChanged,
     required this.onOpenMentor,
     required this.onOpenProfileSection,
     required this.onOpenAdminSection,
@@ -948,6 +959,7 @@ class _DashboardContent extends ConsumerWidget {
   final ValueChanged<int> onOpenSuggestedTrail;
   final VoidCallback onSuggestedTrailConsumed;
   final void Function(SocialModuleTab section) onOpenSpacesSection;
+  final ValueChanged<VoidCallback?> onSpacesInternalBackChanged;
   final VoidCallback onOpenMentor;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final void Function(AdminPanelSection section) onOpenAdminSection;
@@ -1032,6 +1044,7 @@ class _DashboardContent extends ConsumerWidget {
         showScopeChips: false,
         onTabChanged: onOpenSpacesSection,
         onOpenFutureMessages: () => context.push('/future-messages'),
+        onInternalBackChanged: onSpacesInternalBackChanged,
       ),
       const _ProfileArea(section: ProfileModuleSection.evolutionMirror),
       _ProfileArea(section: profileSection),

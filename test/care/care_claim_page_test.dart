@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:evolua_frontend/features/care/application/care_claim_controller.dart';
 import 'package:evolua_frontend/features/care/presentation/pages/care_claim_page.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -242,6 +242,9 @@ void main() {
   testWidgets(
     'native keyboard back only dismisses focused prescription field',
     (tester) async {
+      if (kIsWeb) {
+        return;
+      }
       final controller = _FakeCareClaimController(_claimState());
 
       await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -307,6 +310,9 @@ void main() {
   testWidgets(
     'native keyboard back preserves guidance text and selected attachment',
     (tester) async {
+      if (kIsWeb) {
+        return;
+      }
       final picker = _installFakeFilePicker();
       final controller = _FakeCareClaimController(_claimState());
       picker.nextResult = FilePickerResult([
@@ -353,6 +359,63 @@ void main() {
       expect(controller.recommendationCalls, 0);
     },
   );
+
+  testWidgets('web browser back is not intercepted by focused input', (
+    tester,
+  ) async {
+    if (!kIsWeb) {
+      return;
+    }
+    final controller = _FakeCareClaimController(_claimState());
+
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.resetViewInsets);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [careClaimControllerProvider.overrideWith(() => controller)],
+        child: MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Builder(
+                builder: (context) {
+                  return ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const CareClaimPage(),
+                        ),
+                      );
+                    },
+                    child: const Text('open claim'),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('open claim'));
+    await tester.pumpAndSettle();
+
+    final guidanceField = find.byType(TextField).last;
+    tester.view.viewInsets = FakeViewPadding(bottom: 320);
+    await tester.ensureVisible(guidanceField);
+    await tester.tap(guidanceField);
+    await tester.enterText(guidanceField, 'orientacao mantida');
+    await tester.pump(const Duration(milliseconds: 320));
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('open claim'), findsOneWidget);
+    expect(find.byType(CareClaimPage), findsNothing);
+    expect(controller.buildCalls, 1);
+    expect(controller.recommendationCalls, 0);
+  });
 
   testWidgets(
     'keeps loaded form state during transient claim loading after keyboard metrics',
