@@ -17,6 +17,7 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
 
@@ -39,6 +40,7 @@
     #flutter_target {
       margin: 0;
       width: 100%;
+      height: 100%;
       min-height: 100%;
       background-color: #0B1220;
       overscroll-behavior: none;
@@ -46,6 +48,8 @@
 
     body {
       overflow: hidden;
+      position: fixed;
+      inset: 0;
     }
   </style>
 </head>
@@ -127,6 +131,74 @@
       normalizeLegacyCareHash();
     })();
   </script>
+  <script>
+  (function () {
+    var isMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (!isMobile || !window.visualViewport) {
+      return;
+    }
+
+    function isCareClaimRoute() {
+      return (
+        window.location.pathname.indexOf('/care/claim') >= 0 ||
+        (window.location.hash || '').indexOf('#/care/claim') === 0
+      );
+    }
+
+    var lastHeight = window.visualViewport.height;
+    var lastBlurAt = 0;
+
+    function blurFocusedInputWhenKeyboardCloses() {
+      if (!isCareClaimRoute()) {
+        lastHeight = window.visualViewport.height;
+        return;
+      }
+
+      var nextHeight = window.visualViewport.height;
+      var delta = nextHeight - lastHeight;
+      lastHeight = nextHeight;
+
+      if (delta < 80) {
+        return;
+      }
+
+      var active = document.activeElement;
+      if (!active) {
+        return;
+      }
+
+      var tagName = active.tagName
+        ? active.tagName.toLowerCase()
+        : '';
+
+      var isEditable =
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        active.isContentEditable ||
+        active.getAttribute('contenteditable') === 'true';
+
+      if (!isEditable) {
+        return;
+      }
+
+      var now = Date.now();
+      if (now - lastBlurAt < 250) {
+        return;
+      }
+
+      lastBlurAt = now;
+      active.blur();
+
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    window.visualViewport.addEventListener('resize', function () {
+      window.requestAnimationFrame(blurFocusedInputWhenKeyboardCloses);
+    });
+  })();
+</script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

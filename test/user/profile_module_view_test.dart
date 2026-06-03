@@ -1381,21 +1381,30 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
     });
-    final trail = _testTrail();
+    final completedTrail = _testTrail();
+    final inProgressTrail = _testTrail(
+      id: 8,
+      title: 'Hábitos que cabem na vida real',
+      summary: 'Uma trilha para criar hábitos pequenos, sustentáveis e possíveis.',
+    );
 
     await _pumpEvolutionMirror(
       tester,
       premium: true,
       trailRepository: _FakeTrailRepository(
-        currentJourney: trail,
-        journey: _testCompletedJourney(trail),
+        currentJourney: completedTrail,
+        journey: _testCompletedJourney(completedTrail),
+        journeys: {
+          inProgressTrail.id: _testJourney(inProgressTrail),
+        },
       ),
       checkInRepository: _FakeCheckInRepository(
         items: _evolutionRichCheckIns(),
       ),
     );
 
-    expect(find.textContaining('100% concluído'), findsOneWidget);
+    expect(find.textContaining('50% concluído'), findsOneWidget);
+    expect(find.text('Hábitos que cabem na vida real'), findsOneWidget);
     expect(find.text('Primeira trilha concluída'), findsOneWidget);
     expect(find.text('7 reflexões registradas'), findsOneWidget);
     expect(find.text('1 padrão emocional identificado'), findsOneWidget);

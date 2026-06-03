@@ -2346,20 +2346,65 @@ class _TrailEvolutionPanel extends StatelessWidget {
       );
     }
 
+    final visibleJourneys = _prioritizedMirrorJourneys(journeys);
+    final hiddenCount = journeys.length - visibleJourneys.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var index = 0; index < journeys.length; index++) ...[
-          _TrailEvolutionItem(journey: journeys[index]),
-          if (index < journeys.length - 1) ...[
+        for (var index = 0; index < visibleJourneys.length; index++) ...[
+          _TrailEvolutionItem(journey: visibleJourneys[index]),
+          if (index < visibleJourneys.length - 1) ...[
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 16),
           ],
         ],
+        if (hiddenCount > 0) ...[
+          const SizedBox(height: 16),
+          Text(
+            '+$hiddenCount trilha${hiddenCount == 1 ? '' : 's'} em andamento. Acesse Trilhas para ver todas.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
+          ),
+        ],
       ],
     );
   }
+}
+
+List<TrailJourney> _prioritizedMirrorJourneys(List<TrailJourney> journeys) {
+  final notCompleted = journeys.where((journey) {
+    final totalSteps = journey.steps.length;
+    final completedSteps = journey.completedSteps;
+    final progress = journey.progressPercent;
+
+    if (totalSteps > 0 && completedSteps >= totalSteps) {
+      return false;
+    }
+
+    if (progress >= 100) {
+      return false;
+    }
+
+    return true;
+  }).toList();
+
+  final withProgress = notCompleted.where((journey) {
+    return journey.progressPercent > 0 || journey.completedSteps > 0;
+  }).toList();
+
+  final source = withProgress.isNotEmpty ? withProgress : notCompleted;
+
+  source.sort((a, b) {
+    final byProgress = b.progressPercent.compareTo(a.progressPercent);
+    if (byProgress != 0) return byProgress;
+
+    return b.completedSteps.compareTo(a.completedSteps);
+  });
+
+  return source.take(2).toList();
 }
 
 class _TrailEvolutionItem extends StatelessWidget {
