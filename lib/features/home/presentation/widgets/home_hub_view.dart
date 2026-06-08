@@ -20,6 +20,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class HomeHubView extends ConsumerStatefulWidget {
   const HomeHubView({
@@ -130,6 +131,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onRegenerate: (style) => _regenerateReading(context, style),
           onSaveReading: () => _saveReading(context, checkIn.id),
           onCreateRitual: () => _createRitualFromReading(context, checkIn.id),
+          onOpenHistory: () {
+            Navigator.of(context).maybePop();
+            this.context.push('/consciousness-timeline');
+          },
         ),
       ),
     );
@@ -224,9 +229,36 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
 
     setState(() => _readingActionLoading = ReadingActionLoading.ritual);
     try {
+      final now = widget.now ?? DateTime.now();
+      final localDate = DateTime(now.year, now.month, now.day);
+      final type = now.hour >= 18
+          ? DailyRitualType.evening
+          : DailyRitualType.morning;
+      final periodLabel = type == DailyRitualType.evening
+          ? 'Fechamento do Dia'
+          : 'Ritual do Dia';
+      var rituals = ref.read(dailyRitualControllerProvider).asData?.value;
+      if (rituals == null) {
+        await ref
+            .read(dailyRitualControllerProvider.notifier)
+            .refresh(localDate: localDate);
+        rituals = ref.read(dailyRitualControllerProvider).asData?.value;
+      }
+      if (rituals?.byType(type) != null) {
+        if (!mounted) {
+          return;
+        }
+        AppSnackBar.show(
+          context,
+          message:
+              'Voce ja concluiu o $periodLabel de hoje. Sua leitura continua salva para consulta.',
+          icon: Icons.check_circle_rounded,
+        );
+        return;
+      }
       await ref
           .read(checkInControllerProvider.notifier)
-          .createRitualFromReading(checkInId);
+          .createRitualFromReading(checkInId, localDate: localDate, type: type);
       if (!mounted) {
         return;
       }
@@ -235,7 +267,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: 'Ritual criado a partir da sua leitura.',
+        message: '$periodLabel criado e concluido a partir da sua leitura.',
         icon: Icons.self_improvement_rounded,
       );
     } catch (_) {
@@ -244,7 +276,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: 'Nao foi possivel criar o ritual agora.',
+        message: 'Nao foi possivel criar o ritual do dia agora.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {

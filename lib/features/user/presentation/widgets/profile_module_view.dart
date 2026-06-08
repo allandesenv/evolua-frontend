@@ -9,6 +9,7 @@ import 'package:evolua_frontend/features/care/application/care_share_controller.
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
+import 'package:evolua_frontend/features/emotional/application/consciousness_timeline_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
@@ -1769,6 +1770,8 @@ class _EvolutionMirrorSection extends ConsumerWidget {
     final journey = journeyState?.asData?.value;
     final futureMessages = futureMessageState.asData?.value;
     final careShareState = ref.watch(careShareControllerProvider).asData?.value;
+    final mirrorSummaryState = ref.watch(evolutionMirrorSummaryProvider);
+    final timelineState = ref.watch(consciousnessTimelineProvider);
     final hasCareAccess = careShareState?.hasActiveAccess ?? false;
     final shouldShowFutureMessages =
         futureMessages != null &&
@@ -1822,6 +1825,20 @@ class _EvolutionMirrorSection extends ConsumerWidget {
           description:
               'Sinais simples do seu histórico, para perceber repetições sem transformar isso em cobrança.',
           child: _PatternPanel(stats: stats),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Linha do Tempo da Consciência',
+          description:
+              'Veja como seus estados internos e microações vêm mudando com o tempo.',
+          child: _ConsciousnessTimelinePanel(state: timelineState),
+        ),
+        const SizedBox(height: 16),
+        _EvolutionSectionGroup(
+          title: 'Padrões da leitura profunda',
+          description:
+              'Indicadores derivados das suas leituras, com linguagem de hipótese e sem diagnóstico.',
+          child: _DeepReadingPatternsPanel(state: mirrorSummaryState),
         ),
         const SizedBox(height: 16),
         _EvolutionSectionGroup(
@@ -2067,6 +2084,298 @@ class _EvolutionSectionGroup extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _ConsciousnessTimelinePanel extends StatelessWidget {
+  const _ConsciousnessTimelinePanel({required this.state});
+
+  final AsyncValue<ConsciousnessTimelineState> state;
+
+  @override
+  Widget build(BuildContext context) {
+    return state.when(
+      loading: () => const _MirrorInlineLoading(),
+      error: (_, _) =>
+          const Text('Não foi possível carregar sua linha do tempo agora.'),
+      data: (value) {
+        if (value.items.isEmpty) {
+          return const Text(
+            'Seus próximos check-ins vão começar a formar esta linha.',
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!value.fullAccess) ...[
+              _MirrorNotice(
+                icon: Icons.lock_outline_rounded,
+                text:
+                    value.limitMessage ??
+                    'Você está vendo um resumo dos últimos check-ins. O histórico completo pode ser liberado com anúncio ou Premium.',
+              ),
+              const SizedBox(height: 12),
+            ],
+            ...value.items.take(5).map(_ConsciousnessTimelineTile.new),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/consciousness-timeline'),
+              icon: const Icon(Icons.timeline_rounded),
+              label: const Text('Ver Linha do Tempo'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ConsciousnessTimelineTile extends StatelessWidget {
+  const _ConsciousnessTimelineTile(this.item);
+
+  final ConsciousnessTimelineItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = item.title.trim().isEmpty ? item.mood : item.title;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: context.evoluaColors.outline.withValues(alpha: 0.18),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_timelineDateTime(item.createdAt ?? DateTime.now())} · energia ${item.energyLevel ?? '-'}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: context.evoluaColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (item.identifiedState.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Estado interno: ${item.identifiedState}'),
+              ],
+              if (item.revealingQuestion.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Pergunta: ${item.revealingQuestion}'),
+              ],
+              if (item.microAction.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text('Microação: ${item.microAction}'),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _timelineDateTime(DateTime value) {
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$day/$month às $hour:$minute';
+  }
+}
+
+class _DeepReadingPatternsPanel extends StatelessWidget {
+  const _DeepReadingPatternsPanel({required this.state});
+
+  final AsyncValue<EvolutionMirrorSummary> state;
+
+  @override
+  Widget build(BuildContext context) {
+    return state.when(
+      loading: () => const _MirrorInlineLoading(),
+      error: (_, _) => const Text(
+        'Os padrões profundos aparecem aqui quando houver dados suficientes.',
+      ),
+      data: (summary) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _InsightChip(
+                  label: 'Energia',
+                  value: summary.energyTrend.isEmpty
+                      ? 'sem tendência ainda'
+                      : summary.energyTrend,
+                ),
+                _InsightChip(
+                  label: 'Humor dominante',
+                  value: summary.dominantMood.isEmpty
+                      ? 'sem padrão ainda'
+                      : summary.dominantMood,
+                ),
+                if (summary.recurringStates.isNotEmpty)
+                  _InsightChip(
+                    label: 'Estado recorrente',
+                    value: summary.recurringStates.first.label,
+                  ),
+              ],
+            ),
+            if (summary.emotionalThemes.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Temas frequentes',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: summary.emotionalThemes
+                    .take(5)
+                    .map(
+                      (item) => _InsightChip(
+                        label: item.label,
+                        value: '${item.count}x',
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+            if (summary.revealingQuestions.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Perguntas reveladoras recentes',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: context.evoluaColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...summary.revealingQuestions
+                  .take(3)
+                  .map((item) => _MirrorBullet(text: item)),
+            ],
+            if (summary.progressSignal.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _MirrorNotice(
+                icon: Icons.trending_up_rounded,
+                text: summary.progressSignal,
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _InsightChip extends StatelessWidget {
+  const _InsightChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        child: Text(
+          '$label: $value',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: context.evoluaColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MirrorBullet extends StatelessWidget {
+  const _MirrorBullet({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.circle, size: 7, color: AppColors.accent),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MirrorNotice extends StatelessWidget {
+  const _MirrorNotice({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: context.evoluaColors.outline.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: AppColors.accent),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MirrorInlineLoading extends StatelessWidget {
+  const _MirrorInlineLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: LinearProgressIndicator(minHeight: 2),
     );
   }
 }

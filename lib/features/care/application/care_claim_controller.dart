@@ -66,11 +66,25 @@ class CareClinicalReport {
     required this.generatedAt,
     required this.checkIns,
     required this.rituals,
+    this.careSummary = const {},
+    this.timeline = const [],
+    this.recurringStates = const [],
+    this.revealingQuestions = const [],
+    this.microActions = const [],
+    this.energyTrend = '',
+    this.careDisclaimer = '',
   });
 
   final DateTime? generatedAt;
   final List<CareClinicalCheckIn> checkIns;
   final List<CareClinicalRitual> rituals;
+  final Map<String, dynamic> careSummary;
+  final List<CareClinicalTimelineItem> timeline;
+  final List<CareClinicalCountItem> recurringStates;
+  final List<String> revealingQuestions;
+  final List<String> microActions;
+  final String energyTrend;
+  final String careDisclaimer;
 
   String get latestInsight {
     for (final item in checkIns) {
@@ -81,6 +95,33 @@ class CareClinicalReport {
   }
 
   int get completedRituals => rituals.length;
+}
+
+class CareClinicalTimelineItem {
+  const CareClinicalTimelineItem({
+    required this.mood,
+    required this.energyLevel,
+    required this.identifiedState,
+    required this.insight,
+    required this.revealingQuestion,
+    required this.microAction,
+    required this.createdAt,
+  });
+
+  final String mood;
+  final int? energyLevel;
+  final String identifiedState;
+  final String insight;
+  final String revealingQuestion;
+  final String microAction;
+  final DateTime? createdAt;
+}
+
+class CareClinicalCountItem {
+  const CareClinicalCountItem({required this.label, required this.count});
+
+  final String label;
+  final int count;
 }
 
 class CareClinicalCheckIn {
@@ -370,10 +411,33 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
         .map((item) => Map<String, dynamic>.from(item))
         .map(_parseRitual)
         .toList();
+    final summary = json['careSummary'] is Map
+        ? Map<String, dynamic>.from(json['careSummary'] as Map)
+        : <String, dynamic>{};
     return CareClinicalReport(
       generatedAt: DateTime.tryParse(json['generatedAt']?.toString() ?? ''),
       checkIns: checkIns,
       rituals: rituals,
+      careSummary: summary,
+      timeline: (json['timeline'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .map(_parseTimelineItem)
+          .toList(),
+      recurringStates: _parseCountItems(
+        json['recurringStates'] ?? summary['recurringStates'],
+      ),
+      revealingQuestions: _parseStringList(
+        json['revealingQuestions'] ?? summary['revealingQuestions'],
+      ),
+      microActions: _parseStringList(
+        json['microActions'] ?? summary['microActions'],
+      ),
+      energyTrend:
+          json['energyTrend']?.toString() ??
+          summary['energyTrend']?.toString() ??
+          '',
+      careDisclaimer: json['careDisclaimer']?.toString() ?? '',
     );
   }
 
@@ -413,6 +477,39 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
       intention: json['intention']?.toString() ?? '',
       microAction: json['microAction']?.toString() ?? '',
     );
+  }
+
+  CareClinicalTimelineItem _parseTimelineItem(Map<String, dynamic> json) {
+    return CareClinicalTimelineItem(
+      mood: json['mood']?.toString() ?? '',
+      energyLevel: (json['energyLevel'] as num?)?.toInt(),
+      identifiedState: json['identifiedState']?.toString() ?? '',
+      insight: json['insight']?.toString() ?? '',
+      revealingQuestion: json['revealingQuestion']?.toString() ?? '',
+      microAction: json['microAction']?.toString() ?? '',
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),
+    );
+  }
+
+  List<CareClinicalCountItem> _parseCountItems(dynamic value) {
+    return (value as List? ?? const [])
+        .whereType<Map>()
+        .map((item) {
+          final map = Map<String, dynamic>.from(item);
+          return CareClinicalCountItem(
+            label: map['label']?.toString() ?? '',
+            count: (map['count'] as num?)?.toInt() ?? 0,
+          );
+        })
+        .where((item) => item.label.trim().isNotEmpty)
+        .toList(growable: false);
+  }
+
+  List<String> _parseStringList(dynamic value) {
+    return (value as List? ?? const [])
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
   }
 }
 

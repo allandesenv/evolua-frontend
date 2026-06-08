@@ -33,7 +33,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class DashboardShell extends ConsumerStatefulWidget {
-  const DashboardShell({super.key});
+  const DashboardShell({super.key, this.initialProfileSection});
+
+  final ProfileModuleSection? initialProfileSection;
 
   @override
   ConsumerState<DashboardShell> createState() => _DashboardShellState();
@@ -70,6 +72,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void initState() {
     super.initState();
+    final initialProfileSection = widget.initialProfileSection;
+    if (initialProfileSection != null) {
+      _profileSection = initialProfileSection;
+      _selectedIndex =
+          initialProfileSection == ProfileModuleSection.evolutionMirror
+          ? _mirrorIndex
+          : _profileIndex;
+    }
     _reminderTapSubscription = ref.listenManual(
       dailyCheckInReminderTapProvider,
       (previous, next) {

@@ -9,6 +9,7 @@ import 'package:evolua_frontend/features/content/application/journey_chat_contro
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/application/consciousness_timeline_controller.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
@@ -69,6 +70,8 @@ void _invalidateAuthenticatedProviders(Ref ref) {
     ..invalidate(trailStepResponsesProvider)
     ..invalidate(journeyChatControllerProvider)
     ..invalidate(dailyRitualControllerProvider)
+    ..invalidate(consciousnessTimelineProvider)
+    ..invalidate(evolutionMirrorSummaryProvider)
     ..invalidate(futureMessageControllerProvider)
     ..invalidate(socialPostControllerProvider)
     ..invalidate(communityControllerProvider)
