@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/app/router/auth_router_notifier.dart';
+import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/authenticated_session_reset.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
@@ -30,7 +31,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   }, fireImmediately: true);
   ref.onDispose(authRouterNotifier.dispose);
 
-  return buildAppRouter(authRouterNotifier: authRouterNotifier);
+  return buildAppRouter(
+    authRouterNotifier: authRouterNotifier,
+    onRouteMatched: (route) =>
+        ref.read(appUpdateCurrentRouteProvider.notifier).setRoute(route),
+  );
 });
 
 GoRouter buildAppRouter({
@@ -47,6 +52,7 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? consciousnessTimelinePageBuilder,
   String initialLocation = '/',
   bool overridePlatformDefaultLocation = false,
+  ValueChanged<String>? onRouteMatched,
 }) {
   return GoRouter(
     initialLocation: initialLocation,
@@ -152,6 +158,7 @@ GoRouter buildAppRouter({
       ),
     ],
     redirect: (context, state) {
+      onRouteMatched?.call(state.matchedLocation);
       if (authRouterNotifier.isBootstrapping) {
         if (state.matchedLocation == '/auth') {
           return '/';

@@ -6,6 +6,7 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
@@ -111,6 +112,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   }
 
   void _openInsightSheet(CheckIn checkIn, CheckInAiInsight insight) {
+    ref.read(appUpdateSensitiveFlowProvider.notifier).enter();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -141,7 +143,11 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           },
         ),
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        ref.read(appUpdateSensitiveFlowProvider.notifier).leave();
+      }
+    });
   }
 
   Future<void> _regenerateReading(

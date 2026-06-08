@@ -59,6 +59,22 @@ class AppConfig {
     defaultValue: 'evolua://app',
   );
 
+  static const versionStatusBaseUrl = String.fromEnvironment(
+    'EVOLUA_VERSION_STATUS_BASE_URL',
+    defaultValue: apiBaseUrl,
+  );
+
+  static const evoluaPlayStoreUrl = String.fromEnvironment(
+    'EVOLUA_PLAY_STORE_URL',
+    defaultValue:
+        'https://play.google.com/store/apps/details?id=br.com.zenithit.evolua',
+  );
+
+  static const appUpdateCheckEnabled = bool.fromEnvironment(
+    'EVOLUA_APP_UPDATE_CHECK_ENABLED',
+    defaultValue: true,
+  );
+
   static const privacyPolicyUrl = String.fromEnvironment(
     'EVOLUA_PRIVACY_POLICY_URL',
     defaultValue:
