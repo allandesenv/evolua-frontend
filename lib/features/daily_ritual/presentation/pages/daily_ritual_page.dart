@@ -5,6 +5,9 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
@@ -325,14 +328,14 @@ class _DailyRitualFlow extends StatelessWidget {
   }
 }
 
-class _DailyRitualResult extends StatelessWidget {
+class _DailyRitualResult extends ConsumerWidget {
   const _DailyRitualResult({required this.copy, required this.ritual});
 
   final _DailyRitualCopy copy;
   final DailyRitual ritual;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     return PrimaryPanel(
       padding: const EdgeInsets.all(24),
@@ -367,7 +370,17 @@ class _DailyRitualResult extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
-            onPressed: () => context.go('/home'),
+            onPressed: () async {
+              await ref
+                  .read(interstitialAdServiceProvider)
+                  .maybeShow(
+                    trigger: InterstitialTrigger.ritualCompletedExit,
+                    session: ref.read(authControllerProvider).asData?.value,
+                  );
+              if (context.mounted) {
+                context.go('/home');
+              }
+            },
             icon: const Icon(Icons.home_rounded),
             label: Text(l10n.dailyRitualBackHome),
           ),

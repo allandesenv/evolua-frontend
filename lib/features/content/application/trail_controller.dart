@@ -170,6 +170,7 @@ class TrailJourneyActions {
 
 class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
   static const _pageSize = 4;
+  static const _minimumSearchLength = 4;
   String? _search;
   bool? _premium;
   String? _category;
@@ -190,9 +191,27 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
     bool? premium,
     String? category,
   }) async {
-    _search = search;
+    final normalizedSearch = search?.trim();
+    final effectiveSearch =
+        normalizedSearch != null &&
+            normalizedSearch.length >= _minimumSearchLength
+        ? normalizedSearch
+        : null;
+    final effectiveCategory = category?.trim();
+    final normalizedCategory =
+        effectiveCategory == null || effectiveCategory.isEmpty
+        ? null
+        : effectiveCategory;
+
+    if (_search == effectiveSearch &&
+        _premium == premium &&
+        _category == normalizedCategory) {
+      return;
+    }
+
+    _search = effectiveSearch;
     _premium = premium;
-    _category = category;
+    _category = normalizedCategory;
     _resetLoadMoreState();
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async => _fetch(page: 0));

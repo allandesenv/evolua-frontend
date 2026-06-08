@@ -1,4 +1,6 @@
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +41,11 @@ class MonetizationAccessController extends AsyncNotifier<void> {
             onAdClosed: onAdClosed,
           );
       if (rewardConfirmedByBackend) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .recordRewardedAdShown(
+              session: ref.read(authControllerProvider).asData?.value,
+            );
         await ref.read(subscriptionControllerProvider.notifier).refresh();
       }
     });

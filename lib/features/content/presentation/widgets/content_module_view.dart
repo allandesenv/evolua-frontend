@@ -4,6 +4,8 @@ import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -156,11 +158,14 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   Future<void> _applyFilters({String? searchOverride}) {
     final rawSearch = searchOverride ?? _searchController.text;
     final normalizedSearch = rawSearch.trim();
+    final effectiveSearch = normalizedSearch.length >= _minimumSearchLength
+        ? normalizedSearch
+        : '';
     setState(() => _selectedCatalogTrail = null);
     return ref
         .read(trailControllerProvider.notifier)
         .applyFilters(
-          search: normalizedSearch.isEmpty ? null : normalizedSearch,
+          search: effectiveSearch.isEmpty ? null : effectiveSearch,
           premium: _premiumFilter,
         );
   }
@@ -540,7 +545,18 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
       if (!journey.isStarted) {
         await actions.start(journey.trail.id);
       } else if (journey.nextStep != null && !journey.isCompleted) {
-        await actions.completeStep(journey.trail.id, journey.nextStep!.index);
+        final updatedJourney = await actions.completeStep(
+          journey.trail.id,
+          journey.nextStep!.index,
+        );
+        if (updatedJourney.isCompleted) {
+          await ref
+              .read(interstitialAdServiceProvider)
+              .maybeShow(
+                trigger: InterstitialTrigger.trailCompletion,
+                session: ref.read(authControllerProvider).asData?.value,
+              );
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Você avançou mais um passo.')),
@@ -611,7 +627,18 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
       if (!journey.isStarted) {
         await actions.start(journey.trail.id);
       } else if (journey.nextStep != null) {
-        await actions.completeStep(journey.trail.id, journey.nextStep!.index);
+        final updatedJourney = await actions.completeStep(
+          journey.trail.id,
+          journey.nextStep!.index,
+        );
+        if (updatedJourney.isCompleted) {
+          await ref
+              .read(interstitialAdServiceProvider)
+              .maybeShow(
+                trigger: InterstitialTrigger.trailCompletion,
+                session: ref.read(authControllerProvider).asData?.value,
+              );
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Você avançou mais um passo.')),

@@ -3,6 +3,8 @@ import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -80,6 +82,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool _isRewardLoading = false;
   ReadingActionLoading? _readingActionLoading;
   bool _secondaryProvidersEnabled = true;
+  final Map<int, int> _readingVariationCounts = {};
 
   @override
   void initState() {
@@ -128,7 +131,8 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenPremium: widget.onOpenPremium,
           readingActionLoading: _readingActionLoading,
           isSaved: checkIn.savedReading,
-          onRegenerate: (style) => _regenerateReading(context, style),
+          onRegenerate: (style) =>
+              _regenerateReading(context, checkIn.id, style),
           onSaveReading: () => _saveReading(context, checkIn.id),
           onCreateRitual: () => _createRitualFromReading(context, checkIn.id),
           onOpenHistory: () {
@@ -142,6 +146,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
 
   Future<void> _regenerateReading(
     BuildContext sheetContext,
+    int checkInId,
     String style,
   ) async {
     if (_readingActionLoading != null) {
@@ -164,6 +169,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: 'Leitura atualizada com um novo foco.',
         icon: Icons.auto_awesome_rounded,
       );
+      final count = (_readingVariationCounts[checkInId] ?? 0) + 1;
+      _readingVariationCounts[checkInId] = count;
+      if (count == 2 || count == 3) {
+        await _maybeShowInterstitial(
+          InterstitialTrigger.readingVariationMilestone,
+        );
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -203,6 +215,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: 'Leitura salva para voce retomar depois.',
         icon: Icons.bookmark_added_rounded,
       );
+      await _maybeShowInterstitial(InterstitialTrigger.readingSavedExit);
     } catch (_) {
       if (!mounted) {
         return;
@@ -305,6 +318,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       final rewarded = await ref
           .read(rewardedAdServiceProvider)
           .showRewardedAd(rewardType: 'DEEP_EMOTIONAL_READING');
+      if (rewarded) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .recordRewardedAdShown(
+              session: ref.read(authControllerProvider).asData?.value,
+            );
+      }
       if (!mounted) {
         return;
       }
@@ -335,6 +355,15 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         setState(() => _isRewardLoading = false);
       }
     }
+  }
+
+  Future<void> _maybeShowInterstitial(InterstitialTrigger trigger) async {
+    await ref
+        .read(interstitialAdServiceProvider)
+        .maybeShow(
+          trigger: trigger,
+          session: ref.read(authControllerProvider).asData?.value,
+        );
   }
 
   void _openRhythmDetails(_RhythmSummary summary, List<CheckIn> recentItems) {

@@ -99,6 +99,14 @@ class AppConfig {
   static const adMobAndroidRewardedTestAdUnitId =
       'ca-app-pub-3940256099942544/5224354917';
 
+  static const adMobAndroidInterstitialFreeAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_ANDROID_INTERSTITIAL_FREE_AD_UNIT_ID',
+    defaultValue: 'ca-app-pub-1136517314419681/5451133226',
+  );
+
+  static const adMobAndroidInterstitialTestAdUnitId =
+      'ca-app-pub-3940256099942544/1033173712';
+
   static const adMobIosRewardedAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_IOS_REWARDED_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-3940256099942544/1712485313',
@@ -116,6 +124,14 @@ class AppConfig {
 
   static const adMobIosRewardedTestAdUnitId =
       'ca-app-pub-3940256099942544/1712485313';
+
+  static const adMobIosInterstitialFreeAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_IOS_INTERSTITIAL_FREE_AD_UNIT_ID',
+    defaultValue: '',
+  );
+
+  static const adMobIosInterstitialTestAdUnitId =
+      'ca-app-pub-3940256099942544/4411468910';
 
   static bool get adMobUseTestAds {
     if (const bool.hasEnvironment('EVOLUA_ADMOB_USE_TEST_ADS')) {

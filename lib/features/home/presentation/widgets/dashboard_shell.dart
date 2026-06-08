@@ -5,6 +5,7 @@ import 'package:evolua_frontend/app/startup/startup_diagnostics.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/care/application/care_prescription_handler.dart';
@@ -61,6 +62,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ProviderSubscription<int>? _carePrescriptionSubscription;
   ProviderSubscription<int>? _careRecommendationSubscription;
   String? _startupWarmupUserId;
+  String? _interstitialPreloadUserId;
   VoidCallback? _spacesInternalBackAction;
 
   static const _spacesIndex = 2;
@@ -594,6 +596,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     final isCompact = ResponsiveBreakpoints.isCompact(context);
     final pagePadding = ResponsiveBreakpoints.pagePadding(context);
     final session = ref.watch(authControllerProvider).asData?.value;
+    _preloadInterstitialForFreeUser(session);
     _schedulePostLoginWarmup(session);
     final checkInState = ref.watch(checkInControllerProvider);
     final historyForFirstExperience = checkInState.asData?.value;
@@ -881,6 +884,21 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               ),
       ),
     );
+  }
+
+  void _preloadInterstitialForFreeUser(AuthSession? session) {
+    if (session == null ||
+        session.isPremium ||
+        _interstitialPreloadUserId == session.userId) {
+      return;
+    }
+    _interstitialPreloadUserId = session.userId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref.read(interstitialAdServiceProvider).preload();
+    });
   }
 
   void _schedulePostLoginWarmup(AuthSession? session) {

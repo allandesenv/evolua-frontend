@@ -25,6 +25,7 @@ import 'package:evolua_frontend/features/subscription/domain/repositories/subscr
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/domain/repositories/profile_repository.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -607,6 +608,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(trailRepository.listCallCount, initialCalls);
+      expect(find.text('Respiracao breve'), findsOneWidget);
+      expect(find.byType(FeedSkeleton), findsNothing);
       expect(
         find.text('Digite pelo menos 4 caracteres para buscar.'),
         findsOneWidget,

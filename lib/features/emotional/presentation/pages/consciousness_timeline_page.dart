@@ -1,6 +1,9 @@
 import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/consciousness_timeline_controller.dart';
@@ -27,6 +30,7 @@ class _ConsciousnessTimelinePageState
   String? _energyRange;
   bool _rewardLoading = false;
   int? _actionLoadingCheckInId;
+  bool _historyConsumed = false;
 
   @override
   void dispose() {
@@ -44,15 +48,7 @@ class _ConsciousnessTimelinePageState
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _TimelineHeader(
-                  onBack: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/home');
-                    }
-                  },
-                ),
+                child: _TimelineHeader(onBack: _leaveTimeline),
               ),
             ),
             SliverPadding(
@@ -85,9 +81,12 @@ class _ConsciousnessTimelinePageState
                     }),
                     onApplyFilters: _applyFilters,
                     onClearFilters: _clearFilters,
-                    onLoadMore: () => ref
-                        .read(consciousnessTimelineProvider.notifier)
-                        .loadMore(),
+                    onLoadMore: () {
+                      _historyConsumed = true;
+                      ref
+                          .read(consciousnessTimelineProvider.notifier)
+                          .loadMore();
+                    },
                     onUnlockFull: _unlockFull,
                     onOpenPremium: () =>
                         context.go('/home?profileSection=plans'),
@@ -134,6 +133,9 @@ class _ConsciousnessTimelinePageState
       final unlocked = await ref
           .read(consciousnessTimelineProvider.notifier)
           .unlockFullWithReward();
+      if (unlocked) {
+        _historyConsumed = true;
+      }
       if (!mounted) {
         return;
       }
@@ -162,6 +164,7 @@ class _ConsciousnessTimelinePageState
   }
 
   Future<void> _openItemDetail(ConsciousnessTimelineItem item) async {
+    _historyConsumed = true;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -269,12 +272,31 @@ class _ConsciousnessTimelinePageState
     );
     return (start, today);
   }
+
+  Future<void> _leaveTimeline() async {
+    if (_historyConsumed) {
+      await ref
+          .read(interstitialAdServiceProvider)
+          .maybeShow(
+            trigger: InterstitialTrigger.timelineExit,
+            session: ref.read(authControllerProvider).asData?.value,
+          );
+    }
+    if (!mounted) {
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
 }
 
 class _TimelineHeader extends StatelessWidget {
   const _TimelineHeader({required this.onBack});
 
-  final VoidCallback onBack;
+  final Future<void> Function() onBack;
 
   @override
   Widget build(BuildContext context) {
