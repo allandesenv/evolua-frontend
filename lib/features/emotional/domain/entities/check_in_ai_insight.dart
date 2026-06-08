@@ -24,6 +24,13 @@ class CheckInAiInsight {
     this.responseFingerprint,
     this.usedContextSummary,
     this.nextStep,
+    this.title,
+    this.surface,
+    this.behind,
+    this.identifiedState,
+    this.revealingQuestion,
+    this.possibleNewState,
+    this.microAction,
   });
 
   final String insight;
@@ -46,6 +53,13 @@ class CheckInAiInsight {
   final String? responseFingerprint;
   final String? usedContextSummary;
   final CheckInAiNextStep? nextStep;
+  final String? title;
+  final String? surface;
+  final String? behind;
+  final String? identifiedState;
+  final String? revealingQuestion;
+  final String? possibleNewState;
+  final String? microAction;
 }
 
 class CheckInAiNextStep {

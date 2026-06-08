@@ -119,7 +119,8 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(
         find.textContaining(
@@ -213,7 +214,8 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(
         find.text('Seu check-in já conta para o seu Espelho'),
@@ -299,7 +301,8 @@ void main() {
           child: MaterialApp(theme: AppTheme.dark(), home: const HomePage()),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(
         find.textContaining('Leitura sensível do usuário A'),

@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+import 'package:evolua_frontend/features/emotional/data/models/check_in_dto.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -37,7 +38,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Limite de IA atingido'), findsOneWidget);
     expect(
@@ -87,7 +88,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Personalizada'), findsOneWidget);
     expect(find.text('ultimos check-ins'), findsOneWidget);
@@ -103,6 +104,84 @@ void main() {
     expect(selectedStyles, ['practical']);
     expect(saved, isTrue);
     expect(ritual, isTrue);
+  });
+
+  testWidgets('renders structured deep reading when available', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _testApp(
+        premium: true,
+        child: CheckInAiInsightCard(insight: _structuredInsight()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Quando a mente tenta proteger'), findsOneWidget);
+    expect(find.text('O que aparece na superfície'), findsOneWidget);
+    expect(find.text('O que pode estar por trás'), findsOneWidget);
+    expect(find.text('O estado interno identificado'), findsOneWidget);
+    expect(find.text('Pergunta reveladora'), findsOneWidget);
+    expect(find.text('Novo estado possível'), findsOneWidget);
+    expect(find.text('Microação'), findsOneWidget);
+  });
+
+  testWidgets('shows contextual loading on selected reading action', (
+    tester,
+  ) async {
+    var saveTapped = false;
+
+    await tester.pumpWidget(
+      _testApp(
+        premium: true,
+        child: CheckInAiInsightCard(
+          insight: _personalizedInsight(),
+          onRegenerate: (_) {},
+          onSaveReading: () => saveTapped = true,
+          onCreateRitual: () {},
+          readingActionLoading: ReadingActionLoading.deep,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Gerando...'), findsOneWidget);
+    expect(find.text('Mais profunda'), findsNothing);
+
+    await tester.tap(find.text('Salvar leitura'));
+    await tester.pump();
+
+    expect(saveTapped, isFalse);
+  });
+
+  testWidgets('parses structured deep reading fields from dto', (tester) async {
+    final dto = CheckInDto.fromJson({
+      'id': 1,
+      'userId': 'user-1',
+      'mood': 'ansiedade',
+      'reflection': 'texto',
+      'energyLevel': 4,
+      'recommendedPractice': 'Respire.',
+      'savedReading': false,
+      'createdAt': DateTime(2026, 6, 7).toIso8601String(),
+      'aiInsight': {
+        'insight': 'Leitura base.',
+        'suggestedAction': 'Respire.',
+        'riskLevel': 'low',
+        'fallbackUsed': false,
+        'title': 'Quando a mente tenta proteger',
+        'surface': 'Na superfície, aparece ansiedade.',
+        'behind': 'Talvez exista busca por controle.',
+        'identifiedState': 'controle',
+        'revealingQuestion': 'O que você tenta evitar sentir?',
+        'possibleNewState': 'Eu posso trocar controle por cuidado.',
+        'microAction': 'Respire por dois minutos.',
+      },
+    });
+
+    expect(dto.aiInsight?.title, 'Quando a mente tenta proteger');
+    expect(dto.aiInsight?.surface, 'Na superfície, aparece ansiedade.');
+    expect(dto.aiInsight?.microAction, 'Respire por dois minutos.');
   });
 
   testWidgets('blocks refinement actions for free users with premium prompt', (
@@ -189,6 +268,28 @@ CheckInAiInsight _personalizedInsight() {
       type: 'ritual',
       label: 'Fazer uma pausa guiada de 2 minutos.',
     ),
+  );
+}
+
+CheckInAiInsight _structuredInsight() {
+  return const CheckInAiInsight(
+    insight: 'Parece haver uma tentativa de sustentar tudo ao mesmo tempo.',
+    suggestedAction: 'Respire por dois minutos.',
+    riskLevel: 'low',
+    suggestedTrailId: null,
+    suggestedTrailTitle: null,
+    suggestedTrailReason: '',
+    suggestedSpace: null,
+    journeyPlan: null,
+    generatedTrailDraft: null,
+    fallbackUsed: false,
+    title: 'Quando a mente tenta proteger',
+    surface: 'Na superfície, aparece ansiedade com energia 4/10.',
+    behind: 'Talvez exista uma busca por controle diante do incerto.',
+    identifiedState: 'controle',
+    revealingQuestion: 'O que você tenta evitar sentir quando controla tudo?',
+    possibleNewState: 'Eu posso trocar controle por cuidado.',
+    microAction: 'Respire por dois minutos antes de decidir o próximo passo.',
   );
 }
 

@@ -19,6 +19,7 @@ class CheckInAiInsightCard extends ConsumerWidget {
     this.onSaveReading,
     this.onCreateRitual,
     this.isReadingActionLoading = false,
+    this.readingActionLoading,
     this.isSaved = false,
   });
 
@@ -31,6 +32,7 @@ class CheckInAiInsightCard extends ConsumerWidget {
   final VoidCallback? onSaveReading;
   final VoidCallback? onCreateRitual;
   final bool isReadingActionLoading;
+  final ReadingActionLoading? readingActionLoading;
   final bool isSaved;
 
   @override
@@ -59,6 +61,8 @@ class CheckInAiInsightCard extends ConsumerWidget {
     final trailLabel = insight.suggestedTrailTitle == null
         ? 'Abrir trilhas'
         : 'Abrir trilha sugerida';
+    final deepReadingSections = _deepReadingSections(insight);
+    final hasDeepReading = deepReadingSections.isNotEmpty;
 
     return PrimaryPanel(
       semanticLabel: 'Leitura inteligente do check-in',
@@ -165,7 +169,13 @@ class CheckInAiInsightCard extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 12),
-          Text(insight.insight, style: Theme.of(context).textTheme.bodyLarge),
+          if (hasDeepReading)
+            _DeepReadingSummary(
+              title: insight.title,
+              sections: deepReadingSections,
+            )
+          else
+            Text(insight.insight, style: Theme.of(context).textTheme.bodyLarge),
           if (hasLimitedContext) ...[
             const SizedBox(height: 10),
             Text(
@@ -279,7 +289,8 @@ class CheckInAiInsightCard extends ConsumerWidget {
               canCreateRitual) ...[
             const SizedBox(height: 16),
             _ReadingActionBar(
-              isLoading: isReadingActionLoading,
+              isLoading: isReadingActionLoading || readingActionLoading != null,
+              loadingAction: readingActionLoading,
               isSaved: isSaved,
               onRegenerate: onRegenerate == null
                   ? null
@@ -306,6 +317,35 @@ class CheckInAiInsightCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  List<_DeepReadingSectionData> _deepReadingSections(CheckInAiInsight insight) {
+    final sections = [
+      _DeepReadingSectionData(
+        title: 'O que aparece na superfície',
+        body: insight.surface,
+      ),
+      _DeepReadingSectionData(
+        title: 'O que pode estar por trás',
+        body: insight.behind,
+      ),
+      _DeepReadingSectionData(
+        title: 'O estado interno identificado',
+        body: insight.identifiedState,
+      ),
+      _DeepReadingSectionData(
+        title: 'Pergunta reveladora',
+        body: insight.revealingQuestion,
+      ),
+      _DeepReadingSectionData(
+        title: 'Novo estado possível',
+        body: insight.possibleNewState,
+      ),
+      _DeepReadingSectionData(title: 'Microação', body: insight.microAction),
+    ];
+    return sections
+        .where((section) => (section.body ?? '').trim().isNotEmpty)
+        .toList(growable: false);
   }
 
   void _handleRegenerate(
@@ -348,6 +388,79 @@ class CheckInAiInsightCard extends ConsumerWidget {
   }
 }
 
+enum ReadingActionLoading { quick, deep, practical, balanced, save, ritual }
+
+class _DeepReadingSectionData {
+  const _DeepReadingSectionData({required this.title, required this.body});
+
+  final String title;
+  final String? body;
+}
+
+class _DeepReadingSummary extends StatelessWidget {
+  const _DeepReadingSummary({required this.title, required this.sections});
+
+  final String? title;
+  final List<_DeepReadingSectionData> sections;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeTitle = title?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.outline.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (safeTitle != null && safeTitle.isNotEmpty) ...[
+            Text(
+              safeTitle,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          for (var index = 0; index < sections.length; index++) ...[
+            _DeepReadingSection(section: sections[index]),
+            if (index < sections.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DeepReadingSection extends StatelessWidget {
+  const _DeepReadingSection({required this.section});
+
+  final _DeepReadingSectionData section;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          section.title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: AppColors.accent,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(section.body!.trim(), style: Theme.of(context).textTheme.bodyMedium),
+      ],
+    );
+  }
+}
+
 class _ContextSignalChip extends StatelessWidget {
   const _ContextSignalChip({required this.label});
 
@@ -370,6 +483,7 @@ class _ContextSignalChip extends StatelessWidget {
 class _ReadingActionBar extends StatelessWidget {
   const _ReadingActionBar({
     required this.isLoading,
+    required this.loadingAction,
     required this.isSaved,
     required this.onRegenerate,
     required this.onSaveReading,
@@ -377,6 +491,7 @@ class _ReadingActionBar extends StatelessWidget {
   });
 
   final bool isLoading;
+  final ReadingActionLoading? loadingAction;
   final bool isSaved;
   final ValueChanged<String>? onRegenerate;
   final VoidCallback? onSaveReading;
@@ -384,10 +499,13 @@ class _ReadingActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loadingIcon = const SizedBox.square(
+    const loadingIcon = SizedBox.square(
       dimension: 18,
       child: CircularProgressIndicator(strokeWidth: 2),
     );
+    Widget actionIcon(ReadingActionLoading action, IconData icon) {
+      return loadingAction == action ? loadingIcon : Icon(icon);
+    }
 
     return Wrap(
       spacing: 8,
@@ -396,38 +514,82 @@ class _ReadingActionBar extends StatelessWidget {
         if (onRegenerate != null) ...[
           OutlinedButton.icon(
             onPressed: isLoading ? null : () => onRegenerate!('quick'),
-            icon: isLoading ? loadingIcon : const Icon(Icons.compress_rounded),
-            label: const Text('Mais curta'),
+            icon: actionIcon(
+              ReadingActionLoading.quick,
+              Icons.compress_rounded,
+            ),
+            label: Text(
+              loadingAction == ReadingActionLoading.quick
+                  ? 'Gerando...'
+                  : 'Mais curta',
+            ),
           ),
           OutlinedButton.icon(
             onPressed: isLoading ? null : () => onRegenerate!('deep'),
-            icon: const Icon(Icons.auto_awesome_rounded),
-            label: const Text('Mais profunda'),
+            icon: actionIcon(
+              ReadingActionLoading.deep,
+              Icons.auto_awesome_rounded,
+            ),
+            label: Text(
+              loadingAction == ReadingActionLoading.deep
+                  ? 'Gerando...'
+                  : 'Mais profunda',
+            ),
           ),
           OutlinedButton.icon(
             onPressed: isLoading ? null : () => onRegenerate!('practical'),
-            icon: const Icon(Icons.checklist_rounded),
-            label: const Text('Mais pratica'),
+            icon: actionIcon(
+              ReadingActionLoading.practical,
+              Icons.checklist_rounded,
+            ),
+            label: Text(
+              loadingAction == ReadingActionLoading.practical
+                  ? 'Gerando...'
+                  : 'Mais pratica',
+            ),
           ),
           OutlinedButton.icon(
             onPressed: isLoading ? null : () => onRegenerate!('balanced'),
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Gerar outra versao'),
+            icon: actionIcon(
+              ReadingActionLoading.balanced,
+              Icons.refresh_rounded,
+            ),
+            label: Text(
+              loadingAction == ReadingActionLoading.balanced
+                  ? 'Gerando...'
+                  : 'Gerar outra versao',
+            ),
           ),
         ],
         if (onSaveReading != null)
           FilledButton.tonalIcon(
             onPressed: isLoading || isSaved ? null : onSaveReading,
-            icon: Icon(
-              isSaved ? Icons.bookmark_added_rounded : Icons.bookmark_rounded,
+            icon: loadingAction == ReadingActionLoading.save
+                ? loadingIcon
+                : Icon(
+                    isSaved
+                        ? Icons.bookmark_added_rounded
+                        : Icons.bookmark_rounded,
+                  ),
+            label: Text(
+              loadingAction == ReadingActionLoading.save
+                  ? 'Salvando...'
+                  : isSaved
+                  ? 'Leitura salva'
+                  : 'Salvar leitura',
             ),
-            label: Text(isSaved ? 'Leitura salva' : 'Salvar leitura'),
           ),
         if (onCreateRitual != null)
           FilledButton.icon(
             onPressed: isLoading ? null : onCreateRitual,
-            icon: const Icon(Icons.self_improvement_rounded),
-            label: const Text('Transformar em ritual'),
+            icon: loadingAction == ReadingActionLoading.ritual
+                ? loadingIcon
+                : const Icon(Icons.self_improvement_rounded),
+            label: Text(
+              loadingAction == ReadingActionLoading.ritual
+                  ? 'Criando ritual...'
+                  : 'Transformar em ritual',
+            ),
           ),
       ],
     );

@@ -77,7 +77,7 @@ class HomeHubView extends ConsumerStatefulWidget {
 
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool _isRewardLoading = false;
-  bool _isReadingActionLoading = false;
+  ReadingActionLoading? _readingActionLoading;
   bool _secondaryProvidersEnabled = true;
 
   @override
@@ -125,7 +125,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           isRewardLoading: _isRewardLoading,
           onWatchRewardedAd: _watchRewardedAd,
           onOpenPremium: widget.onOpenPremium,
-          isReadingActionLoading: _isReadingActionLoading,
+          readingActionLoading: _readingActionLoading,
           isSaved: checkIn.savedReading,
           onRegenerate: (style) => _regenerateReading(context, style),
           onSaveReading: () => _saveReading(context, checkIn.id),
@@ -139,11 +139,11 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     BuildContext sheetContext,
     String style,
   ) async {
-    if (_isReadingActionLoading) {
+    if (_readingActionLoading != null) {
       return;
     }
 
-    setState(() => _isReadingActionLoading = true);
+    setState(() => _readingActionLoading = _actionForReadingStyle(style));
     try {
       await ref
           .read(checkInControllerProvider.notifier)
@@ -174,17 +174,17 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isReadingActionLoading = false);
+        setState(() => _readingActionLoading = null);
       }
     }
   }
 
   Future<void> _saveReading(BuildContext sheetContext, int checkInId) async {
-    if (_isReadingActionLoading) {
+    if (_readingActionLoading != null) {
       return;
     }
 
-    setState(() => _isReadingActionLoading = true);
+    setState(() => _readingActionLoading = ReadingActionLoading.save);
     try {
       await ref.read(checkInControllerProvider.notifier).saveReading(checkInId);
       if (!mounted) {
@@ -209,7 +209,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isReadingActionLoading = false);
+        setState(() => _readingActionLoading = null);
       }
     }
   }
@@ -218,11 +218,11 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     BuildContext sheetContext,
     int checkInId,
   ) async {
-    if (_isReadingActionLoading) {
+    if (_readingActionLoading != null) {
       return;
     }
 
-    setState(() => _isReadingActionLoading = true);
+    setState(() => _readingActionLoading = ReadingActionLoading.ritual);
     try {
       await ref
           .read(checkInControllerProvider.notifier)
@@ -249,9 +249,18 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isReadingActionLoading = false);
+        setState(() => _readingActionLoading = null);
       }
     }
+  }
+
+  ReadingActionLoading _actionForReadingStyle(String style) {
+    return switch (style) {
+      'quick' => ReadingActionLoading.quick,
+      'practical' => ReadingActionLoading.practical,
+      'balanced' => ReadingActionLoading.balanced,
+      _ => ReadingActionLoading.deep,
+    };
   }
 
   Future<void> _watchRewardedAd() async {

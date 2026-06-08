@@ -98,7 +98,19 @@ class CheckInDto {
       responseFingerprint: value['responseFingerprint']?.toString(),
       usedContextSummary: value['usedContextSummary']?.toString(),
       nextStep: _parseNextStep(value['nextStep']),
+      title: _parseOptionalText(value['title']),
+      surface: _parseOptionalText(value['surface']),
+      behind: _parseOptionalText(value['behind']),
+      identifiedState: _parseOptionalText(value['identifiedState']),
+      revealingQuestion: _parseOptionalText(value['revealingQuestion']),
+      possibleNewState: _parseOptionalText(value['possibleNewState']),
+      microAction: _parseOptionalText(value['microAction']),
     );
+  }
+
+  static String? _parseOptionalText(dynamic value) {
+    final text = value?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
   }
 
   static List<String> _parseStringList(dynamic value) {
