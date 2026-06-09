@@ -72,6 +72,39 @@ void main() {
     );
   });
 
+  test('create succeeds when refresh after saved check-in fails', () async {
+    final created = _checkIn(
+      id: 100,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: null,
+    );
+    final requestOptions = RequestOptions(path: '/v1/check-ins');
+    final repository = _FakeCheckInRepository(
+      createResult: created,
+      lists: [const <CheckIn>[]],
+      listErrors: [
+        DioException(
+          requestOptions: requestOptions,
+          response: Response(requestOptions: requestOptions, statusCode: 503),
+        ),
+      ],
+    );
+    final container = _container(repository);
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: 'salvo', energyLevel: 7);
+
+    final state = container.read(checkInControllerProvider).asData?.value;
+    expect(repository.createCalls, 1);
+    expect(state?.latestCreatedCheckIn?.id, 100);
+    expect(state?.result.items.first.id, 100);
+    expect(state?.isCreatingCheckIn, isFalse);
+    expect(container.read(checkInControllerProvider).hasError, isFalse);
+  });
+
   test(
     'create ignores parallel duplicate submissions while in flight',
     () async {
@@ -504,6 +537,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     this.createResult,
     this.createError,
     this.createErrors = const [],
+    this.listErrors = const [],
     this.createGate,
     this.deepReadingResult,
     this.deepReadingError,
@@ -514,6 +548,7 @@ class _FakeCheckInRepository implements CheckInRepository {
   final CheckIn? createResult;
   final Object? createError;
   final List<Object> createErrors;
+  final List<Object> listErrors;
   final Completer<void>? createGate;
   final CheckIn? deepReadingResult;
   final Object? deepReadingError;
@@ -522,6 +557,7 @@ class _FakeCheckInRepository implements CheckInRepository {
   final List<int> savedReadingIds = [];
   final List<int> ritualReadingIds = [];
   int createCalls = 0;
+  int listCalls = 0;
 
   @override
   Future<PaginatedResponse<CheckIn>> list({
@@ -535,6 +571,11 @@ class _FakeCheckInRepository implements CheckInRepository {
     DateTime? from,
     DateTime? to,
   }) async {
+    listCalls++;
+    if (_lists.isEmpty && listErrors.isNotEmpty) {
+      final error = listErrors.first;
+      throw error;
+    }
     final items = _lists.isEmpty ? const <CheckIn>[] : _lists.removeAt(0);
     return PaginatedResponse(
       items: items,

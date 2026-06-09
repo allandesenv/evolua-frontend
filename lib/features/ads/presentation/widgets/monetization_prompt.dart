@@ -107,7 +107,11 @@ class RewardedAdPrompt extends StatelessWidget {
     required this.isRewardLoading,
     this.onWatchRewardedAd,
     this.onOpenPremium,
+    this.onSecondary,
     this.premiumLabel = 'Aprofundar com Premium',
+    this.watchLabel,
+    this.loadingLabel = 'Carregando anúncio',
+    this.secondaryLabel = 'Agora não',
   });
 
   final String title;
@@ -117,7 +121,11 @@ class RewardedAdPrompt extends StatelessWidget {
   final bool isRewardLoading;
   final VoidCallback? onWatchRewardedAd;
   final VoidCallback? onOpenPremium;
+  final VoidCallback? onSecondary;
   final String premiumLabel;
+  final String? watchLabel;
+  final String loadingLabel;
+  final String secondaryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +198,9 @@ class RewardedAdPrompt extends StatelessWidget {
                         )
                       : const Icon(Icons.play_circle_rounded),
                   label: Text(
-                    isRewardLoading ? 'Carregando anúncio' : 'Assistir anúncio',
+                    isRewardLoading
+                        ? loadingLabel
+                        : watchLabel ?? 'Assistir anúncio',
                   ),
                 ),
               if (onOpenPremium != null)
@@ -198,6 +208,11 @@ class RewardedAdPrompt extends StatelessWidget {
                   onPressed: isRewardLoading ? null : onOpenPremium,
                   icon: const Icon(Icons.workspace_premium_rounded),
                   label: Text(premiumLabel),
+                ),
+              if (onSecondary != null)
+                TextButton(
+                  onPressed: isRewardLoading ? null : onSecondary,
+                  child: Text(secondaryLabel),
                 ),
             ],
           ),

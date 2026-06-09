@@ -20,7 +20,11 @@ class MobileRewardedAdService implements RewardedAdService {
   static const _ssvConfirmationDelay = Duration(seconds: 2);
   static const _ssvMaxWaitAfterAd = Duration(seconds: 8);
 
-  static const _aiRewardTypes = {'DEEP_EMOTIONAL_READING', 'AI_ACTION'};
+  static const _extraCheckInRewardTypes = {RewardResources.extraCheckIn};
+  static const _aiRewardTypes = {
+    RewardResources.deepEmotionalReading,
+    RewardResources.aiExtra,
+  };
   static const _premiumPassRewardTypes = {
     'ADVANCED_MIRROR',
     'SMART_RECOMMENDATION',
@@ -277,6 +281,12 @@ class MobileRewardedAdService implements RewardedAdService {
       }
 
       return AppConfig.adMobAndroidRewardedTestAdUnitId;
+    }
+
+    if (_extraCheckInRewardTypes.contains(normalized)) {
+      return isIOS
+          ? AppConfig.adMobIosRewardedExtraCheckInAdUnitId
+          : AppConfig.adMobAndroidRewardedExtraCheckInAdUnitId;
     }
 
     if (_aiRewardTypes.contains(normalized)) {

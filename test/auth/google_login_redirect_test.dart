@@ -165,6 +165,124 @@ void main() {
       },
     );
 
+    testWidgets('invalid initial route shows boot splash while session loads', (
+      tester,
+    ) async {
+      final storage = _DelayedAuthSessionStorage();
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FakeAuthRepository(googleSession: _testSession()),
+          ),
+          authSessionStorageProvider.overrideWithValue(storage),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final authRouterNotifier = _bindAuthRouterNotifier(container);
+      addTearDown(authRouterNotifier.dispose);
+      final router = _buildTestRouter(
+        authRouterNotifier,
+        initialLocation: '/rota-inexistente',
+        overridePlatformDefaultLocation: true,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.textContaining('Page Not Found'), findsNothing);
+      expect(find.text('Nao encontramos esta pagina.'), findsNothing);
+    });
+
+    testWidgets('invalid route after boot shows friendly not found page', (
+      tester,
+    ) async {
+      final session = _testSession();
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(session.toJson()),
+      });
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FakeAuthRepository(googleSession: session),
+          ),
+          authSessionStorageProvider.overrideWithValue(
+            _SharedPreferencesAuthSessionStorage(),
+          ),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final authRouterNotifier = _bindAuthRouterNotifier(container);
+      addTearDown(authRouterNotifier.dispose);
+      final router = _buildTestRouter(
+        authRouterNotifier,
+        initialLocation: '/rota-inexistente',
+        overridePlatformDefaultLocation: true,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nao encontramos esta pagina.'), findsOneWidget);
+      expect(find.text('Voltar para o Evolua'), findsOneWidget);
+      expect(find.textContaining('Page Not Found'), findsNothing);
+    });
+
+    testWidgets(
+      'boot error shows friendly retry instead of auth or not found',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final container = ProviderContainer(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(
+              _FakeAuthRepository(googleSession: _testSession()),
+            ),
+            authSessionStorageProvider.overrideWithValue(
+              _FailingAuthSessionStorage(),
+            ),
+            profileRepositoryProvider.overrideWithValue(
+              _FakeProfileRepository(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final authRouterNotifier = _bindAuthRouterNotifier(container);
+        addTearDown(authRouterNotifier.dispose);
+        final router = _buildTestRouter(authRouterNotifier);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Nao conseguimos iniciar o Evolua agora.'),
+          findsOneWidget,
+        );
+        expect(find.text('Tentar novamente'), findsOneWidget);
+        expect(find.text('auth-page'), findsNothing);
+        expect(find.textContaining('Page Not Found'), findsNothing);
+      },
+    );
+
     testWidgets('unauthenticated user trying /home is redirected to /auth', (
       tester,
     ) async {
@@ -615,6 +733,7 @@ AuthRouterNotifier _bindAuthRouterNotifier(ProviderContainer container) {
 GoRouter _buildTestRouter(
   AuthRouterNotifier authRouterNotifier, {
   String initialLocation = '/',
+  bool overridePlatformDefaultLocation = false,
 }) {
   return buildAppRouter(
     authRouterNotifier: authRouterNotifier,
@@ -623,6 +742,7 @@ GoRouter _buildTestRouter(
         const _PlaceholderPage('callback-page'),
     homePageBuilder: (context, state) => const _PlaceholderPage('home-page'),
     initialLocation: initialLocation,
+    overridePlatformDefaultLocation: overridePlatformDefaultLocation,
   );
 }
 
@@ -728,6 +848,19 @@ class _DelayedAuthSessionStorage implements AuthSessionStorage {
 
   @override
   Future<String?> read() => _readCompleter.future;
+
+  @override
+  Future<void> write(String value) async {}
+
+  @override
+  Future<void> clear() async {}
+}
+
+class _FailingAuthSessionStorage implements AuthSessionStorage {
+  @override
+  Future<String?> read() async {
+    throw StateError('storage unavailable');
+  }
 
   @override
   Future<void> write(String value) async {}
