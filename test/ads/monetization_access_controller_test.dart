@@ -14,7 +14,7 @@ void main() {
       overrides: [
         subscriptionRepositoryProvider.overrideWithValue(repository),
         rewardedAdServiceProvider.overrideWithValue(
-          _FakeRewardedAdService(result: false),
+          _FakeRewardedAdService(result: RewardedAdResult.loadFailed),
         ),
       ],
     );
@@ -30,7 +30,7 @@ void main() {
 
   test('grants access after rewarded ad and refreshed entitlement', () async {
     final repository = _FakeSubscriptionRepository(accessAllowed: true);
-    final rewarded = _FakeRewardedAdService(result: true);
+    final rewarded = _FakeRewardedAdService(result: RewardedAdResult.rewarded);
     final container = ProviderContainer(
       overrides: [
         subscriptionRepositoryProvider.overrideWithValue(repository),
@@ -52,14 +52,13 @@ void main() {
 class _FakeRewardedAdService implements RewardedAdService {
   _FakeRewardedAdService({required this.result});
 
-  final bool result;
+  final RewardedAdResult result;
   String? rewardType;
 
   @override
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   }) async {
     this.rewardType = rewardType;

@@ -18,4 +18,11 @@ abstract class SocialPostRepository {
     required String community,
     required String visibility,
   });
+
+  Future<SocialPost> update({
+    required String id,
+    required String content,
+  });
+
+  Future<void> delete(String id);
 }

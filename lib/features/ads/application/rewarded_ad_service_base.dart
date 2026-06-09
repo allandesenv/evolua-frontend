@@ -1,8 +1,21 @@
+enum RewardedAdResult {
+  rewarded,
+  noFill,
+  loadFailed,
+  showFailed,
+  dismissedWithoutReward,
+  timeout,
+  unsupported,
+}
+
+extension RewardedAdResultX on RewardedAdResult {
+  bool get isRewarded => this == RewardedAdResult.rewarded;
+}
+
 abstract class RewardedAdService {
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   });
 }

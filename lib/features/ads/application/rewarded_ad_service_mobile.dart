@@ -19,7 +19,6 @@ class MobileRewardedAdService implements RewardedAdService {
   static const _ssvConfirmationAttempts = 8;
   static const _ssvConfirmationDelay = Duration(seconds: 2);
   static const _ssvMaxWaitAfterAd = Duration(seconds: 8);
-  static const _fallbackConfirmationMaxWait = Duration(seconds: 4);
 
   static const _aiRewardTypes = {'DEEP_EMOTIONAL_READING', 'AI_ACTION'};
   static const _premiumPassRewardTypes = {
@@ -32,14 +31,13 @@ class MobileRewardedAdService implements RewardedAdService {
   final SubscriptionRepository _repository;
 
   @override
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   }) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
-      return false;
+      return RewardedAdResult.unsupported;
     }
 
     final normalizedRewardType = rewardType.trim().toUpperCase();
@@ -65,6 +63,7 @@ class MobileRewardedAdService implements RewardedAdService {
       required bool opened,
       required bool earned,
       String source = 'unknown',
+      RewardedAdResult? result,
     }) {
       if (completer.isCompleted) {
         return;
@@ -76,7 +75,11 @@ class MobileRewardedAdService implements RewardedAdService {
       );
 
       completer.complete(
-        _RewardedAdOutcome(openedFullScreen: opened, earnedReward: earned),
+        _RewardedAdOutcome(
+          openedFullScreen: opened,
+          earnedReward: earned,
+          result: result,
+        ),
       );
     }
 
@@ -163,6 +166,7 @@ class MobileRewardedAdService implements RewardedAdService {
                   opened: openedFullScreen,
                   earned: false,
                   source: 'onAdFailedToShowFullScreenContent',
+                  result: RewardedAdResult.showFailed,
                 );
               },
             );
@@ -186,6 +190,9 @@ class MobileRewardedAdService implements RewardedAdService {
               opened: false,
               earned: false,
               source: 'onAdFailedToLoad',
+              result: error.code == 3
+                  ? RewardedAdResult.noFill
+                  : RewardedAdResult.loadFailed,
             );
           },
         ),
@@ -205,16 +212,19 @@ class MobileRewardedAdService implements RewardedAdService {
           return _RewardedAdOutcome(
             openedFullScreen: openedFullScreen,
             earnedReward: earnedReward,
+            result: RewardedAdResult.timeout,
           );
         },
       );
 
       if (!outcome.openedFullScreen) {
-        return false;
+        return outcome.result ?? RewardedAdResult.loadFailed;
       }
 
       if (!outcome.earnedReward) {
-        return false;
+        return outcome.result == RewardedAdResult.timeout
+            ? RewardedAdResult.timeout
+            : RewardedAdResult.dismissedWithoutReward;
       }
 
       if (AppConfig.adMobUseTestAds) {
@@ -223,11 +233,7 @@ class MobileRewardedAdService implements RewardedAdService {
         } catch (error) {
           debugPrint('AdMob test reward grant failed: $error');
 
-          if (normalizedRewardType == 'DEEP_EMOTIONAL_READING') {
-            return true;
-          }
-
-          return false;
+          return RewardedAdResult.loadFailed;
         }
       }
 
@@ -238,33 +244,10 @@ class MobileRewardedAdService implements RewardedAdService {
       );
 
       if (confirmed) {
-        return true;
+        return RewardedAdResult.rewarded;
       }
 
-      final canUseClientFallback =
-          allowClientOpenedFallback ||
-          normalizedRewardType == 'DEEP_EMOTIONAL_READING';
-
-      if (!canUseClientFallback) {
-        return false;
-      }
-
-      try {
-        await _repository.grantClientOpenedReward(session.id);
-      } catch (error) {
-        debugPrint('AdMob client-opened reward grant failed: $error');
-
-        return normalizedRewardType == 'DEEP_EMOTIONAL_READING';
-      }
-
-      final fallbackConfirmed = await _waitForServerSideReward(
-        rewardType: rewardType,
-        contextId: contextId,
-        maxWait: _fallbackConfirmationMaxWait,
-      );
-
-      return fallbackConfirmed ||
-          normalizedRewardType == 'DEEP_EMOTIONAL_READING';
+      return RewardedAdResult.loadFailed;
     } finally {
       WidgetsBinding.instance.removeObserver(lifecycleFallback);
     }
@@ -397,8 +380,10 @@ class _RewardedAdOutcome {
   const _RewardedAdOutcome({
     this.openedFullScreen = false,
     this.earnedReward = false,
+    this.result,
   });
 
   final bool openedFullScreen;
   final bool earnedReward;
+  final RewardedAdResult? result;
 }

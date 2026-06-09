@@ -534,8 +534,8 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
       return;
     }
 
-    if (journey.isCompleted) {
-      _showJourneyDetails(context, journey.trail);
+    if (_isJourneyEffectivelyCompleted(journey)) {
+      widget.onOpenCatalog();
       return;
     }
 
@@ -544,12 +544,13 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
       final actions = ref.read(trailJourneyActionProvider);
       if (!journey.isStarted) {
         await actions.start(journey.trail.id);
-      } else if (journey.nextStep != null && !journey.isCompleted) {
+      } else if (journey.nextStep != null &&
+          !_isJourneyEffectivelyCompleted(journey)) {
         final updatedJourney = await actions.completeStep(
           journey.trail.id,
           journey.nextStep!.index,
         );
-        if (updatedJourney.isCompleted) {
+        if (_isJourneyEffectivelyCompleted(updatedJourney)) {
           await ref
               .read(interstitialAdServiceProvider)
               .maybeShow(
@@ -562,6 +563,14 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
             const SnackBar(content: Text('Você avançou mais um passo.')),
           );
         }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não encontramos uma próxima etapa segura para esta trilha.',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -616,8 +625,8 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
       return;
     }
 
-    if (journey.isCompleted) {
-      _showJourneyDetails(context, journey.trail);
+    if (_isJourneyEffectivelyCompleted(journey)) {
+      widget.onBack();
       return;
     }
 
@@ -631,7 +640,7 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
           journey.trail.id,
           journey.nextStep!.index,
         );
-        if (updatedJourney.isCompleted) {
+        if (_isJourneyEffectivelyCompleted(updatedJourney)) {
           await ref
               .read(interstitialAdServiceProvider)
               .maybeShow(
@@ -644,6 +653,14 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
             const SnackBar(content: Text('Você avançou mais um passo.')),
           );
         }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não encontramos uma próxima etapa segura para esta trilha.',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -698,6 +715,7 @@ class _VisualJourneyPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final activeColor = _journeyAccentColor(journey.trail);
+    final isCompleted = _isJourneyEffectivelyCompleted(journey);
     final nextStep = journey.nextStep;
 
     return PrimaryPanel(
@@ -725,7 +743,9 @@ class _VisualJourneyPanel extends StatelessWidget {
                     activeColor: activeColor,
                   ),
                   const SizedBox(height: 18),
-                  if (compact)
+                  if (journey.steps.isEmpty)
+                    _JourneyEmptyStepsCard(activeColor: activeColor)
+                  else if (compact)
                     _JourneyTimeline(
                       journey: journey,
                       activeColor: activeColor,
@@ -752,12 +772,19 @@ class _VisualJourneyPanel extends StatelessWidget {
                             trailId: journey.trail.id,
                             step: nextStep ?? journey.steps.last,
                             activeColor: activeColor,
-                            isCompleted: journey.isCompleted,
+                            isCompleted: isCompleted,
                           ),
                         ),
                       ],
                     ),
                   const SizedBox(height: 18),
+                  if (isCompleted) ...[
+                    _JourneyCompletionCard(
+                      activeColor: activeColor,
+                      onExploreTrails: onPrimaryAction,
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   _JourneyMentorEntryCard(onOpenMentor: onOpenMentor),
                 ],
               ),
@@ -767,6 +794,7 @@ class _VisualJourneyPanel extends StatelessWidget {
           _JourneyStickyCta(
             journey: journey,
             isActing: isActing,
+            isCompleted: isCompleted,
             onPressed: isActing || journey.steps.isEmpty
                 ? null
                 : onPrimaryAction,
@@ -781,11 +809,13 @@ class _JourneyStickyCta extends StatelessWidget {
   const _JourneyStickyCta({
     required this.journey,
     required this.isActing,
+    required this.isCompleted,
     required this.onPressed,
   });
 
   final TrailJourney journey;
   final bool isActing;
+  final bool isCompleted;
   final VoidCallback? onPressed;
 
   @override
@@ -818,14 +848,94 @@ class _JourneyStickyCta extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Icon(
-                  journey.isCompleted
-                      ? Icons.replay_rounded
+                  isCompleted
+                      ? Icons.explore_rounded
                       : journey.isStarted
                       ? Icons.task_alt_rounded
                       : Icons.play_arrow_rounded,
                 ),
-          label: Text(_journeyCtaLabel(journey)),
+          label: Text(_journeyCtaLabel(journey, isCompleted: isCompleted)),
         ),
+      ),
+    );
+  }
+}
+
+class _JourneyEmptyStepsCard extends StatelessWidget {
+  const _JourneyEmptyStepsCard({required this.activeColor});
+
+  final Color activeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: activeColor.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        'Ainda não encontramos etapas disponíveis para esta trilha.',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: context.evoluaColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _JourneyCompletionCard extends StatelessWidget {
+  const _JourneyCompletionCard({
+    required this.activeColor,
+    required this.onExploreTrails,
+  });
+
+  final Color activeColor;
+  final VoidCallback onExploreTrails;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: activeColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: activeColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified_rounded, color: activeColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Trilha concluída',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: context.evoluaColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Você concluiu esta jornada. Que tal explorar uma nova trilha?',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: onExploreTrails,
+            icon: const Icon(Icons.explore_rounded),
+            label: const Text('Explorar novas trilhas'),
+          ),
+        ],
       ),
     );
   }
@@ -2263,9 +2373,18 @@ String? _extractYoutubeId(String? url) {
   return null;
 }
 
-String _journeyCtaLabel(TrailJourney journey) {
-  if (journey.isCompleted) {
-    return 'Revisar trilha';
+bool _isJourneyEffectivelyCompleted(TrailJourney journey) {
+  return journey.isCompleted ||
+      (journey.steps.isNotEmpty &&
+          journey.steps.every((step) => step.isCompleted));
+}
+
+String _journeyCtaLabel(TrailJourney journey, {bool? isCompleted}) {
+  if (isCompleted ?? _isJourneyEffectivelyCompleted(journey)) {
+    return 'Explorar novas trilhas';
+  }
+  if (journey.steps.isEmpty) {
+    return 'Trilha indisponível';
   }
   if (!journey.isStarted) {
     return 'Iniciar trilha';
@@ -2274,7 +2393,7 @@ String _journeyCtaLabel(TrailJourney journey) {
 }
 
 String _catalogTrailCtaLabel(TrailJourney journey) {
-  if (journey.isCompleted) {
+  if (_isJourneyEffectivelyCompleted(journey)) {
     return 'Revisar trilha';
   }
   if (journey.isStarted) {
@@ -2443,7 +2562,7 @@ class _JourneyStepSheetState extends State<_JourneyStepSheet> {
               trailId: widget.journey.trail.id,
               step: step,
               activeColor: widget.activeColor,
-              isCompleted: widget.journey.isCompleted,
+              isCompleted: _isJourneyEffectivelyCompleted(widget.journey),
             ),
           ),
         ),
@@ -2759,7 +2878,7 @@ class _TrailExplorer extends ConsumerWidget {
                                       }
                                     },
                                     icon: Icon(
-                                      journey.isCompleted
+                                      _isJourneyEffectivelyCompleted(journey)
                                           ? Icons.replay_rounded
                                           : journey.isStarted
                                           ? Icons.task_alt_rounded

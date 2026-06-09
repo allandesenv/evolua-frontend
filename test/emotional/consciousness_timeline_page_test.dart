@@ -93,7 +93,7 @@ void main() {
     await tester.pumpWidget(
       _app(
         adapter: adapter,
-        rewardedAdResult: false,
+        rewardedAdResult: RewardedAdResult.loadFailed,
         accessAllowedAfterReward: true,
       ),
     );
@@ -116,7 +116,7 @@ void main() {
 
 Widget _app({
   required _TimelineAdapter adapter,
-  bool rewardedAdResult = true,
+  RewardedAdResult rewardedAdResult = RewardedAdResult.rewarded,
   bool accessAllowedAfterReward = false,
 }) {
   final dio = Dio()..httpClientAdapter = adapter;
@@ -214,13 +214,12 @@ class _TimelineAdapter implements HttpClientAdapter {
 class _FakeRewardedAdService implements RewardedAdService {
   const _FakeRewardedAdService({required this.result});
 
-  final bool result;
+  final RewardedAdResult result;
 
   @override
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   }) async {
     return result;

@@ -6,6 +6,7 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -324,7 +325,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       final rewarded = await ref
           .read(rewardedAdServiceProvider)
           .showRewardedAd(rewardType: 'DEEP_EMOTIONAL_READING');
-      if (rewarded) {
+      if (rewarded.isRewarded) {
         await ref
             .read(interstitialAdServiceProvider)
             .recordRewardedAdShown(
@@ -340,10 +341,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: rewarded
+        message: rewarded.isRewarded
             ? 'Crédito extra de IA liberado. Faça um novo check-in quando quiser.'
             : context.l10n.errorRewardedAdUnavailable,
-        icon: rewarded
+        icon: rewarded.isRewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
       );

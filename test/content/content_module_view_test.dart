@@ -132,6 +132,50 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('completed journey shows final state and opens catalog', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(
+        _testApp(
+          trailRepository: _FakeTrailRepository(
+            journeyBuilder: _completedByStepsJourney,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trilha concluída'), findsWidgets);
+      expect(find.text('Fazer prÃ³xima etapa'), findsNothing);
+      expect(find.text('Explorar novas trilhas'), findsWidgets);
+
+      await tester.ensureVisible(find.text('Explorar novas trilhas').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Explorar novas trilhas').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Respiracao breve'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('empty step list is not treated as completed', (tester) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(
+        _testApp(
+          trailRepository: _FakeTrailRepository(
+            journeyBuilder: _emptyStepsJourney,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trilha concluída'), findsNothing);
+      expect(find.text('Trilha indisponível'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('journey and catalog communicate different purposes', (
       tester,
     ) async {
@@ -1330,14 +1374,13 @@ class _FakeRewardedAdService implements RewardedAdService {
   String? lastRewardType;
 
   @override
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   }) async {
     lastRewardType = rewardType;
-    return true;
+    return RewardedAdResult.rewarded;
   }
 }
 
@@ -1534,6 +1577,61 @@ TrailJourney _journey(Trail trail) {
     ),
     progressPercent: 0,
     nextStep: steps.first,
+  );
+}
+
+TrailJourney _completedByStepsJourney(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Respirar',
+      summary: 'Dois minutos de presenca.',
+      content: 'Respire por quatro ciclos.',
+      type: 'EXERCISE',
+      status: 'completed',
+      estimatedMinutes: 2,
+      mediaLinks: [],
+    ),
+    const TrailJourneyStep(
+      index: 1,
+      title: 'Escolher',
+      summary: 'Uma proxima acao simples.',
+      content: 'Escolha uma acao pequena.',
+      type: 'REFLECTION',
+      status: 'completed',
+      estimatedMinutes: 4,
+      mediaLinks: [],
+    ),
+  ];
+
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 1,
+      completedStepIndexes: const [0, 1],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 2),
+      completedAt: null,
+    ),
+    progressPercent: 100,
+    nextStep: null,
+  );
+}
+
+TrailJourney _emptyStepsJourney(Trail trail) {
+  return TrailJourney(
+    trail: trail,
+    steps: const [],
+    progress: TrailProgress(
+      currentStepIndex: 0,
+      completedStepIndexes: const [],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      completedAt: null,
+    ),
+    progressPercent: 0,
+    nextStep: null,
   );
 }
 
