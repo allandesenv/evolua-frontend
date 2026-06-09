@@ -83,6 +83,7 @@ class HomeHubView extends ConsumerStatefulWidget {
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool _isRewardLoading = false;
   ReadingActionLoading? _readingActionLoading;
+  bool _isGeneratingDailyRitualFromCheckIn = false;
   bool _secondaryProvidersEnabled = true;
   final Map<int, int> _readingVariationCounts = {};
 
@@ -257,14 +258,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       final periodLabel = type == DailyRitualType.evening
           ? 'Fechamento do Dia'
           : 'Ritual do Dia';
-      var rituals = ref.read(dailyRitualControllerProvider).asData?.value;
-      if (rituals == null) {
+      final existing = await ref
+          .read(dailyRitualRepositoryProvider)
+          .today(type: type, localDate: localDate);
+      if (existing != null) {
         await ref
             .read(dailyRitualControllerProvider.notifier)
             .refresh(localDate: localDate);
-        rituals = ref.read(dailyRitualControllerProvider).asData?.value;
-      }
-      if (rituals?.byType(type) != null) {
         if (!mounted) {
           return;
         }
@@ -302,6 +302,85 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     } finally {
       if (mounted) {
         setState(() => _readingActionLoading = null);
+      }
+    }
+  }
+
+  Future<void> _createDailyRitualFromCheckIn(int checkInId) async {
+    if (_isGeneratingDailyRitualFromCheckIn) {
+      return;
+    }
+
+    setState(() => _isGeneratingDailyRitualFromCheckIn = true);
+    try {
+      final now = widget.now ?? DateTime.now();
+      final localDate = DateTime(now.year, now.month, now.day);
+      final type = now.hour >= 18
+          ? DailyRitualType.evening
+          : DailyRitualType.morning;
+      final periodLabel = type == DailyRitualType.evening
+          ? 'Fechamento do Dia'
+          : 'Ritual do Dia';
+      final existing = await ref
+          .read(dailyRitualRepositoryProvider)
+          .today(type: type, localDate: localDate);
+      if (existing != null) {
+        await ref
+            .read(dailyRitualControllerProvider.notifier)
+            .refresh(localDate: localDate);
+        if (!mounted) {
+          return;
+        }
+        AppSnackBar.show(
+          context,
+          message:
+              'Você já tem o $periodLabel de hoje. Ele continua disponível para consulta.',
+          icon: Icons.check_circle_rounded,
+        );
+        return;
+      }
+      await ref
+          .read(checkInControllerProvider.notifier)
+          .createRitualFromReading(checkInId, localDate: localDate, type: type);
+      final checkInFailure = ref.read(checkInControllerProvider).asError;
+      if (checkInFailure != null) {
+        Error.throwWithStackTrace(
+          checkInFailure.error,
+          checkInFailure.stackTrace,
+        );
+      }
+      await ref
+          .read(dailyRitualControllerProvider.notifier)
+          .refresh(localDate: localDate);
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: '$periodLabel criado a partir do seu check-in.',
+        icon: Icons.self_improvement_rounded,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      try {
+        await ref.read(checkInControllerProvider.notifier).refresh();
+      } catch (_) {
+        // Best effort: the user-facing error below keeps the widget recoverable.
+      }
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message:
+            'Não conseguimos gerar seu ritual agora. Tente novamente em instantes.',
+        icon: Icons.wifi_off_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingDailyRitualFromCheckIn = false);
       }
     }
   }
@@ -472,6 +551,11 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       currentJourneySummary: currentJourney?.summary,
     );
     final currentTime = widget.now ?? DateTime.now();
+    final todayCheckIn = _latestCheckInForDay(
+      latestCreatedCheckIn: latestCreatedCheckIn,
+      recentItems: recentItems,
+      now: currentTime,
+    );
     final showMirrorReward =
         latestCreatedCheckIn != null &&
         _isSameLocalDay(latestCreatedCheckIn.createdAt, currentTime);
@@ -489,8 +573,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           now: currentTime,
           morningRitual: dailyRitualState.asData?.value.morning,
           eveningRitual: dailyRitualState.asData?.value.evening,
+          todayCheckIn: todayCheckIn,
           isLoading: dailyRitualState.isLoading && !dailyRitualState.hasValue,
+          isGeneratingFromCheckIn: _isGeneratingDailyRitualFromCheckIn,
           onCheckIn: widget.onOpenCheckIn,
+          onGenerateFromCheckIn: todayCheckIn == null
+              ? null
+              : () => _createDailyRitualFromCheckIn(todayCheckIn.id),
           onOpenDailyRitual: widget.onOpenDailyRitual,
           onOpenNextStep: widget.onOpenTrails,
           onOpenReflection: widget.onOpenFeed,
@@ -580,6 +669,23 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final b = second.toLocal();
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
+
+  CheckIn? _latestCheckInForDay({
+    required CheckIn? latestCreatedCheckIn,
+    required List<CheckIn> recentItems,
+    required DateTime now,
+  }) {
+    if (latestCreatedCheckIn != null &&
+        _isSameLocalDay(latestCreatedCheckIn.createdAt, now)) {
+      return latestCreatedCheckIn;
+    }
+    for (final item in recentItems) {
+      if (_isSameLocalDay(item.createdAt, now)) {
+        return item;
+      }
+    }
+    return null;
+  }
 }
 
 class _DailyJourneyCard extends StatelessWidget {
@@ -588,8 +694,11 @@ class _DailyJourneyCard extends StatelessWidget {
     required this.now,
     required this.morningRitual,
     required this.eveningRitual,
+    required this.todayCheckIn,
     required this.isLoading,
+    required this.isGeneratingFromCheckIn,
     required this.onCheckIn,
+    required this.onGenerateFromCheckIn,
     required this.onOpenDailyRitual,
     required this.onOpenNextStep,
     required this.onOpenReflection,
@@ -599,8 +708,11 @@ class _DailyJourneyCard extends StatelessWidget {
   final DateTime now;
   final DailyRitual? morningRitual;
   final DailyRitual? eveningRitual;
+  final CheckIn? todayCheckIn;
   final bool isLoading;
+  final bool isGeneratingFromCheckIn;
   final VoidCallback onCheckIn;
+  final VoidCallback? onGenerateFromCheckIn;
   final ValueChanged<String> onOpenDailyRitual;
   final VoidCallback onOpenNextStep;
   final VoidCallback onOpenReflection;
@@ -614,7 +726,9 @@ class _DailyJourneyCard extends StatelessWidget {
       now: now,
       morningRitual: morningRitual,
       eveningRitual: eveningRitual,
+      todayCheckIn: todayCheckIn,
       onCheckIn: onCheckIn,
+      onGenerateFromCheckIn: onGenerateFromCheckIn,
       onOpenDailyRitual: onOpenDailyRitual,
       onOpenNextStep: onOpenNextStep,
       onOpenReflection: onOpenReflection,
@@ -689,21 +803,30 @@ class _DailyJourneyCard extends StatelessWidget {
   }) {
     final actions = [
       FilledButton.icon(
-        onPressed: isLoading ? null : model.primaryAction,
-        icon: isLoading
+        onPressed: isLoading || isGeneratingFromCheckIn
+            ? null
+            : model.primaryAction,
+        icon: isGeneratingFromCheckIn
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : isLoading
             ? const SizedBox.square(
                 dimension: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : Icon(model.primaryIcon),
         label: Text(
-          model.primaryLabel,
+          isGeneratingFromCheckIn ? 'Gerando...' : model.primaryLabel,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
       ),
       OutlinedButton.icon(
-        onPressed: isLoading ? null : model.secondaryAction,
+        onPressed: isLoading || isGeneratingFromCheckIn
+            ? null
+            : model.secondaryAction,
         icon: Icon(model.secondaryIcon),
         label: Text(
           model.secondaryLabel,
@@ -828,7 +951,9 @@ class _DailyJourneyCardModel {
     required DateTime now,
     required DailyRitual? morningRitual,
     required DailyRitual? eveningRitual,
+    required CheckIn? todayCheckIn,
     required VoidCallback onCheckIn,
+    required VoidCallback? onGenerateFromCheckIn,
     required ValueChanged<String> onOpenDailyRitual,
     required VoidCallback onOpenNextStep,
     required VoidCallback onOpenReflection,
@@ -854,6 +979,19 @@ class _DailyJourneyCardModel {
           secondaryAction: onOpenReflection,
         );
       }
+      if (todayCheckIn != null && onGenerateFromCheckIn != null) {
+        return _DailyJourneyCardModel(
+          title: 'Criar fechamento do dia',
+          message:
+              'Você já fez seu check-in de hoje. Agora pode transformar esse momento em um cuidado simples para fechar o dia.',
+          primaryLabel: 'Gerar com meu check-in',
+          primaryIcon: Icons.auto_awesome_rounded,
+          primaryAction: onGenerateFromCheckIn,
+          secondaryLabel: 'Criar manualmente',
+          secondaryIcon: Icons.edit_note_rounded,
+          secondaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
+        );
+      }
       return _DailyJourneyCardModel(
         title: l10n.homeDailyEveningTitle,
         message: l10n.homeDailyEveningBody,
@@ -877,6 +1015,20 @@ class _DailyJourneyCardModel {
         secondaryLabel: l10n.homeDailyDayPrimary,
         secondaryIcon: Icons.favorite_rounded,
         secondaryAction: onCheckIn,
+      );
+    }
+
+    if (todayCheckIn != null && onGenerateFromCheckIn != null) {
+      return _DailyJourneyCardModel(
+        title: 'Criar ritual do dia',
+        message:
+            'Você já fez seu check-in de hoje. Agora pode transformar esse momento em um cuidado simples para o seu dia.',
+        primaryLabel: 'Gerar com meu check-in',
+        primaryIcon: Icons.auto_awesome_rounded,
+        primaryAction: onGenerateFromCheckIn,
+        secondaryLabel: 'Criar manualmente',
+        secondaryIcon: Icons.edit_note_rounded,
+        secondaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
       );
     }
 

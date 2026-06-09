@@ -147,7 +147,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Trilha concluída'), findsWidgets);
-      expect(find.text('Fazer prÃ³xima etapa'), findsNothing);
+      expect(find.text('Fazer próxima etapa'), findsNothing);
       expect(find.text('Explorar novas trilhas'), findsWidgets);
 
       await tester.ensureVisible(find.text('Explorar novas trilhas').last);

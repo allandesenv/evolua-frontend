@@ -242,7 +242,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           AppSnackBar.show(
             context,
             message:
-                'Seu check-in nÃ£o foi salvo. Verifique sua conexÃ£o e tente novamente.',
+                'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.',
             icon: Icons.favorite_border_rounded,
           );
         }
@@ -448,8 +448,8 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           final currentRewardFailure = rewardFailure;
           final sheetMessage = currentRewardFailure == null
               ? (rewardedAdAvailable
-                    ? 'VocÃª jÃ¡ fez seu check-in gratuito de hoje. Para registrar outro momento, assista a um anÃºncio ou continue sem limites com o Premium.'
-                    : 'VocÃª jÃ¡ usou o desbloqueio por anÃºncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhÃ£.')
+                    ? 'Você já fez seu check-in gratuito de hoje. Para registrar outro momento, assista a um anúncio ou continue sem limites com o Premium.'
+                    : 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.')
               : _rewardFailureMessage(currentRewardFailure);
           return SafeArea(
             top: false,
@@ -582,7 +582,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               AppSnackBar.show(
                                 context,
                                 message:
-                                    'Recebemos a recompensa, mas nÃ£o conseguimos liberar este check-in agora. Tente novamente em instantes.',
+                                    'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.',
                                 icon: Icons.info_outline_rounded,
                               );
                             } else if (saved ==
@@ -904,10 +904,10 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   }) {
     return switch (result) {
       _CheckInSubmitResult.networkError =>
-        'Seu check-in nÃ£o foi salvo. Verifique sua conexÃ£o e tente novamente.',
+        'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.',
       _CheckInSubmitResult.serverError => _errorMessage(fallbackError),
       _CheckInSubmitResult.rewardConfirmedButStillBlocked =>
-        'Recebemos a recompensa, mas nÃ£o conseguimos liberar este check-in agora. Tente novamente em instantes.',
+        'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.',
       _CheckInSubmitResult.success || _CheckInSubmitResult.limitReached => '',
       _CheckInSubmitResult.unknownError => _errorMessage(fallbackError),
     };

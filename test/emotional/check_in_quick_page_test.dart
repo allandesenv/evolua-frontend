@@ -773,6 +773,14 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+        expect(
+          find.text(
+            'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Ã'), findsNothing);
+        expect(find.textContaining('Â'), findsNothing);
         expect(find.textContaining('desbloqueio por'), findsOneWidget);
         expect(find.textContaining('Assistir'), findsNothing);
         expect(find.text('Ver Premium'), findsOneWidget);
