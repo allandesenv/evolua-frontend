@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/app/router/app_router.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
+import 'package:evolua_frontend/features/app_update/presentation/app_update_gate.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
 import 'package:evolua_frontend/l10n/generated/app_localizations.dart';
 import 'package:evolua_frontend/l10n/locale_controller.dart';
@@ -45,7 +46,7 @@ class EvoluaApp extends ConsumerWidget {
             textScaler: TextScaler.linear(preferences.textScale),
             disableAnimations: preferences.shouldDisableAnimations,
           ),
-          child: child ?? const SizedBox.shrink(),
+          child: AppUpdateGate(child: child ?? const SizedBox.shrink()),
         );
       },
       localizationsDelegates: AppLocalizations.localizationsDelegates,

@@ -1,0 +1,11 @@
+{
+  "installCommand": "echo \"Flutter será instalado no build\"",
+  "buildCommand": "git clone https://github.com/flutter/flutter.git -b stable --depth 1 && ./flutter/bin/flutter config --enable-web && ./flutter/bin/flutter pub get && ./flutter/bin/flutter build web --release --dart-define=EVOLUA_API_BASE_URL=https://evolua-api-production.up.railway.app --dart-define=EVOLUA_CARE_PORTAL_BASE_URL=https://evolua-frontend.vercel.app",
+  "outputDirectory": "build/web",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/app/router/auth_router_notifier.dart';
+import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/authenticated_session_reset.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/presentation/pages/auth_page.dart';
@@ -9,6 +10,7 @@ import 'package:evolua_frontend/features/care/presentation/pages/care_share_page
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/presentation/pages/daily_ritual_page.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
+import 'package:evolua_frontend/features/emotional/presentation/pages/consciousness_timeline_page.dart';
 import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/subscription/presentation/pages/billing_return_page.dart';
@@ -29,7 +31,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   }, fireImmediately: true);
   ref.onDispose(authRouterNotifier.dispose);
 
-  return buildAppRouter(authRouterNotifier: authRouterNotifier);
+  return buildAppRouter(
+    authRouterNotifier: authRouterNotifier,
+    onRouteMatched: (route) =>
+        ref.read(appUpdateCurrentRouteProvider.notifier).setRoute(route),
+  );
 });
 
 GoRouter buildAppRouter({
@@ -43,8 +49,10 @@ GoRouter buildAppRouter({
   GoRouterWidgetBuilder? dailyRitualPageBuilder,
   GoRouterWidgetBuilder? futureMessagesPageBuilder,
   GoRouterWidgetBuilder? futureMessageDetailPageBuilder,
+  GoRouterWidgetBuilder? consciousnessTimelinePageBuilder,
   String initialLocation = '/',
   bool overridePlatformDefaultLocation = false,
+  ValueChanged<String>? onRouteMatched,
 }) {
   return GoRouter(
     initialLocation: initialLocation,
@@ -91,7 +99,11 @@ GoRouter buildAppRouter({
       ),
       GoRoute(
         path: '/home',
-        builder: homePageBuilder ?? (context, state) => const HomePage(),
+        builder:
+            homePageBuilder ??
+            (context, state) => HomePage(
+              profileSection: state.uri.queryParameters['profileSection'],
+            ),
       ),
       GoRoute(
         path: '/billing/return',
@@ -104,6 +116,12 @@ GoRouter buildAppRouter({
         path: '/check-in',
         builder:
             checkInPageBuilder ?? (context, state) => const CheckInQuickPage(),
+      ),
+      GoRoute(
+        path: '/consciousness-timeline',
+        builder:
+            consciousnessTimelinePageBuilder ??
+            (context, state) => const ConsciousnessTimelinePage(),
       ),
       GoRoute(
         path: '/care/share',
@@ -140,6 +158,7 @@ GoRouter buildAppRouter({
       ),
     ],
     redirect: (context, state) {
+      onRouteMatched?.call(state.matchedLocation);
       if (authRouterNotifier.isBootstrapping) {
         if (state.matchedLocation == '/auth') {
           return '/';

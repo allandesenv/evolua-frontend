@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/ai_quota_limit_card.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/content/application/journey_chat_controller.dart';
@@ -339,10 +340,10 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
       }
       AppSnackBar.show(
         context,
-        message: rewarded
+        message: rewarded.isRewarded
             ? 'Crédito extra de IA liberado. Envie uma nova mensagem ao Mentor.'
             : context.l10n.errorRewardedAdUnavailable,
-        icon: rewarded
+        icon: rewarded.isRewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
       );

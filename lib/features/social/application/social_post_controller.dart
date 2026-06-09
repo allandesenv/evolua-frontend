@@ -84,15 +84,16 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
     state = await AsyncValue.guard(() async => _fetch(page: page));
   }
 
-  Future<void> create({
+  Future<SocialPost?> create({
     required String content,
     required String community,
     required String visibility,
   }) async {
     final repository = ref.read(socialPostRepositoryProvider);
+    SocialPost? createdPost;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await repository.create(
+      createdPost = await repository.create(
         content: content,
         community: community,
         visibility: visibility,
@@ -100,6 +101,23 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
 
       return _fetch(page: 0);
     });
+    return state.hasError ? null : createdPost;
+  }
+
+  Future<SocialPost> updatePost({
+    required String id,
+    required String content,
+  }) async {
+    final updatedPost = await ref
+        .read(socialPostRepositoryProvider)
+        .update(id: id, content: content);
+    _replacePost(updatedPost);
+    return updatedPost;
+  }
+
+  Future<void> deletePost(String id) async {
+    await ref.read(socialPostRepositoryProvider).delete(id);
+    _removePost(id);
   }
 
   Future<SocialFeedState> _fetch({required int page}) async {
@@ -258,5 +276,35 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
       DioExceptionType.unknown => true,
       _ => false,
     };
+  }
+
+  void _replacePost(SocialPost post) {
+    final value = state.asData?.value;
+    if (value == null) {
+      return;
+    }
+    final items = value.result.items
+        .map((item) => item.id == post.id ? post : item)
+        .toList();
+    state = AsyncData(SocialFeedState.fresh(value.result.copyWith(items: items)));
+  }
+
+  void _removePost(String id) {
+    final value = state.asData?.value;
+    if (value == null) {
+      return;
+    }
+    final items = value.result.items.where((item) => item.id != id).toList();
+    final removedCount = value.result.items.length - items.length;
+    state = AsyncData(
+      SocialFeedState.fresh(
+        value.result.copyWith(
+          items: items,
+          totalItems: (value.result.totalItems - removedCount)
+              .clamp(0, 1 << 31)
+              .toInt(),
+        ),
+      ),
+    );
   }
 }

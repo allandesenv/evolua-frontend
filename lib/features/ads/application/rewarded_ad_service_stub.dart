@@ -9,12 +9,11 @@ class WebRewardedAdService implements RewardedAdService {
   const WebRewardedAdService();
 
   @override
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   }) async {
-    return false;
+    return RewardedAdResult.unsupported;
   }
 }

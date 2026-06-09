@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
@@ -161,6 +163,152 @@ void main() {
       );
     });
 
+    testWidgets('space post author sees edit and delete actions', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Opções da reflexão'), findsOneWidget);
+    });
+
+    testWidgets('space post non-author does not see edit and delete actions', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(_testApp(currentUserId: 'user-2'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Opções da reflexão'), findsNothing);
+    });
+
+    testWidgets('space post author edits reflection content', (tester) async {
+      await _setCompactSurface(tester);
+      final posts = _FakeSocialPostRepository();
+
+      await tester.pumpWidget(_testApp(posts: posts));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Opções da reflexão'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        'Atualizei com mais cuidado.',
+      );
+      await tester.tap(find.text('Salvar atualização'));
+      await tester.pumpAndSettle();
+
+      expect(posts.lastUpdatedId, 'post-1');
+      expect(find.text('Atualizei com mais cuidado.'), findsOneWidget);
+      expect(find.text('Reflexão atualizada.'), findsOneWidget);
+    });
+
+    testWidgets('space post author deletes reflection after confirmation', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final posts = _FakeSocialPostRepository();
+
+      await tester.pumpWidget(_testApp(posts: posts));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Opções da reflexão'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Excluir'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Tem certeza que deseja excluir esta reflexão? Essa ação não poderá ser desfeita.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Excluir').last);
+      await tester.pumpAndSettle();
+
+      expect(posts.lastDeletedId, 'post-1');
+      expect(find.text('Uma reflexão já compartilhada.'), findsNothing);
+      expect(find.text('Reflexão excluída.'), findsOneWidget);
+    });
+
+    testWidgets('space post delete cancel keeps reflection', (tester) async {
+      await _setCompactSurface(tester);
+      final posts = _FakeSocialPostRepository();
+
+      await tester.pumpWidget(_testApp(posts: posts));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Opções da reflexão'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Excluir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(posts.lastDeletedId, isNull);
+      expect(find.text('Uma reflexão já compartilhada.'), findsOneWidget);
+    });
+
+    testWidgets('space post share snackbar can undo created reflection', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final posts = _FakeSocialPostRepository(posts: []);
+
+      await tester.pumpWidget(_testApp(posts: posts));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ver espaço'));
+      await tester.tap(find.text('Ver espaço'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Escrever reflexão'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        'Compartilhei sem querer.',
+      );
+      await tester.tap(find.text('Compartilhar reflexão'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Desfazer'), findsOneWidget);
+      expect(find.text('Compartilhei sem querer.'), findsOneWidget);
+
+      await tester.tap(find.text('Desfazer'));
+      await tester.pumpAndSettle();
+
+      expect(posts.lastDeletedId, 'post-created');
+      expect(find.text('Compartilhei sem querer.'), findsNothing);
+      expect(find.text('Compartilhamento desfeito.'), findsOneWidget);
+    });
+
     testWidgets(
       'compact spaces auto-loads paginated items from parent scroll',
       (tester) async {
@@ -293,11 +441,15 @@ Future<void> _setCompactSurface(WidgetTester tester) async {
 Widget _testApp({
   CommunityRepository? communities,
   SocialPostRepository? posts,
+  String currentUserId = 'user-1',
 }) {
   SharedPreferences.setMockInitialValues({});
 
   return ProviderScope(
     overrides: [
+      authControllerProvider.overrideWith(
+        () => _FakeAuthController(userId: currentUserId),
+      ),
       communityRepositoryProvider.overrideWithValue(
         communities ?? _FakeCommunityRepository(),
       ),
@@ -317,6 +469,22 @@ Widget _testApp({
       ),
     ),
   );
+}
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController({required this.userId});
+
+  final String userId;
+
+  @override
+  Future<AuthSession?> build() async {
+    return AuthSession(
+      userId: userId,
+      email: '$userId@evolua.test',
+      roles: const ['ROLE_USER'],
+      accessToken: 'test-token',
+    );
+  }
 }
 
 class _FakeCommunityRepository implements CommunityRepository {
@@ -394,9 +562,26 @@ class _FakeCommunityRepository implements CommunityRepository {
 }
 
 class _FakeSocialPostRepository implements SocialPostRepository {
+  _FakeSocialPostRepository({List<SocialPost>? posts})
+    : posts =
+          posts ??
+          [
+            SocialPost(
+              id: 'post-1',
+              userId: 'user-1',
+              content: 'Uma reflexão já compartilhada.',
+              community: 'respirar',
+              visibility: 'PUBLIC',
+              createdAt: DateTime(2026, 5, 22, 8),
+            ),
+          ];
+
+  final List<SocialPost> posts;
   String? lastListedCommunity;
   String? lastCreatedCommunity;
   String? lastCreatedContent;
+  String? lastUpdatedId;
+  String? lastDeletedId;
 
   @override
   Future<PaginatedResponse<SocialPost>> list({
@@ -412,16 +597,7 @@ class _FakeSocialPostRepository implements SocialPostRepository {
     lastListedCommunity = community;
     final items = community == null
         ? const <SocialPost>[]
-        : [
-            SocialPost(
-              id: 'post-1',
-              userId: 'user-1',
-              content: 'Uma reflexão já compartilhada.',
-              community: community,
-              visibility: 'PUBLIC',
-              createdAt: DateTime(2026, 5, 22, 8),
-            ),
-          ];
+        : posts.where((post) => post.community == community).toList();
     return PaginatedResponse(
       items: items,
       page: page,
@@ -444,7 +620,7 @@ class _FakeSocialPostRepository implements SocialPostRepository {
   }) async {
     lastCreatedCommunity = community;
     lastCreatedContent = content;
-    return SocialPost(
+    final post = SocialPost(
       id: 'post-created',
       userId: 'user-1',
       content: content,
@@ -452,6 +628,29 @@ class _FakeSocialPostRepository implements SocialPostRepository {
       visibility: visibility,
       createdAt: DateTime(2026, 5, 22, 9),
     );
+    posts.insert(0, post);
+    return post;
+  }
+
+  @override
+  Future<SocialPost> update({
+    required String id,
+    required String content,
+  }) async {
+    lastUpdatedId = id;
+    final index = posts.indexWhere((post) => post.id == id);
+    if (index < 0) {
+      throw StateError('Post not found');
+    }
+    final updated = posts[index].copyWith(content: content);
+    posts[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    lastDeletedId = id;
+    posts.removeWhere((post) => post.id == id);
   }
 }
 

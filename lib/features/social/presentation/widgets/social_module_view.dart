@@ -8,6 +8,7 @@ import 'package:evolua_frontend/features/social/application/community_controller
 import 'package:evolua_frontend/features/social/application/social_feed_state.dart';
 import 'package:evolua_frontend/features/social/application/social_post_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
+import 'package:evolua_frontend/features/social/domain/entities/social_post.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_communities_area.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_shared_widgets.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -150,6 +151,11 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
           formKey: _communityPostFormKey,
           contentController: _communityPostContentController,
           initialVisibility: _communityPostVisibility,
+          title: 'Escrever reflexão',
+          subtitle: 'Compartilhe um registro curto no espaço atual.',
+          submitLabel: 'Compartilhar reflexão',
+          showVisibility: true,
+          disposeContentController: false,
           onSubmit: (visibility) async {
             _communityPostVisibility = visibility;
             final success = await _submitCommunityPost();
@@ -168,7 +174,7 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
       return false;
     }
 
-    await ref
+    final createdPost = await ref
         .read(socialPostControllerProvider.notifier)
         .create(
           content: _communityPostContentController.text.trim(),
@@ -185,8 +191,118 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
       context,
       message: 'Reflexão publicada em ${community.name}.',
       icon: Icons.check_circle_outline_rounded,
+      actionLabel: createdPost == null ? null : 'Desfazer',
+      onAction: createdPost == null
+          ? null
+          : () => unawaited(_undoCreatedPost(createdPost)),
     );
     return true;
+  }
+
+  Future<void> _openEditCommunityPostSheet(SocialPost post) async {
+    final formKey = GlobalKey<FormState>();
+    final contentController = TextEditingController(text: post.content);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.surface,
+        builder: (sheetContext) {
+          return _CommunityReflectionSheet(
+            formKey: formKey,
+            contentController: contentController,
+            initialVisibility: post.visibility,
+            title: 'Editar reflexão',
+            subtitle: 'Ajuste o texto que você compartilhou neste espaço.',
+            submitLabel: 'Salvar atualização',
+            showVisibility: false,
+            disposeContentController: true,
+            onSubmit: (_) async {
+              await ref
+                  .read(socialPostControllerProvider.notifier)
+                  .updatePost(
+                    id: post.id,
+                    content: contentController.text.trim(),
+                  );
+              if (!mounted || !sheetContext.mounted) {
+                return;
+              }
+              Navigator.of(sheetContext).pop();
+              AppSnackBar.show(
+                context,
+                message: 'Reflexão atualizada.',
+                icon: Icons.check_circle_outline_rounded,
+              );
+            },
+          );
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        _showError(
+          error,
+          fallback: 'Não foi possível atualizar esta reflexão agora.',
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteCommunityPost(SocialPost post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Excluir reflexão?'),
+          content: const Text(
+            'Tem certeza que deseja excluir esta reflexão? Essa ação não poderá ser desfeita.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _deleteCommunityPost(post, successMessage: 'Reflexão excluída.');
+    }
+  }
+
+  Future<void> _undoCreatedPost(SocialPost post) {
+    return _deleteCommunityPost(
+      post,
+      successMessage: 'Compartilhamento desfeito.',
+      fallback: 'Não foi possível desfazer o compartilhamento agora.',
+    );
+  }
+
+  Future<void> _deleteCommunityPost(
+    SocialPost post, {
+    required String successMessage,
+    String fallback = 'Não foi possível excluir esta reflexão agora.',
+  }) async {
+    try {
+      await ref.read(socialPostControllerProvider.notifier).deletePost(post.id);
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: successMessage,
+        icon: Icons.check_circle_outline_rounded,
+      );
+    } catch (error) {
+      if (mounted) {
+        _showError(error, fallback: fallback);
+      }
+    }
   }
 
   Future<void> _leaveSelectedCommunity() async {
@@ -381,10 +497,13 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
       return _CommunityDetailView(
         community: selectedCommunity,
         postsState: postsState,
+        currentUserId: session?.userId,
         onBack: _closeCommunityDetail,
         onWriteReflection: postsState.isLoading && !postsState.hasValue
             ? null
             : _openCommunityPostSheet,
+        onEditPost: _openEditCommunityPostSheet,
+        onDeletePost: _confirmDeleteCommunityPost,
         onLeave: _leaveSelectedCommunity,
         onRefresh: () => ref
             .read(socialPostControllerProvider.notifier)
@@ -457,8 +576,11 @@ class _CommunityDetailView extends StatelessWidget {
   const _CommunityDetailView({
     required this.community,
     required this.postsState,
+    required this.currentUserId,
     required this.onBack,
     required this.onWriteReflection,
+    required this.onEditPost,
+    required this.onDeletePost,
     required this.onLeave,
     required this.onRefresh,
     required this.onPageChanged,
@@ -466,8 +588,11 @@ class _CommunityDetailView extends StatelessWidget {
 
   final Community community;
   final AsyncValue<SocialFeedState> postsState;
+  final String? currentUserId;
   final VoidCallback onBack;
   final VoidCallback? onWriteReflection;
+  final ValueChanged<SocialPost> onEditPost;
+  final ValueChanged<SocialPost> onDeletePost;
   final VoidCallback onLeave;
   final VoidCallback onRefresh;
   final ValueChanged<int> onPageChanged;
@@ -601,6 +726,30 @@ class _CommunityDetailView extends StatelessWidget {
                                     ? 'Aberta'
                                     : 'Privada',
                               ),
+                              if (post.userId == currentUserId) ...[
+                                const Spacer(),
+                                PopupMenuButton<String>(
+                                  tooltip: 'Opções da reflexão',
+                                  icon: const Icon(Icons.more_horiz_rounded),
+                                  onSelected: (value) {
+                                    if (value == 'edit') {
+                                      onEditPost(post);
+                                    } else if (value == 'delete') {
+                                      onDeletePost(post);
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Editar'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Excluir'),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -638,12 +787,22 @@ class _CommunityReflectionSheet extends StatefulWidget {
     required this.formKey,
     required this.contentController,
     required this.initialVisibility,
+    required this.title,
+    required this.subtitle,
+    required this.submitLabel,
+    required this.showVisibility,
+    required this.disposeContentController,
     required this.onSubmit,
   });
 
   final GlobalKey<FormState> formKey;
   final TextEditingController contentController;
   final String initialVisibility;
+  final String title;
+  final String subtitle;
+  final String submitLabel;
+  final bool showVisibility;
+  final bool disposeContentController;
   final Future<void> Function(String visibility) onSubmit;
 
   @override
@@ -654,6 +813,14 @@ class _CommunityReflectionSheet extends StatefulWidget {
 class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
   late String _visibility = widget.initialVisibility;
   bool _submitting = false;
+
+  @override
+  void dispose() {
+    if (widget.disposeContentController) {
+      widget.contentController.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -674,7 +841,7 @@ class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Escrever reflexão',
+                  widget.title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -682,7 +849,7 @@ class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Compartilhe um registro curto no espaço atual.',
+                  widget.subtitle,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
@@ -699,25 +866,27 @@ class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
                       ? 'Escreva sua reflexão.'
                       : null,
                 ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<String>(
-                  initialValue: _visibility,
-                  decoration: const InputDecoration(
-                    labelText: 'Visibilidade',
-                    prefixIcon: Icon(Icons.visibility_rounded),
+                if (widget.showVisibility) ...[
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _visibility,
+                    decoration: const InputDecoration(
+                      labelText: 'Visibilidade',
+                      prefixIcon: Icon(Icons.visibility_rounded),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'PUBLIC', child: Text('Aberta')),
+                      DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
+                    ],
+                    onChanged: _submitting
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => _visibility = value);
+                            }
+                          },
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'PUBLIC', child: Text('Aberta')),
-                    DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
-                  ],
-                  onChanged: _submitting
-                      ? null
-                      : (value) {
-                          if (value != null) {
-                            setState(() => _visibility = value);
-                          }
-                        },
-                ),
+                ],
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
@@ -744,7 +913,7 @@ class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.send_rounded),
-                    label: const Text('Compartilhar reflexão'),
+                    label: Text(widget.submitLabel),
                   ),
                 ),
               ],

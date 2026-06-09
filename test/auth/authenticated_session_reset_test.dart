@@ -17,6 +17,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/emotional/application/consciousness_timeline_controller.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
@@ -195,6 +196,8 @@ void main() {
       await container.read(settingsPrivacyPreferencesControllerProvider.future);
       await container.read(accessibilityPreferencesControllerProvider.future);
       await container.read(trailStepResponsesProvider.future);
+      await container.read(consciousnessTimelineProvider.future);
+      await container.read(evolutionMirrorSummaryProvider.future);
       await container.read(
         trailStepResponseProvider((
           userId: 'user-a',
@@ -215,6 +218,8 @@ void main() {
           settingsPrivacyPreferencesControllerProvider,
           accessibilityPreferencesControllerProvider,
           trailStepResponsesProvider,
+          consciousnessTimelineProvider,
+          evolutionMirrorSummaryProvider,
           trailStepResponseProvider((
             userId: 'user-a',
             trailId: 1,
@@ -222,6 +227,85 @@ void main() {
           )),
         ]),
       );
+    },
+  );
+
+  test(
+    'clears consciousness timeline and mirror summary when account changes',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final authRepository = _FakeAuthRepository([
+        _session(userId: 'user-a', email: 'a@evolua.test'),
+        _session(userId: 'user-b', email: 'b@evolua.test'),
+      ]);
+      final apiAdapter = _FakeApiAdapter(
+        timelineLabel: 'Linha do usuario A',
+        stateLabel: 'estado-a',
+        summaryMood: 'humor-a',
+      );
+      final observer = _DisposedProviderObserver();
+      final container = _container(
+        authRepository,
+        _FakeProfileRepository(_profile(userId: 'user-a', displayName: 'A')),
+        _FakeCheckInRepository(
+          _checkIn(userId: 'user-a', insight: 'Leitura A'),
+        ),
+        observer: observer,
+        apiDio: Dio()..httpClientAdapter = apiAdapter,
+      );
+      addTearDown(container.dispose);
+
+      container.read(authenticatedSessionResetObserverProvider);
+      await container.read(authControllerProvider.future);
+      await container
+          .read(authControllerProvider.notifier)
+          .login(email: 'a@evolua.test', password: '123456');
+      await _flushSessionReset();
+
+      final firstTimeline = await container.read(
+        consciousnessTimelineProvider.future,
+      );
+      final firstSummary = await container.read(
+        evolutionMirrorSummaryProvider.future,
+      );
+      expect(firstTimeline.items.single.title, 'Linha do usuario A');
+      expect(firstSummary.dominantMood, 'humor-a');
+
+      apiAdapter
+        ..timelineLabel = 'Linha do usuario B'
+        ..stateLabel = 'estado-b'
+        ..summaryMood = 'humor-b';
+      observer.disposedProviders.clear();
+
+      await container.read(authControllerProvider.notifier).logout();
+      await _flushSessionReset();
+
+      expect(
+        observer.disposedProviders,
+        containsAll(<Object>[
+          consciousnessTimelineProvider,
+          evolutionMirrorSummaryProvider,
+        ]),
+      );
+      expect(container.read(consciousnessTimelineProvider).isLoading, isTrue);
+      expect(container.read(evolutionMirrorSummaryProvider).isLoading, isTrue);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .login(email: 'b@evolua.test', password: '123456');
+      await _flushSessionReset();
+
+      final secondTimeline = await container.read(
+        consciousnessTimelineProvider.future,
+      );
+      final secondSummary = await container.read(
+        evolutionMirrorSummaryProvider.future,
+      );
+      expect(secondTimeline.items.single.title, 'Linha do usuario B');
+      expect(secondTimeline.items.single.identifiedState, 'estado-b');
+      expect(secondTimeline.items.single.title, isNot('Linha do usuario A'));
+      expect(secondSummary.dominantMood, 'humor-b');
+      expect(secondSummary.dominantMood, isNot('humor-a'));
     },
   );
 
@@ -271,7 +355,9 @@ ProviderContainer _container(
   CheckInRepository checkInRepository, {
   ProviderObserver? observer,
   DailyCheckInReminderScheduler? reminderScheduler,
+  Dio? apiDio,
 }) {
+  final fakeApiDio = apiDio ?? _fakeApiDio();
   return ProviderContainer(
     observers: [?observer],
     overrides: [
@@ -281,13 +367,93 @@ ProviderContainer _container(
       trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
-      ).overrideWithValue(_fakeUserDio()),
+      ).overrideWithValue(fakeApiDio),
+      if (AppConfig.emotionalBaseUrl != AppConfig.userBaseUrl)
+        authenticatedDioProvider(
+          AppConfig.emotionalBaseUrl,
+        ).overrideWithValue(fakeApiDio),
       if (reminderScheduler != null)
         dailyCheckInReminderSchedulerProvider.overrideWithValue(
           reminderScheduler,
         ),
     ],
   );
+}
+
+Dio _fakeApiDio() {
+  return Dio()..httpClientAdapter = _FakeApiAdapter();
+}
+
+class _FakeApiAdapter implements HttpClientAdapter {
+  _FakeApiAdapter({
+    this.timelineLabel = 'Linha de teste',
+    this.stateLabel = 'presenca',
+    this.summaryMood = 'calma',
+  });
+
+  String timelineLabel;
+  String stateLabel;
+  String summaryMood;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final data = switch (options.path) {
+      '/v1/profiles/me/privacy-settings' =>
+        SettingsPrivacyPreferences.defaults().toJson(),
+      '/v1/profiles/me/accessibility-settings' =>
+        AccessibilityPreferences.defaults().toJson(),
+      '/v1/check-ins/consciousness-timeline' => {
+        'items': [
+          {
+            'checkInId': 1,
+            'mood': 'calma',
+            'energyLevel': 7,
+            'title': timelineLabel,
+            'insight': 'Parece um movimento de cuidado.',
+            'identifiedState': stateLabel,
+            'revealingQuestion': 'O que voce percebe agora?',
+            'possibleNewState': 'Posso escolher presenca.',
+            'microAction': 'Respirar por dois minutos.',
+            'reflection': 'texto',
+            'savedReading': false,
+            'createdAt': DateTime(2026, 6, 8, 10).toIso8601String(),
+          },
+        ],
+        'fullAccess': true,
+        'premium': true,
+        'rewardedAdAvailable': false,
+      },
+      '/v1/evolution-mirror/summary' => {
+        'checkInCount': 1,
+        'averageEnergy': 7,
+        'energyTrend': 'sugere estabilidade recente',
+        'dominantMood': summaryMood,
+        'recurringStates': [
+          {'label': stateLabel, 'count': 1},
+        ],
+        'emotionalThemes': const [],
+        'revealingQuestions': const [],
+        'microActions': const [],
+        'progressSignal': 'Ainda ha poucos dados.',
+        'disclaimer': 'Dados de apoio.',
+      },
+      _ => <String, Object?>{},
+    };
+    return ResponseBody.fromString(
+      jsonEncode({'data': data}),
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
+    );
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {
@@ -469,38 +635,6 @@ class _FakeReminderScheduler implements DailyCheckInReminderScheduler {
     required String body,
     required String payload,
   }) async {}
-}
-
-Dio _fakeUserDio() {
-  return Dio()..httpClientAdapter = _FakeUserAdapter();
-}
-
-class _FakeUserAdapter implements HttpClientAdapter {
-  @override
-  void close({bool force = false}) {}
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final path = options.path;
-    final data = switch (path) {
-      '/v1/profiles/me/privacy-settings' =>
-        SettingsPrivacyPreferences.defaults().toJson(),
-      '/v1/profiles/me/accessibility-settings' =>
-        AccessibilityPreferences.defaults().toJson(),
-      _ => <String, Object?>{},
-    };
-    return ResponseBody.fromString(
-      jsonEncode({'data': data}),
-      200,
-      headers: {
-        Headers.contentTypeHeader: ['application/json'],
-      },
-    );
-  }
 }
 
 Future<void> _flushSessionReset() async {

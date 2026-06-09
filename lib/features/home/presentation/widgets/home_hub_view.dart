@@ -3,7 +3,11 @@ import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
@@ -20,6 +24,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class HomeHubView extends ConsumerStatefulWidget {
   const HomeHubView({
@@ -77,8 +82,9 @@ class HomeHubView extends ConsumerStatefulWidget {
 
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool _isRewardLoading = false;
-  bool _isReadingActionLoading = false;
+  ReadingActionLoading? _readingActionLoading;
   bool _secondaryProvidersEnabled = true;
+  final Map<int, int> _readingVariationCounts = {};
 
   @override
   void initState() {
@@ -107,6 +113,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   }
 
   void _openInsightSheet(CheckIn checkIn, CheckInAiInsight insight) {
+    ref.read(appUpdateSensitiveFlowProvider.notifier).enter();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -125,25 +132,35 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           isRewardLoading: _isRewardLoading,
           onWatchRewardedAd: _watchRewardedAd,
           onOpenPremium: widget.onOpenPremium,
-          isReadingActionLoading: _isReadingActionLoading,
+          readingActionLoading: _readingActionLoading,
           isSaved: checkIn.savedReading,
-          onRegenerate: (style) => _regenerateReading(context, style),
+          onRegenerate: (style) =>
+              _regenerateReading(context, checkIn.id, style),
           onSaveReading: () => _saveReading(context, checkIn.id),
           onCreateRitual: () => _createRitualFromReading(context, checkIn.id),
+          onOpenHistory: () {
+            Navigator.of(context).maybePop();
+            this.context.push('/consciousness-timeline');
+          },
         ),
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        ref.read(appUpdateSensitiveFlowProvider.notifier).leave();
+      }
+    });
   }
 
   Future<void> _regenerateReading(
     BuildContext sheetContext,
+    int checkInId,
     String style,
   ) async {
-    if (_isReadingActionLoading) {
+    if (_readingActionLoading != null) {
       return;
     }
 
-    setState(() => _isReadingActionLoading = true);
+    setState(() => _readingActionLoading = _actionForReadingStyle(style));
     try {
       await ref
           .read(checkInControllerProvider.notifier)
@@ -159,6 +176,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: 'Leitura atualizada com um novo foco.',
         icon: Icons.auto_awesome_rounded,
       );
+      final count = (_readingVariationCounts[checkInId] ?? 0) + 1;
+      _readingVariationCounts[checkInId] = count;
+      if (count == 2 || count == 3) {
+        await _maybeShowInterstitial(
+          InterstitialTrigger.readingVariationMilestone,
+        );
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -174,17 +198,17 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isReadingActionLoading = false);
+        setState(() => _readingActionLoading = null);
       }
     }
   }
 
   Future<void> _saveReading(BuildContext sheetContext, int checkInId) async {
-    if (_isReadingActionLoading) {
+    if (_readingActionLoading != null) {
       return;
     }
 
-    setState(() => _isReadingActionLoading = true);
+    setState(() => _readingActionLoading = ReadingActionLoading.save);
     try {
       await ref.read(checkInControllerProvider.notifier).saveReading(checkInId);
       if (!mounted) {
@@ -198,6 +222,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: 'Leitura salva para voce retomar depois.',
         icon: Icons.bookmark_added_rounded,
       );
+      await _maybeShowInterstitial(InterstitialTrigger.readingSavedExit);
     } catch (_) {
       if (!mounted) {
         return;
@@ -209,7 +234,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isReadingActionLoading = false);
+        setState(() => _readingActionLoading = null);
       }
     }
   }
@@ -218,15 +243,42 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     BuildContext sheetContext,
     int checkInId,
   ) async {
-    if (_isReadingActionLoading) {
+    if (_readingActionLoading != null) {
       return;
     }
 
-    setState(() => _isReadingActionLoading = true);
+    setState(() => _readingActionLoading = ReadingActionLoading.ritual);
     try {
+      final now = widget.now ?? DateTime.now();
+      final localDate = DateTime(now.year, now.month, now.day);
+      final type = now.hour >= 18
+          ? DailyRitualType.evening
+          : DailyRitualType.morning;
+      final periodLabel = type == DailyRitualType.evening
+          ? 'Fechamento do Dia'
+          : 'Ritual do Dia';
+      var rituals = ref.read(dailyRitualControllerProvider).asData?.value;
+      if (rituals == null) {
+        await ref
+            .read(dailyRitualControllerProvider.notifier)
+            .refresh(localDate: localDate);
+        rituals = ref.read(dailyRitualControllerProvider).asData?.value;
+      }
+      if (rituals?.byType(type) != null) {
+        if (!mounted) {
+          return;
+        }
+        AppSnackBar.show(
+          context,
+          message:
+              'Voce ja concluiu o $periodLabel de hoje. Sua leitura continua salva para consulta.',
+          icon: Icons.check_circle_rounded,
+        );
+        return;
+      }
       await ref
           .read(checkInControllerProvider.notifier)
-          .createRitualFromReading(checkInId);
+          .createRitualFromReading(checkInId, localDate: localDate, type: type);
       if (!mounted) {
         return;
       }
@@ -235,7 +287,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: 'Ritual criado a partir da sua leitura.',
+        message: '$periodLabel criado e concluido a partir da sua leitura.',
         icon: Icons.self_improvement_rounded,
       );
     } catch (_) {
@@ -244,14 +296,23 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: 'Nao foi possivel criar o ritual agora.',
+        message: 'Nao foi possivel criar o ritual do dia agora.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
       if (mounted) {
-        setState(() => _isReadingActionLoading = false);
+        setState(() => _readingActionLoading = null);
       }
     }
+  }
+
+  ReadingActionLoading _actionForReadingStyle(String style) {
+    return switch (style) {
+      'quick' => ReadingActionLoading.quick,
+      'practical' => ReadingActionLoading.practical,
+      'balanced' => ReadingActionLoading.balanced,
+      _ => ReadingActionLoading.deep,
+    };
   }
 
   Future<void> _watchRewardedAd() async {
@@ -264,6 +325,13 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       final rewarded = await ref
           .read(rewardedAdServiceProvider)
           .showRewardedAd(rewardType: 'DEEP_EMOTIONAL_READING');
+      if (rewarded.isRewarded) {
+        await ref
+            .read(interstitialAdServiceProvider)
+            .recordRewardedAdShown(
+              session: ref.read(authControllerProvider).asData?.value,
+            );
+      }
       if (!mounted) {
         return;
       }
@@ -273,10 +341,10 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: rewarded
+        message: rewarded.isRewarded
             ? 'Crédito extra de IA liberado. Faça um novo check-in quando quiser.'
             : context.l10n.errorRewardedAdUnavailable,
-        icon: rewarded
+        icon: rewarded.isRewarded
             ? Icons.ondemand_video_rounded
             : Icons.workspace_premium_rounded,
       );
@@ -294,6 +362,15 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         setState(() => _isRewardLoading = false);
       }
     }
+  }
+
+  Future<void> _maybeShowInterstitial(InterstitialTrigger trigger) async {
+    await ref
+        .read(interstitialAdServiceProvider)
+        .maybeShow(
+          trigger: trigger,
+          session: ref.read(authControllerProvider).asData?.value,
+        );
   }
 
   void _openRhythmDetails(_RhythmSummary summary, List<CheckIn> recentItems) {

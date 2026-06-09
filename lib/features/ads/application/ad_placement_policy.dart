@@ -8,6 +8,11 @@ enum AdPlacementContext {
   communitiesList,
   plans,
   neutralNavigation,
+  trailCompletion,
+  readingSavedExit,
+  ritualCompletedExit,
+  timelineExit,
+  readingVariationMilestone,
   negativeCheckIn,
   journal,
   deepReflection,
@@ -74,7 +79,14 @@ class AdPlacementPolicy {
     AdPlacementContext.neutralNavigation,
   };
 
-  static const _interstitialContexts = {AdPlacementContext.neutralNavigation};
+  static const _interstitialContexts = {
+    AdPlacementContext.neutralNavigation,
+    AdPlacementContext.trailCompletion,
+    AdPlacementContext.readingSavedExit,
+    AdPlacementContext.ritualCompletedExit,
+    AdPlacementContext.timelineExit,
+    AdPlacementContext.readingVariationMilestone,
+  };
 
   static const _nativeContexts = {
     AdPlacementContext.feedNeutral,
