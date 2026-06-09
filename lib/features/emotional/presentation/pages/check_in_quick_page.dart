@@ -448,8 +448,8 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           final currentRewardFailure = rewardFailure;
           final sheetMessage = currentRewardFailure == null
               ? (rewardedAdAvailable
-                    ? 'VocÃª jÃ¡ fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anÃºncio, assine Premium ou volte amanhÃ£.'
-                    : 'VocÃª jÃ¡ usou o desbloqueio por anÃºncio de hoje. Para registrar outro check-in agora, assine Premium ou volte amanhÃ£.')
+                    ? 'VocÃª jÃ¡ fez seu check-in gratuito de hoje. Para registrar outro momento, assista a um anÃºncio ou continue sem limites com o Premium.'
+                    : 'VocÃª jÃ¡ usou o desbloqueio por anÃºncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhÃ£.')
               : _rewardFailureMessage(currentRewardFailure);
           return SafeArea(
             top: false,
@@ -465,9 +465,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
                   child: RewardedAdPrompt(
-                    title: 'Desbloquear novo check-in hoje',
+                    title: _rewardPromptTitle(rewardFailure),
                     message: sheetMessage,
-                    rewardLabel: rewardedAdAvailable
+                    rewardLabel: rewardFailure == null && rewardedAdAvailable
                         ? 'Assistir anúncio libera mais um check-in hoje.'
                         : '',
                     rewardedAdAvailable: rewardedAdAvailable,
@@ -475,6 +475,37 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                     onWatchRewardedAd: rewardedAdAvailable
                         ? () async {
                             if (rewardLoading || autoSubmitLoading) {
+                              return;
+                            }
+                            if (rewardFailure ==
+                                RewardedAdResult
+                                    .rewardConfirmedButAccessDenied) {
+                              setSheetState(() => autoSubmitLoading = true);
+                              final saved = await _submit(
+                                allowLimitUnlock: false,
+                                rewardConfirmed: true,
+                              );
+                              if (!mounted ||
+                                  saved == _CheckInSubmitResult.success) {
+                                if (sheetContext.mounted) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                                if (mounted) {
+                                  AppSnackBar.show(
+                                    context,
+                                    message: 'Check-in salvo com carinho.',
+                                    icon: Icons.check_circle_outline_rounded,
+                                  );
+                                }
+                                return;
+                              }
+                              if (sheetContext.mounted) {
+                                setSheetState(() {
+                                  autoSubmitLoading = false;
+                                  rewardFailure = RewardedAdResult
+                                      .rewardConfirmedButAccessDenied;
+                                });
+                              }
                               return;
                             }
                             setSheetState(() {
@@ -539,7 +570,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               return;
                             }
                             if (sheetContext.mounted) {
-                              setSheetState(() => autoSubmitLoading = false);
+                              setSheetState(() {
+                                autoSubmitLoading = false;
+                                rewardFailure = RewardedAdResult
+                                    .rewardConfirmedButAccessDenied;
+                              });
                             }
                             if (saved ==
                                 _CheckInSubmitResult
@@ -556,7 +591,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                             }
                           }
                         : null,
-                    watchLabel: rewardFailure == null
+                    watchLabel:
+                        rewardFailure ==
+                            RewardedAdResult.rewardConfirmedButAccessDenied
+                        ? 'Tentar salvar novamente'
+                        : rewardFailure == null
                         ? 'Assistir anúncio'
                         : 'Tentar novamente',
                     loadingLabel: autoSubmitLoading
@@ -569,17 +608,13 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                       Navigator.of(sheetContext).pop();
                       widget.onOpenPremium?.call();
                     },
-                    premiumLabel: rewardFailure == null
-                        ? context.l10n.checkInPremiumAction
-                        : 'Ver Premium',
-                    onSecondary: rewardFailure == null
-                        ? null
-                        : () {
-                            if (rewardLoading || autoSubmitLoading) {
-                              return;
-                            }
-                            Navigator.of(sheetContext).pop();
-                          },
+                    premiumLabel: 'Ver Premium',
+                    onSecondary: () {
+                      if (rewardLoading || autoSubmitLoading) {
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop();
+                    },
                     secondaryLabel: 'Agora não',
                   ),
                 ),
@@ -598,10 +633,26 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       RewardedAdResult.showFailed ||
       RewardedAdResult.timeout ||
       RewardedAdResult.unsupported =>
-        'No momento não há anúncios disponíveis para liberar este check-in. Tente novamente em alguns instantes ou volte amanhã para fazer seu check-in gratuito. Se preferir, o Premium libera seus check-ins sem anúncios.',
+        'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, volte amanhã para seu check-in gratuito ou continue sem anúncios com o Premium.',
       RewardedAdResult.dismissedWithoutReward =>
-        'O anúncio foi fechado antes da recompensa. Tente novamente.',
+        'Para liberar mais um check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'Recebemos a recompensa, mas não conseguimos salvar seu check-in agora. Tente novamente em instantes.',
       RewardedAdResult.rewarded => 'Anúncio confirmado.',
+    };
+  }
+
+  String _rewardPromptTitle(RewardedAdResult? result) {
+    return switch (result) {
+      RewardedAdResult.noFill ||
+      RewardedAdResult.loadFailed ||
+      RewardedAdResult.showFailed ||
+      RewardedAdResult.timeout ||
+      RewardedAdResult.unsupported => 'Nenhum anúncio disponível agora',
+      RewardedAdResult.dismissedWithoutReward => 'Anúncio não concluído',
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'Não conseguimos salvar agora',
+      RewardedAdResult.rewarded || null => 'Desbloquear novo check-in hoje',
     };
   }
 
@@ -610,6 +661,8 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       RewardedAdResult.noFill => 'NO_FILL',
       RewardedAdResult.loadFailed => 'AD_LOAD_FAILED',
       RewardedAdResult.showFailed => 'AD_SHOW_FAILED',
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'REWARD_CONFIRMED_BUT_ACCESS_DENIED',
       RewardedAdResult.timeout => 'AD_TIMEOUT',
       RewardedAdResult.unsupported => 'AD_UNSUPPORTED',
       RewardedAdResult.dismissedWithoutReward => 'DISMISSED_WITHOUT_REWARD',

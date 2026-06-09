@@ -106,6 +106,9 @@ class MobileRewardedAdService implements RewardedAdService {
           if (completer.isCompleted) {
             return;
           }
+          if (!earnedReward) {
+            return;
+          }
 
           notifyAdClosedOnce();
 
@@ -237,7 +240,7 @@ class MobileRewardedAdService implements RewardedAdService {
         } catch (error) {
           debugPrint('AdMob test reward grant failed: $error');
 
-          return RewardedAdResult.loadFailed;
+          return RewardedAdResult.rewardConfirmedButAccessDenied;
         }
       }
 
@@ -251,7 +254,7 @@ class MobileRewardedAdService implements RewardedAdService {
         return RewardedAdResult.rewarded;
       }
 
-      return RewardedAdResult.loadFailed;
+      return RewardedAdResult.rewardConfirmedButAccessDenied;
     } finally {
       WidgetsBinding.instance.removeObserver(lifecycleFallback);
     }

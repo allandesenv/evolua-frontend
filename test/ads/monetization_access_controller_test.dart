@@ -47,6 +47,31 @@ void main() {
     expect(rewarded.rewardType, 'ADVANCED_MIRROR');
     expect(repository.accessCalls, 1);
   });
+
+  test(
+    'keeps reward confirmation failure distinct from ad load failure',
+    () async {
+      final repository = _FakeSubscriptionRepository(accessAllowed: false);
+      final rewarded = _FakeRewardedAdService(
+        result: RewardedAdResult.rewarded,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          subscriptionRepositoryProvider.overrideWithValue(repository),
+          rewardedAdServiceProvider.overrideWithValue(rewarded),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(monetizationAccessControllerProvider.notifier)
+          .unlockWithRewardedAdResult(resource: RewardResources.extraCheckIn);
+
+      expect(result, RewardedAdResult.rewardConfirmedButAccessDenied);
+      expect(rewarded.rewardType, RewardResources.extraCheckIn);
+      expect(repository.accessCalls, 1);
+    },
+  );
 }
 
 class _FakeRewardedAdService implements RewardedAdService {

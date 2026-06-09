@@ -88,7 +88,7 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     final refreshed = await access(resource: resource, contextId: contextId);
     return rewardedAccessGranted(refreshed)
         ? RewardedAdResult.rewarded
-        : RewardedAdResult.loadFailed;
+        : RewardedAdResult.rewardConfirmedButAccessDenied;
   }
 
   bool rewardedAccessGranted(MonetizationAccessStatus status) {

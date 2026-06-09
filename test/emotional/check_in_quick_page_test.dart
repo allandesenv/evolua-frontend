@@ -406,7 +406,7 @@ void main() {
         expect(
           tester
               .widget<OutlinedButton>(
-                find.widgetWithText(OutlinedButton, 'Assinar Premium'),
+                find.widgetWithText(OutlinedButton, 'Ver Premium'),
               )
               .onPressed,
           isNull,
@@ -509,7 +509,7 @@ void main() {
       expect(
         tester
             .widget<OutlinedButton>(
-              find.widgetWithText(OutlinedButton, 'Assinar Premium'),
+              find.widgetWithText(OutlinedButton, 'Ver Premium'),
             )
             .onPressed,
         isNull,
@@ -558,13 +558,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
-      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      expect(find.text('Não conseguimos salvar agora'), findsOneWidget);
       if (find.text('Entendi').evaluate().isNotEmpty) {
         await tester.tap(find.text('Entendi'));
         await tester.pumpAndSettle();
       }
-      expect(find.text('Assistir anúncio'), findsOneWidget);
-      await tester.tap(find.text('Assistir anúncio'));
+      expect(find.text('Tentar salvar novamente'), findsOneWidget);
+      await tester.tap(find.text('Tentar salvar novamente'));
       await tester.pumpAndSettle();
       expect(repository.createCalls, 3);
     });
@@ -602,9 +602,9 @@ void main() {
       expect(find.textContaining('Abrindo'), findsOneWidget);
       await tester.pumpAndSettle();
 
-      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      expect(find.text('Nenhum anúncio disponível agora'), findsOneWidget);
       expect(
-        find.textContaining('No momento não há anúncios disponíveis'),
+        find.textContaining('Não conseguimos carregar um anúncio'),
         findsOneWidget,
       );
       expect(find.text('Tentar novamente'), findsOneWidget);
@@ -618,7 +618,7 @@ void main() {
 
       expect(rewarded.showCalls, 2);
       expect(repository.createCalls, 1);
-      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      expect(find.text('Nenhum anúncio disponível agora'), findsOneWidget);
 
       await tester.tap(find.text('Ver Premium'));
       await tester.pumpAndSettle();
@@ -696,8 +696,15 @@ void main() {
           await tester.tap(find.text('Assistir anúncio'));
           await tester.pumpAndSettle();
 
-          expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
           expect(find.text('Tentar novamente'), findsOneWidget);
+          if (result == RewardedAdResult.dismissedWithoutReward) {
+            expect(find.text('Anúncio não concluído'), findsOneWidget);
+          } else {
+            expect(
+              find.text('Nenhum anúncio disponível agora'),
+              findsOneWidget,
+            );
+          }
           expect(repository.createCalls, 1);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
@@ -735,6 +742,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
+      expect(find.text('Não conseguimos salvar agora'), findsOneWidget);
+      expect(find.textContaining('Recebemos a recompensa'), findsWidgets);
+      expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
     });
 
     testWidgets(
@@ -765,7 +775,8 @@ void main() {
         expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
         expect(find.textContaining('desbloqueio por'), findsOneWidget);
         expect(find.textContaining('Assistir'), findsNothing);
-        expect(find.text('Assinar Premium'), findsOneWidget);
+        expect(find.text('Ver Premium'), findsOneWidget);
+        expect(find.text('Agora não'), findsWidgets);
       },
     );
   });

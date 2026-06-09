@@ -4,6 +4,7 @@ enum RewardedAdResult {
   loadFailed,
   showFailed,
   dismissedWithoutReward,
+  rewardConfirmedButAccessDenied,
   timeout,
   unsupported,
 }
