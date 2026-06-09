@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Evolua</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background-color: #0B1220;
+      color: #F4F8FB;
+      overscroll-behavior: none;
+    }
+  </style>
+  <script>
+    (function () {
+      var target = window.location.pathname + window.location.search + window.location.hash;
+      sessionStorage.setItem('evolua.github_pages.redirect', target);
+      window.location.replace('/evolua-frontend/');
+    })();
+  </script>
+</head>
+<body>
+  <p>Redirecionando para o Evolua...</p>
+</body>
+</html>
