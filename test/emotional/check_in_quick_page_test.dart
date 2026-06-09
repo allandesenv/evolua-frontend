@@ -383,7 +383,8 @@ void main() {
             checkInRepository: repository,
             rewardedAdService: rewarded,
             subscriptionRepository: _FakeSubscriptionRepository(
-              accessAllowed: false,
+              accessAllowed: true,
+              rewardedAdAvailable: true,
             ),
           ),
         );
@@ -415,7 +416,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(rewarded.rewardType, 'DEEP_EMOTIONAL_READING');
-        expect(rewarded.allowClientOpenedFallback, isTrue);
+        expect(rewarded.rewardType, 'DEEP_EMOTIONAL_READING');
         expect(repository.createCalls, 2);
         expect(repository.createdReflection, 'preciso registrar outro momento');
         expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
@@ -437,7 +438,8 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: false,
+            accessAllowed: true,
+            rewardedAdAvailable: true,
           ),
         ),
       );
@@ -482,7 +484,8 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: false,
+            accessAllowed: true,
+            rewardedAdAvailable: true,
           ),
         ),
       );
@@ -536,7 +539,8 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: false,
+            accessAllowed: true,
+            rewardedAdAvailable: true,
           ),
         ),
       );
@@ -565,10 +569,10 @@ void main() {
       expect(repository.createCalls, 3);
     });
 
-    testWidgets('reward failure follows existing retry flow', (tester) async {
+    testWidgets('reward failure keeps extra check-in blocked', (tester) async {
       final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
       final rewarded = _FakeRewardedAdService(
-        result: false,
+        result: RewardedAdResult.noFill,
         delay: const Duration(milliseconds: 300),
       );
 
@@ -577,7 +581,8 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: false,
+            accessAllowed: true,
+            rewardedAdAvailable: true,
           ),
         ),
       );
@@ -596,9 +601,57 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
-      expect(repository.createCalls, 2);
+      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      expect(
+        find.textContaining('Não há anúncios disponíveis agora'),
+        findsOneWidget,
+      );
+      expect(repository.createCalls, 1);
     });
+
+    testWidgets(
+      'non rewarded ad outcomes keep button available and do not submit',
+      (tester) async {
+        for (final result in [
+          RewardedAdResult.loadFailed,
+          RewardedAdResult.showFailed,
+          RewardedAdResult.dismissedWithoutReward,
+          RewardedAdResult.timeout,
+        ]) {
+          final repository = _FakeCheckInRepository(
+            blockFirstCreateWith402: true,
+          );
+          final rewarded = _FakeRewardedAdService(result: result);
+
+          await tester.pumpWidget(
+            _testApp(
+              checkInRepository: repository,
+              rewardedAdService: rewarded,
+              subscriptionRepository: _FakeSubscriptionRepository(
+                accessAllowed: false,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.enterText(
+            find.byType(TextFormField).first,
+            'preciso registrar outro momento',
+          );
+          await tester.tap(find.text('Fazer check-in'));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.text('Assistir anúncio'));
+          await tester.pumpAndSettle();
+
+          expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+          expect(find.text('Assistir anúncio'), findsOneWidget);
+          expect(repository.createCalls, 1);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+      },
+    );
 
     testWidgets('second 402 after reward shows friendly confirmation message', (
       tester,
@@ -611,7 +664,8 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: false,
+            accessAllowed: true,
+            rewardedAdAvailable: true,
           ),
         ),
       );
@@ -943,27 +997,29 @@ class _FakeCheckInRepository implements CheckInRepository {
 
 class _FakeRewardedAdService implements RewardedAdService {
   _FakeRewardedAdService({
-    required this.result,
+    required Object result,
     this.delay = Duration.zero,
     this.closeAfter,
-  });
+  }) : result = switch (result) {
+         true => RewardedAdResult.rewarded,
+         false => RewardedAdResult.loadFailed,
+         final RewardedAdResult explicit => explicit,
+         _ => RewardedAdResult.loadFailed,
+       };
 
-  final bool result;
+  final RewardedAdResult result;
   final Duration delay;
   final Duration? closeAfter;
   String? rewardType;
-  bool? allowClientOpenedFallback;
   int adClosedCallbacks = 0;
 
   @override
-  Future<bool> showRewardedAd({
+  Future<RewardedAdResult> showRewardedAd({
     required String rewardType,
     String? contextId,
-    bool allowClientOpenedFallback = false,
     void Function()? onAdClosed,
   }) async {
     this.rewardType = rewardType;
-    this.allowClientOpenedFallback = allowClientOpenedFallback;
     final closeAfter = this.closeAfter;
     if (closeAfter != null) {
       await Future<void>.delayed(closeAfter);

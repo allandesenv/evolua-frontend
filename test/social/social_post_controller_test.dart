@@ -207,6 +207,19 @@ class _FakeSocialPostRepository implements SocialPostRepository {
   }) async {
     return _posts().first;
   }
+
+  @override
+  Future<SocialPost> update({
+    required String id,
+    required String content,
+  }) async {
+    return _posts().firstWhere((post) => post.id == id).copyWith(
+      content: content,
+    );
+  }
+
+  @override
+  Future<void> delete(String id) async {}
 }
 
 PaginatedResponse<SocialPost> _response(List<SocialPost> items) {

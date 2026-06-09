@@ -68,30 +68,8 @@ class CareRepositoryImpl implements CareRepository {
 
   @override
   Future<Map<String, dynamic>> loadCareReportSource() async {
-    final checkIns = await _dio.get<dynamic>(
-      '/v1/check-ins',
-      queryParameters: {
-        'page': 0,
-        'size': 30,
-        'sortBy': 'createdAt',
-        'sortDir': 'desc',
-      },
-    );
-    final rituals = await _dio.get<dynamic>(
-      '/v1/daily-rituals',
-      queryParameters: {
-        'start': _formatDate(DateTime.now().subtract(const Duration(days: 30))),
-        'end': _formatDate(DateTime.now()),
-      },
-    );
-    final payload = ApiPayloadParser.dataMap(checkIns.data);
-    return {
-      'generatedAt': DateTime.now().toUtc().toIso8601String(),
-      'checkIns': payload['items'] ?? const [],
-      'dailyRituals': ApiPayloadParser.dataList(rituals.data),
-      'source': 'evolua-mobile',
-      'version': 1,
-    };
+    final response = await _dio.get<dynamic>('/v1/care/report-source');
+    return ApiPayloadParser.dataMap(response.data);
   }
 
   @override
@@ -148,12 +126,5 @@ class CareRepositoryImpl implements CareRepository {
   @override
   Future<void> acknowledgeRecommendation(String recommendationId) async {
     await _dio.post<dynamic>('/v1/care/recommendations/$recommendationId/ack');
-  }
-
-  String _formatDate(DateTime value) {
-    final normalized = DateTime(value.year, value.month, value.day);
-    final month = normalized.month.toString().padLeft(2, '0');
-    final day = normalized.day.toString().padLeft(2, '0');
-    return '${normalized.year}-$month-$day';
   }
 }

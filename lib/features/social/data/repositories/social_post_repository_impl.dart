@@ -64,4 +64,26 @@ class SocialPostRepositoryImpl implements SocialPostRepository {
       ApiPayloadParser.dataMap(response.data),
     ).toEntity();
   }
+
+  @override
+  Future<SocialPost> update({
+    required String id,
+    required String content,
+  }) async {
+    final response = await _dio.put<dynamic>(
+      '/v1/posts/$id',
+      data: {
+        'content': content,
+      },
+    );
+
+    return SocialPostDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    await _dio.delete<dynamic>('/v1/posts/$id');
+  }
 }

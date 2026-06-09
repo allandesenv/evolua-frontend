@@ -3,6 +3,7 @@ import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_speech_transcription_service.dart';
@@ -428,15 +429,15 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               return;
                             }
                             setSheetState(() => rewardLoading = true);
+                            late final RewardedAdResult rewardResult;
                             try {
-                              await ref
+                              rewardResult = await ref
                                   .read(
                                     monetizationAccessControllerProvider
                                         .notifier,
                                   )
-                                  .unlockWithRewardedAd(
+                                  .unlockWithRewardedAdResult(
                                     resource: 'DEEP_EMOTIONAL_READING',
-                                    allowClientOpenedFallback: true,
                                   );
                             } finally {
                               if (sheetContext.mounted) {
@@ -444,6 +445,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               }
                             }
                             if (!mounted) {
+                              return;
+                            }
+                            if (!rewardResult.isRewarded) {
+                              AppSnackBar.show(
+                                context,
+                                message: _rewardFailureMessage(rewardResult),
+                                icon: Icons.info_outline_rounded,
+                              );
                               return;
                             }
                             if (sheetContext.mounted) {
@@ -480,6 +489,24 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         },
       ),
     );
+  }
+
+  String _rewardFailureMessage(RewardedAdResult result) {
+    return switch (result) {
+      RewardedAdResult.noFill =>
+        'Não há anúncios disponíveis agora. Tente mais tarde, volte amanhã ou assine o Premium para liberar check-ins extras.',
+      RewardedAdResult.showFailed =>
+        'O anúncio não conseguiu abrir agora. Tente novamente em instantes.',
+      RewardedAdResult.dismissedWithoutReward =>
+        'O check-in extra só é liberado quando o anúncio é concluído.',
+      RewardedAdResult.timeout =>
+        'Não conseguimos confirmar o anúncio a tempo. Tente novamente em instantes.',
+      RewardedAdResult.unsupported =>
+        'Anúncios não estão disponíveis nesta plataforma agora.',
+      RewardedAdResult.rewarded => 'Anúncio confirmado.',
+      RewardedAdResult.loadFailed =>
+        'Não conseguimos carregar o anúncio agora. Verifique sua conexão e tente novamente.',
+    };
   }
 
   Future<void> _showDeepReadingUnlockSheet() async {

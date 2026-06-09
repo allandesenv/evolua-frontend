@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+import 'package:evolua_frontend/features/emotional/data/models/check_in_dto.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -37,7 +38,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Limite de IA atingido'), findsOneWidget);
     expect(
@@ -56,6 +57,7 @@ void main() {
     final selectedStyles = <String>[];
     var saved = false;
     var ritual = false;
+    var history = false;
 
     await tester.pumpWidget(
       _testApp(
@@ -84,25 +86,135 @@ void main() {
           onRegenerate: selectedStyles.add,
           onSaveReading: () => saved = true,
           onCreateRitual: () => ritual = true,
+          onOpenHistory: () => history = true,
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Personalizada'), findsOneWidget);
     expect(find.text('ultimos check-ins'), findsOneWidget);
     expect(find.text('trilha ativa'), findsOneWidget);
-    expect(find.text('Mais curta'), findsOneWidget);
+    expect(find.text('Mais curta'), findsNothing);
+    expect(find.text('Ajustar leitura'), findsOneWidget);
+    expect(find.text('Transformar em cuidado'), findsOneWidget);
     expect(find.text('Salvar leitura'), findsOneWidget);
-    expect(find.text('Transformar em ritual'), findsOneWidget);
+    expect(find.text('Criar ritual do dia'), findsOneWidget);
+    expect(find.text('Ver histórico'), findsOneWidget);
 
+    await tester.tap(find.text('Ajustar leitura'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mais pratica'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Salvar leitura'));
-    await tester.tap(find.text('Transformar em ritual'));
+    await tester.tap(find.text('Ver histórico'));
+    await tester.tap(find.text('Criar ritual do dia'));
 
     expect(selectedStyles, ['practical']);
     expect(saved, isTrue);
     expect(ritual, isTrue);
+    expect(history, isTrue);
+  });
+
+  testWidgets('renders structured deep reading when available', (tester) async {
+    await tester.pumpWidget(
+      _testApp(
+        premium: true,
+        child: CheckInAiInsightCard(insight: _structuredInsight()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Quando a mente tenta proteger'), findsOneWidget);
+    expect(find.text('O que aparece na superfície'), findsOneWidget);
+    expect(find.text('O que pode estar por trás'), findsOneWidget);
+    expect(find.text('O estado interno identificado'), findsOneWidget);
+    expect(find.text('Pergunta reveladora'), findsOneWidget);
+    expect(find.text('Novo estado possível'), findsOneWidget);
+    expect(find.text('Microação'), findsOneWidget);
+  });
+
+  testWidgets('shows contextual loading on selected reading action', (
+    tester,
+  ) async {
+    var saveTapped = false;
+
+    await tester.pumpWidget(
+      _testApp(
+        premium: true,
+        child: CheckInAiInsightCard(
+          insight: _personalizedInsight(),
+          onRegenerate: (_) {},
+          onSaveReading: () => saveTapped = true,
+          onCreateRitual: () {},
+          readingActionLoading: ReadingActionLoading.deep,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Gerando...'), findsOneWidget);
+    expect(find.text('Ajustar leitura'), findsNothing);
+
+    await tester.tap(find.text('Salvar leitura'));
+    await tester.pump();
+
+    expect(saveTapped, isFalse);
+  });
+
+  testWidgets('shows create ritual action even without ritual next step', (
+    tester,
+  ) async {
+    var ritual = false;
+
+    await tester.pumpWidget(
+      _testApp(
+        premium: true,
+        child: CheckInAiInsightCard(
+          insight: _structuredInsight(),
+          onCreateRitual: () => ritual = true,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Criar ritual do dia'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Criar ritual do dia'));
+    await tester.tap(find.text('Criar ritual do dia'));
+    await tester.pump();
+
+    expect(ritual, isTrue);
+  });
+
+  testWidgets('parses structured deep reading fields from dto', (tester) async {
+    final dto = CheckInDto.fromJson({
+      'id': 1,
+      'userId': 'user-1',
+      'mood': 'ansiedade',
+      'reflection': 'texto',
+      'energyLevel': 4,
+      'recommendedPractice': 'Respire.',
+      'savedReading': false,
+      'createdAt': DateTime(2026, 6, 7).toIso8601String(),
+      'aiInsight': {
+        'insight': 'Leitura base.',
+        'suggestedAction': 'Respire.',
+        'riskLevel': 'low',
+        'fallbackUsed': false,
+        'title': 'Quando a mente tenta proteger',
+        'surface': 'Na superfície, aparece ansiedade.',
+        'behind': 'Talvez exista busca por controle.',
+        'identifiedState': 'controle',
+        'revealingQuestion': 'O que você tenta evitar sentir?',
+        'possibleNewState': 'Eu posso trocar controle por cuidado.',
+        'microAction': 'Respire por dois minutos.',
+      },
+    });
+
+    expect(dto.aiInsight?.title, 'Quando a mente tenta proteger');
+    expect(dto.aiInsight?.surface, 'Na superfície, aparece ansiedade.');
+    expect(dto.aiInsight?.microAction, 'Respire por dois minutos.');
   });
 
   testWidgets('blocks refinement actions for free users with premium prompt', (
@@ -123,6 +235,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Ajustar leitura'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mais profunda'));
     await tester.pumpAndSettle();
 
@@ -150,9 +264,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Ajustar leitura'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mais curta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajustar leitura'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mais profunda'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajustar leitura'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mais pratica'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Gerar outra versao'));
 
     expect(selectedStyles, ['quick', 'deep', 'practical', 'balanced']);
@@ -166,7 +289,9 @@ Widget _testApp({required Widget child, required bool premium}) {
         _FakeSubscriptionRepository(premium: premium),
       ),
     ],
-    child: MaterialApp(home: Scaffold(body: child)),
+    child: MaterialApp(
+      home: Scaffold(body: SingleChildScrollView(child: child)),
+    ),
   );
 }
 
@@ -189,6 +314,28 @@ CheckInAiInsight _personalizedInsight() {
       type: 'ritual',
       label: 'Fazer uma pausa guiada de 2 minutos.',
     ),
+  );
+}
+
+CheckInAiInsight _structuredInsight() {
+  return const CheckInAiInsight(
+    insight: 'Parece haver uma tentativa de sustentar tudo ao mesmo tempo.',
+    suggestedAction: 'Respire por dois minutos.',
+    riskLevel: 'low',
+    suggestedTrailId: null,
+    suggestedTrailTitle: null,
+    suggestedTrailReason: '',
+    suggestedSpace: null,
+    journeyPlan: null,
+    generatedTrailDraft: null,
+    fallbackUsed: false,
+    title: 'Quando a mente tenta proteger',
+    surface: 'Na superfície, aparece ansiedade com energia 4/10.',
+    behind: 'Talvez exista uma busca por controle diante do incerto.',
+    identifiedState: 'controle',
+    revealingQuestion: 'O que você tenta evitar sentir quando controla tudo?',
+    possibleNewState: 'Eu posso trocar controle por cuidado.',
+    microAction: 'Respire por dois minutos antes de decidir o próximo passo.',
   );
 }
 

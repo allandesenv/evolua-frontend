@@ -3062,6 +3062,19 @@ class _FakeSocialPostRepository implements SocialPostRepository {
   }) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<SocialPost> update({
+    required String id,
+    required String content,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> delete(String id) {
+    throw UnimplementedError();
+  }
 }
 
 class _FakeCommunityRepository implements CommunityRepository {

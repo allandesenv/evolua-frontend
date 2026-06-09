@@ -22,7 +22,6 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
     with WidgetsBindingObserver {
   CareClaimState? _lastLoadedState;
 
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(careClaimControllerProvider);
@@ -83,10 +82,7 @@ class _CareClaimPageState extends ConsumerState<CareClaimPage>
                     maxWidth: 1180,
                     minHeight: constraints.maxHeight,
                   ),
-                  child: Padding(
-                    padding: padding,
-                    child: _buildBody(state),
-                  ),
+                  child: Padding(padding: padding, child: _buildBody(state)),
                 ),
               ),
             ),
@@ -140,6 +136,8 @@ class _CareDashboardState extends ConsumerState<_CareDashboard> {
               _CareClaimHeader(state: widget.state),
               const SizedBox(height: 20),
               _ClinicalSummaryPanel(report: widget.state.report),
+              const SizedBox(height: 20),
+              _CareDeepIndicatorsPanel(report: widget.state.report),
               const SizedBox(height: 20),
               _ResponsivePair(
                 primary: _MoodChartPanel(
@@ -611,6 +609,117 @@ class _InsightPanel extends StatelessWidget {
             label: 'Check-ins no relatório',
             value: report.checkIns.length.toString(),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CareDeepIndicatorsPanel extends StatelessWidget {
+  const _CareDeepIndicatorsPanel({required this.report});
+
+  final CareClinicalReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSignals =
+        report.recurringStates.isNotEmpty ||
+        report.revealingQuestions.isNotEmpty ||
+        report.microActions.isNotEmpty ||
+        report.energyTrend.trim().isNotEmpty ||
+        report.timeline.isNotEmpty;
+    if (!hasSignals) {
+      return const SizedBox.shrink();
+    }
+
+    return PrimaryPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Linha do tempo emocional',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            report.careDisclaimer.trim().isEmpty
+                ? 'Indicadores agregados de apoio à conversa, sem avaliação clínica.'
+                : report.careDisclaimer,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: context.evoluaColors.textSecondary,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              if (report.energyTrend.trim().isNotEmpty)
+                _MetricPill(label: 'Energia', value: report.energyTrend),
+              if (report.recurringStates.isNotEmpty)
+                _MetricPill(
+                  label: 'Estado recorrente',
+                  value: report.recurringStates.first.label,
+                ),
+              if (report.timeline.isNotEmpty)
+                _MetricPill(
+                  label: 'Registros na linha',
+                  value: report.timeline.length.toString(),
+                ),
+            ],
+          ),
+          if (report.recurringStates.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Estados internos recorrentes',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: report.recurringStates
+                  .take(5)
+                  .map(
+                    (item) =>
+                        _MetricPill(label: item.label, value: '${item.count}x'),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (report.revealingQuestions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Perguntas reveladoras recentes',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...report.revealingQuestions
+                .take(3)
+                .map((item) => _AttentionPoint(text: item)),
+          ],
+          if (report.microActions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Microações e aderência',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: context.evoluaColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...report.microActions
+                .take(3)
+                .map((item) => _AttentionPoint(text: item)),
+          ],
         ],
       ),
     );

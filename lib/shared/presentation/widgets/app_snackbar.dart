@@ -7,6 +7,8 @@ class AppSnackBar {
     BuildContext context, {
     required String message,
     IconData? icon,
+    String? actionLabel,
+    VoidCallback? onAction,
   }) {
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) {
@@ -16,6 +18,9 @@ class AppSnackBar {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
+        action: actionLabel == null || onAction == null
+            ? null
+            : SnackBarAction(label: actionLabel, onPressed: onAction),
         content: Row(
           children: [
             if (icon != null) ...[
