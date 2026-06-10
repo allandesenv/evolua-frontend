@@ -5,8 +5,8 @@ class AppConfig {
 
   static const apiBaseUrl = String.fromEnvironment(
     'EVOLUA_API_BASE_URL',
-    defaultValue: 'https://evolua-api-production.up.railway.app',
-    //defaultValue: 'http://192.168.0.47:8080',
+    //defaultValue: 'https://evolua-api-production.up.railway.app',
+    defaultValue: 'http://192.168.0.47:8080',
   );
 
   static const authBaseUrl = String.fromEnvironment(
@@ -107,6 +107,12 @@ class AppConfig {
     defaultValue: 'ca-app-pub-1136517314419681/4183412880',
   );
 
+  static const adMobAndroidRewardedExtraCheckInAdUnitId =
+      String.fromEnvironment(
+        'EVOLUA_ADMOB_ANDROID_REWARDED_EXTRA_CHECKIN_AD_UNIT_ID',
+        defaultValue: adMobAndroidRewardedAiExtraAdUnitId,
+      );
+
   static const adMobAndroidRewardedPremiumPassAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_ANDROID_REWARDED_PREMIUM_PASS_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-1136517314419681/7734426496',
@@ -131,6 +137,11 @@ class AppConfig {
   static const adMobIosRewardedAiExtraAdUnitId = String.fromEnvironment(
     'EVOLUA_ADMOB_IOS_REWARDED_AI_EXTRA_AD_UNIT_ID',
     defaultValue: adMobIosRewardedAdUnitId,
+  );
+
+  static const adMobIosRewardedExtraCheckInAdUnitId = String.fromEnvironment(
+    'EVOLUA_ADMOB_IOS_REWARDED_EXTRA_CHECKIN_AD_UNIT_ID',
+    defaultValue: adMobIosRewardedAiExtraAdUnitId,
   );
 
   static const adMobIosRewardedPremiumPassAdUnitId = String.fromEnvironment(

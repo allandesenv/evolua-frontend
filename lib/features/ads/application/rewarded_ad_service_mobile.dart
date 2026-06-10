@@ -20,7 +20,11 @@ class MobileRewardedAdService implements RewardedAdService {
   static const _ssvConfirmationDelay = Duration(seconds: 2);
   static const _ssvMaxWaitAfterAd = Duration(seconds: 8);
 
-  static const _aiRewardTypes = {'DEEP_EMOTIONAL_READING', 'AI_ACTION'};
+  static const _extraCheckInRewardTypes = {RewardResources.extraCheckIn};
+  static const _aiRewardTypes = {
+    RewardResources.deepEmotionalReading,
+    RewardResources.aiExtra,
+  };
   static const _premiumPassRewardTypes = {
     'ADVANCED_MIRROR',
     'SMART_RECOMMENDATION',
@@ -100,6 +104,9 @@ class MobileRewardedAdService implements RewardedAdService {
 
         Future<void>.delayed(const Duration(milliseconds: 700), () {
           if (completer.isCompleted) {
+            return;
+          }
+          if (!earnedReward) {
             return;
           }
 
@@ -233,7 +240,7 @@ class MobileRewardedAdService implements RewardedAdService {
         } catch (error) {
           debugPrint('AdMob test reward grant failed: $error');
 
-          return RewardedAdResult.loadFailed;
+          return RewardedAdResult.rewardConfirmedButAccessDenied;
         }
       }
 
@@ -247,7 +254,7 @@ class MobileRewardedAdService implements RewardedAdService {
         return RewardedAdResult.rewarded;
       }
 
-      return RewardedAdResult.loadFailed;
+      return RewardedAdResult.rewardConfirmedButAccessDenied;
     } finally {
       WidgetsBinding.instance.removeObserver(lifecycleFallback);
     }
@@ -277,6 +284,12 @@ class MobileRewardedAdService implements RewardedAdService {
       }
 
       return AppConfig.adMobAndroidRewardedTestAdUnitId;
+    }
+
+    if (_extraCheckInRewardTypes.contains(normalized)) {
+      return isIOS
+          ? AppConfig.adMobIosRewardedExtraCheckInAdUnitId
+          : AppConfig.adMobAndroidRewardedExtraCheckInAdUnitId;
     }
 
     if (_aiRewardTypes.contains(normalized)) {

@@ -1214,7 +1214,7 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
       (item) => item.status == _CareAttachmentStatus.failed,
     )) {
       _showMessage(
-        'Revise os anexos com falha antes de enviar a orientaÃ§Ã£o.',
+        'Revise os anexos com falha antes de enviar a orientação.',
       );
       return;
     }
@@ -1242,7 +1242,7 @@ class _RecommendationPanelState extends ConsumerState<_RecommendationPanel> {
         }
       });
       if (_attachments.isNotEmpty) {
-        _showMessage('Anexo enviado com seguranÃ§a.');
+        _showMessage('Anexo enviado com segurança.');
       }
       _guidanceController.clear();
       setState(_attachments.clear);

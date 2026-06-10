@@ -98,6 +98,8 @@ class MonetizationAccessStatus {
     required this.upgradeRecommended,
     this.limitMessage,
     this.entitlementExpiresAt,
+    this.rewardedCreditsGrantedToday = 0,
+    this.rewardedCreditsUsedToday = 0,
   });
 
   final String resource;
@@ -108,6 +110,11 @@ class MonetizationAccessStatus {
   final bool upgradeRecommended;
   final String? limitMessage;
   final DateTime? entitlementExpiresAt;
+  final int rewardedCreditsGrantedToday;
+  final int rewardedCreditsUsedToday;
+
+  bool get hasPendingRewardCredit =>
+      rewardedCreditsGrantedToday > rewardedCreditsUsedToday;
 }
 
 class CheckoutSession {

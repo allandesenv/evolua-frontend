@@ -58,6 +58,15 @@ GoRouter buildAppRouter({
     initialLocation: initialLocation,
     overridePlatformDefaultLocation: overridePlatformDefaultLocation,
     refreshListenable: authRouterNotifier,
+    errorBuilder: (context, state) {
+      if (authRouterNotifier.isBootstrapping ||
+          authRouterNotifier.hasBootError) {
+        return const _AuthBootPage();
+      }
+      return _RouteNotFoundPage(
+        isAuthenticated: authRouterNotifier.isAuthenticated,
+      );
+    },
     routes: [
       GoRoute(
         path: '/',
@@ -72,6 +81,9 @@ GoRouter buildAppRouter({
             return null;
           }
           if (authRouterNotifier.isBootstrapping) {
+            return null;
+          }
+          if (authRouterNotifier.hasBootError) {
             return null;
           }
           return authRouterNotifier.isAuthenticated ? '/home' : '/auth';
@@ -165,6 +177,12 @@ GoRouter buildAppRouter({
         }
         return null;
       }
+      if (authRouterNotifier.hasBootError) {
+        if (state.matchedLocation == '/auth') {
+          return '/';
+        }
+        return null;
+      }
 
       final goingToAuth = state.matchedLocation == '/auth';
       final goingToResetPassword = state.matchedLocation == '/reset-password';
@@ -196,24 +214,98 @@ bool _hasCareClaimHash() {
   return fragment == '/care/claim' || fragment.startsWith('/care/claim?');
 }
 
-class _AuthBootPage extends StatelessWidget {
+class _AuthBootPage extends ConsumerWidget {
   const _AuthBootPage();
 
   @override
-  Widget build(BuildContext context) {
-    return const GradientScaffold(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    final hasBootError = authState.hasError && !authState.hasValue;
+
+    return GradientScaffold(
       child: Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
-              SizedBox(height: 28),
-              SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
+              const EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
+              const SizedBox(height: 28),
+              if (hasBootError) ...[
+                Text(
+                  'Nao conseguimos iniciar o Evolua agora.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Verifique sua conexao e tente novamente em instantes.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                FilledButton(
+                  onPressed: () => ref.invalidate(authControllerProvider),
+                  child: const Text('Tentar novamente'),
+                ),
+              ] else
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteNotFoundPage extends StatelessWidget {
+  const _RouteNotFoundPage({required this.isAuthenticated});
+
+  final bool isAuthenticated;
+
+  @override
+  Widget build(BuildContext context) {
+    return GradientScaffold(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
+              const SizedBox(height: 28),
+              Text(
+                'Nao encontramos esta pagina.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'O link pode ter mudado ou nao estar mais disponivel.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 22),
+              FilledButton(
+                onPressed: () =>
+                    context.go(isAuthenticated ? '/home' : '/auth'),
+                child: const Text('Voltar para o Evolua'),
               ),
             ],
           ),

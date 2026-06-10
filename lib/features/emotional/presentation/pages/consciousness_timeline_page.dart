@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/consciousness_timeline_controller.dart';
@@ -25,6 +26,9 @@ class ConsciousnessTimelinePage extends ConsumerStatefulWidget {
 
 class _ConsciousnessTimelinePageState
     extends ConsumerState<ConsciousnessTimelinePage> {
+  static const _ritualAlreadyExistsMessage =
+      'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.';
+
   final _moodController = TextEditingController();
   _TimelinePeriod _period = _TimelinePeriod.thirtyDays;
   String? _energyRange;
@@ -213,12 +217,37 @@ class _ConsciousnessTimelinePageState
   Future<void> _createRitual(ConsciousnessTimelineItem item) async {
     await _runItemAction(item, () async {
       final now = DateTime.now();
+      final localDate = DateTime(now.year, now.month, now.day);
       final type = now.hour >= 18
           ? DailyRitualType.evening
           : DailyRitualType.morning;
+      final existing = await ref
+          .read(dailyRitualRepositoryProvider)
+          .today(type: type, localDate: localDate);
+      if (existing != null) {
+        await ref
+            .read(dailyRitualControllerProvider.notifier)
+            .refresh(localDate: localDate);
+        if (mounted) {
+          AppSnackBar.show(
+            context,
+            message: _ritualAlreadyExistsMessage,
+            icon: Icons.info_outline_rounded,
+            actionLabel: 'Abrir ritual',
+            onAction: () => context.go(
+              '/daily-ritual?type=${DailyRitualType.toRouteValue(type)}',
+            ),
+          );
+        }
+        return;
+      }
       await ref
           .read(checkInControllerProvider.notifier)
-          .createRitualFromReading(item.checkInId, localDate: now, type: type);
+          .createRitualFromReading(
+            item.checkInId,
+            localDate: localDate,
+            type: type,
+          );
       if (mounted) {
         AppSnackBar.show(
           context,

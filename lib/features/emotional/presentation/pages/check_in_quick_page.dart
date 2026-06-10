@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
@@ -18,6 +20,18 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+const _extraCheckInRewardResource = RewardResources.extraCheckIn;
+const _checkInSubmitTimeout = Duration(seconds: 15);
+
+enum _CheckInSubmitResult {
+  success,
+  limitReached,
+  networkError,
+  serverError,
+  rewardConfirmedButStillBlocked,
+  unknownError,
+}
 
 class CheckInQuickPage extends StatelessWidget {
   const CheckInQuickPage({super.key});
@@ -201,10 +215,13 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     );
   }
 
-  Future<bool> _submit({bool allowLimitUnlock = true}) async {
+  Future<_CheckInSubmitResult> _submit({
+    bool allowLimitUnlock = true,
+    bool rewardConfirmed = false,
+  }) async {
     if (_isSubmitting) {
       _showSavingInProgressMessage();
-      return false;
+      return _CheckInSubmitResult.unknownError;
     }
 
     setState(() => _isSubmitting = true);
@@ -218,28 +235,43 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                   ? null
                   : _reflectionController.text.trim(),
               energyLevel: _energyLevel.round(),
-            );
+            )
+            .timeout(_checkInSubmitTimeout);
+      } on TimeoutException {
+        if (mounted) {
+          AppSnackBar.show(
+            context,
+            message:
+                'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.',
+            icon: Icons.favorite_border_rounded,
+          );
+        }
+        return _CheckInSubmitResult.networkError;
       } catch (error) {
         if (!mounted) {
-          return false;
+          return _CheckInSubmitResult.unknownError;
         }
         if (allowLimitUnlock && _isCheckInLimitError(error)) {
           setState(() => _isSubmitting = false);
           await _showExtraCheckInUnlockSheet();
+          return _CheckInSubmitResult.limitReached;
         } else if (!allowLimitUnlock && _isCheckInLimitError(error)) {
-          return false;
+          return rewardConfirmed
+              ? _CheckInSubmitResult.rewardConfirmedButStillBlocked
+              : _CheckInSubmitResult.limitReached;
         } else {
+          final result = _submitErrorResult(error);
           AppSnackBar.show(
             context,
-            message: _errorMessage(error),
+            message: _submitErrorMessage(result, fallbackError: error),
             icon: Icons.favorite_border_rounded,
           );
+          return result;
         }
-        return false;
       }
 
       if (!mounted) {
-        return false;
+        return _CheckInSubmitResult.unknownError;
       }
 
       final asyncState = ref.read(checkInControllerProvider);
@@ -247,8 +279,20 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         if (allowLimitUnlock && _isCheckInLimitError(asyncState.error)) {
           setState(() => _isSubmitting = false);
           await _showExtraCheckInUnlockSheet();
+          return _CheckInSubmitResult.limitReached;
         }
-        return false;
+        if (!allowLimitUnlock && _isCheckInLimitError(asyncState.error)) {
+          return rewardConfirmed
+              ? _CheckInSubmitResult.rewardConfirmedButStillBlocked
+              : _CheckInSubmitResult.limitReached;
+        }
+        final result = _submitErrorResult(asyncState.error);
+        AppSnackBar.show(
+          context,
+          message: _submitErrorMessage(result, fallbackError: asyncState.error),
+          icon: Icons.favorite_border_rounded,
+        );
+        return result;
       }
 
       _reflectionController.clear();
@@ -261,7 +305,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           ?.aiInsight;
       if (insight?.quotaLimited == true) {
         await _showDeepReadingUnlockSheet();
-        return true;
+        return _CheckInSubmitResult.success;
       }
       AppSnackBar.show(
         context,
@@ -272,7 +316,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       );
       await _maybeInviteDailyReminder();
       widget.onCompleted?.call();
-      return true;
+      return _CheckInSubmitResult.success;
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -384,7 +428,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     try {
       final access = await ref
           .read(monetizationAccessControllerProvider.notifier)
-          .access(resource: 'DEEP_EMOTIONAL_READING');
+          .access(resource: _extraCheckInRewardResource);
       rewardedAdAvailable = access.rewardedAdAvailable;
     } catch (_) {
       rewardedAdAvailable = false;
@@ -394,12 +438,19 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     }
     var rewardLoading = false;
     var autoSubmitLoading = false;
+    RewardedAdResult? rewardFailure;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
+          final currentRewardFailure = rewardFailure;
+          final sheetMessage = currentRewardFailure == null
+              ? (rewardedAdAvailable
+                    ? 'Você já fez seu check-in gratuito de hoje. Para registrar outro momento, assista a um anúncio ou continue sem limites com o Premium.'
+                    : 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.')
+              : _rewardFailureMessage(currentRewardFailure);
           return SafeArea(
             top: false,
             child: Padding(
@@ -414,11 +465,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
                   child: RewardedAdPrompt(
-                    title: 'Desbloquear novo check-in hoje',
-                    message: rewardedAdAvailable
-                        ? 'Você já fez o check-in gratuito de hoje. Para registrar outro momento agora, assista a um anúncio, assine Premium ou volte amanhã.'
-                        : 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, assine Premium ou volte amanhã.',
-                    rewardLabel: rewardedAdAvailable
+                    title: _rewardPromptTitle(rewardFailure),
+                    message: sheetMessage,
+                    rewardLabel: rewardFailure == null && rewardedAdAvailable
                         ? 'Assistir anúncio libera mais um check-in hoje.'
                         : '',
                     rewardedAdAvailable: rewardedAdAvailable,
@@ -428,8 +477,42 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                             if (rewardLoading || autoSubmitLoading) {
                               return;
                             }
-                            setSheetState(() => rewardLoading = true);
-                            late final RewardedAdResult rewardResult;
+                            if (rewardFailure ==
+                                RewardedAdResult
+                                    .rewardConfirmedButAccessDenied) {
+                              setSheetState(() => autoSubmitLoading = true);
+                              final saved = await _submit(
+                                allowLimitUnlock: false,
+                                rewardConfirmed: true,
+                              );
+                              if (!mounted ||
+                                  saved == _CheckInSubmitResult.success) {
+                                if (sheetContext.mounted) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                                if (mounted) {
+                                  AppSnackBar.show(
+                                    context,
+                                    message: 'Check-in salvo com carinho.',
+                                    icon: Icons.check_circle_outline_rounded,
+                                  );
+                                }
+                                return;
+                              }
+                              if (sheetContext.mounted) {
+                                setSheetState(() {
+                                  autoSubmitLoading = false;
+                                  rewardFailure = RewardedAdResult
+                                      .rewardConfirmedButAccessDenied;
+                                });
+                              }
+                              return;
+                            }
+                            setSheetState(() {
+                              rewardFailure = null;
+                              rewardLoading = true;
+                            });
+                            var rewardResult = RewardedAdResult.loadFailed;
                             try {
                               rewardResult = await ref
                                   .read(
@@ -437,8 +520,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                                         .notifier,
                                   )
                                   .unlockWithRewardedAdResult(
-                                    resource: 'DEEP_EMOTIONAL_READING',
+                                    resource: _extraCheckInRewardResource,
                                   );
+                            } catch (error) {
+                              debugPrint(
+                                'Evolua rewarded extra check-in failed: '
+                                'reason=AD_LOAD_FAILED error=$error',
+                              );
+                              rewardResult = RewardedAdResult.loadFailed;
                             } finally {
                               if (sheetContext.mounted) {
                                 setSheetState(() => rewardLoading = false);
@@ -448,11 +537,15 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               return;
                             }
                             if (!rewardResult.isRewarded) {
-                              AppSnackBar.show(
-                                context,
-                                message: _rewardFailureMessage(rewardResult),
-                                icon: Icons.info_outline_rounded,
+                              debugPrint(
+                                'Evolua rewarded extra check-in skipped: '
+                                'reason=${_rewardFailureDebugReason(rewardResult)}',
                               );
+                              if (sheetContext.mounted) {
+                                setSheetState(
+                                  () => rewardFailure = rewardResult,
+                                );
+                              }
                               return;
                             }
                             if (sheetContext.mounted) {
@@ -460,19 +553,54 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                             }
                             final saved = await _submit(
                               allowLimitUnlock: false,
+                              rewardConfirmed: true,
                             );
-                            if (!mounted || saved) {
+                            if (!mounted ||
+                                saved == _CheckInSubmitResult.success) {
                               if (sheetContext.mounted) {
                                 Navigator.of(sheetContext).pop();
+                              }
+                              if (mounted) {
+                                AppSnackBar.show(
+                                  context,
+                                  message: 'Check-in salvo com carinho.',
+                                  icon: Icons.check_circle_outline_rounded,
+                                );
                               }
                               return;
                             }
                             if (sheetContext.mounted) {
-                              setSheetState(() => autoSubmitLoading = false);
+                              setSheetState(() {
+                                autoSubmitLoading = false;
+                                rewardFailure = RewardedAdResult
+                                    .rewardConfirmedButAccessDenied;
+                              });
                             }
-                            await _showRewardConfirmationProblemMessage();
+                            if (saved ==
+                                _CheckInSubmitResult
+                                    .rewardConfirmedButStillBlocked) {
+                              AppSnackBar.show(
+                                context,
+                                message:
+                                    'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.',
+                                icon: Icons.info_outline_rounded,
+                              );
+                            } else if (saved ==
+                                _CheckInSubmitResult.limitReached) {
+                              await _showRewardConfirmationProblemMessage();
+                            }
                           }
                         : null,
+                    watchLabel:
+                        rewardFailure ==
+                            RewardedAdResult.rewardConfirmedButAccessDenied
+                        ? 'Tentar salvar novamente'
+                        : rewardFailure == null
+                        ? 'Assistir anúncio'
+                        : 'Tentar novamente',
+                    loadingLabel: autoSubmitLoading
+                        ? 'Confirmando recompensa'
+                        : 'Abrindo anúncio',
                     onOpenPremium: () {
                       if (rewardLoading || autoSubmitLoading) {
                         return;
@@ -480,7 +608,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                       Navigator.of(sheetContext).pop();
                       widget.onOpenPremium?.call();
                     },
-                    premiumLabel: context.l10n.checkInPremiumAction,
+                    premiumLabel: 'Ver Premium',
+                    onSecondary: () {
+                      if (rewardLoading || autoSubmitLoading) {
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop();
+                    },
+                    secondaryLabel: 'Agora não',
                   ),
                 ),
               ),
@@ -493,19 +628,45 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
 
   String _rewardFailureMessage(RewardedAdResult result) {
     return switch (result) {
-      RewardedAdResult.noFill =>
-        'Não há anúncios disponíveis agora. Tente mais tarde, volte amanhã ou assine o Premium para liberar check-ins extras.',
-      RewardedAdResult.showFailed =>
-        'O anúncio não conseguiu abrir agora. Tente novamente em instantes.',
-      RewardedAdResult.dismissedWithoutReward =>
-        'O check-in extra só é liberado quando o anúncio é concluído.',
-      RewardedAdResult.timeout =>
-        'Não conseguimos confirmar o anúncio a tempo. Tente novamente em instantes.',
+      RewardedAdResult.noFill ||
+      RewardedAdResult.loadFailed ||
+      RewardedAdResult.showFailed ||
+      RewardedAdResult.timeout ||
       RewardedAdResult.unsupported =>
-        'Anúncios não estão disponíveis nesta plataforma agora.',
+        'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, volte amanhã para seu check-in gratuito ou continue sem anúncios com o Premium.',
+      RewardedAdResult.dismissedWithoutReward =>
+        'Para liberar mais um check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'Recebemos a recompensa, mas não conseguimos salvar seu check-in agora. Tente novamente em instantes.',
       RewardedAdResult.rewarded => 'Anúncio confirmado.',
-      RewardedAdResult.loadFailed =>
-        'Não conseguimos carregar o anúncio agora. Verifique sua conexão e tente novamente.',
+    };
+  }
+
+  String _rewardPromptTitle(RewardedAdResult? result) {
+    return switch (result) {
+      RewardedAdResult.noFill ||
+      RewardedAdResult.loadFailed ||
+      RewardedAdResult.showFailed ||
+      RewardedAdResult.timeout ||
+      RewardedAdResult.unsupported => 'Nenhum anúncio disponível agora',
+      RewardedAdResult.dismissedWithoutReward => 'Anúncio não concluído',
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'Não conseguimos salvar agora',
+      RewardedAdResult.rewarded || null => 'Desbloquear novo check-in hoje',
+    };
+  }
+
+  String _rewardFailureDebugReason(RewardedAdResult result) {
+    return switch (result) {
+      RewardedAdResult.noFill => 'NO_FILL',
+      RewardedAdResult.loadFailed => 'AD_LOAD_FAILED',
+      RewardedAdResult.showFailed => 'AD_SHOW_FAILED',
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'REWARD_CONFIRMED_BUT_ACCESS_DENIED',
+      RewardedAdResult.timeout => 'AD_TIMEOUT',
+      RewardedAdResult.unsupported => 'AD_UNSUPPORTED',
+      RewardedAdResult.dismissedWithoutReward => 'DISMISSED_WITHOUT_REWARD',
+      RewardedAdResult.rewarded => 'REWARDED',
     };
   }
 
@@ -710,6 +871,46 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
 
   bool _isCheckInLimitError(Object? error) {
     return error is DioException && error.response?.statusCode == 402;
+  }
+
+  _CheckInSubmitResult _submitErrorResult(Object? error) {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode == 402) {
+        return _CheckInSubmitResult.limitReached;
+      }
+      if (statusCode != null && statusCode >= 500) {
+        return _CheckInSubmitResult.serverError;
+      }
+      return switch (error.type) {
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.receiveTimeout ||
+        DioExceptionType.connectionError => _CheckInSubmitResult.networkError,
+        _ => _CheckInSubmitResult.unknownError,
+      };
+    }
+
+    if (error is TimeoutException) {
+      return _CheckInSubmitResult.networkError;
+    }
+
+    return _CheckInSubmitResult.unknownError;
+  }
+
+  String _submitErrorMessage(
+    _CheckInSubmitResult result, {
+    Object? fallbackError,
+  }) {
+    return switch (result) {
+      _CheckInSubmitResult.networkError =>
+        'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.',
+      _CheckInSubmitResult.serverError => _errorMessage(fallbackError),
+      _CheckInSubmitResult.rewardConfirmedButStillBlocked =>
+        'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.',
+      _CheckInSubmitResult.success || _CheckInSubmitResult.limitReached => '',
+      _CheckInSubmitResult.unknownError => _errorMessage(fallbackError),
+    };
   }
 }
 
