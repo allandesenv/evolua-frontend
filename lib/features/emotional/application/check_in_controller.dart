@@ -269,7 +269,12 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(trailControllerProvider);
 
-      final result = await _fetch(page: 0);
+      late final PaginatedResponse<CheckIn> result;
+      try {
+        result = await _fetch(page: 0);
+      } catch (_) {
+        result = _resultWithCreatedCheckIn(previous?.result, created);
+      }
       final latest = _canonicalLatestCheckIn(result, created);
       pendingInsightId = latest?.aiInsight == null ? latest?.id : null;
       state = AsyncData(
@@ -290,6 +295,32 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       }
       Error.throwWithStackTrace(error, stackTrace);
     }
+  }
+
+  PaginatedResponse<CheckIn> _resultWithCreatedCheckIn(
+    PaginatedResponse<CheckIn>? previous,
+    CheckIn created,
+  ) {
+    final previousItems = previous?.items ?? const <CheckIn>[];
+    final items = [
+      created,
+      ...previousItems.where((item) => item.id != created.id),
+    ];
+    return PaginatedResponse(
+      items: items,
+      page: previous?.page ?? 0,
+      size: previous?.size ?? _pageSize,
+      totalItems: previous == null
+          ? items.length
+          : (previous.totalItems +
+                (previousItems.any((item) => item.id == created.id) ? 0 : 1)),
+      totalPages: previous?.totalPages ?? 1,
+      hasNext: previous?.hasNext ?? false,
+      hasPrevious: previous?.hasPrevious ?? false,
+      sortBy: previous?.sortBy ?? 'createdAt',
+      sortDir: previous?.sortDir ?? 'desc',
+      filters: previous?.filters ?? const {},
+    );
   }
 
   CheckInHistoryState _copyState(

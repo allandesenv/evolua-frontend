@@ -112,6 +112,48 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('shows clear feedback when timeline ritual already exists', (
+    tester,
+  ) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: true,
+      premium: true,
+      existingRitual: _ritual(),
+      pages: [
+        [_item(title: 'Leitura com ritual existente')],
+      ],
+    );
+
+    await tester.pumpWidget(_app(adapter: adapter));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Abrir detalhes').last);
+    await tester.tap(find.text('Abrir detalhes').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Detalhes da leitura'), findsOneWidget);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pump();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Criar ritual'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.ritualCreateRequests, 0);
+    expect(
+      find.text(
+        'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Abrir ritual'), findsOneWidget);
+    expect(
+      find.text('Ritual do dia criado a partir desta leitura.'),
+      findsNothing,
+    );
+  });
 }
 
 Widget _app({
@@ -153,19 +195,35 @@ Map<String, Object?> _item({int checkInId = 1, required String title}) {
   };
 }
 
+Map<String, Object?> _ritual() {
+  return {
+    'id': 88,
+    'localDate': DateTime.now().toIso8601String().substring(0, 10),
+    'type': DateTime.now().hour >= 18 ? 'EVENING' : 'MORNING',
+    'emotionalState': 'calma',
+    'dayNeed': 'presenca',
+    'intention': 'Hoje vou agir com calma.',
+    'microAction': 'Respirar por dois minutos.',
+    'createdAt': DateTime.now().toIso8601String(),
+  };
+}
+
 class _TimelineAdapter implements HttpClientAdapter {
   _TimelineAdapter({
     required this.pages,
     required this.fullAccess,
     this.premium = false,
     this.rewardedAdAvailable = false,
+    this.existingRitual,
   });
 
   final List<List<Map<String, Object?>>> pages;
   final bool fullAccess;
   final bool premium;
   final bool rewardedAdAvailable;
+  final Map<String, Object?>? existingRitual;
   final List<int> pagesRequested = [];
+  int ritualCreateRequests = 0;
   Map<String, dynamic> lastQuery = const {};
 
   @override
@@ -177,6 +235,25 @@ class _TimelineAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (options.path == '/v1/daily-rituals/today') {
+      return ResponseBody.fromString(
+        jsonEncode({'data': existingRitual}),
+        200,
+        headers: {
+          Headers.contentTypeHeader: ['application/json'],
+        },
+      );
+    }
+    if (options.path.endsWith('/reading/ritual')) {
+      ritualCreateRequests += 1;
+      return ResponseBody.fromString(
+        jsonEncode({'data': _ritual()}),
+        201,
+        headers: {
+          Headers.contentTypeHeader: ['application/json'],
+        },
+      );
+    }
     lastQuery = Map<String, dynamic>.from(options.queryParameters);
     final page = int.tryParse(options.queryParameters['page'].toString()) ?? 0;
     pagesRequested.add(page);

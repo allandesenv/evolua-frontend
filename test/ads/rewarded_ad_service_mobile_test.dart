@@ -15,6 +15,24 @@ void main() {
       expect(adUnitId, AppConfig.adMobAndroidRewardedAiExtraAdUnitId);
     });
 
+    test('uses extra check-in block for extra check-in reward', () {
+      final adUnitId = MobileRewardedAdService.adUnitIdFor(
+        rewardType: 'EXTRA_CHECK_IN',
+        isAndroid: true,
+        isIOS: false,
+        useTestAds: false,
+      );
+
+      expect(adUnitId, AppConfig.adMobAndroidRewardedExtraCheckInAdUnitId);
+    });
+
+    test('extra check-in block falls back to AI extra by default', () {
+      expect(
+        AppConfig.adMobAndroidRewardedExtraCheckInAdUnitId,
+        AppConfig.adMobAndroidRewardedAiExtraAdUnitId,
+      );
+    });
+
     test('uses premium pass block for advanced mirror', () {
       final adUnitId = MobileRewardedAdService.adUnitIdFor(
         rewardType: 'ADVANCED_MIRROR',

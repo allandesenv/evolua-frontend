@@ -60,9 +60,9 @@ class MonetizationAccessController extends AsyncNotifier<void> {
     String? contextId,
     void Function()? onAdClosed,
   }) async {
-    var result = RewardedAdResult.unsupported;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    RewardedAdResult? result;
+    try {
       result = await ref
           .read(rewardedAdServiceProvider)
           .showRewardedAd(
@@ -70,28 +70,40 @@ class MonetizationAccessController extends AsyncNotifier<void> {
             contextId: contextId,
             onAdClosed: onAdClosed,
           );
-      if (result.isRewarded) {
-        await ref
-            .read(interstitialAdServiceProvider)
-            .recordRewardedAdShown(
-              session: ref.read(authControllerProvider).asData?.value,
-            );
-        await ref.read(subscriptionControllerProvider.notifier).refresh();
+      if (!result.isRewarded) {
+        state = const AsyncData(null);
+        return result;
       }
-    });
-    if (state.hasError) {
+
+      await ref
+          .read(interstitialAdServiceProvider)
+          .recordRewardedAdShown(
+            session: ref.read(authControllerProvider).asData?.value,
+          );
+      try {
+        await ref.read(subscriptionControllerProvider.notifier).refresh();
+      } catch (_) {
+        // The reward can still be consumed by the protected action even if
+        // refreshing subscription UI state fails transiently.
+      }
+      final refreshed = await access(resource: resource, contextId: contextId);
+      final granted = rewardedAccessGranted(refreshed);
+      state = const AsyncData(null);
+      return granted
+          ? RewardedAdResult.rewarded
+          : RewardedAdResult.rewardConfirmedButAccessDenied;
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      if (result?.isRewarded == true) {
+        return RewardedAdResult.rewardConfirmedButAccessDenied;
+      }
       return RewardedAdResult.loadFailed;
     }
-    if (!result.isRewarded) {
-      return result;
-    }
-    final refreshed = await access(resource: resource, contextId: contextId);
-    return rewardedAccessGranted(refreshed)
-        ? RewardedAdResult.rewarded
-        : RewardedAdResult.loadFailed;
   }
 
   bool rewardedAccessGranted(MonetizationAccessStatus status) {
-    return status.allowed || status.entitlementExpiresAt != null;
+    return status.allowed ||
+        status.entitlementExpiresAt != null ||
+        status.hasPendingRewardCredit;
   }
 }
