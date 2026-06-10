@@ -81,6 +81,9 @@ class HomeHubView extends ConsumerStatefulWidget {
 }
 
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
+  static const _ritualAlreadyExistsMessage =
+      'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.';
+
   bool _isRewardLoading = false;
   ReadingActionLoading? _readingActionLoading;
   bool _isGeneratingDailyRitualFromCheckIn = false;
@@ -224,7 +227,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         icon: Icons.bookmark_added_rounded,
       );
       await _maybeShowInterstitial(InterstitialTrigger.readingSavedExit);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
@@ -270,9 +273,15 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         }
         AppSnackBar.show(
           context,
-          message:
-              'Voce ja concluiu o $periodLabel de hoje. Sua leitura continua salva para consulta.',
-          icon: Icons.check_circle_rounded,
+          message: _ritualAlreadyExistsMessage,
+          icon: Icons.info_outline_rounded,
+          actionLabel: 'Abrir ritual',
+          onAction: () {
+            if (sheetContext.mounted) {
+              Navigator.of(sheetContext).maybePop();
+            }
+            widget.onOpenDailyRitual(type);
+          },
         );
         return;
       }
@@ -290,13 +299,17 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: '$periodLabel criado e concluido a partir da sua leitura.',
         icon: Icons.self_improvement_rounded,
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       AppSnackBar.show(
         context,
-        message: 'Nao foi possivel criar o ritual do dia agora.',
+        message: friendlyApiErrorMessage(
+          error,
+          context.l10n,
+          fallback: 'Nao foi possivel criar o ritual do dia agora.',
+        ),
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -304,6 +317,24 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         setState(() => _readingActionLoading = null);
       }
     }
+  }
+
+  void _showRitualAlreadyExistsSnackBar(
+    String type, {
+    BuildContext? sheetContext,
+  }) {
+    AppSnackBar.show(
+      context,
+      message: _ritualAlreadyExistsMessage,
+      icon: Icons.info_outline_rounded,
+      actionLabel: 'Abrir ritual',
+      onAction: () {
+        if (sheetContext != null && sheetContext.mounted) {
+          Navigator.of(sheetContext).maybePop();
+        }
+        widget.onOpenDailyRitual(type);
+      },
+    );
   }
 
   Future<void> _createDailyRitualFromCheckIn(int checkInId) async {
@@ -331,12 +362,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         if (!mounted) {
           return;
         }
-        AppSnackBar.show(
-          context,
-          message:
-              'Você já tem o $periodLabel de hoje. Ele continua disponível para consulta.',
-          icon: Icons.check_circle_rounded,
-        );
+        _showRitualAlreadyExistsSnackBar(type);
         return;
       }
       await ref
@@ -360,7 +386,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         message: '$periodLabel criado a partir do seu check-in.',
         icon: Icons.self_improvement_rounded,
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
@@ -374,10 +400,15 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message:
-            'Não conseguimos gerar seu ritual agora. Tente novamente em instantes.',
+        message: friendlyApiErrorMessage(
+          error,
+          context.l10n,
+          fallback:
+              'Não conseguimos gerar seu ritual agora. Tente novamente em instantes.',
+        ),
         icon: Icons.wifi_off_rounded,
       );
+      return;
     } finally {
       if (mounted) {
         setState(() => _isGeneratingDailyRitualFromCheckIn = false);

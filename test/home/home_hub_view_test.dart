@@ -853,35 +853,37 @@ void main() {
       expect(find.text('Ver meu ritual'), findsOneWidget);
     });
 
-    testWidgets(
-      'does not duplicate when ritual appears before generation tap',
-      (tester) async {
-        final checkIns = _FakeCheckInRepository(
-          items: [_testCheckIn(id: 43, createdAt: DateTime(2026, 5, 7, 10))],
-        );
-        final dailyRituals = _FakeDailyRitualRepository();
+    testWidgets('does not duplicate when ritual appears before generation tap', (
+      tester,
+    ) async {
+      final checkIns = _FakeCheckInRepository(
+        items: [_testCheckIn(id: 43, createdAt: DateTime(2026, 5, 7, 10))],
+      );
+      final dailyRituals = _FakeDailyRitualRepository();
 
-        await tester.pumpWidget(
-          _testApp(
-            now: DateTime(2026, 5, 7, 15),
-            checkInRepository: checkIns,
-            dailyRitualRepository: dailyRituals,
-          ),
-        );
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 15),
+          checkInRepository: checkIns,
+          dailyRitualRepository: dailyRituals,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        expect(find.text('Gerar com meu check-in'), findsOneWidget);
-        dailyRituals.morning = _testRitual(DailyRitualType.morning);
-        await tester.tap(find.text('Gerar com meu check-in'));
-        await tester.pumpAndSettle();
+      expect(find.text('Gerar com meu check-in'), findsOneWidget);
+      dailyRituals.morning = _testRitual(DailyRitualType.morning);
+      await tester.tap(find.text('Gerar com meu check-in'));
+      await tester.pumpAndSettle();
 
-        expect(checkIns.ritualTypes, isEmpty);
-        expect(
-          find.textContaining('Você já tem o Ritual do Dia de hoje'),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(checkIns.ritualTypes, isEmpty);
+      expect(
+        find.text(
+          'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Abrir ritual'), findsOneWidget);
+    });
 
     testWidgets('shows friendly error when check-in ritual generation fails', (
       tester,
@@ -993,41 +995,44 @@ void main() {
 
       expect(checkIns.ritualTypes, isEmpty);
       expect(
-        find.textContaining('Voce ja concluiu o Ritual do Dia'),
+        find.text(
+          'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.',
+        ),
         findsOneWidget,
       );
+      expect(find.text('Abrir ritual'), findsOneWidget);
     });
 
-    testWidgets(
-      'does not create duplicate evening closing for current period',
-      (tester) async {
-        final checkIns = _FakeCheckInRepository();
-        final existing = _testRitual(DailyRitualType.evening);
+    testWidgets('does not create duplicate evening closing for current period', (
+      tester,
+    ) async {
+      final checkIns = _FakeCheckInRepository();
+      final existing = _testRitual(DailyRitualType.evening);
 
-        await tester.pumpWidget(
-          _testApp(
-            checkInRepository: checkIns,
-            dailyRitualRepository: _FakeDailyRitualRepository(
-              evening: existing,
-            ),
-            now: DateTime(2026, 5, 7, 19),
-          ),
-        );
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: checkIns,
+          dailyRitualRepository: _FakeDailyRitualRepository(evening: existing),
+          now: DateTime(2026, 5, 7, 19),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.text('Insight rápido'));
-        await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Criar ritual do dia'));
-        await tester.tap(find.text('Criar ritual do dia'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Insight rápido'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Criar ritual do dia'));
+      await tester.tap(find.text('Criar ritual do dia'));
+      await tester.pumpAndSettle();
 
-        expect(checkIns.ritualTypes, isEmpty);
-        expect(
-          find.textContaining('Voce ja concluiu o Fechamento do Dia'),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(checkIns.ritualTypes, isEmpty);
+      expect(
+        find.text(
+          'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Abrir ritual'), findsOneWidget);
+    });
 
     testWidgets(
       'full analysis sheet closes with header back and Android back',

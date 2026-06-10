@@ -48,8 +48,32 @@ void main() {
     expect(repository.accessCalls, 1);
   });
 
+  test('grants quota reward when extra check-in credit is pending', () async {
+    final repository = _FakeSubscriptionRepository(
+      accessAllowed: false,
+      rewardedCreditsGrantedToday: 1,
+      rewardedCreditsUsedToday: 0,
+    );
+    final rewarded = _FakeRewardedAdService(result: RewardedAdResult.rewarded);
+    final container = ProviderContainer(
+      overrides: [
+        subscriptionRepositoryProvider.overrideWithValue(repository),
+        rewardedAdServiceProvider.overrideWithValue(rewarded),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(monetizationAccessControllerProvider.notifier)
+        .unlockWithRewardedAdResult(resource: RewardResources.extraCheckIn);
+
+    expect(result, RewardedAdResult.rewarded);
+    expect(rewarded.rewardType, RewardResources.extraCheckIn);
+    expect(repository.accessCalls, 1);
+  });
+
   test(
-    'keeps reward confirmation failure distinct from ad load failure',
+    'keeps reward confirmation failure distinct when no quota credit exists',
     () async {
       final repository = _FakeSubscriptionRepository(accessAllowed: false);
       final rewarded = _FakeRewardedAdService(
@@ -92,9 +116,15 @@ class _FakeRewardedAdService implements RewardedAdService {
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
-  _FakeSubscriptionRepository({required this.accessAllowed});
+  _FakeSubscriptionRepository({
+    required this.accessAllowed,
+    this.rewardedCreditsGrantedToday = 0,
+    this.rewardedCreditsUsedToday = 0,
+  });
 
   final bool accessAllowed;
+  final int rewardedCreditsGrantedToday;
+  final int rewardedCreditsUsedToday;
   int accessCalls = 0;
 
   @override
@@ -145,6 +175,8 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       entitlementExpiresAt: accessAllowed
           ? DateTime.now().add(const Duration(hours: 2))
           : null,
+      rewardedCreditsGrantedToday: rewardedCreditsGrantedToday,
+      rewardedCreditsUsedToday: rewardedCreditsUsedToday,
     );
   }
 

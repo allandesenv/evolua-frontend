@@ -197,6 +197,10 @@ class SubscriptionRepositoryImpl implements SubscriptionRepository {
       entitlementExpiresAt: json['entitlementExpiresAt'] == null
           ? null
           : DateTime.tryParse(json['entitlementExpiresAt'].toString()),
+      rewardedCreditsGrantedToday:
+          (json['rewardedCreditsGrantedToday'] as num?)?.toInt() ?? 0,
+      rewardedCreditsUsedToday:
+          (json['rewardedCreditsUsedToday'] as num?)?.toInt() ?? 0,
     );
   }
 

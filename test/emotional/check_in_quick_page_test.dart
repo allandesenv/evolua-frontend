@@ -438,8 +438,10 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: true,
+            accessAllowed: false,
             rewardedAdAvailable: true,
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
           ),
         ),
       );
@@ -467,6 +469,7 @@ void main() {
 
       expect(find.text('Desbloquear novo check-in hoje'), findsNothing);
       expect(repository.createCalls, 2);
+      expect(rewarded.showCalls, 1);
     });
 
     testWidgets('keeps rewarded button loading during automatic submit', (
@@ -484,8 +487,10 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: true,
+            accessAllowed: false,
             rewardedAdAvailable: true,
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
           ),
         ),
       );
@@ -539,8 +544,10 @@ void main() {
           checkInRepository: repository,
           rewardedAdService: rewarded,
           subscriptionRepository: _FakeSubscriptionRepository(
-            accessAllowed: true,
+            accessAllowed: false,
             rewardedAdAvailable: true,
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
           ),
         ),
       );
@@ -558,6 +565,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
+      expect(rewarded.showCalls, 1);
       expect(find.text('Não conseguimos salvar agora'), findsOneWidget);
       if (find.text('Entendi').evaluate().isNotEmpty) {
         await tester.tap(find.text('Entendi'));
@@ -567,6 +575,7 @@ void main() {
       await tester.tap(find.text('Tentar salvar novamente'));
       await tester.pumpAndSettle();
       expect(repository.createCalls, 3);
+      expect(rewarded.showCalls, 1);
     });
 
     testWidgets('no fill keeps sheet open with calm actions', (tester) async {
@@ -747,46 +756,43 @@ void main() {
       expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
     });
 
-    testWidgets(
-      'after daily rewarded credit is used only shows premium action',
-      (tester) async {
-        final repository = _FakeCheckInRepository(
-          blockFirstCreateWith402: true,
-        );
+    testWidgets('after daily rewarded credit is used only shows premium action', (
+      tester,
+    ) async {
+      final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
 
-        await tester.pumpWidget(
-          _testApp(
-            checkInRepository: repository,
-            subscriptionRepository: _FakeSubscriptionRepository(
-              accessAllowed: false,
-              rewardedAdAvailable: false,
-            ),
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          subscriptionRepository: _FakeSubscriptionRepository(
+            accessAllowed: false,
+            rewardedAdAvailable: false,
           ),
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        await tester.enterText(
-          find.byType(TextFormField).first,
-          'mais um registro do dia',
-        );
-        await tester.tap(find.text('Fazer check-in'));
-        await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'mais um registro do dia',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
-        expect(
-          find.text(
-            'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.',
-          ),
-          findsOneWidget,
-        );
-        expect(find.textContaining('Ã'), findsNothing);
-        expect(find.textContaining('Â'), findsNothing);
-        expect(find.textContaining('desbloqueio por'), findsOneWidget);
-        expect(find.textContaining('Assistir'), findsNothing);
-        expect(find.text('Ver Premium'), findsOneWidget);
-        expect(find.text('Agora não'), findsWidgets);
-      },
-    );
+      expect(find.text('Desbloquear novo check-in hoje'), findsOneWidget);
+      expect(
+        find.text(
+          'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Ã'), findsNothing);
+      expect(find.textContaining('Â'), findsNothing);
+      expect(find.textContaining('desbloqueio por'), findsOneWidget);
+      expect(find.textContaining('Assistir'), findsNothing);
+      expect(find.text('Ver Premium'), findsOneWidget);
+      expect(find.text('Agora não'), findsWidgets);
+    });
   });
 }
 
@@ -1120,10 +1126,14 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   _FakeSubscriptionRepository({
     required this.accessAllowed,
     bool? rewardedAdAvailable,
+    this.rewardedCreditsGrantedToday = 0,
+    this.rewardedCreditsUsedToday = 0,
   }) : rewardedAdAvailable = rewardedAdAvailable ?? !accessAllowed;
 
   final bool accessAllowed;
   final bool rewardedAdAvailable;
+  final int rewardedCreditsGrantedToday;
+  final int rewardedCreditsUsedToday;
 
   @override
   Future<CurrentSubscription?> cancel() async => null;
@@ -1172,6 +1182,8 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
       entitlementExpiresAt: accessAllowed
           ? DateTime.now().add(const Duration(hours: 2))
           : null,
+      rewardedCreditsGrantedToday: rewardedCreditsGrantedToday,
+      rewardedCreditsUsedToday: rewardedCreditsUsedToday,
     );
   }
 
