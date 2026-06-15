@@ -344,7 +344,7 @@ void main() {
   });
 
   testWidgets(
-    'dashboard opens one check-in prompt when launched from reminder',
+    'dashboard stays on home when launched from reminder notification',
     (tester) async {
       SharedPreferences.setMockInitialValues({
         'evolua.auth.session': jsonEncode(_testSession().toJson()),
@@ -358,12 +358,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsOneWidget);
-
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Agora não'));
-      await tester.pumpAndSettle();
-
       expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsNothing);
+      expect(find.text('Início'), findsWidgets);
 
       await tester.pumpWidget(
         _dashboardShell(checkInRepository: const _FakeCheckInRepository()),
@@ -1385,7 +1381,8 @@ void main() {
     final inProgressTrail = _testTrail(
       id: 8,
       title: 'Hábitos que cabem na vida real',
-      summary: 'Uma trilha para criar hábitos pequenos, sustentáveis e possíveis.',
+      summary:
+          'Uma trilha para criar hábitos pequenos, sustentáveis e possíveis.',
     );
 
     await _pumpEvolutionMirror(
@@ -1394,9 +1391,7 @@ void main() {
       trailRepository: _FakeTrailRepository(
         currentJourney: completedTrail,
         journey: _testCompletedJourney(completedTrail),
-        journeys: {
-          inProgressTrail.id: _testJourney(inProgressTrail),
-        },
+        journeys: {inProgressTrail.id: _testJourney(inProgressTrail)},
       ),
       checkInRepository: _FakeCheckInRepository(
         items: _evolutionRichCheckIns(),
@@ -3064,10 +3059,7 @@ class _FakeSocialPostRepository implements SocialPostRepository {
   }
 
   @override
-  Future<SocialPost> update({
-    required String id,
-    required String content,
-  }) {
+  Future<SocialPost> update({required String id, required String content}) {
     throw UnimplementedError();
   }
 
