@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart' as ytm;
 import 'package:youtube_player_iframe/youtube_player_iframe.dart' as ytw;
@@ -557,6 +558,10 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
                 trigger: InterstitialTrigger.trailCompletion,
                 session: ref.read(authControllerProvider).asData?.value,
               );
+          if (mounted) {
+            context.go('/home');
+          }
+          return;
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -647,6 +652,10 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
                 trigger: InterstitialTrigger.trailCompletion,
                 session: ref.read(authControllerProvider).asData?.value,
               );
+          if (mounted) {
+            context.go('/home');
+          }
+          return;
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -84,7 +84,7 @@ void main() {
     );
   });
 
-  test('keeps banners neutral and interstitial rare', () {
+  test('keeps banners neutral and interstitial limited to v1 exits', () {
     expect(
       AdPlacementPolicy.canShow(
         format: AdFormat.banner,
@@ -108,7 +108,52 @@ void main() {
         premium: false,
         interstitialEnabled: true,
       ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.ritualCompletedExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
       isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.trailCompletion,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.readingSavedExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.timelineExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.readingVariationMilestone,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
     );
     expect(
       AdPlacementPolicy.canShow(

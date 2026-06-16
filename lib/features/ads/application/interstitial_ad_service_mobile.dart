@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/features/ads/application/ad_mob_initialization_service.dart';
 import 'package:evolua_frontend/features/ads/application/ad_placement_policy.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
@@ -39,13 +40,13 @@ class MobileInterstitialAdService implements InterstitialAdService {
     }
     final adUnitId = _adUnitId;
     if (adUnitId.trim().isEmpty) {
-      debugInterstitial('skipped por ad unit vazio');
+      debugInterstitial('skippedMissingAdUnit');
       return;
     }
 
     _isLoading = true;
-    debugInterstitial('load started');
-    await MobileAds.instance.initialize();
+    debugInterstitial('loadStarted');
+    await adMobInitializationService.ensureInitialized();
     await InterstitialAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(),
@@ -59,8 +60,8 @@ class MobileInterstitialAdService implements InterstitialAdService {
           _isLoading = false;
           _ad = null;
           debugInterstitial(
-            'failed code=${error.code} domain=${error.domain} '
-            'message=${error.message}',
+            'failedToLoad code=${error.code} domain=${error.domain} '
+            'message=${error.message} responseInfo=${error.responseInfo}',
           );
         },
       ),
@@ -73,25 +74,29 @@ class MobileInterstitialAdService implements InterstitialAdService {
     required AuthSession? session,
   }) async {
     if (!_platformSupported) {
-      debugInterstitial('skipped por plataforma sem suporte');
+      debugInterstitial('skippedUnsupportedPlatform');
       return false;
     }
     final currentSession = session;
     if (currentSession == null) {
-      debugInterstitial('skipped por sessao ausente');
+      debugInterstitial('skippedMissingSession');
       return false;
     }
-    if (currentSession.isPremium) {
-      debugInterstitial('skipped por Premium');
+    if (isAdFreeSession(currentSession)) {
+      debugInterstitial('skippedForPremium');
+      return false;
+    }
+    if (!InterstitialPlacementConfig.isEnabled(trigger)) {
+      debugInterstitial('skippedDisabledPlacement trigger=${trigger.name}');
       return false;
     }
     if (!AdPlacementPolicy.canShow(
       format: AdFormat.interstitial,
       context: trigger.context,
-      premium: currentSession.isPremium,
+      premium: isAdFreeSession(currentSession),
       interstitialEnabled: true,
     )) {
-      debugInterstitial('skipped por contexto sensível');
+      debugInterstitial('skippedDisabledPlacement trigger=${trigger.name}');
       return false;
     }
 
@@ -102,13 +107,13 @@ class MobileInterstitialAdService implements InterstitialAdService {
       now: DateTime.now(),
     );
     if (!decision.allowed) {
-      debugInterstitial('skipped por ${decision.reason}');
+      debugInterstitial('skippedByCooldown reason=${decision.reason}');
       return false;
     }
 
     final readyAd = _ad;
     if (readyAd == null || _isShowing) {
-      debugInterstitial('skipped por no ad ready');
+      debugInterstitial('skippedNoAdReady');
       unawaited(preload());
       return false;
     }
@@ -184,6 +189,19 @@ class MobileInterstitialAdService implements InterstitialAdService {
   }
 
   bool get _platformSupported => Platform.isAndroid || Platform.isIOS;
+
+  @visibleForTesting
+  static bool isAdFreeSession(AuthSession session) {
+    if (session.isPremium) {
+      return true;
+    }
+    return session.roles.any((role) {
+      final normalized = role.trim().toUpperCase();
+      return normalized == 'ROLE_FOUNDER' ||
+          normalized == 'ROLE_FOUNDING_MEMBER' ||
+          normalized == 'ROLE_FUNDADOR';
+    });
+  }
 
   String get _adUnitId {
     return adUnitIdFor(
