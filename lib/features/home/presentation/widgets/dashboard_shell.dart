@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/app/startup/app_startup_controller.dart';
 import 'package:evolua_frontend/app/startup/startup_diagnostics.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
@@ -28,6 +29,7 @@ import 'package:evolua_frontend/features/user/domain/entities/profile.dart';
 import 'package:evolua_frontend/features/user/presentation/widgets/profile_module_view.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,6 +66,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   String? _startupWarmupUserId;
   String? _interstitialPreloadUserId;
   VoidCallback? _spacesInternalBackAction;
+  bool _resendingEmailVerification = false;
+  bool _refreshingEmailVerification = false;
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -248,6 +252,78 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       );
     } finally {
       _checkInOpening = false;
+    }
+  }
+
+  Future<void> _resendEmailVerification() async {
+    if (_resendingEmailVerification) {
+      return;
+    }
+    setState(() => _resendingEmailVerification = true);
+    try {
+      await ref.read(authControllerProvider.notifier).resendEmailVerification();
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: 'Enviamos um novo e-mail de confirmacao.',
+        icon: Icons.mark_email_read_rounded,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: _friendlyEmailVerificationError(error),
+        icon: Icons.info_outline_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _resendingEmailVerification = false);
+      }
+    }
+  }
+
+  String _friendlyEmailVerificationError(Object error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && data['message'] is String) {
+        final message = (data['message'] as String).trim();
+        if (message.isNotEmpty) {
+          return message;
+        }
+      }
+    }
+    return 'Nao conseguimos reenviar agora. Tente novamente em instantes.';
+  }
+
+  Future<void> _refreshEmailVerificationStatus() async {
+    if (_refreshingEmailVerification) {
+      return;
+    }
+    setState(() => _refreshingEmailVerification = true);
+    try {
+      final refreshed = await ref
+          .read(authControllerProvider.notifier)
+          .refreshSession();
+      if (!mounted) {
+        return;
+      }
+      AppSnackBar.show(
+        context,
+        message: refreshed?.emailVerified == true
+            ? 'E-mail confirmado. Obrigado!'
+            : 'Ainda nao identificamos a confirmacao. Confira seu e-mail e tente novamente.',
+        icon: refreshed?.emailVerified == true
+            ? Icons.verified_rounded
+            : Icons.info_outline_rounded,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _refreshingEmailVerification = false);
+      }
     }
   }
 
@@ -650,6 +726,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenFutureMessages: () => context.push('/future-messages'),
       onOpenCheckIn: () => _openCheckIn(compact: isCompact),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
+      onResendEmailVerification: _resendEmailVerification,
+      onRefreshEmailVerification: _refreshEmailVerificationStatus,
+      isResendingEmailVerification: _resendingEmailVerification,
+      isRefreshingEmailVerification: _refreshingEmailVerification,
     );
 
     return PopScope<void>(
@@ -976,6 +1056,10 @@ class _DashboardContent extends ConsumerWidget {
     required this.onOpenFutureMessages,
     required this.onOpenCheckIn,
     required this.onLogout,
+    required this.onResendEmailVerification,
+    required this.onRefreshEmailVerification,
+    required this.isResendingEmailVerification,
+    required this.isRefreshingEmailVerification,
   });
 
   final int selectedIndex;
@@ -996,6 +1080,10 @@ class _DashboardContent extends ConsumerWidget {
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onOpenCheckIn;
   final VoidCallback onLogout;
+  final Future<void> Function() onResendEmailVerification;
+  final Future<void> Function() onRefreshEmailVerification;
+  final bool isResendingEmailVerification;
+  final bool isRefreshingEmailVerification;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1127,6 +1215,15 @@ class _DashboardContent extends ConsumerWidget {
             ),
           ),
         ),
+        if (session != null && !session.emailVerified) ...[
+          const SizedBox(height: 12),
+          _EmailVerificationNotice(
+            onResend: onResendEmailVerification,
+            onRefresh: onRefreshEmailVerification,
+            resending: isResendingEmailVerification,
+            refreshing: isRefreshingEmailVerification,
+          ),
+        ],
         const SizedBox(height: 18),
         Expanded(
           child: AnimatedSwitcher(
@@ -1320,6 +1417,61 @@ class _ProfileArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ProfileModuleView(section: section);
+  }
+}
+
+class _EmailVerificationNotice extends StatelessWidget {
+  const _EmailVerificationNotice({
+    required this.onResend,
+    required this.onRefresh,
+    required this.resending,
+    required this.refreshing,
+  });
+
+  final Future<void> Function() onResend;
+  final Future<void> Function() onRefresh;
+  final bool resending;
+  final bool refreshing;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.evoluaColors;
+    final busy = resending || refreshing;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.24)),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 10,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Icon(Icons.mark_email_unread_rounded, color: AppColors.accent),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Text(
+              'Confirme seu e-mail para manter sua conta mais segura.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: busy ? null : () => unawaited(onResend()),
+            child: Text(resending ? 'Enviando...' : 'Reenviar e-mail'),
+          ),
+          OutlinedButton(
+            onPressed: busy ? null : () => unawaited(onRefresh()),
+            child: Text(refreshing ? 'Atualizando...' : 'Ja confirmei'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

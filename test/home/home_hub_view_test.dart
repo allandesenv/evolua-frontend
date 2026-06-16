@@ -173,6 +173,7 @@ void main() {
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(rewarded.rewardType, 'EXTRA_CHECK_IN');
       expect(rewarded.showCalls, 1);
@@ -303,6 +304,7 @@ void main() {
         await tester.tap(find.text('Assistir anúncio'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
+        await tester.pump(const Duration(milliseconds: 600));
 
         expect(openedCheckIn, isTrue);
         expect(rewarded.showCalls, 1);
@@ -345,6 +347,7 @@ void main() {
       await tester.tap(find.text('Assistir anúncio'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(openedCheckIn, isTrue);
       expect(rewarded.showCalls, 1);
@@ -388,6 +391,7 @@ void main() {
         await tester.tap(find.text('Assistir anúncio'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
+        await tester.pump(const Duration(milliseconds: 600));
 
         expect(openedCheckIn, isTrue);
         expect(rewarded.showCalls, 1);
@@ -441,11 +445,194 @@ void main() {
       adGate.complete(RewardedAdResult.rewarded);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(openedCheckIn, isTrue);
       expect(rewarded.showCalls, 1);
       expect(subscriptions.accessCalls, 3);
     });
+
+    testWidgets('extra check-in gate closes before opening check-in sheet', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      var gateVisibleWhenOpening = true;
+      final rewarded = _FakeRewardedAdService(
+        result: RewardedAdResult.rewarded,
+      );
+      final subscriptions = _FakeSubscriptionRepository(
+        accessStatuses: [
+          _accessStatus(),
+          _accessStatus(),
+          _accessStatus(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 197, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          subscriptionRepository: subscriptions,
+          rewardedAdService: rewarded,
+          onOpenCheckIn: () {
+            openedCheckIn = true;
+            gateVisibleWhenOpening = find
+                .text('Liberar novo check-in')
+                .evaluate()
+                .isNotEmpty;
+            showModalBottomSheet<void>(
+              context: tester.element(find.byType(HomeHubView)),
+              builder: (context) => SafeArea(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Concluir check-in fake'),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+
+      expect(openedCheckIn, isTrue);
+      expect(gateVisibleWhenOpening, isFalse);
+      expect(find.text('Liberar novo check-in'), findsNothing);
+      expect(find.text('Concluir check-in fake'), findsOneWidget);
+
+      await tester.tap(find.text('Concluir check-in fake'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liberar novo check-in'), findsNothing);
+      expect(find.text('Concluir check-in fake'), findsNothing);
+    });
+
+    testWidgets(
+      'pending confirmation verifies access without another rewarded attempt',
+      (tester) async {
+        for (final result in [
+          RewardedAdResult.timeout,
+          RewardedAdResult.rewardConfirmedButAccessDenied,
+        ]) {
+          var openedCheckIn = false;
+          final rewarded = _FakeRewardedAdService(result: result);
+          final subscriptions = _FakeSubscriptionRepository(
+            rewardedCreditsGrantedToday: 0,
+            rewardedCreditsUsedToday: 0,
+          );
+
+          await tester.pumpWidget(
+            _testApp(
+              now: DateTime(2026, 5, 7, 13),
+              checkInRepository: _FakeCheckInRepository(
+                items: [
+                  _testCheckIn(id: 198, createdAt: DateTime(2026, 5, 7, 9)),
+                ],
+              ),
+              subscriptionRepository: subscriptions,
+              rewardedAdService: rewarded,
+              onOpenCheckIn: () => openedCheckIn = true,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.text('Novo check-in'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Assistir anúncio'));
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 4));
+
+          expect(openedCheckIn, isFalse);
+          expect(rewarded.showCalls, 1);
+          expect(subscriptions.accessCalls, 5);
+          expect(find.text('Confirmação em andamento'), findsOneWidget);
+          expect(find.text('Verificar liberação'), findsOneWidget);
+          expect(find.text('Assistir anúncio'), findsNothing);
+
+          await tester.tap(find.text('Verificar liberação'));
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 4));
+
+          expect(openedCheckIn, isFalse);
+          expect(rewarded.showCalls, 1);
+          expect(subscriptions.accessCalls, 8);
+          expect(find.text('Verificar liberação'), findsOneWidget);
+
+          await tester.tap(find.text('Agora não'));
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
+    testWidgets(
+      'pending confirmation verification opens check-in when credit appears',
+      (tester) async {
+        var openedCheckIn = false;
+        final rewarded = _FakeRewardedAdService(
+          result: RewardedAdResult.timeout,
+        );
+        final subscriptions = _FakeSubscriptionRepository(
+          accessStatuses: [
+            _accessStatus(),
+            _accessStatus(),
+            _accessStatus(),
+            _accessStatus(),
+            _accessStatus(),
+            _accessStatus(
+              rewardedCreditsGrantedToday: 1,
+              rewardedCreditsUsedToday: 0,
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            now: DateTime(2026, 5, 7, 13),
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                _testCheckIn(id: 199, createdAt: DateTime(2026, 5, 7, 9)),
+              ],
+            ),
+            subscriptionRepository: subscriptions,
+            rewardedAdService: rewarded,
+            onOpenCheckIn: () => openedCheckIn = true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Novo check-in'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Assistir anúncio'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 4));
+
+        expect(openedCheckIn, isFalse);
+        expect(rewarded.showCalls, 1);
+        expect(subscriptions.accessCalls, 5);
+        expect(find.text('Verificar liberação'), findsOneWidget);
+
+        await tester.tap(find.text('Verificar liberação'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pump(const Duration(milliseconds: 600));
+
+        expect(openedCheckIn, isTrue);
+        expect(rewarded.showCalls, 1);
+        expect(subscriptions.accessCalls, 6);
+        expect(find.text('Confirmação em andamento'), findsNothing);
+      },
+    );
 
     testWidgets(
       'extra check-in gate keeps user out on failed or pending rewards',
@@ -496,10 +683,14 @@ void main() {
           expect(find.text('Liberar novo check-in'), findsNothing);
           if (result == RewardedAdResult.rewardConfirmedButAccessDenied) {
             expect(find.text('Confirmação em andamento'), findsOneWidget);
+            expect(find.text('Verificar liberação'), findsOneWidget);
+            expect(find.text('Assistir anúncio'), findsNothing);
             expect(find.text('Não foi possível liberar agora'), findsNothing);
             expect(subscriptions.accessCalls, 5);
           } else if (result == RewardedAdResult.timeout) {
             expect(find.text('Confirmação em andamento'), findsOneWidget);
+            expect(find.text('Verificar liberação'), findsOneWidget);
+            expect(find.text('Assistir anúncio'), findsNothing);
             expect(find.text('Não foi possível liberar agora'), findsNothing);
             expect(subscriptions.accessCalls, 5);
           } else if (result == RewardedAdResult.dismissedWithoutReward) {

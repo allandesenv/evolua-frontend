@@ -19,4 +19,6 @@ abstract class AuthRepository {
     required String token,
     required String newPassword,
   });
+
+  Future<void> resendEmailVerification({required String accessToken});
 }

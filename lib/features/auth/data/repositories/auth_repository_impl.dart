@@ -82,6 +82,14 @@ class AuthRepositoryImpl implements AuthRepository {
     );
   }
 
+  @override
+  Future<void> resendEmailVerification({required String accessToken}) async {
+    await _dio.post<void>(
+      '/v1/auth/email/verification/resend',
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+  }
+
   Map<String, dynamic> _normalizePayload(dynamic data) {
     if (data is Map<String, dynamic>) {
       if (data['data'] is Map<String, dynamic>) {

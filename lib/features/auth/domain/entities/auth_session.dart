@@ -10,6 +10,7 @@ class AuthSession {
     this.avatarUrl,
     this.refreshToken,
     this.expiresAt,
+    this.emailVerified = true,
   });
 
   final String userId;
@@ -20,6 +21,7 @@ class AuthSession {
   final String? avatarUrl;
   final String? refreshToken;
   final DateTime? expiresAt;
+  final bool emailVerified;
 
   bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
   bool get isAdmin => roles.contains('ROLE_ADMIN');
@@ -35,6 +37,7 @@ class AuthSession {
       'avatarUrl': avatarUrl,
       'refreshToken': refreshToken,
       'expiresAt': expiresAt?.toIso8601String(),
+      'emailVerified': emailVerified,
     };
   }
 
@@ -53,6 +56,13 @@ class AuthSession {
         .map((item) => item.toString())
         .where((item) => item.isNotEmpty)
         .toList();
+    final emailVerified = _parseBool(
+      json['emailVerified'] ??
+          json['email_verified'] ??
+          claims['emailVerified'] ??
+          claims['email_verified'],
+      fallback: true,
+    );
 
     DateTime? expiresAt;
     final rawExpiresAt = json['expiresAt']?.toString();
@@ -61,7 +71,10 @@ class AuthSession {
     } else {
       final exp = claims['exp'];
       if (exp is num) {
-        expiresAt = DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000, isUtc: true).toLocal();
+        expiresAt = DateTime.fromMillisecondsSinceEpoch(
+          exp.toInt() * 1000,
+          isUtc: true,
+        ).toLocal();
       }
     }
 
@@ -74,7 +87,24 @@ class AuthSession {
       avatarUrl: json['avatarUrl']?.toString(),
       refreshToken: json['refreshToken']?.toString(),
       expiresAt: expiresAt,
+      emailVerified: emailVerified,
     );
+  }
+
+  static bool _parseBool(Object? value, {required bool fallback}) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true') {
+        return true;
+      }
+      if (normalized == 'false') {
+        return false;
+      }
+    }
+    return fallback;
   }
 
   static Map<String, dynamic> _decodeJwtPayload(String token) {

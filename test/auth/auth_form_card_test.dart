@@ -831,6 +831,9 @@ class _FakeAuthRepository implements AuthRepository {
       );
     }
   }
+
+  @override
+  Future<void> resendEmailVerification({required String accessToken}) async {}
 }
 
 class _FakeProfileRepository implements ProfileRepository {
