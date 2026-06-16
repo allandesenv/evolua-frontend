@@ -17,7 +17,7 @@ class WebInterstitialAdService implements InterstitialAdService {
     required InterstitialTrigger trigger,
     required AuthSession? session,
   }) async {
-    debugInterstitial('skipped por plataforma sem suporte');
+    debugInterstitial('skippedUnsupportedPlatform');
     return false;
   }
 

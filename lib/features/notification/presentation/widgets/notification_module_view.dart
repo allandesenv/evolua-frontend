@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
+import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -373,12 +374,16 @@ class _NotificationInboxDialog extends ConsumerWidget {
                                   )
                                   .markAsRead(item.id);
                             }
-                            final actionTarget = item.actionTarget;
+                            final actionTarget = _resolvedActionTarget(item);
                             if (context.mounted &&
                                 actionTarget != null &&
                                 actionTarget.isNotEmpty) {
                               Navigator.of(context).maybePop();
-                              context.push(actionTarget);
+                              if (actionTarget == '/home') {
+                                context.go(actionTarget);
+                              } else {
+                                context.push(actionTarget);
+                              }
                             }
                           },
                           borderRadius: BorderRadius.circular(18),
@@ -474,6 +479,14 @@ class _NotificationInboxDialog extends ConsumerWidget {
       'EVENT' => 'Evento relevante',
       _ => 'Mensagem',
     };
+  }
+
+  String? _resolvedActionTarget(NotificationJob item) {
+    final actionTarget = item.actionTarget;
+    if (item.type == 'CHECKIN_REMINDER' || actionTarget == '/check-in') {
+      return '/home';
+    }
+    return actionTarget;
   }
 
   String _timeLabel(DateTime dateTime) {

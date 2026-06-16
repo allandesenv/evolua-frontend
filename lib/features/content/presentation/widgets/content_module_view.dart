@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart' as ytm;
 import 'package:youtube_player_iframe/youtube_player_iframe.dart' as ytw;
@@ -557,6 +558,10 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
                 trigger: InterstitialTrigger.trailCompletion,
                 session: ref.read(authControllerProvider).asData?.value,
               );
+          if (mounted) {
+            context.go('/home');
+          }
+          return;
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -647,6 +652,10 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
                 trigger: InterstitialTrigger.trailCompletion,
                 session: ref.read(authControllerProvider).asData?.value,
               );
+          if (mounted) {
+            context.go('/home');
+          }
+          return;
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -714,6 +723,9 @@ class _VisualJourneyPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = ResponsiveBreakpoints.isCompact(context);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardVisible = keyboardInset > 0;
+    final scrollBottomPadding = keyboardVisible ? keyboardInset + 120 : 18.0;
     final activeColor = _journeyAccentColor(journey.trail);
     final isCompleted = _isJourneyEffectivelyCompleted(journey);
     final nextStep = journey.nextStep;
@@ -724,7 +736,8 @@ class _VisualJourneyPanel extends StatelessWidget {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 18),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.only(bottom: scrollBottomPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -790,15 +803,17 @@ class _VisualJourneyPanel extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 14),
-          _JourneyStickyCta(
-            journey: journey,
-            isActing: isActing,
-            isCompleted: isCompleted,
-            onPressed: isActing || journey.steps.isEmpty
-                ? null
-                : onPrimaryAction,
-          ),
+          if (!keyboardVisible) ...[
+            const SizedBox(height: 14),
+            _JourneyStickyCta(
+              journey: journey,
+              isActing: isActing,
+              isCompleted: isCompleted,
+              onPressed: isActing || journey.steps.isEmpty
+                  ? null
+                  : onPrimaryAction,
+            ),
+          ],
         ],
       ),
     );
@@ -1597,6 +1612,13 @@ class _TrailStepResponseEditorState
               enabled: !_isSaving,
               onChanged: _scheduleDraftSave,
               textCapitalization: TextCapitalization.sentences,
+              keyboardType: TextInputType.multiline,
+              scrollPadding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom + 140,
+                top: 32,
+                left: 16,
+                right: 16,
+              ),
               minLines: 3,
               maxLines: 6,
               decoration: const InputDecoration(

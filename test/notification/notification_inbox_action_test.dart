@@ -154,6 +154,65 @@ void main() {
     expect(repository.readIds, isEmpty);
     expect(find.text('ritual-morning'), findsOneWidget);
   });
+
+  testWidgets('check-in notification tap opens home instead of check-in', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _FakeNotificationRepository([
+      NotificationJob(
+        id: 'check-in-reminder-1',
+        userId: 'user-1',
+        type: 'CHECKIN_REMINDER',
+        title: 'Hora do check-in',
+        message: 'Registre seu momento no Evolua.',
+        actionTarget: '/check-in',
+        source: 'SYSTEM',
+        createdBy: null,
+        createdAt: DateTime(2026, 6, 15, 8),
+        readAt: null,
+      ),
+    ]);
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) =>
+              const Scaffold(body: Center(child: NotificationBellButton())),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => const Text('home-opened'),
+        ),
+        GoRoute(
+          path: '/check-in',
+          builder: (context, state) => const Text('check-in-opened'),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          notificationRepositoryProvider.overrideWithValue(repository),
+          authControllerProvider.overrideWith(
+            () => _FakeAuthController(userId: 'user-1'),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.notifications_active_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hora do check-in'));
+    await tester.pumpAndSettle();
+
+    expect(repository.readIds, ['check-in-reminder-1']);
+    expect(find.text('home-opened'), findsOneWidget);
+    expect(find.text('check-in-opened'), findsNothing);
+  });
 }
 
 Widget _testApp(_FakeNotificationRepository repository) {
