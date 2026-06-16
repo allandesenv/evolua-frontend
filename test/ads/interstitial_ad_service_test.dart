@@ -42,7 +42,32 @@ void main() {
     expect(adUnitId, 'ca-app-pub-3940256099942544/4411468910');
   });
 
-  test('policy allows interstitial only in permitted natural transitions', () {
+  test('policy allows interstitial only in v1 completion exits', () {
+    expect(
+      InterstitialPlacementConfig.isEnabled(
+        InterstitialTrigger.ritualCompletedExit,
+      ),
+      isTrue,
+    );
+    expect(
+      InterstitialPlacementConfig.isEnabled(
+        InterstitialTrigger.trailCompletion,
+      ),
+      isTrue,
+    );
+    expect(
+      InterstitialPlacementConfig.isEnabled(
+        InterstitialTrigger.readingSavedExit,
+      ),
+      isFalse,
+    );
+    expect(
+      InterstitialPlacementConfig.isEnabled(
+        InterstitialTrigger.readingVariationMilestone,
+      ),
+      isFalse,
+    );
+
     expect(
       AdPlacementPolicy.canShow(
         format: AdFormat.interstitial,
@@ -51,6 +76,42 @@ void main() {
         interstitialEnabled: true,
       ),
       isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.ritualCompletedExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.readingSavedExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.timelineExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.readingVariationMilestone,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
     );
     expect(
       AdPlacementPolicy.canShow(
@@ -72,8 +133,23 @@ void main() {
     );
   });
 
+  test('frequency cap allows first v1 action', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    const cap = InterstitialFrequencyCap();
+    final now = DateTime(2026, 6, 8, 10);
+
+    final decision = await cap.checkAndRecordAction(
+      preferences: preferences,
+      userId: 'free-user',
+      now: now,
+    );
+
+    expect(decision.allowed, isTrue);
+  });
+
   test(
-    'frequency cap requires two relevant actions before first show',
+    'frequency cap blocks five-minute cooldown, recent rewarded, and daily max',
     () async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
@@ -85,78 +161,61 @@ void main() {
         userId: 'free-user',
         now: now,
       );
-      final second = await cap.checkAndRecordAction(
-        preferences: preferences,
-        userId: 'free-user',
-        now: now.add(const Duration(minutes: 1)),
-      );
-
-      expect(first.allowed, isFalse);
-      expect(second.allowed, isTrue);
-    },
-  );
-
-  test('frequency cap blocks recent rewarded and daily max', () async {
-    SharedPreferences.setMockInitialValues({});
-    final preferences = await SharedPreferences.getInstance();
-    const cap = InterstitialFrequencyCap();
-    final now = DateTime(2026, 6, 8, 10);
-
-    await cap.recordRewarded(
-      preferences: preferences,
-      userId: 'free-user',
-      now: now,
-    );
-    await cap.checkAndRecordAction(
-      preferences: preferences,
-      userId: 'free-user',
-      now: now.add(const Duration(minutes: 1)),
-    );
-    final blockedByRewarded = await cap.checkAndRecordAction(
-      preferences: preferences,
-      userId: 'free-user',
-      now: now.add(const Duration(minutes: 2)),
-    );
-
-    expect(blockedByRewarded.allowed, isFalse);
-    expect(blockedByRewarded.reason, 'rewarded recente');
-
-    final later = now.add(const Duration(minutes: 20));
-    for (var i = 0; i < 3; i++) {
-      await cap.checkAndRecordAction(
-        preferences: preferences,
-        userId: 'free-user',
-        now: later.add(Duration(minutes: i * 10)),
-      );
-      final allowed = await cap.checkAndRecordAction(
-        preferences: preferences,
-        userId: 'free-user',
-        now: later.add(Duration(minutes: i * 10 + 1)),
-      );
-      expect(allowed.allowed, isTrue);
+      expect(first.allowed, isTrue);
       await cap.recordShown(
         preferences: preferences,
         userId: 'free-user',
-        now: later.add(Duration(minutes: i * 10 + 1)),
+        now: now,
       );
-    }
+      final blockedByCooldown = await cap.checkAndRecordAction(
+        preferences: preferences,
+        userId: 'free-user',
+        now: now.add(const Duration(minutes: 4)),
+      );
+      expect(blockedByCooldown.allowed, isFalse);
+      expect(blockedByCooldown.reason, 'frequency cap');
 
-    await cap.checkAndRecordAction(
-      preferences: preferences,
-      userId: 'free-user',
-      now: later.add(const Duration(hours: 1)),
-    );
-    final dailyMax = await cap.checkAndRecordAction(
-      preferences: preferences,
-      userId: 'free-user',
-      now: later.add(const Duration(hours: 1, minutes: 1)),
-    );
+      await cap.recordRewarded(
+        preferences: preferences,
+        userId: 'free-user',
+        now: now.add(const Duration(minutes: 6)),
+      );
+      final blockedByRewarded = await cap.checkAndRecordAction(
+        preferences: preferences,
+        userId: 'free-user',
+        now: now.add(const Duration(minutes: 7)),
+      );
 
-    expect(dailyMax.allowed, isFalse);
-    expect(dailyMax.reason, 'frequency cap');
-  });
+      expect(blockedByRewarded.allowed, isFalse);
+      expect(blockedByRewarded.reason, 'rewarded recente');
 
-  test('premium session is recognized as non eligible by policy layer', () {
+      final later = now.add(const Duration(minutes: 20));
+      for (var i = 0; i < 2; i++) {
+        final allowed = await cap.checkAndRecordAction(
+          preferences: preferences,
+          userId: 'free-user',
+          now: later.add(Duration(minutes: i * 10)),
+        );
+        expect(allowed.allowed, isTrue);
+        await cap.recordShown(
+          preferences: preferences,
+          userId: 'free-user',
+          now: later.add(Duration(minutes: i * 10)),
+        );
+      }
+
+      final dailyMax = await cap.checkAndRecordAction(
+        preferences: preferences,
+        userId: 'free-user',
+        now: later.add(const Duration(hours: 1)),
+      );
+
+      expect(dailyMax.allowed, isFalse);
+      expect(dailyMax.reason, 'frequency cap');
+    },
+  );
+
+  test('premium and founder sessions are recognized as non eligible', () {
     const premiumSession = AuthSession(
       userId: 'premium-user',
       email: 'premium@evolua.test',
@@ -165,6 +224,18 @@ void main() {
     );
 
     expect(premiumSession.isPremium, isTrue);
+    expect(MobileInterstitialAdService.isAdFreeSession(premiumSession), isTrue);
+    expect(
+      MobileInterstitialAdService.isAdFreeSession(
+        const AuthSession(
+          userId: 'founder-user',
+          email: 'founder@evolua.test',
+          roles: ['ROLE_FOUNDER'],
+          accessToken: 'token',
+        ),
+      ),
+      isTrue,
+    );
     expect(
       AdPlacementPolicy.canShow(
         format: AdFormat.interstitial,

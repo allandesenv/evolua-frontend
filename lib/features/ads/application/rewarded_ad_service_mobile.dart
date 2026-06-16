@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/features/ads/application/ad_mob_initialization_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
@@ -53,7 +54,7 @@ class MobileRewardedAdService implements RewardedAdService {
 
     final adUnitId = _adUnitIdFor(rewardType);
 
-    await MobileAds.instance.initialize();
+    await adMobInitializationService.ensureInitialized();
 
     final completer = Completer<_RewardedAdOutcome>();
     RewardedAd? rewardedAd;

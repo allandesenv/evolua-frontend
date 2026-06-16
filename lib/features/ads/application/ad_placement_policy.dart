@@ -80,12 +80,8 @@ class AdPlacementPolicy {
   };
 
   static const _interstitialContexts = {
-    AdPlacementContext.neutralNavigation,
     AdPlacementContext.trailCompletion,
-    AdPlacementContext.readingSavedExit,
     AdPlacementContext.ritualCompletedExit,
-    AdPlacementContext.timelineExit,
-    AdPlacementContext.readingVariationMilestone,
   };
 
   static const _nativeContexts = {

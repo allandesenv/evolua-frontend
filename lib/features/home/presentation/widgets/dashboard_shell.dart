@@ -92,11 +92,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           if (!mounted) {
             return;
           }
-          unawaited(
-            _openReminderCheckIn(
-              isCompact: ResponsiveBreakpoints.isCompact(context),
-            ),
-          );
+          unawaited(_openHomeFromReminderNotification());
         });
       },
     );
@@ -394,10 +390,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
-  void _consumePendingReminderCheckInIfNeeded({
-    required bool isCompact,
-    required AuthSession? session,
-  }) {
+  void _consumePendingReminderCheckInIfNeeded({required AuthSession? session}) {
     if (session == null || _openingReminderCheckIn || _checkInOpening) {
       return;
     }
@@ -414,14 +407,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           return;
         }
         await _markInitialCheckInPromptHandled(session.userId);
-        await _openCheckIn(compact: isCompact);
+        _showHomeFromReminderNotification();
       } finally {
         _openingReminderCheckIn = false;
       }
     });
   }
 
-  Future<void> _openReminderCheckIn({required bool isCompact}) async {
+  Future<void> _openHomeFromReminderNotification() async {
     final session = ref.read(authControllerProvider).asData?.value;
     if (session == null || _openingReminderCheckIn || _checkInOpening) {
       return;
@@ -429,10 +422,22 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _openingReminderCheckIn = true;
     try {
       await _markInitialCheckInPromptHandled(session.userId);
-      await _openCheckIn(compact: isCompact);
+      _showHomeFromReminderNotification();
     } finally {
       _openingReminderCheckIn = false;
     }
+  }
+
+  void _showHomeFromReminderNotification() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedIndex = 0;
+      _history.clear();
+      _suggestedTrailIdToOpen = null;
+    });
+    GoRouter.maybeOf(context)?.go('/home');
   }
 
   Future<void> _markInitialCheckInPromptHandled(String userId) async {
@@ -483,7 +488,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         try {
           await _markFirstExperienceHandled(firstExperienceKey);
           await _markInitialCheckInPromptKeyHandled(initialPromptKey);
-          await _openCheckIn(compact: true);
+          _showHomeFromReminderNotification();
         } finally {
           _openingReminderCheckIn = false;
         }
@@ -613,10 +618,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       checkInState: checkInState,
     );
     if (!shouldFirstExperienceHandleCheckIn) {
-      _consumePendingReminderCheckInIfNeeded(
-        isCompact: isCompact,
-        session: session,
-      );
+      _consumePendingReminderCheckInIfNeeded(session: session);
     }
     final isAdmin = session?.isAdmin ?? false;
     final l10n = context.l10n;

@@ -15,6 +15,20 @@ enum InterstitialTrigger {
   final AdPlacementContext context;
 }
 
+class InterstitialPlacementConfig {
+  const InterstitialPlacementConfig._();
+
+  static bool isEnabled(InterstitialTrigger trigger) {
+    return switch (trigger) {
+      InterstitialTrigger.ritualCompletedExit => true,
+      InterstitialTrigger.trailCompletion => true,
+      InterstitialTrigger.readingSavedExit => false,
+      InterstitialTrigger.timelineExit => false,
+      InterstitialTrigger.readingVariationMilestone => false,
+    };
+  }
+}
+
 abstract class InterstitialAdService {
   Future<void> preload();
 
@@ -30,10 +44,10 @@ abstract class InterstitialAdService {
 
 class InterstitialFrequencyCap {
   const InterstitialFrequencyCap({
-    this.minInterval = const Duration(minutes: 8),
+    this.minInterval = const Duration(minutes: 5),
     this.rewardedCooldown = const Duration(minutes: 8),
     this.maxPerDay = 3,
-    this.minActionsBetweenShows = 2,
+    this.minActionsBetweenShows = 1,
   });
 
   final Duration minInterval;
