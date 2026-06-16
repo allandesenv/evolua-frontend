@@ -54,8 +54,17 @@ class MobileRewardedAdService implements RewardedAdService {
     );
 
     final adUnitId = _adUnitIdFor(rewardType);
+    final logicalAdUnit = _logicalAdUnitNameFor(rewardType);
 
+    debugPrint(
+      'Evolua rewarded load requested: rewardType=$normalizedRewardType '
+      'logicalAdUnit=$logicalAdUnit adUnitId=${_maskAdUnitId(adUnitId)}',
+    );
     await adMobInitializationService.ensureInitialized();
+    debugPrint(
+      'Evolua rewarded MobileAds initialized: '
+      'rewardType=$normalizedRewardType logicalAdUnit=$logicalAdUnit',
+    );
 
     final completer = Completer<_RewardedAdOutcome>();
     RewardedAd? rewardedAd;
@@ -194,7 +203,9 @@ class MobileRewardedAdService implements RewardedAdService {
             );
           },
           onAdFailedToLoad: (error) {
-            debugPrint(_describeLoadError(error, rewardType, adUnitId));
+            debugPrint(
+              _describeLoadError(error, rewardType, adUnitId, logicalAdUnit),
+            );
 
             completeOutcome(
               opened: false,
@@ -282,6 +293,29 @@ class MobileRewardedAdService implements RewardedAdService {
     );
   }
 
+  String _logicalAdUnitNameFor(String rewardType) {
+    final normalized = rewardType.trim().toUpperCase();
+    if (AppConfig.adMobUseTestAds) {
+      return Platform.isIOS ? 'ios_rewarded_test' : 'android_rewarded_test';
+    }
+    if (_extraCheckInRewardTypes.contains(normalized)) {
+      return Platform.isIOS
+          ? 'ios_rewarded_extra_check_in'
+          : 'android_rewarded_extra_check_in';
+    }
+    if (_aiRewardTypes.contains(normalized)) {
+      return Platform.isIOS
+          ? 'ios_rewarded_ai_extra'
+          : 'android_rewarded_ai_extra';
+    }
+    if (_premiumPassRewardTypes.contains(normalized)) {
+      return Platform.isIOS
+          ? 'ios_rewarded_premium_pass'
+          : 'android_rewarded_premium_pass';
+    }
+    return 'unknown_rewarded';
+  }
+
   @visibleForTesting
   static String adUnitIdFor({
     required String rewardType,
@@ -326,6 +360,7 @@ class MobileRewardedAdService implements RewardedAdService {
     LoadAdError error,
     String rewardType,
     String adUnitId,
+    String logicalAdUnit,
   ) {
     final hint = switch (error.code) {
       2 =>
@@ -334,11 +369,36 @@ class MobileRewardedAdService implements RewardedAdService {
         'Sem inventário no momento. Em blocos recém-criados, aguarde a ativação no AdMob ou teste com EVOLUA_ADMOB_USE_TEST_ADS=true.',
       _ => 'Falha ao carregar rewarded ad.',
     };
+    final responseInfo = error.responseInfo;
+    final adapterResponses = responseInfo?.adapterResponses
+        ?.map(
+          (adapter) =>
+              '${adapter.adapterClassName}'
+              '(source=${adapter.adSourceName}, '
+              'latencyMs=${adapter.latencyMillis}, '
+              'error=${adapter.adError})',
+        )
+        .join(' | ');
 
     return 'AdMob rewarded load failed: resource=$rewardType '
-        'adUnitId=$adUnitId code=${error.code} domain=${error.domain} '
-        'message=${error.message} responseInfo=${error.responseInfo} '
+        'logicalAdUnit=$logicalAdUnit '
+        'adUnitId=${_maskAdUnitId(adUnitId)} '
+        'code=${error.code} domain=${error.domain} '
+        'message=${error.message} '
+        'responseId=${responseInfo?.responseId} '
+        'mediationAdapter=${responseInfo?.mediationAdapterClassName} '
+        'responseExtras=${responseInfo?.responseExtras} '
+        'adapterResponses=$adapterResponses '
         'hint=$hint';
+  }
+
+  String _maskAdUnitId(String adUnitId) {
+    final trimmed = adUnitId.trim();
+    if (trimmed.length <= 8) {
+      return trimmed.isEmpty ? '<empty>' : '***';
+    }
+    return '${trimmed.substring(0, 6)}...'
+        '${trimmed.substring(trimmed.length - 4)}';
   }
 
   Future<bool> _waitForServerSideReward({

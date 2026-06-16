@@ -4,8 +4,10 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -82,11 +84,15 @@ class HomeHubView extends ConsumerStatefulWidget {
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   static const _ritualAlreadyExistsMessage =
       'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.';
+  static const _extraCheckInGateRecheckAttempts = 3;
+  static const _extraCheckInGateRecheckDelay = Duration(milliseconds: 1500);
 
   bool _isRewardLoading = false;
   ReadingActionLoading? _readingActionLoading;
   bool _isGeneratingDailyRitualFromCheckIn = false;
+  bool _isExtraCheckInRewardLoading = false;
   bool _secondaryProvidersEnabled = true;
+  int _extraCheckInGateAttemptSequence = 0;
   final Map<int, int> _readingVariationCounts = {};
 
   @override
@@ -476,6 +482,230 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     }
   }
 
+  Future<void> _showExtraCheckInGateSheet() async {
+    if (_isExtraCheckInRewardLoading) {
+      return;
+    }
+
+    RewardedAdResult? rewardFailure;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final currentFailure = rewardFailure;
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              child: RewardedAdPrompt(
+                title: _extraCheckInGateTitle(currentFailure),
+                message: _extraCheckInGateMessage(currentFailure),
+                rewardLabel: 'Assistir anúncio libera mais um check-in hoje.',
+                rewardedAdAvailable: true,
+                isRewardLoading: _isExtraCheckInRewardLoading,
+                watchLabel: 'Assistir anúncio',
+                loadingLabel: 'Carregando anúncio',
+                premiumLabel: 'Ver Premium',
+                secondaryLabel: 'Agora não',
+                onWatchRewardedAd: () async {
+                  if (_isExtraCheckInRewardLoading) {
+                    return;
+                  }
+                  setState(() => _isExtraCheckInRewardLoading = true);
+                  setSheetState(() {
+                    rewardFailure = null;
+                  });
+                  final attemptId = ++_extraCheckInGateAttemptSequence;
+                  debugPrint(
+                    'Evolua gate extra check-in attemptId=$attemptId started',
+                  );
+                  var result = RewardedAdResult.loadFailed;
+                  var openCheckIn = false;
+                  try {
+                    result = await ref
+                        .read(monetizationAccessControllerProvider.notifier)
+                        .unlockWithRewardedAdResult(
+                          resource: RewardResources.extraCheckIn,
+                        );
+                    openCheckIn = await _shouldOpenExtraCheckInAfterReward(
+                      result,
+                      attemptId: attemptId,
+                    );
+                  } catch (error) {
+                    debugPrint(
+                      'Evolua gate extra check-in attemptId=$attemptId '
+                      'failed before result error=$error',
+                    );
+                    result = RewardedAdResult.loadFailed;
+                    openCheckIn = false;
+                  } finally {
+                    if (mounted) {
+                      setState(() => _isExtraCheckInRewardLoading = false);
+                    }
+                  }
+                  if (!mounted || !sheetContext.mounted) {
+                    return;
+                  }
+                  if (openCheckIn) {
+                    Navigator.of(sheetContext).maybePop();
+                    widget.onOpenCheckIn();
+                    return;
+                  }
+                  setSheetState(() {
+                    rewardFailure = result;
+                  });
+                },
+                onOpenPremium: widget.onOpenPremium == null
+                    ? null
+                    : () {
+                        Navigator.of(sheetContext).maybePop();
+                        widget.onOpenPremium?.call();
+                      },
+                onSecondary: () => Navigator.of(sheetContext).maybePop(),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (mounted && _isExtraCheckInRewardLoading) {
+      setState(() => _isExtraCheckInRewardLoading = false);
+    }
+  }
+
+  Future<bool> _shouldOpenExtraCheckInAfterReward(
+    RewardedAdResult result, {
+    required int attemptId,
+  }) async {
+    debugPrint(
+      'Evolua gate extra check-in attemptId=$attemptId '
+      'reward result=${result.name}',
+    );
+    if (result == RewardedAdResult.rewarded) {
+      _logExtraCheckInGateFinalDecision(
+        attemptId: attemptId,
+        openCheckIn: true,
+      );
+      return true;
+    }
+
+    final shouldRecheck =
+        result == RewardedAdResult.rewardConfirmedButAccessDenied ||
+        result == RewardedAdResult.timeout;
+    if (!shouldRecheck) {
+      _logExtraCheckInGateFinalDecision(
+        attemptId: attemptId,
+        openCheckIn: false,
+      );
+      return false;
+    }
+
+    for (
+      var attempt = 1;
+      attempt <= _extraCheckInGateRecheckAttempts;
+      attempt++
+    ) {
+      if (attempt > 1) {
+        await Future<void>.delayed(_extraCheckInGateRecheckDelay);
+      }
+      if (!mounted) {
+        _logExtraCheckInGateFinalDecision(
+          attemptId: attemptId,
+          openCheckIn: false,
+        );
+        return false;
+      }
+
+      try {
+        final access = await ref
+            .read(monetizationAccessControllerProvider.notifier)
+            .access(resource: RewardResources.extraCheckIn);
+        final hasPendingRewardCredit =
+            access.rewardedCreditsGrantedToday >
+            access.rewardedCreditsUsedToday;
+        debugPrint(
+          'Evolua gate extra check-in attemptId=$attemptId '
+          'recheck attempt number=$attempt '
+          'access.allowed=${access.allowed} '
+          'rewardedCreditsGrantedToday=${access.rewardedCreditsGrantedToday} '
+          'rewardedCreditsUsedToday=${access.rewardedCreditsUsedToday} '
+          'hasPendingRewardCredit=$hasPendingRewardCredit',
+        );
+
+        if (access.allowed ||
+            access.entitlementExpiresAt != null ||
+            hasPendingRewardCredit) {
+          _logExtraCheckInGateFinalDecision(
+            attemptId: attemptId,
+            openCheckIn: true,
+          );
+          return true;
+        }
+      } catch (error) {
+        debugPrint(
+          'Evolua gate extra check-in attemptId=$attemptId '
+          'recheck attempt number=$attempt '
+          'failed error=$error',
+        );
+      }
+    }
+
+    _logExtraCheckInGateFinalDecision(attemptId: attemptId, openCheckIn: false);
+    return false;
+  }
+
+  void _logExtraCheckInGateFinalDecision({
+    required int attemptId,
+    required bool openCheckIn,
+  }) {
+    debugPrint(
+      'Evolua gate extra check-in attemptId=$attemptId '
+      'final decision openCheckIn=$openCheckIn',
+    );
+  }
+
+  String _extraCheckInGateTitle(RewardedAdResult? result) {
+    return switch (result) {
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'Confirmação em andamento',
+      RewardedAdResult.dismissedWithoutReward => 'Anúncio não concluído',
+      RewardedAdResult.noFill => 'Nenhum anúncio disponível agora',
+      RewardedAdResult.loadFailed => 'Não conseguimos carregar o anúncio agora',
+      RewardedAdResult.showFailed => 'Não conseguimos abrir o anúncio agora',
+      RewardedAdResult.unsupported => 'Anúncio indisponível neste dispositivo',
+      RewardedAdResult.timeout => 'Confirmação em andamento',
+      RewardedAdResult.rewarded || null => 'Liberar novo check-in',
+    };
+  }
+
+  String _extraCheckInGateMessage(RewardedAdResult? result) {
+    return switch (result) {
+      RewardedAdResult.rewardConfirmedButAccessDenied =>
+        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente novamente em alguns segundos.',
+      RewardedAdResult.dismissedWithoutReward =>
+        'Para liberar outro check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
+      RewardedAdResult.timeout =>
+        'A confirmação do anúncio demorou mais que o esperado. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
+      RewardedAdResult.noFill =>
+        'Nenhum anúncio disponível agora. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
+      RewardedAdResult.loadFailed =>
+        'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
+      RewardedAdResult.showFailed =>
+        'Não conseguimos abrir o anúncio neste momento. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
+      RewardedAdResult.unsupported =>
+        'Anúncios não estão disponíveis neste dispositivo. Você pode ver o Premium ou voltar amanhã.',
+      RewardedAdResult.rewarded || null =>
+        'Você já fez seu check-in gratuito de hoje. Para registrar outro agora, você pode assistir a um anúncio, ver o Premium ou voltar amanhã.',
+    };
+  }
+
   bool get _isEveningPeriod {
     return _ritualTypeFor(widget.now ?? DateTime.now()) ==
         DailyRitualType.evening;
@@ -512,6 +742,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
+    final subscriptionState = ref.watch(subscriptionControllerProvider);
     final futureMessageState = _secondaryProvidersEnabled
         ? ref.watch(futureMessageControllerProvider)
         : AsyncData(_emptyFutureMessageState());
@@ -591,6 +822,24 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       recentItems: recentItems,
       now: currentTime,
     );
+    final subscriptionLoaded = subscriptionState.hasValue;
+    final currentSubscription = subscriptionState.asData?.value.current;
+    final isPremium =
+        session?.isPremium == true || currentSubscription?.premium == true;
+    final shouldGateExtraCheckIn =
+        session != null &&
+        checkInState.hasValue &&
+        canUseCheckInState &&
+        todayCheckIn != null &&
+        !isPremium &&
+        subscriptionLoaded &&
+        currentSubscription?.premium != true;
+    final openCheckInFromHome = shouldGateExtraCheckIn
+        ? _showExtraCheckInGateSheet
+        : widget.onOpenCheckIn;
+    final checkInButtonLabel = shouldGateExtraCheckIn
+        ? 'Novo check-in'
+        : 'Fazer check-in';
     final showMirrorReward =
         latestCreatedCheckIn != null &&
         _isSameLocalDay(latestCreatedCheckIn.createdAt, currentTime);
@@ -611,7 +860,9 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           todayCheckIn: todayCheckIn,
           isLoading: dailyRitualState.isLoading && !dailyRitualState.hasValue,
           isGeneratingFromCheckIn: _isGeneratingDailyRitualFromCheckIn,
-          onCheckIn: widget.onOpenCheckIn,
+          checkInLabel: checkInButtonLabel,
+          onCheckIn: openCheckInFromHome,
+          gateExtraCheckIn: shouldGateExtraCheckIn,
           onGenerateFromCheckIn: todayCheckIn == null
               ? null
               : () => _createDailyRitualFromCheckIn(todayCheckIn.id),
@@ -626,7 +877,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onOpenFutureMessages: widget.onOpenFutureMessages,
           onOpenReflection: widget.onOpenFeed,
           onOpenInsight: latestInsight == null
-              ? widget.onOpenCheckIn
+              ? openCheckInFromHome
               : () => _openInsightSheet(latestReadingCheckIn!, latestInsight),
           onOpenEvolutionMirror: widget.onOpenEvolutionMirror,
           onOpenCareShare: widget.onOpenCareShare,
@@ -671,7 +922,9 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
               'Uma única ação agora vale mais do que abrir muitas frentes ao mesmo tempo.',
           meta: paceMeta,
           buttonLabel: paceButtonLabel,
-          onPrimaryAction: paceAction,
+          onPrimaryAction: paceAction == widget.onOpenCheckIn
+              ? openCheckInFromHome
+              : paceAction,
           onOpenCommunity: widget.onOpenCommunity,
         ),
         const SizedBox(height: 22),
@@ -732,7 +985,9 @@ class _DailyJourneyCard extends StatelessWidget {
     required this.todayCheckIn,
     required this.isLoading,
     required this.isGeneratingFromCheckIn,
+    required this.checkInLabel,
     required this.onCheckIn,
+    required this.gateExtraCheckIn,
     required this.onGenerateFromCheckIn,
     required this.onOpenDailyRitual,
     required this.onOpenNextStep,
@@ -746,7 +1001,9 @@ class _DailyJourneyCard extends StatelessWidget {
   final CheckIn? todayCheckIn;
   final bool isLoading;
   final bool isGeneratingFromCheckIn;
+  final String checkInLabel;
   final VoidCallback onCheckIn;
+  final bool gateExtraCheckIn;
   final VoidCallback? onGenerateFromCheckIn;
   final ValueChanged<String> onOpenDailyRitual;
   final VoidCallback onOpenNextStep;
@@ -762,7 +1019,9 @@ class _DailyJourneyCard extends StatelessWidget {
       morningRitual: morningRitual,
       eveningRitual: eveningRitual,
       todayCheckIn: todayCheckIn,
+      checkInLabel: checkInLabel,
       onCheckIn: onCheckIn,
+      gateExtraCheckIn: gateExtraCheckIn,
       onGenerateFromCheckIn: onGenerateFromCheckIn,
       onOpenDailyRitual: onOpenDailyRitual,
       onOpenNextStep: onOpenNextStep,
@@ -987,7 +1246,9 @@ class _DailyJourneyCardModel {
     required DailyRitual? morningRitual,
     required DailyRitual? eveningRitual,
     required CheckIn? todayCheckIn,
+    required String checkInLabel,
     required VoidCallback onCheckIn,
+    required bool gateExtraCheckIn,
     required VoidCallback? onGenerateFromCheckIn,
     required ValueChanged<String> onOpenDailyRitual,
     required VoidCallback onOpenNextStep,
@@ -1047,7 +1308,7 @@ class _DailyJourneyCardModel {
         primaryLabel: l10n.homeDailyViewRitual,
         primaryIcon: Icons.visibility_rounded,
         primaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
-        secondaryLabel: l10n.homeDailyDayPrimary,
+        secondaryLabel: checkInLabel,
         secondaryIcon: Icons.favorite_rounded,
         secondaryAction: onCheckIn,
       );
@@ -1061,9 +1322,13 @@ class _DailyJourneyCardModel {
         primaryLabel: 'Gerar com meu check-in',
         primaryIcon: Icons.auto_awesome_rounded,
         primaryAction: onGenerateFromCheckIn,
-        secondaryLabel: 'Criar manualmente',
-        secondaryIcon: Icons.edit_note_rounded,
-        secondaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
+        secondaryLabel: gateExtraCheckIn ? checkInLabel : 'Criar manualmente',
+        secondaryIcon: gateExtraCheckIn
+            ? Icons.favorite_rounded
+            : Icons.edit_note_rounded,
+        secondaryAction: gateExtraCheckIn
+            ? onCheckIn
+            : () => onOpenDailyRitual(DailyRitualType.morning),
       );
     }
 
@@ -1076,7 +1341,7 @@ class _DailyJourneyCardModel {
         primaryLabel: l10n.homeDailyMorningPrimary,
         primaryIcon: Icons.wb_sunny_rounded,
         primaryAction: () => onOpenDailyRitual(DailyRitualType.morning),
-        secondaryLabel: l10n.homeDailyDayPrimary,
+        secondaryLabel: checkInLabel,
         secondaryIcon: Icons.favorite_rounded,
         secondaryAction: onCheckIn,
       );
@@ -1085,7 +1350,7 @@ class _DailyJourneyCardModel {
     return _DailyJourneyCardModel(
       title: l10n.homeDailyDayTitle,
       message: l10n.homeDailyDayBody,
-      primaryLabel: l10n.homeDailyDayPrimary,
+      primaryLabel: checkInLabel,
       primaryIcon: Icons.favorite_rounded,
       primaryAction: onCheckIn,
       secondaryLabel: l10n.homeDailyDaySecondary,

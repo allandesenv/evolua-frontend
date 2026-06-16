@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -27,6 +32,9 @@ import 'package:evolua_frontend/features/future_message/domain/entities/future_m
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
+import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
+import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
+import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -95,6 +103,364 @@ void main() {
         expect(openedCheckIn, isFalse);
       },
     );
+
+    testWidgets('free user with today check-in sees unlock gate first', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      final rewarded = _FakeRewardedAdService();
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 91, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          rewardedAdService: rewarded,
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Novo check-in'), findsOneWidget);
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+
+      expect(openedCheckIn, isFalse);
+      expect(find.text('Liberar novo check-in'), findsOneWidget);
+      expect(
+        find.text(
+          'Você já fez seu check-in gratuito de hoje. Para registrar outro agora, você pode assistir a um anúncio, ver o Premium ou voltar amanhã.',
+        ),
+        findsOneWidget,
+      );
+      expect(rewarded.showCalls, 0);
+    });
+
+    testWidgets('rewarded extra check-in opens writing only when confirmed', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      final rewarded = _FakeRewardedAdService(
+        result: RewardedAdResult.rewarded,
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 92, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          rewardedAdService: rewarded,
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(rewarded.rewardType, 'EXTRA_CHECK_IN');
+      expect(rewarded.showCalls, 1);
+      expect(openedCheckIn, isTrue);
+      expect(find.text('Liberar novo check-in'), findsNothing);
+    });
+
+    testWidgets(
+      'extra check-in gate opens when pending confirmation has reward credit',
+      (tester) async {
+        var openedCheckIn = false;
+        final rewarded = _FakeRewardedAdService(
+          result: RewardedAdResult.rewardConfirmedButAccessDenied,
+        );
+        final subscriptions = _FakeSubscriptionRepository(
+          accessStatuses: [
+            _accessStatus(
+              rewardedCreditsGrantedToday: 1,
+              rewardedCreditsUsedToday: 0,
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            now: DateTime(2026, 5, 7, 13),
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                _testCheckIn(id: 192, createdAt: DateTime(2026, 5, 7, 9)),
+              ],
+            ),
+            subscriptionRepository: subscriptions,
+            rewardedAdService: rewarded,
+            onOpenCheckIn: () => openedCheckIn = true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Novo check-in'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Assistir anúncio'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+
+        expect(openedCheckIn, isTrue);
+        expect(rewarded.showCalls, 1);
+        expect(subscriptions.accessCalls, 1);
+        expect(find.text('Não foi possível liberar agora'), findsNothing);
+      },
+    );
+
+    testWidgets('extra check-in gate opens when timeout recheck finds credit', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      final rewarded = _FakeRewardedAdService(result: RewardedAdResult.timeout);
+      final subscriptions = _FakeSubscriptionRepository(
+        accessStatuses: [
+          _accessStatus(),
+          _accessStatus(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 193, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          subscriptionRepository: subscriptions,
+          rewardedAdService: rewarded,
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(openedCheckIn, isTrue);
+      expect(rewarded.showCalls, 1);
+      expect(subscriptions.accessCalls, 2);
+      expect(find.text('Não foi possível liberar agora'), findsNothing);
+    });
+
+    testWidgets('extra check-in gate blocks double rewarded taps', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      final adGate = Completer<RewardedAdResult>();
+      final rewarded = _FakeRewardedAdService(resultGate: adGate);
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 93, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          rewardedAdService: rewarded,
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Assistir anúncio'));
+      await tester.pump();
+      await tester.tap(find.text('Carregando anúncio'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(rewarded.showCalls, 1);
+
+      adGate.complete(RewardedAdResult.rewarded);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(openedCheckIn, isTrue);
+      expect(rewarded.showCalls, 1);
+    });
+
+    testWidgets(
+      'extra check-in gate keeps user out on failed or pending rewards',
+      (tester) async {
+        for (final result in [
+          RewardedAdResult.noFill,
+          RewardedAdResult.loadFailed,
+          RewardedAdResult.showFailed,
+          RewardedAdResult.timeout,
+          RewardedAdResult.dismissedWithoutReward,
+          RewardedAdResult.rewardConfirmedButAccessDenied,
+        ]) {
+          var openedCheckIn = false;
+          final rewarded = _FakeRewardedAdService(result: result);
+          final subscriptions = _FakeSubscriptionRepository(
+            rewardedCreditsGrantedToday: 0,
+            rewardedCreditsUsedToday: 0,
+          );
+
+          await tester.pumpWidget(
+            _testApp(
+              now: DateTime(2026, 5, 7, 13),
+              checkInRepository: _FakeCheckInRepository(
+                items: [
+                  _testCheckIn(id: 94, createdAt: DateTime(2026, 5, 7, 9)),
+                ],
+              ),
+              subscriptionRepository: subscriptions,
+              rewardedAdService: rewarded,
+              onOpenCheckIn: () => openedCheckIn = true,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.text('Novo check-in'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Assistir anúncio'));
+          await tester.pump();
+          if (result == RewardedAdResult.timeout ||
+              result == RewardedAdResult.rewardConfirmedButAccessDenied) {
+            await tester.pump(const Duration(seconds: 4));
+          } else {
+            await tester.pump(const Duration(milliseconds: 350));
+          }
+
+          expect(openedCheckIn, isFalse);
+          expect(rewarded.showCalls, 1);
+          expect(find.text('Liberar novo check-in'), findsNothing);
+          if (result == RewardedAdResult.rewardConfirmedButAccessDenied) {
+            expect(find.text('Confirmação em andamento'), findsOneWidget);
+            expect(find.text('Não foi possível liberar agora'), findsNothing);
+            expect(subscriptions.accessCalls, 3);
+          } else if (result == RewardedAdResult.timeout) {
+            expect(find.text('Confirmação em andamento'), findsOneWidget);
+            expect(find.text('Não foi possível liberar agora'), findsNothing);
+            expect(subscriptions.accessCalls, 3);
+          } else if (result == RewardedAdResult.dismissedWithoutReward) {
+            expect(find.text('Anúncio não concluído'), findsOneWidget);
+            expect(subscriptions.accessCalls, 0);
+          } else if (result == RewardedAdResult.noFill) {
+            expect(
+              find.text('Nenhum anúncio disponível agora'),
+              findsOneWidget,
+            );
+            expect(subscriptions.accessCalls, 0);
+          } else if (result == RewardedAdResult.loadFailed) {
+            expect(
+              find.text('Não conseguimos carregar o anúncio agora'),
+              findsOneWidget,
+            );
+            expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
+            expect(subscriptions.accessCalls, 0);
+          } else if (result == RewardedAdResult.showFailed) {
+            expect(
+              find.text('Não conseguimos abrir o anúncio agora'),
+              findsOneWidget,
+            );
+            expect(subscriptions.accessCalls, 0);
+          } else {
+            expect(find.text('Não foi possível liberar agora'), findsOneWidget);
+            expect(subscriptions.accessCalls, 0);
+          }
+          await tester.tap(find.text('Agora não'));
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
+    testWidgets('extra check-in gate premium and now close without errors', (
+      tester,
+    ) async {
+      var openedPremium = false;
+      var openedCheckIn = false;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 95, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          onOpenCheckIn: () => openedCheckIn = true,
+          onOpenPremium: () => openedPremium = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ver Premium'));
+      await tester.pumpAndSettle();
+
+      expect(openedPremium, isTrue);
+      expect(openedCheckIn, isFalse);
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agora não'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liberar novo check-in'), findsNothing);
+      expect(openedCheckIn, isFalse);
+    });
+
+    testWidgets('premium bypasses extra check-in gate', (tester) async {
+      var openedCheckIn = 0;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          authSession: _authSession(
+            userId: 'user-123',
+            email: 'premium@evolua.test',
+            roles: const ['ROLE_PREMIUM'],
+          ),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 96, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          subscriptionRepository: _FakeSubscriptionRepository(premium: true),
+          dailyRitualRepository: _FakeDailyRitualRepository(
+            morning: _testRitual(DailyRitualType.morning),
+          ),
+          onOpenCheckIn: () => openedCheckIn++,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fazer check-in'), findsOneWidget);
+      await tester.tap(find.text('Fazer check-in'));
+      expect(openedCheckIn, 1);
+      expect(find.text('Liberar novo check-in'), findsNothing);
+    });
+
+    testWidgets('loading subscription does not apply extra check-in gate', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          subscriptionRepository: _PendingSubscriptionRepository(),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 97, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          dailyRitualRepository: _FakeDailyRitualRepository(
+            morning: _testRitual(DailyRitualType.morning),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('Novo check-in'), findsNothing);
+      expect(find.text('Liberar novo check-in'), findsNothing);
+    });
 
     testWidgets('shows persisted intelligent reading from history', (
       tester,
@@ -713,12 +1079,13 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Gerar com meu check-in'), findsOneWidget);
-      expect(find.text('Criar manualmente'), findsOneWidget);
+      expect(find.text('Novo check-in'), findsOneWidget);
 
-      await tester.tap(find.text('Criar manualmente'));
+      await tester.tap(find.text('Novo check-in'));
       await tester.pumpAndSettle();
 
-      expect(openedType, DailyRitualType.morning);
+      expect(openedType, isNull);
+      expect(find.text('Liberar novo check-in'), findsOneWidget);
     });
 
     testWidgets('generates morning ritual from latest today check-in', (
@@ -1261,6 +1628,9 @@ Widget _testApp({
   ),
   TrailRepository? trailRepository,
   DailyRitualRepository? dailyRitualRepository,
+  SubscriptionRepository? subscriptionRepository,
+  RewardedAdService? rewardedAdService,
+  AuthSession? authSession,
   ThemeData? theme,
   DateTime? now,
   VoidCallback? onOpenTrails,
@@ -1272,9 +1642,16 @@ Widget _testApp({
   VoidCallback? onOpenCareShare,
   ValueChanged<String>? onOpenDailyRitual,
   VoidCallback? onOpenCheckIn,
+  VoidCallback? onOpenPremium,
 }) {
   return ProviderScope(
     overrides: [
+      authSessionStorageProvider.overrideWithValue(
+        _MemoryAuthSessionStorage(
+          authSession ??
+              _authSession(userId: 'user-123', email: 'user@evolua.test'),
+        ),
+      ),
       checkInRepositoryProvider.overrideWithValue(
         checkInRepository ?? _FakeCheckInRepository(),
       ),
@@ -1288,6 +1665,14 @@ Widget _testApp({
       dailyRitualRepositoryProvider.overrideWithValue(
         dailyRitualRepository ?? _FakeDailyRitualRepository(),
       ),
+      subscriptionRepositoryProvider.overrideWithValue(
+        subscriptionRepository ?? _FakeSubscriptionRepository(),
+      ),
+      interstitialAdServiceProvider.overrideWithValue(
+        _FakeInterstitialAdService(),
+      ),
+      if (rewardedAdService != null)
+        rewardedAdServiceProvider.overrideWithValue(rewardedAdService),
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.dark(),
@@ -1313,6 +1698,7 @@ Widget _testApp({
             onOpenCareShare: onOpenCareShare ?? () {},
             onOpenDailyRitual: onOpenDailyRitual ?? (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},
+            onOpenPremium: onOpenPremium,
           ),
         ),
       ),
@@ -1785,6 +2171,179 @@ class _StaticCheckInController extends CheckInController {
   Future<CheckInHistoryState> build() async => value;
 }
 
+class _FakeRewardedAdService implements RewardedAdService {
+  _FakeRewardedAdService({
+    this.result = RewardedAdResult.rewarded,
+    this.resultGate,
+  });
+
+  final RewardedAdResult result;
+  final Completer<RewardedAdResult>? resultGate;
+  int showCalls = 0;
+  String? rewardType;
+
+  @override
+  Future<RewardedAdResult> showRewardedAd({
+    required String rewardType,
+    String? contextId,
+    void Function()? onAdClosed,
+  }) async {
+    showCalls++;
+    this.rewardType = rewardType;
+    return resultGate == null ? result : resultGate!.future;
+  }
+}
+
+class _FakeInterstitialAdService implements InterstitialAdService {
+  int rewardedShownRecords = 0;
+
+  @override
+  Future<void> preload() async {}
+
+  @override
+  Future<bool> maybeShow({
+    required InterstitialTrigger trigger,
+    required AuthSession? session,
+  }) async {
+    return false;
+  }
+
+  @override
+  Future<void> recordRewardedAdShown({AuthSession? session}) async {
+    rewardedShownRecords++;
+  }
+
+  @override
+  void dispose() {}
+}
+
+class _FakeSubscriptionRepository implements SubscriptionRepository {
+  _FakeSubscriptionRepository({
+    this.premium = false,
+    this.rewardedCreditsGrantedToday = 1,
+    this.rewardedCreditsUsedToday = 0,
+    List<MonetizationAccessStatus>? accessStatuses,
+  }) : _accessStatuses = List<MonetizationAccessStatus>.of(
+         accessStatuses ?? const [],
+       );
+
+  final bool premium;
+  final int rewardedCreditsGrantedToday;
+  final int rewardedCreditsUsedToday;
+  final List<MonetizationAccessStatus> _accessStatuses;
+  int accessCalls = 0;
+
+  @override
+  Future<List<PlanView>> listPlans() async => const [];
+
+  @override
+  Future<CurrentSubscription?> current() async => CurrentSubscription(
+    planCode: premium ? 'premium-monthly' : 'essential-free',
+    status: 'ACTIVE',
+    billingCycle: 'MONTHLY',
+    premium: premium,
+    adsEnabled: !premium,
+    aiQuotaRemainingToday: premium ? 999 : 0,
+    mentorPremiumPassActive: false,
+    mentorRewardedAdAvailable: false,
+  );
+
+  @override
+  Future<CurrentSubscription?> cancel() async => current();
+
+  @override
+  Future<CheckoutSession> checkoutStatus(String checkoutId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> createRewardSession({
+    required String rewardType,
+    String? contextId,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantClientOpenedReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AdRewardSession> grantTestReward(String sessionId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<MonetizationAccessStatus> monetizationAccess({
+    required String resource,
+    String? contextId,
+  }) async {
+    accessCalls++;
+    if (_accessStatuses.isNotEmpty) {
+      return _accessStatuses.removeAt(0);
+    }
+    return _accessStatus(
+      resource: resource,
+      contextId: contextId,
+      allowed: premium,
+      premium: premium,
+      rewardedAdAvailable: !premium,
+      upgradeRecommended: !premium,
+      rewardedCreditsGrantedToday: rewardedCreditsGrantedToday,
+      rewardedCreditsUsedToday: rewardedCreditsUsedToday,
+    );
+  }
+
+  @override
+  Future<CheckoutSession> startCheckout({
+    required String planCode,
+    required String frontendBaseUrl,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<CheckoutSession> verifyGooglePlayPurchase({
+    required String productId,
+    required String purchaseToken,
+    required String packageName,
+    required String planCode,
+  }) {
+    throw UnimplementedError();
+  }
+}
+
+class _PendingSubscriptionRepository extends _FakeSubscriptionRepository {
+  @override
+  Future<CurrentSubscription?> current() =>
+      Completer<CurrentSubscription?>().future;
+}
+
+MonetizationAccessStatus _accessStatus({
+  String resource = RewardResources.extraCheckIn,
+  String? contextId,
+  bool allowed = false,
+  bool premium = false,
+  bool rewardedAdAvailable = true,
+  bool upgradeRecommended = true,
+  DateTime? entitlementExpiresAt,
+  int rewardedCreditsGrantedToday = 0,
+  int rewardedCreditsUsedToday = 0,
+}) {
+  return MonetizationAccessStatus(
+    resource: resource,
+    contextId: contextId,
+    allowed: allowed,
+    premium: premium,
+    rewardedAdAvailable: rewardedAdAvailable,
+    upgradeRecommended: upgradeRecommended,
+    entitlementExpiresAt: entitlementExpiresAt,
+    rewardedCreditsGrantedToday: rewardedCreditsGrantedToday,
+    rewardedCreditsUsedToday: rewardedCreditsUsedToday,
+  );
+}
+
 class _MemoryAuthSessionStorage implements AuthSessionStorage {
   _MemoryAuthSessionStorage(AuthSession session)
     : _value = jsonEncode(session.toJson());
@@ -1841,18 +2400,26 @@ List<CheckIn> _checkIns() {
   ];
 }
 
-AuthSession _authSession({required String userId, required String email}) {
+AuthSession _authSession({
+  required String userId,
+  required String email,
+  List<String> roles = const ['ROLE_USER'],
+}) {
   return AuthSession(
     userId: userId,
     email: email,
-    roles: const ['ROLE_USER'],
-    accessToken: _jwt(userId: userId, email: email),
+    roles: roles,
+    accessToken: _jwt(userId: userId, email: email, roles: roles),
     refreshToken: 'refresh-$userId',
     expiresAt: DateTime.now().add(const Duration(hours: 1)),
   );
 }
 
-String _jwt({required String userId, required String email}) {
+String _jwt({
+  required String userId,
+  required String email,
+  List<String> roles = const ['ROLE_USER'],
+}) {
   String encode(Map<String, Object> value) {
     return base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
   }
@@ -1861,7 +2428,7 @@ String _jwt({required String userId, required String email}) {
   final payload = encode({
     'sub': userId,
     'email': email,
-    'roles': const ['ROLE_USER'],
+    'roles': roles,
     'exp':
         DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch ~/
         1000,
