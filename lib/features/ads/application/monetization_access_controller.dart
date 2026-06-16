@@ -5,6 +5,7 @@ import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_bas
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final monetizationAccessControllerProvider =
@@ -94,6 +95,10 @@ class MonetizationAccessController extends AsyncNotifier<void> {
           ? RewardedAdResult.rewarded
           : RewardedAdResult.rewardConfirmedButAccessDenied;
     } catch (error, stackTrace) {
+      debugPrint(
+        'Evolua rewarded unlockWithRewardedAdResult failed: '
+        'resource=$resource result=${result?.name} error=$error',
+      );
       state = AsyncError(error, stackTrace);
       if (result?.isRewarded == true) {
         return RewardedAdResult.rewardConfirmedButAccessDenied;
