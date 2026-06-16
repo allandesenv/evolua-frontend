@@ -5,6 +5,7 @@ import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_bas
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -95,15 +96,35 @@ class MonetizationAccessController extends AsyncNotifier<void> {
           ? RewardedAdResult.rewarded
           : RewardedAdResult.rewardConfirmedButAccessDenied;
     } catch (error, stackTrace) {
-      debugPrint(
-        'Evolua rewarded unlockWithRewardedAdResult failed: '
-        'resource=$resource result=${result?.name} error=$error',
-      );
+      if (error is DioException) {
+        debugPrint(
+          'Evolua rewarded unlockWithRewardedAdResult failed: '
+          'resource=$resource result=${result?.name} '
+          'statusCode=${error.response?.statusCode} '
+          'path=${error.requestOptions.path} '
+          'responseData=${_safeDioResponseData(error.response?.data)} '
+          'error=$error',
+        );
+      } else {
+        debugPrint(
+          'Evolua rewarded unlockWithRewardedAdResult failed: '
+          'resource=$resource result=${result?.name} error=$error',
+        );
+      }
       state = AsyncError(error, stackTrace);
       if (result?.isRewarded == true) {
         return RewardedAdResult.rewardConfirmedButAccessDenied;
       }
       return RewardedAdResult.loadFailed;
     }
+  }
+
+  String _safeDioResponseData(Object? data) {
+    final raw = data?.toString() ?? '<empty>';
+    final singleLine = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (singleLine.length <= 800) {
+      return singleLine;
+    }
+    return '${singleLine.substring(0, 800)}...';
   }
 }

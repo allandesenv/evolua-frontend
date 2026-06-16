@@ -144,6 +144,15 @@ void main() {
       final rewarded = _FakeRewardedAdService(
         result: RewardedAdResult.rewarded,
       );
+      final subscriptions = _FakeSubscriptionRepository(
+        accessStatuses: [
+          _accessStatus(),
+          _accessStatus(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
+          ),
+        ],
+      );
 
       await tester.pumpWidget(
         _testApp(
@@ -151,6 +160,7 @@ void main() {
           checkInRepository: _FakeCheckInRepository(
             items: [_testCheckIn(id: 92, createdAt: DateTime(2026, 5, 7, 9))],
           ),
+          subscriptionRepository: subscriptions,
           rewardedAdService: rewarded,
           onOpenCheckIn: () => openedCheckIn = true,
         ),
@@ -165,9 +175,51 @@ void main() {
 
       expect(rewarded.rewardType, 'EXTRA_CHECK_IN');
       expect(rewarded.showCalls, 1);
+      expect(subscriptions.accessCalls, 2);
       expect(openedCheckIn, isTrue);
       expect(find.text('Liberar novo check-in'), findsNothing);
     });
+
+    testWidgets(
+      'extra check-in gate opens without rewarded when credit is already pending',
+      (tester) async {
+        var openedCheckIn = false;
+        final rewarded = _FakeRewardedAdService();
+        final subscriptions = _FakeSubscriptionRepository(
+          accessStatuses: [
+            _accessStatus(
+              rewardedCreditsGrantedToday: 1,
+              rewardedCreditsUsedToday: 0,
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            now: DateTime(2026, 5, 7, 13),
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                _testCheckIn(id: 191, createdAt: DateTime(2026, 5, 7, 9)),
+              ],
+            ),
+            subscriptionRepository: subscriptions,
+            rewardedAdService: rewarded,
+            onOpenCheckIn: () => openedCheckIn = true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Novo check-in'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Assistir anúncio'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+
+        expect(openedCheckIn, isTrue);
+        expect(rewarded.showCalls, 0);
+        expect(subscriptions.accessCalls, 1);
+      },
+    );
 
     testWidgets(
       'extra check-in gate opens when pending confirmation has reward credit',
@@ -178,6 +230,7 @@ void main() {
         );
         final subscriptions = _FakeSubscriptionRepository(
           accessStatuses: [
+            _accessStatus(),
             _accessStatus(
               rewardedCreditsGrantedToday: 1,
               rewardedCreditsUsedToday: 0,
@@ -208,7 +261,7 @@ void main() {
 
         expect(openedCheckIn, isTrue);
         expect(rewarded.showCalls, 1);
-        expect(subscriptions.accessCalls, 1);
+        expect(subscriptions.accessCalls, 2);
         expect(find.text('Não foi possível liberar agora'), findsNothing);
       },
     );
@@ -253,12 +306,67 @@ void main() {
       expect(find.text('Não foi possível liberar agora'), findsNothing);
     });
 
+    testWidgets(
+      'extra check-in gate opens when rewarded setup fails but credit is pending',
+      (tester) async {
+        var openedCheckIn = false;
+        final rewarded = _FakeRewardedAdService(error: Exception('HTTP 400'));
+        final subscriptions = _FakeSubscriptionRepository(
+          accessStatuses: [
+            _accessStatus(),
+            _accessStatus(
+              rewardedCreditsGrantedToday: 1,
+              rewardedCreditsUsedToday: 0,
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            now: DateTime(2026, 5, 7, 13),
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                _testCheckIn(id: 194, createdAt: DateTime(2026, 5, 7, 9)),
+              ],
+            ),
+            subscriptionRepository: subscriptions,
+            rewardedAdService: rewarded,
+            onOpenCheckIn: () => openedCheckIn = true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Novo check-in'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Assistir anúncio'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+
+        expect(openedCheckIn, isTrue);
+        expect(rewarded.showCalls, 1);
+        expect(subscriptions.accessCalls, 2);
+        expect(
+          find.text('NÃ£o conseguimos carregar o anÃºncio agora'),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('extra check-in gate blocks double rewarded taps', (
       tester,
     ) async {
       var openedCheckIn = false;
       final adGate = Completer<RewardedAdResult>();
       final rewarded = _FakeRewardedAdService(resultGate: adGate);
+      final subscriptions = _FakeSubscriptionRepository(
+        accessStatuses: [
+          _accessStatus(),
+          _accessStatus(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
+          ),
+        ],
+      );
 
       await tester.pumpWidget(
         _testApp(
@@ -266,6 +374,7 @@ void main() {
           checkInRepository: _FakeCheckInRepository(
             items: [_testCheckIn(id: 93, createdAt: DateTime(2026, 5, 7, 9))],
           ),
+          subscriptionRepository: subscriptions,
           rewardedAdService: rewarded,
           onOpenCheckIn: () => openedCheckIn = true,
         ),
@@ -287,6 +396,7 @@ void main() {
 
       expect(openedCheckIn, isTrue);
       expect(rewarded.showCalls, 1);
+      expect(subscriptions.accessCalls, 2);
     });
 
     testWidgets(
@@ -339,36 +449,36 @@ void main() {
           if (result == RewardedAdResult.rewardConfirmedButAccessDenied) {
             expect(find.text('Confirmação em andamento'), findsOneWidget);
             expect(find.text('Não foi possível liberar agora'), findsNothing);
-            expect(subscriptions.accessCalls, 3);
+            expect(subscriptions.accessCalls, 4);
           } else if (result == RewardedAdResult.timeout) {
             expect(find.text('Confirmação em andamento'), findsOneWidget);
             expect(find.text('Não foi possível liberar agora'), findsNothing);
-            expect(subscriptions.accessCalls, 3);
+            expect(subscriptions.accessCalls, 4);
           } else if (result == RewardedAdResult.dismissedWithoutReward) {
             expect(find.text('Anúncio não concluído'), findsOneWidget);
-            expect(subscriptions.accessCalls, 0);
+            expect(subscriptions.accessCalls, 1);
           } else if (result == RewardedAdResult.noFill) {
             expect(
               find.text('Nenhum anúncio disponível agora'),
               findsOneWidget,
             );
-            expect(subscriptions.accessCalls, 0);
+            expect(subscriptions.accessCalls, 1);
           } else if (result == RewardedAdResult.loadFailed) {
             expect(
               find.text('Não conseguimos carregar o anúncio agora'),
               findsOneWidget,
             );
             expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
-            expect(subscriptions.accessCalls, 0);
+            expect(subscriptions.accessCalls, 2);
           } else if (result == RewardedAdResult.showFailed) {
             expect(
               find.text('Não conseguimos abrir o anúncio agora'),
               findsOneWidget,
             );
-            expect(subscriptions.accessCalls, 0);
+            expect(subscriptions.accessCalls, 1);
           } else {
             expect(find.text('Não foi possível liberar agora'), findsOneWidget);
-            expect(subscriptions.accessCalls, 0);
+            expect(subscriptions.accessCalls, 1);
           }
           await tester.tap(find.text('Agora não'));
           await tester.pumpAndSettle();
@@ -2175,10 +2285,12 @@ class _FakeRewardedAdService implements RewardedAdService {
   _FakeRewardedAdService({
     this.result = RewardedAdResult.rewarded,
     this.resultGate,
+    this.error,
   });
 
   final RewardedAdResult result;
   final Completer<RewardedAdResult>? resultGate;
+  final Object? error;
   int showCalls = 0;
   String? rewardType;
 
@@ -2190,6 +2302,10 @@ class _FakeRewardedAdService implements RewardedAdService {
   }) async {
     showCalls++;
     this.rewardType = rewardType;
+    final failure = error;
+    if (failure != null) {
+      throw failure;
+    }
     return resultGate == null ? result : resultGate!.future;
   }
 }
@@ -2220,7 +2336,7 @@ class _FakeInterstitialAdService implements InterstitialAdService {
 class _FakeSubscriptionRepository implements SubscriptionRepository {
   _FakeSubscriptionRepository({
     this.premium = false,
-    this.rewardedCreditsGrantedToday = 1,
+    this.rewardedCreditsGrantedToday = 0,
     this.rewardedCreditsUsedToday = 0,
     List<MonetizationAccessStatus>? accessStatuses,
   }) : _accessStatuses = List<MonetizationAccessStatus>.of(
