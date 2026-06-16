@@ -140,6 +140,12 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           onRegenerate: (style) =>
               _regenerateReading(context, checkIn.id, style),
           onSaveReading: () => _saveReading(context, checkIn.id),
+          createRitualLabel: _isEveningPeriod
+              ? 'Fazer fechamento do dia'
+              : 'Criar ritual do dia',
+          createRitualLoadingLabel: _isEveningPeriod
+              ? 'Abrindo fechamento...'
+              : 'Criando ritual...',
           onCreateRitual: () => _createRitualFromReading(context, checkIn.id),
           onOpenHistory: () {
             Navigator.of(context).maybePop();
@@ -244,16 +250,19 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       return;
     }
 
+    final now = widget.now ?? DateTime.now();
+    final localDate = DateTime(now.year, now.month, now.day);
+    final type = _ritualTypeFor(now);
+    if (type == DailyRitualType.evening) {
+      if (sheetContext.mounted) {
+        Navigator.of(sheetContext).maybePop();
+      }
+      widget.onOpenDailyRitual(DailyRitualType.evening);
+      return;
+    }
+
     setState(() => _readingActionLoading = ReadingActionLoading.ritual);
     try {
-      final now = widget.now ?? DateTime.now();
-      final localDate = DateTime(now.year, now.month, now.day);
-      final type = now.hour >= 18
-          ? DailyRitualType.evening
-          : DailyRitualType.morning;
-      final periodLabel = type == DailyRitualType.evening
-          ? 'Fechamento do Dia'
-          : 'Ritual do Dia';
       final existing = await ref
           .read(dailyRitualRepositoryProvider)
           .today(type: type, localDate: localDate);
@@ -289,7 +298,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: '$periodLabel criado e concluido a partir da sua leitura.',
+        message: 'Ritual do Dia criado e concluido a partir da sua leitura.',
         icon: Icons.self_improvement_rounded,
       );
     } catch (error) {
@@ -335,16 +344,16 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       return;
     }
 
+    final now = widget.now ?? DateTime.now();
+    final localDate = DateTime(now.year, now.month, now.day);
+    final type = _ritualTypeFor(now);
+    if (type == DailyRitualType.evening) {
+      widget.onOpenDailyRitual(DailyRitualType.evening);
+      return;
+    }
+
     setState(() => _isGeneratingDailyRitualFromCheckIn = true);
     try {
-      final now = widget.now ?? DateTime.now();
-      final localDate = DateTime(now.year, now.month, now.day);
-      final type = now.hour >= 18
-          ? DailyRitualType.evening
-          : DailyRitualType.morning;
-      final periodLabel = type == DailyRitualType.evening
-          ? 'Fechamento do Dia'
-          : 'Ritual do Dia';
       final existing = await ref
           .read(dailyRitualRepositoryProvider)
           .today(type: type, localDate: localDate);
@@ -376,7 +385,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       }
       AppSnackBar.show(
         context,
-        message: '$periodLabel criado a partir do seu check-in.',
+        message: 'Ritual do Dia criado a partir do seu check-in.',
         icon: Icons.self_improvement_rounded,
       );
     } catch (error) {
@@ -465,6 +474,17 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         setState(() => _isRewardLoading = false);
       }
     }
+  }
+
+  bool get _isEveningPeriod {
+    return _ritualTypeFor(widget.now ?? DateTime.now()) ==
+        DailyRitualType.evening;
+  }
+
+  String _ritualTypeFor(DateTime dateTime) {
+    return dateTime.hour >= 18
+        ? DailyRitualType.evening
+        : DailyRitualType.morning;
   }
 
   void _openRhythmDetails(_RhythmSummary summary, List<CheckIn> recentItems) {
@@ -999,12 +1019,12 @@ class _DailyJourneyCardModel {
           title: 'Criar fechamento do dia',
           message:
               'Você já fez seu check-in de hoje. Agora pode transformar esse momento em um cuidado simples para fechar o dia.',
-          primaryLabel: 'Gerar com meu check-in',
-          primaryIcon: Icons.auto_awesome_rounded,
-          primaryAction: onGenerateFromCheckIn,
-          secondaryLabel: 'Criar manualmente',
+          primaryLabel: l10n.homeDailyEveningPrimary,
+          primaryIcon: Icons.nightlight_round,
+          primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
+          secondaryLabel: l10n.homeDailyEveningSecondary,
           secondaryIcon: Icons.edit_note_rounded,
-          secondaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
+          secondaryAction: onOpenReflection,
         );
       }
       return _DailyJourneyCardModel(

@@ -631,13 +631,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       RewardedAdResult.noFill ||
       RewardedAdResult.loadFailed ||
       RewardedAdResult.showFailed ||
-      RewardedAdResult.timeout ||
       RewardedAdResult.unsupported =>
         'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, volte amanhã para seu check-in gratuito ou continue sem anúncios com o Premium.',
+      RewardedAdResult.timeout =>
+        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente salvar novamente em alguns segundos.',
       RewardedAdResult.dismissedWithoutReward =>
         'Para liberar mais um check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
       RewardedAdResult.rewardConfirmedButAccessDenied =>
-        'Recebemos a recompensa, mas não conseguimos salvar seu check-in agora. Tente novamente em instantes.',
+        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente salvar novamente em alguns segundos.',
       RewardedAdResult.rewarded => 'Anúncio confirmado.',
     };
   }
@@ -647,11 +648,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       RewardedAdResult.noFill ||
       RewardedAdResult.loadFailed ||
       RewardedAdResult.showFailed ||
-      RewardedAdResult.timeout ||
       RewardedAdResult.unsupported => 'Nenhum anúncio disponível agora',
+      RewardedAdResult.timeout => 'Confirmação em andamento',
       RewardedAdResult.dismissedWithoutReward => 'Anúncio não concluído',
       RewardedAdResult.rewardConfirmedButAccessDenied =>
-        'Não conseguimos salvar agora',
+        'Confirmação em andamento',
       RewardedAdResult.rewarded || null => 'Desbloquear novo check-in hoje',
     };
   }

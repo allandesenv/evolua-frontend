@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_mobile.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,6 +77,28 @@ void main() {
         ),
         throwsUnsupportedError,
       );
+    });
+  });
+
+  group('MobileRewardedAdService rewarded outcome policy', () {
+    test('continues to SSV when reward was earned before timeout', () {
+      final result = rewardedResultBeforeSsv(
+        openedFullScreen: true,
+        earnedReward: true,
+        outcomeResult: RewardedAdResult.timeout,
+      );
+
+      expect(result, isNull);
+    });
+
+    test('keeps timeout only when no reward was earned', () {
+      final result = rewardedResultBeforeSsv(
+        openedFullScreen: true,
+        earnedReward: false,
+        outcomeResult: RewardedAdResult.timeout,
+      );
+
+      expect(result, RewardedAdResult.timeout);
     });
   });
 }

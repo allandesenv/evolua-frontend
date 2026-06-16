@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/ads/application/ad_mob_initialization_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_access_grant.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
@@ -19,7 +20,7 @@ class MobileRewardedAdService implements RewardedAdService {
 
   static const _ssvConfirmationAttempts = 8;
   static const _ssvConfirmationDelay = Duration(seconds: 2);
-  static const _ssvMaxWaitAfterAd = Duration(seconds: 8);
+  static const _ssvMaxWaitAfterAd = Duration(seconds: 30);
 
   static const _extraCheckInRewardTypes = {RewardResources.extraCheckIn};
   static const _aiRewardTypes = {
@@ -172,9 +173,9 @@ class MobileRewardedAdService implements RewardedAdService {
 
                 completeOutcome(
                   opened: openedFullScreen,
-                  earned: false,
+                  earned: earnedReward,
                   source: 'onAdFailedToShowFullScreenContent',
-                  result: RewardedAdResult.showFailed,
+                  result: earnedReward ? null : RewardedAdResult.showFailed,
                 );
               },
             );
@@ -182,6 +183,7 @@ class MobileRewardedAdService implements RewardedAdService {
             ad.show(
               onUserEarnedReward: (ad, reward) {
                 earnedReward = true;
+                openedFullScreen = true;
 
                 debugPrint(
                   'Evolua rewarded earned: '
@@ -225,14 +227,13 @@ class MobileRewardedAdService implements RewardedAdService {
         },
       );
 
-      if (!outcome.openedFullScreen) {
-        return outcome.result ?? RewardedAdResult.loadFailed;
-      }
-
-      if (!outcome.earnedReward) {
-        return outcome.result == RewardedAdResult.timeout
-            ? RewardedAdResult.timeout
-            : RewardedAdResult.dismissedWithoutReward;
+      final failureBeforeSsv = rewardedResultBeforeSsv(
+        openedFullScreen: outcome.openedFullScreen,
+        earnedReward: outcome.earnedReward,
+        outcomeResult: outcome.result,
+      );
+      if (failureBeforeSsv != null) {
+        return failureBeforeSsv;
       }
 
       if (AppConfig.adMobUseTestAds) {
@@ -252,9 +253,20 @@ class MobileRewardedAdService implements RewardedAdService {
       );
 
       if (confirmed) {
+        debugPrint(
+          'Evolua rewarded ssv confirmed: rewardType=$normalizedRewardType',
+        );
         return RewardedAdResult.rewarded;
       }
 
+      debugPrint(
+        'Evolua rewarded ssv not confirmed after wait: '
+        'rewardType=$normalizedRewardType',
+      );
+      debugPrint(
+        'Evolua rewarded rewardConfirmedButAccessDenied: '
+        'rewardType=$normalizedRewardType',
+      );
       return RewardedAdResult.rewardConfirmedButAccessDenied;
     } finally {
       WidgetsBinding.instance.removeObserver(lifecycleFallback);
@@ -344,7 +356,7 @@ class MobileRewardedAdService implements RewardedAdService {
           contextId: contextId,
         );
 
-        if (access.allowed || access.entitlementExpiresAt != null) {
+        if (rewardedAccessGranted(access)) {
           return true;
         }
       } catch (_) {
@@ -400,4 +412,21 @@ class _RewardedAdOutcome {
   final bool openedFullScreen;
   final bool earnedReward;
   final RewardedAdResult? result;
+}
+
+@visibleForTesting
+RewardedAdResult? rewardedResultBeforeSsv({
+  required bool openedFullScreen,
+  required bool earnedReward,
+  RewardedAdResult? outcomeResult,
+}) {
+  if (earnedReward) {
+    return null;
+  }
+  if (!openedFullScreen) {
+    return outcomeResult ?? RewardedAdResult.loadFailed;
+  }
+  return outcomeResult == RewardedAdResult.timeout
+      ? RewardedAdResult.timeout
+      : RewardedAdResult.dismissedWithoutReward;
 }

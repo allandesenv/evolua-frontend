@@ -159,6 +159,19 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('started journey CTA explains current step completion', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+
+      await tester.pumpWidget(_testApp());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fazer próxima etapa'), findsNothing);
+      expect(find.text('Concluir etapa atual'), findsOneWidget);
+      expect(find.textContaining('Leia a etapa atual'), findsNothing);
+    });
+
     testWidgets('empty step list is not treated as completed', (tester) async {
       await _setCompactSurface(tester);
 
@@ -529,12 +542,33 @@ void main() {
       await tester.pumpWidget(_testApp(trailRepository: trailRepository));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.textContaining('Fazer'));
-      await tester.tap(find.textContaining('Fazer'));
+      await tester.ensureVisible(find.text('Concluir etapa atual'));
+      await tester.tap(find.text('Concluir etapa atual'));
       await tester.pumpAndSettle();
 
       expect(trailRepository.completeStepCallCount, 1);
       expect(trailRepository.savedResponses, isEmpty);
+    });
+
+    testWidgets('step completion snackbar names released next step', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        completeStepJourneyBuilder: _journeyAfterFirstStep,
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Concluir etapa atual'));
+      await tester.tap(find.text('Concluir etapa atual'));
+      await tester.pump();
+
+      expect(
+        find.text('Etapa concluída. Próxima etapa liberada: Escolher.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('video step does not render editable response block', (
@@ -565,6 +599,22 @@ void main() {
 
       expect(find.text('Sua resposta'), findsNothing);
       expect(find.text('Salvar resposta'), findsNothing);
+      expect(find.text('Pausar'), findsNothing);
+      expect(find.text('Parar'), findsNothing);
+      expect(find.text('0.75x'), findsOneWidget);
+      expect(find.text('1x'), findsOneWidget);
+      expect(find.text('1.25x'), findsOneWidget);
+      expect(find.text('1.5x'), findsOneWidget);
+
+      final contentFinder = find.textContaining('orienta').first;
+      final listenButtonFinder = find.byIcon(Icons.volume_up_rounded);
+
+      expect(contentFinder, findsOneWidget);
+      expect(listenButtonFinder, findsOneWidget);
+      expect(
+        tester.getTopLeft(contentFinder).dy,
+        lessThan(tester.getTopLeft(listenButtonFinder).dy),
+      );
     });
 
     testWidgets('reading step does not render editable response block', (
@@ -1151,6 +1201,7 @@ class _FakeTrailRepository implements TrailRepository {
     List<Trail>? catalogTrails,
     Map<({int trailId, int stepIndex}), String>? initialResponses,
     TrailJourney Function(Trail trail)? journeyBuilder,
+    TrailJourney Function(Trail trail)? completeStepJourneyBuilder,
     bool failLoadingResponse = false,
     bool failSavingResponse = false,
     Completer<void>? saveGate,
@@ -1179,6 +1230,7 @@ class _FakeTrailRepository implements TrailRepository {
            ],
        savedResponses = Map.of(initialResponses ?? const {}),
        _journeyBuilder = journeyBuilder,
+       _completeStepJourneyBuilder = completeStepJourneyBuilder,
        _failLoadingResponse = failLoadingResponse,
        _failSavingResponse = failSavingResponse,
        _saveGate = saveGate,
@@ -1188,6 +1240,7 @@ class _FakeTrailRepository implements TrailRepository {
   final List<Trail> _catalogTrails;
   final Map<({int trailId, int stepIndex}), String> savedResponses;
   final TrailJourney Function(Trail trail)? _journeyBuilder;
+  final TrailJourney Function(Trail trail)? _completeStepJourneyBuilder;
   final bool _failLoadingResponse;
   final bool _failSavingResponse;
   final Completer<void>? _saveGate;
@@ -1279,6 +1332,14 @@ class _FakeTrailRepository implements TrailRepository {
   @override
   Future<TrailJourney> completeStep(int trailId, int stepIndex) async {
     completeStepCallCount++;
+    final completeStepJourneyBuilder = _completeStepJourneyBuilder;
+    if (completeStepJourneyBuilder != null) {
+      final activeTrail = _activeTrail;
+      final trail = activeTrail != null && trailId == activeTrail.id
+          ? activeTrail
+          : _catalogTrails.firstWhere((trail) => trail.id == trailId);
+      return completeStepJourneyBuilder(trail);
+    }
     return journey(trailId);
   }
 
@@ -1577,6 +1638,45 @@ TrailJourney _journey(Trail trail) {
     ),
     progressPercent: 0,
     nextStep: steps.first,
+  );
+}
+
+TrailJourney _journeyAfterFirstStep(Trail trail) {
+  final steps = [
+    const TrailJourneyStep(
+      index: 0,
+      title: 'Respirar',
+      summary: 'Dois minutos de presenca.',
+      content: 'Respire por quatro ciclos.',
+      type: 'EXERCISE',
+      status: 'completed',
+      estimatedMinutes: 2,
+      mediaLinks: [],
+    ),
+    const TrailJourneyStep(
+      index: 1,
+      title: 'Escolher',
+      summary: 'Uma proxima acao simples.',
+      content: 'Escolha uma acao pequena.',
+      type: 'REFLECTION',
+      status: 'current',
+      estimatedMinutes: 4,
+      mediaLinks: [],
+    ),
+  ];
+
+  return TrailJourney(
+    trail: trail,
+    steps: steps,
+    progress: TrailProgress(
+      currentStepIndex: 1,
+      completedStepIndexes: const [0],
+      startedAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 2),
+      completedAt: null,
+    ),
+    progressPercent: 50,
+    nextStep: steps.last,
   );
 }
 

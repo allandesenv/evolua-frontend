@@ -110,11 +110,17 @@ void main() {
 
     final context = tester.element(find.text('Fundo claro'));
     final colors = context.evoluaColors;
-    final containers = tester.widgetList<Container>(find.byType(Container));
-    final decorated = containers.firstWhere(
-      (container) => container.decoration is BoxDecoration,
+    final decoratedBoxes = tester.widgetList<DecoratedBox>(
+      find.byType(DecoratedBox),
     );
-    final decoration = decorated.decoration! as BoxDecoration;
+
+    final decoration = decoratedBoxes
+        .map((box) => box.decoration)
+        .whereType<BoxDecoration>()
+        .firstWhere(
+          (decoration) => decoration.gradient is LinearGradient,
+        );
+
     final gradient = decoration.gradient! as LinearGradient;
 
     expect(Theme.of(context).brightness, Brightness.light);

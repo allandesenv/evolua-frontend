@@ -18,6 +18,8 @@ class CheckInAiInsightCard extends ConsumerWidget {
     this.onRegenerate,
     this.onSaveReading,
     this.onCreateRitual,
+    this.createRitualLabel = 'Criar ritual do dia',
+    this.createRitualLoadingLabel = 'Criando ritual...',
     this.onOpenHistory,
     this.isReadingActionLoading = false,
     this.readingActionLoading,
@@ -32,6 +34,8 @@ class CheckInAiInsightCard extends ConsumerWidget {
   final ValueChanged<String>? onRegenerate;
   final VoidCallback? onSaveReading;
   final VoidCallback? onCreateRitual;
+  final String createRitualLabel;
+  final String createRitualLoadingLabel;
   final VoidCallback? onOpenHistory;
   final bool isReadingActionLoading;
   final ReadingActionLoading? readingActionLoading;
@@ -302,6 +306,8 @@ class CheckInAiInsightCard extends ConsumerWidget {
                     ),
               onSaveReading: onSaveReading,
               onCreateRitual: canCreateRitual ? onCreateRitual : null,
+              createRitualLabel: createRitualLabel,
+              createRitualLoadingLabel: createRitualLoadingLabel,
               onOpenHistory: onOpenHistory,
             ),
           ],
@@ -493,6 +499,8 @@ class _ReadingActionBar extends StatelessWidget {
     required this.onRegenerate,
     required this.onSaveReading,
     required this.onCreateRitual,
+    required this.createRitualLabel,
+    required this.createRitualLoadingLabel,
     required this.onOpenHistory,
   });
 
@@ -502,6 +510,8 @@ class _ReadingActionBar extends StatelessWidget {
   final ValueChanged<String>? onRegenerate;
   final VoidCallback? onSaveReading;
   final VoidCallback? onCreateRitual;
+  final String createRitualLabel;
+  final String createRitualLoadingLabel;
   final VoidCallback? onOpenHistory;
 
   @override
@@ -535,8 +545,8 @@ class _ReadingActionBar extends StatelessWidget {
                       : const Icon(Icons.self_improvement_rounded),
                   label: Text(
                     loadingAction == ReadingActionLoading.ritual
-                        ? 'Criando ritual...'
-                        : 'Criar ritual do dia',
+                        ? createRitualLoadingLabel
+                        : createRitualLabel,
                   ),
                 ),
               if (onOpenHistory != null)
