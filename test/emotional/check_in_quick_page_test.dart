@@ -5,6 +5,7 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_speech_transcription_service.dart';
@@ -114,6 +115,40 @@ void main() {
       expect(repository.createdReflection, 'quero registrar antes da leitura');
       expect(completed, isTrue);
       expect(find.textContaining('leitura aparecer'), findsOneWidget);
+    });
+
+    testWidgets('quota-limited saved check-in completes without reward prompt', (
+      tester,
+    ) async {
+      var completed = false;
+      final repository = _FakeCheckInRepository(createQuotaLimitedInsight: true);
+      final rewarded = _FakeRewardedAdService(result: RewardedAdResult.rewarded);
+
+      await tester.pumpWidget(
+        _testApp(
+          checkInRepository: repository,
+          rewardedAdService: rewarded,
+          onCompleted: () => completed = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'quero salvar sem outro anuncio',
+      );
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(repository.createCalls, 1);
+      expect(completed, isTrue);
+      expect(rewarded.showCalls, 0);
+      expect(find.byType(RewardedAdPrompt), findsNothing);
+      expect(
+        find.textContaining('leitura aprofundada pode ser liberada depois'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('network failure shows friendly server message', (
@@ -995,6 +1030,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     this.createGate,
     this.failCreateCallWithNetwork,
     this.createWithoutInsight = false,
+    this.createQuotaLimitedInsight = false,
   }) : items = items ?? _checkIns();
 
   final List<CheckIn> items;
@@ -1003,6 +1039,7 @@ class _FakeCheckInRepository implements CheckInRepository {
   final Completer<void>? createGate;
   final int? failCreateCallWithNetwork;
   final bool createWithoutInsight;
+  final bool createQuotaLimitedInsight;
   int createCalls = 0;
   String? createdMood;
   String? createdReflection;
@@ -1089,7 +1126,9 @@ class _FakeCheckInRepository implements CheckInRepository {
       reflection: reflection ?? '',
       energyLevel: energyLevel,
       recommendedPractice: 'Respire por dois minutos.',
-      aiInsight: createWithoutInsight ? null : _insight(),
+      aiInsight: createWithoutInsight
+          ? null
+          : _insight(quotaLimited: createQuotaLimitedInsight),
       createdAt: DateTime.now(),
     );
   }
@@ -1271,8 +1310,8 @@ List<CheckIn> _checkIns() {
   ];
 }
 
-CheckInAiInsight _insight() {
-  return const CheckInAiInsight(
+CheckInAiInsight _insight({bool quotaLimited = false}) {
+  return CheckInAiInsight(
     insight: 'Um momento de ansiedade leve.',
     suggestedAction: 'Respire por alguns ciclos.',
     riskLevel: 'low',
@@ -1283,5 +1322,6 @@ CheckInAiInsight _insight() {
     journeyPlan: null,
     generatedTrailDraft: null,
     fallbackUsed: false,
+    quotaLimited: quotaLimited,
   );
 }

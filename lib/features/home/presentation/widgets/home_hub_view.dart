@@ -528,15 +528,26 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
                   var result = RewardedAdResult.loadFailed;
                   var openCheckIn = false;
                   try {
-                    result = await ref
-                        .read(monetizationAccessControllerProvider.notifier)
-                        .unlockWithRewardedAdResult(
-                          resource: RewardResources.extraCheckIn,
-                        );
-                    openCheckIn = await _shouldOpenExtraCheckInAfterReward(
-                      result,
+                    openCheckIn = await _hasExtraCheckInAccess(
                       attemptId: attemptId,
+                      source: 'pre_reward_access_check',
                     );
+                    if (!openCheckIn) {
+                      result = await ref
+                          .read(monetizationAccessControllerProvider.notifier)
+                          .unlockWithRewardedAdResult(
+                            resource: RewardResources.extraCheckIn,
+                          );
+                      openCheckIn = await _shouldOpenExtraCheckInAfterReward(
+                        result,
+                        attemptId: attemptId,
+                      );
+                    } else {
+                      _logExtraCheckInGateFinalDecision(
+                        attemptId: attemptId,
+                        openCheckIn: true,
+                      );
+                    }
                   } catch (error) {
                     debugPrint(
                       'Evolua gate extra check-in attemptId=$attemptId '
@@ -594,6 +605,18 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         openCheckIn: true,
       );
       return true;
+    }
+
+    if (result == RewardedAdResult.loadFailed) {
+      final hasAccess = await _hasExtraCheckInAccess(
+        attemptId: attemptId,
+        source: 'load_failed_access_recheck',
+      );
+      _logExtraCheckInGateFinalDecision(
+        attemptId: attemptId,
+        openCheckIn: hasAccess,
+      );
+      return hasAccess;
     }
 
     final shouldRecheck =
@@ -659,6 +682,36 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
 
     _logExtraCheckInGateFinalDecision(attemptId: attemptId, openCheckIn: false);
     return false;
+  }
+
+  Future<bool> _hasExtraCheckInAccess({
+    required int attemptId,
+    required String source,
+  }) async {
+    try {
+      final access = await ref
+          .read(monetizationAccessControllerProvider.notifier)
+          .access(resource: RewardResources.extraCheckIn);
+      final hasPendingRewardCredit =
+          access.rewardedCreditsGrantedToday > access.rewardedCreditsUsedToday;
+      debugPrint(
+        'Evolua gate extra check-in attemptId=$attemptId '
+        '$source '
+        'access.allowed=${access.allowed} '
+        'rewardedCreditsGrantedToday=${access.rewardedCreditsGrantedToday} '
+        'rewardedCreditsUsedToday=${access.rewardedCreditsUsedToday} '
+        'hasPendingRewardCredit=$hasPendingRewardCredit',
+      );
+      return access.allowed ||
+          access.entitlementExpiresAt != null ||
+          hasPendingRewardCredit;
+    } catch (error) {
+      debugPrint(
+        'Evolua gate extra check-in attemptId=$attemptId '
+        '$source failed error=$error',
+      );
+      return false;
+    }
   }
 
   void _logExtraCheckInGateFinalDecision({
