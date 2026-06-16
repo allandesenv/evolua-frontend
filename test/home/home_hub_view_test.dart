@@ -147,6 +147,7 @@ void main() {
       final subscriptions = _FakeSubscriptionRepository(
         accessStatuses: [
           _accessStatus(),
+          _accessStatus(),
           _accessStatus(
             rewardedCreditsGrantedToday: 1,
             rewardedCreditsUsedToday: 0,
@@ -175,7 +176,7 @@ void main() {
 
       expect(rewarded.rewardType, 'EXTRA_CHECK_IN');
       expect(rewarded.showCalls, 1);
-      expect(subscriptions.accessCalls, 2);
+      expect(subscriptions.accessCalls, 3);
       expect(openedCheckIn, isTrue);
       expect(find.text('Liberar novo check-in'), findsNothing);
     });
@@ -211,15 +212,58 @@ void main() {
 
         await tester.tap(find.text('Novo check-in'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Assistir anúncio'));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 350));
 
         expect(openedCheckIn, isTrue);
         expect(rewarded.showCalls, 0);
         expect(subscriptions.accessCalls, 1);
       },
     );
+
+    testWidgets('extra check-in gate shows daily reward exhausted state', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+      var openedPremium = false;
+      final rewarded = _FakeRewardedAdService();
+      final subscriptions = _FakeSubscriptionRepository(
+        rewardedCreditsGrantedToday: 1,
+        rewardedCreditsUsedToday: 1,
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 13),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 196, createdAt: DateTime(2026, 5, 7, 9))],
+          ),
+          subscriptionRepository: subscriptions,
+          rewardedAdService: rewarded,
+          onOpenCheckIn: () => openedCheckIn = true,
+          onOpenPremium: () => openedPremium = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+
+      expect(openedCheckIn, isFalse);
+      expect(rewarded.showCalls, 0);
+      expect(subscriptions.accessCalls, 1);
+      expect(find.text('Check-in extra já usado hoje'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
+
+      await tester.tap(find.text('Agora não'));
+      await tester.pumpAndSettle();
+      expect(find.text('Check-in extra já usado hoje'), findsNothing);
+      expect(openedPremium, isFalse);
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ver Premium'));
+      await tester.pumpAndSettle();
+      expect(openedPremium, isTrue);
+    });
 
     testWidgets(
       'extra check-in gate opens when pending confirmation has reward credit',
@@ -230,6 +274,7 @@ void main() {
         );
         final subscriptions = _FakeSubscriptionRepository(
           accessStatuses: [
+            _accessStatus(),
             _accessStatus(),
             _accessStatus(
               rewardedCreditsGrantedToday: 1,
@@ -261,7 +306,7 @@ void main() {
 
         expect(openedCheckIn, isTrue);
         expect(rewarded.showCalls, 1);
-        expect(subscriptions.accessCalls, 2);
+        expect(subscriptions.accessCalls, 3);
         expect(find.text('Não foi possível liberar agora'), findsNothing);
       },
     );
@@ -273,6 +318,7 @@ void main() {
       final rewarded = _FakeRewardedAdService(result: RewardedAdResult.timeout);
       final subscriptions = _FakeSubscriptionRepository(
         accessStatuses: [
+          _accessStatus(),
           _accessStatus(),
           _accessStatus(
             rewardedCreditsGrantedToday: 1,
@@ -302,7 +348,7 @@ void main() {
 
       expect(openedCheckIn, isTrue);
       expect(rewarded.showCalls, 1);
-      expect(subscriptions.accessCalls, 2);
+      expect(subscriptions.accessCalls, 3);
       expect(find.text('Não foi possível liberar agora'), findsNothing);
     });
 
@@ -313,6 +359,7 @@ void main() {
         final rewarded = _FakeRewardedAdService(error: Exception('HTTP 400'));
         final subscriptions = _FakeSubscriptionRepository(
           accessStatuses: [
+            _accessStatus(),
             _accessStatus(),
             _accessStatus(
               rewardedCreditsGrantedToday: 1,
@@ -344,7 +391,7 @@ void main() {
 
         expect(openedCheckIn, isTrue);
         expect(rewarded.showCalls, 1);
-        expect(subscriptions.accessCalls, 2);
+        expect(subscriptions.accessCalls, 3);
         expect(
           find.text('NÃ£o conseguimos carregar o anÃºncio agora'),
           findsNothing,
@@ -360,6 +407,7 @@ void main() {
       final rewarded = _FakeRewardedAdService(resultGate: adGate);
       final subscriptions = _FakeSubscriptionRepository(
         accessStatuses: [
+          _accessStatus(),
           _accessStatus(),
           _accessStatus(
             rewardedCreditsGrantedToday: 1,
@@ -396,7 +444,7 @@ void main() {
 
       expect(openedCheckIn, isTrue);
       expect(rewarded.showCalls, 1);
-      expect(subscriptions.accessCalls, 2);
+      expect(subscriptions.accessCalls, 3);
     });
 
     testWidgets(
@@ -449,36 +497,36 @@ void main() {
           if (result == RewardedAdResult.rewardConfirmedButAccessDenied) {
             expect(find.text('Confirmação em andamento'), findsOneWidget);
             expect(find.text('Não foi possível liberar agora'), findsNothing);
-            expect(subscriptions.accessCalls, 4);
+            expect(subscriptions.accessCalls, 5);
           } else if (result == RewardedAdResult.timeout) {
             expect(find.text('Confirmação em andamento'), findsOneWidget);
             expect(find.text('Não foi possível liberar agora'), findsNothing);
-            expect(subscriptions.accessCalls, 4);
+            expect(subscriptions.accessCalls, 5);
           } else if (result == RewardedAdResult.dismissedWithoutReward) {
             expect(find.text('Anúncio não concluído'), findsOneWidget);
-            expect(subscriptions.accessCalls, 1);
+            expect(subscriptions.accessCalls, 2);
           } else if (result == RewardedAdResult.noFill) {
             expect(
               find.text('Nenhum anúncio disponível agora'),
               findsOneWidget,
             );
-            expect(subscriptions.accessCalls, 1);
+            expect(subscriptions.accessCalls, 2);
           } else if (result == RewardedAdResult.loadFailed) {
             expect(
               find.text('Não conseguimos carregar o anúncio agora'),
               findsOneWidget,
             );
             expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
-            expect(subscriptions.accessCalls, 2);
+            expect(subscriptions.accessCalls, 4);
           } else if (result == RewardedAdResult.showFailed) {
             expect(
               find.text('Não conseguimos abrir o anúncio agora'),
               findsOneWidget,
             );
-            expect(subscriptions.accessCalls, 1);
+            expect(subscriptions.accessCalls, 2);
           } else {
             expect(find.text('Não foi possível liberar agora'), findsOneWidget);
-            expect(subscriptions.accessCalls, 1);
+            expect(subscriptions.accessCalls, 2);
           }
           await tester.tap(find.text('Agora não'));
           await tester.pumpAndSettle();
