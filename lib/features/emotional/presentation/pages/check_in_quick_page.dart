@@ -304,7 +304,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           .latestCreatedCheckIn
           ?.aiInsight;
       if (insight?.quotaLimited == true) {
-        await _showDeepReadingUnlockSheet();
+        AppSnackBar.show(
+          context,
+          message:
+              'Check-in salvo. Você já pode continuar; a leitura aprofundada pode ser liberada depois.',
+          icon: Icons.check_circle_outline_rounded,
+        );
+        await _maybeInviteDailyReminder();
+        widget.onCompleted?.call();
         return _CheckInSubmitResult.success;
       }
       AppSnackBar.show(
@@ -671,6 +678,8 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     };
   }
 
+  // Kept for manual deep-reading unlock flows; do not auto-open after save.
+  // ignore: unused_element
   Future<void> _showDeepReadingUnlockSheet() async {
     if (!mounted) {
       return;
