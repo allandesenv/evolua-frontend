@@ -634,7 +634,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       RewardedAdResult.unsupported =>
         'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, volte amanhã para seu check-in gratuito ou continue sem anúncios com o Premium.',
       RewardedAdResult.timeout =>
-        'Recebemos a conclusÃ£o do anÃºncio, mas ainda estamos confirmando a liberaÃ§Ã£o. Tente salvar novamente em alguns segundos.',
+        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente salvar novamente em alguns segundos.',
       RewardedAdResult.dismissedWithoutReward =>
         'Para liberar mais um check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
       RewardedAdResult.rewardConfirmedButAccessDenied =>
