@@ -14,7 +14,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class ConsciousnessTimelinePage extends ConsumerStatefulWidget {
-  const ConsciousnessTimelinePage({super.key});
+  const ConsciousnessTimelinePage({super.key, this.now});
+
+  final DateTime? now;
 
   @override
   ConsumerState<ConsciousnessTimelinePage> createState() =>
@@ -179,6 +181,12 @@ class _ConsciousnessTimelinePageState
           onCreateRitual: item.checkInId <= 0
               ? null
               : () => _createRitual(item),
+          createRitualLabel: _isEveningPeriod
+              ? 'Fazer fechamento'
+              : 'Criar ritual',
+          createRitualLoadingLabel: _isEveningPeriod
+              ? 'Abrindo...'
+              : 'Criando...',
         ),
       ),
     );
@@ -207,11 +215,17 @@ class _ConsciousnessTimelinePageState
 
   Future<void> _createRitual(ConsciousnessTimelineItem item) async {
     await _runItemAction(item, () async {
-      final now = DateTime.now();
+      final now = widget.now ?? DateTime.now();
       final localDate = DateTime(now.year, now.month, now.day);
       final type = now.hour >= 18
           ? DailyRitualType.evening
           : DailyRitualType.morning;
+      if (type == DailyRitualType.evening) {
+        if (mounted) {
+          context.go('/daily-ritual?type=evening');
+        }
+        return;
+      }
       final existing = await ref
           .read(dailyRitualRepositoryProvider)
           .today(type: type, localDate: localDate);
@@ -249,6 +263,11 @@ class _ConsciousnessTimelinePageState
         );
       }
     });
+  }
+
+  bool get _isEveningPeriod {
+    final now = widget.now ?? DateTime.now();
+    return now.hour >= 18;
   }
 
   Future<void> _runItemAction(
@@ -709,6 +728,8 @@ class _TimelineItemDetail extends StatelessWidget {
     required this.isActionLoading,
     required this.onSaveReading,
     required this.onCreateRitual,
+    required this.createRitualLabel,
+    required this.createRitualLoadingLabel,
   });
 
   final ConsciousnessTimelineItem item;
@@ -716,6 +737,8 @@ class _TimelineItemDetail extends StatelessWidget {
   final bool isActionLoading;
   final VoidCallback? onSaveReading;
   final VoidCallback? onCreateRitual;
+  final String createRitualLabel;
+  final String createRitualLoadingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -802,7 +825,9 @@ class _TimelineItemDetail extends StatelessWidget {
                           )
                         : const Icon(Icons.self_improvement_rounded),
                     label: Text(
-                      isActionLoading ? 'Criando...' : 'Criar ritual',
+                      isActionLoading
+                          ? createRitualLoadingLabel
+                          : createRitualLabel,
                     ),
                   ),
               ],

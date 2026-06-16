@@ -12,6 +12,7 @@ import 'package:evolua_frontend/features/subscription/domain/repositories/subscr
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   testWidgets('shows free preview and opens item detail', (tester) async {
@@ -154,14 +155,90 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('opens manual evening closing instead of creating ritual', (
+    tester,
+  ) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: true,
+      premium: true,
+      pages: [
+        [_item(title: 'Leitura da noite')],
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(adapter: adapter, now: DateTime(2026, 6, 8, 20)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Abrir detalhes').last);
+    await tester.tap(find.text('Abrir detalhes').last);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pump();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Fazer fechamento'), findsOneWidget);
+    await tester.tap(find.text('Fazer fechamento'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.ritualCreateRequests, 0);
+    expect(find.text('ritual-evening'), findsOneWidget);
+  });
+
+  testWidgets('keeps ritual creation action before evening', (tester) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: true,
+      premium: true,
+      pages: [
+        [_item(title: 'Leitura da manha')],
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(adapter: adapter, now: DateTime(2026, 6, 8, 10)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Abrir detalhes').last);
+    await tester.tap(find.text('Abrir detalhes').last);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pump();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Criar ritual'), findsOneWidget);
+    expect(find.text('Fazer fechamento'), findsNothing);
+  });
 }
 
 Widget _app({
   required _TimelineAdapter adapter,
   RewardedAdResult rewardedAdResult = RewardedAdResult.rewarded,
   bool accessAllowedAfterReward = false,
+  DateTime? now,
 }) {
   final dio = Dio()..httpClientAdapter = adapter;
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => ConsciousnessTimelinePage(now: now),
+      ),
+      GoRoute(
+        path: '/daily-ritual',
+        builder: (context, state) =>
+            Text('ritual-${state.uri.queryParameters['type']}'),
+      ),
+    ],
+  );
   return ProviderScope(
     overrides: [
       authenticatedDioProvider(
@@ -174,7 +251,7 @@ Widget _app({
         _FakeSubscriptionRepository(accessAllowed: accessAllowedAfterReward),
       ),
     ],
-    child: const MaterialApp(home: ConsciousnessTimelinePage()),
+    child: MaterialApp.router(routerConfig: router),
   );
 }
 

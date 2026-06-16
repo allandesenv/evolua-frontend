@@ -566,7 +566,7 @@ void main() {
 
       expect(repository.createCalls, 2);
       expect(rewarded.showCalls, 1);
-      expect(find.text('Não conseguimos salvar agora'), findsOneWidget);
+      expect(find.text('Confirmação em andamento'), findsOneWidget);
       if (find.text('Entendi').evaluate().isNotEmpty) {
         await tester.tap(find.text('Entendi'));
         await tester.pumpAndSettle();
@@ -577,6 +577,53 @@ void main() {
       expect(repository.createCalls, 3);
       expect(rewarded.showCalls, 1);
     });
+
+    testWidgets(
+      'reward confirmation pending does not show no-fill copy and retries save without another ad',
+      (tester) async {
+        final repository = _FakeCheckInRepository(blockCreateCountWith402: 2);
+        final rewarded = _FakeRewardedAdService(
+          result: RewardedAdResult.rewardConfirmedButAccessDenied,
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            checkInRepository: repository,
+            rewardedAdService: rewarded,
+            subscriptionRepository: _FakeSubscriptionRepository(
+              accessAllowed: false,
+              rewardedAdAvailable: true,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'preciso registrar outro momento',
+        );
+        await tester.tap(find.text('Fazer check-in'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Assistir anúncio'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
+        expect(find.text('Confirmação em andamento'), findsOneWidget);
+        expect(
+          find.textContaining('ainda estamos confirmando'),
+          findsOneWidget,
+        );
+        expect(find.text('Tentar salvar novamente'), findsOneWidget);
+        expect(repository.createCalls, 1);
+        expect(rewarded.showCalls, 1);
+
+        await tester.tap(find.text('Tentar salvar novamente'));
+        await tester.pumpAndSettle();
+
+        expect(repository.createCalls, 2);
+        expect(rewarded.showCalls, 1);
+      },
+    );
 
     testWidgets('no fill keeps sheet open with calm actions', (tester) async {
       final repository = _FakeCheckInRepository(blockFirstCreateWith402: true);
@@ -708,6 +755,9 @@ void main() {
           expect(find.text('Tentar novamente'), findsOneWidget);
           if (result == RewardedAdResult.dismissedWithoutReward) {
             expect(find.text('Anúncio não concluído'), findsOneWidget);
+          } else if (result == RewardedAdResult.timeout) {
+            expect(find.textContaining('Confirma'), findsOneWidget);
+            expect(find.textContaining('Nenhum'), findsNothing);
           } else {
             expect(
               find.text('Nenhum anúncio disponível agora'),
@@ -751,7 +801,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.createCalls, 2);
-      expect(find.text('Não conseguimos salvar agora'), findsOneWidget);
+      expect(find.text('Confirmação em andamento'), findsOneWidget);
       expect(find.textContaining('Recebemos a recompensa'), findsWidgets);
       expect(find.text('Nenhum anúncio disponível agora'), findsNothing);
     });

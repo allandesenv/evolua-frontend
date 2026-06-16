@@ -1,4 +1,5 @@
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_access_grant.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
@@ -99,11 +100,5 @@ class MonetizationAccessController extends AsyncNotifier<void> {
       }
       return RewardedAdResult.loadFailed;
     }
-  }
-
-  bool rewardedAccessGranted(MonetizationAccessStatus status) {
-    return status.allowed ||
-        status.entitlementExpiresAt != null ||
-        status.hasPendingRewardCredit;
   }
 }
