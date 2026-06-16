@@ -1355,9 +1355,6 @@ class _JourneyStepDetailCard extends ConsumerWidget {
           if (step.type.toUpperCase() == 'VIDEO' && step.video != null) ...[
             _JourneyVideoPlayer(trailId: trailId, step: step),
             const SizedBox(height: 12),
-          ] else ...[
-            _StepTtsPlayer(step: step),
-            const SizedBox(height: 12),
           ],
           MarkdownBody(
             data: step.content,
@@ -1377,6 +1374,10 @@ class _JourneyStepDetailCard extends ConsumerWidget {
                   ).textTheme.bodyMedium?.copyWith(color: activeColor),
                 ),
           ),
+          if (step.type.toUpperCase() != 'VIDEO') ...[
+            const SizedBox(height: 14),
+            _StepTtsPlayer(step: step),
+          ],
           if (_supportsStepResponse(step.type)) ...[
             const SizedBox(height: 18),
             if (userId != null && userId.trim().isNotEmpty)
@@ -1731,55 +1732,90 @@ class _StepTtsPlayerState extends State<_StepTtsPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: context.evoluaColors.outline.withValues(alpha: 0.22),
+    final speedSelector = SizedBox(
+      height: 36,
+      child: SegmentedButton<double>(
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          textStyle: WidgetStateProperty.all(
+            Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
         ),
-      ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          FilledButton.icon(
-            onPressed: _speaking ? null : _speak,
-            icon: const Icon(Icons.volume_up_rounded),
-            label: const Text('Ouvir'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _speaking ? _pause : null,
-            icon: const Icon(Icons.pause_rounded),
-            label: const Text('Pausar'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _speaking ? _stop : null,
-            icon: const Icon(Icons.stop_rounded),
-            label: const Text('Parar'),
-          ),
-          SegmentedButton<double>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 0.75, label: Text('0.75x')),
-              ButtonSegment(value: 1, label: Text('1x')),
-              ButtonSegment(value: 1.25, label: Text('1.25x')),
-              ButtonSegment(value: 1.5, label: Text('1.5x')),
-            ],
-            selected: {_speed},
-            onSelectionChanged: (value) async {
-              final next = value.first;
-              setState(() => _speed = next);
-              if (_speaking) {
-                await _stop();
-                await _speak();
-              }
-            },
-          ),
+        segments: const [
+          ButtonSegment(value: 0.75, label: Text('0.75x')),
+          ButtonSegment(value: 1, label: Text('1x')),
+          ButtonSegment(value: 1.25, label: Text('1.25x')),
+          ButtonSegment(value: 1.5, label: Text('1.5x')),
         ],
+        selected: {_speed},
+        onSelectionChanged: (value) async {
+          final next = value.first;
+          setState(() => _speed = next);
+          if (_speaking) {
+            await _stop();
+            await _speak();
+          }
+        },
+      ),
+    );
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: context.evoluaColors.surfaceStrong.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: context.evoluaColors.outline.withValues(alpha: 0.16),
+          ),
+        ),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 36),
+              ),
+              onPressed: _speaking ? null : _speak,
+              icon: const Icon(Icons.volume_up_rounded, size: 18),
+              label: const Text('Ouvir'),
+            ),
+            if (_speaking) ...[
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 36),
+                ),
+                onPressed: _pause,
+                icon: const Icon(Icons.pause_rounded, size: 18),
+                label: const Text('Pausar'),
+              ),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(0, 36),
+                ),
+                onPressed: _stop,
+                icon: const Icon(Icons.stop_rounded, size: 18),
+                label: const Text('Parar'),
+              ),
+            ],
+            speedSelector,
+          ],
+        ),
       ),
     );
   }

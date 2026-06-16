@@ -565,6 +565,22 @@ void main() {
 
       expect(find.text('Sua resposta'), findsNothing);
       expect(find.text('Salvar resposta'), findsNothing);
+      expect(find.text('Pausar'), findsNothing);
+      expect(find.text('Parar'), findsNothing);
+      expect(find.text('0.75x'), findsOneWidget);
+      expect(find.text('1x'), findsOneWidget);
+      expect(find.text('1.25x'), findsOneWidget);
+      expect(find.text('1.5x'), findsOneWidget);
+
+      final contentFinder = find.textContaining('orienta').first;
+      final listenButtonFinder = find.byIcon(Icons.volume_up_rounded);
+
+      expect(contentFinder, findsOneWidget);
+      expect(listenButtonFinder, findsOneWidget);
+      expect(
+        tester.getTopLeft(contentFinder).dy,
+        lessThan(tester.getTopLeft(listenButtonFinder).dy),
+      );
     });
 
     testWidgets('reading step does not render editable response block', (
