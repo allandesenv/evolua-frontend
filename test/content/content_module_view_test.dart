@@ -148,12 +148,6 @@ void main() {
 
       expect(find.text('Trilha concluída'), findsWidgets);
       expect(find.text('Fazer próxima etapa'), findsNothing);
-      expect(
-        find.text(
-          'Leia a etapa atual. Quando terminar, toque para concluir e liberar a próxima.',
-        ),
-        findsNothing,
-      );
       expect(find.text('Explorar novas trilhas'), findsWidgets);
 
       await tester.ensureVisible(find.text('Explorar novas trilhas').last);
@@ -174,13 +168,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Fazer próxima etapa'), findsNothing);
-      expect(find.text('Concluir: Respirar'), findsOneWidget);
-      expect(
-        find.text(
-          'Leia a etapa atual. Quando terminar, toque para concluir e liberar a próxima.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Concluir etapa atual'), findsOneWidget);
+      expect(find.textContaining('Leia a etapa atual'), findsNothing);
     });
 
     testWidgets('empty step list is not treated as completed', (tester) async {
@@ -553,8 +542,8 @@ void main() {
       await tester.pumpWidget(_testApp(trailRepository: trailRepository));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Concluir: Respirar'));
-      await tester.tap(find.text('Concluir: Respirar'));
+      await tester.ensureVisible(find.text('Concluir etapa atual'));
+      await tester.tap(find.text('Concluir etapa atual'));
       await tester.pumpAndSettle();
 
       expect(trailRepository.completeStepCallCount, 1);
@@ -572,8 +561,8 @@ void main() {
       await tester.pumpWidget(_testApp(trailRepository: trailRepository));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Concluir: Respirar'));
-      await tester.tap(find.text('Concluir: Respirar'));
+      await tester.ensureVisible(find.text('Concluir etapa atual'));
+      await tester.tap(find.text('Concluir etapa atual'));
       await tester.pump();
 
       expect(

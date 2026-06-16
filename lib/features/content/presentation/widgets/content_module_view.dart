@@ -836,11 +836,6 @@ class _JourneyStickyCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final useDetailedLabel = MediaQuery.sizeOf(context).width >= 360;
-    final showCompletionHint = _shouldShowJourneyCompletionHint(
-      journey,
-      isCompleted: isCompleted,
-    );
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + bottomInset),
@@ -858,48 +853,28 @@ class _JourneyStickyCta extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showCompletionHint) ...[
-            Text(
-              'Leia a etapa atual. Quando terminar, toque para concluir e liberar a próxima.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: context.evoluaColors.textSecondary,
-                height: 1.25,
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onPressed,
-              icon: isActing
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      isCompleted
-                          ? Icons.explore_rounded
-                          : journey.isStarted
-                          ? Icons.task_alt_rounded
-                          : Icons.play_arrow_rounded,
-                    ),
-              label: Text(
-                _journeyCtaLabel(
-                  journey,
-                  isCompleted: isCompleted,
-                  includeStepTitle: useDetailedLabel,
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: isActing
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  isCompleted
+                      ? Icons.explore_rounded
+                      : journey.isStarted
+                      ? Icons.task_alt_rounded
+                      : Icons.play_arrow_rounded,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+          label: Text(
+            _journeyCtaLabel(journey, isCompleted: isCompleted),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2478,18 +2453,7 @@ String _journeyStepCompletedMessage(TrailJourney journey) {
   return 'Etapa concluída. Próxima etapa liberada.';
 }
 
-bool _shouldShowJourneyCompletionHint(
-  TrailJourney journey, {
-  required bool isCompleted,
-}) {
-  return journey.isStarted && !isCompleted && journey.nextStep != null;
-}
-
-String _journeyCtaLabel(
-  TrailJourney journey, {
-  bool? isCompleted,
-  bool includeStepTitle = true,
-}) {
+String _journeyCtaLabel(TrailJourney journey, {bool? isCompleted}) {
   if (isCompleted ?? _isJourneyEffectivelyCompleted(journey)) {
     return 'Explorar novas trilhas';
   }
@@ -2498,10 +2462,6 @@ String _journeyCtaLabel(
   }
   if (!journey.isStarted) {
     return 'Iniciar trilha';
-  }
-  final nextTitle = journey.nextStep?.title.trim();
-  if (includeStepTitle && nextTitle != null && nextTitle.isNotEmpty) {
-    return 'Concluir: $nextTitle';
   }
   return 'Concluir etapa atual';
 }
