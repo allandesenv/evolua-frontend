@@ -95,6 +95,9 @@ class _FakeAuthRepository implements AuthRepository {
     lastResetToken = token;
     lastResetPassword = newPassword;
   }
+
+  @override
+  Future<void> resendEmailVerification({required String accessToken}) async {}
 }
 
 AuthSession _session() {

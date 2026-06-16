@@ -496,6 +496,9 @@ class _FakeAuthRepository implements AuthRepository {
     required String token,
     required String newPassword,
   }) async {}
+
+  @override
+  Future<void> resendEmailVerification({required String accessToken}) async {}
 }
 
 class _FakeTrailRepository implements TrailRepository {

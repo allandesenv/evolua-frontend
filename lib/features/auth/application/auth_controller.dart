@@ -182,6 +182,18 @@ class AuthController extends AsyncNotifier<AuthSession?> {
         .resetPassword(token: token, newPassword: newPassword);
   }
 
+  Future<void> resendEmailVerification() async {
+    final storage = ref.read(authSessionStorageProvider);
+    final session = state.asData?.value ?? await _readStoredSession(storage);
+    final accessToken = session?.accessToken;
+    if (accessToken == null || accessToken.isEmpty) {
+      throw StateError('Sessao invalida.');
+    }
+    await ref
+        .read(authRepositoryProvider)
+        .resendEmailVerification(accessToken: accessToken);
+  }
+
   Future<void> _syncGoogleProfile(AuthSession session) async {
     try {
       await ref
