@@ -380,6 +380,59 @@ void main() {
         expect(response.data, {'text': 'estável versão ação'});
       },
     );
+    test('keeps old stored sessions verified by default', () {
+      final session = AuthSession.fromJson({
+        'userId': 'user-123',
+        'email': 'user@evolua.app',
+        'roles': const ['ROLE_USER'],
+        'accessToken': _buildJwt(
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      });
+
+      expect(session.emailVerified, isTrue);
+    });
+
+    test('parses and persists email verification status', () {
+      final session = AuthSession.fromJson({
+        'userId': 'user-123',
+        'email': 'user@evolua.app',
+        'roles': const ['ROLE_USER'],
+        'accessToken': _buildJwt(
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          emailVerified: false,
+        ),
+        'emailVerified': false,
+      });
+
+      expect(session.emailVerified, isFalse);
+      expect(AuthSession.fromJson(session.toJson()).emailVerified, isFalse);
+    });
+
+    test('resend email verification uses current access token', () async {
+      final current = _testSession(
+        accessToken: _buildJwt(
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(current.toJson()),
+      });
+      final repository = _FakeAuthRepository(refreshSession: current);
+      final container = _container(repository);
+      addTearDown(container.dispose);
+      await container.read(authControllerProvider.future);
+
+      await container
+          .read(authControllerProvider.notifier)
+          .resendEmailVerification();
+
+      expect(repository.resendEmailVerificationCalls, 1);
+      expect(
+        repository.lastResendEmailVerificationAccessToken,
+        current.accessToken,
+      );
+    });
   });
 }
 
@@ -400,6 +453,8 @@ class _FakeAuthRepository implements AuthRepository {
   final Completer<AuthSession>? refreshCompleter;
   final Object? refreshError;
   int refreshCalls = 0;
+  int resendEmailVerificationCalls = 0;
+  String? lastResendEmailVerificationAccessToken;
 
   @override
   Future<AuthSession> exchangeGoogleCode({required String code}) async {
@@ -443,6 +498,12 @@ class _FakeAuthRepository implements AuthRepository {
     required String token,
     required String newPassword,
   }) async {}
+
+  @override
+  Future<void> resendEmailVerification({required String accessToken}) async {
+    resendEmailVerificationCalls += 1;
+    lastResendEmailVerificationAccessToken = accessToken;
+  }
 }
 
 class _QueuedAdapter implements HttpClientAdapter {
@@ -483,7 +544,7 @@ AuthSession _testSession({
   );
 }
 
-String _buildJwt({required DateTime expiresAt}) {
+String _buildJwt({required DateTime expiresAt, bool emailVerified = true}) {
   String encode(Map<String, Object> value) {
     return base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
   }
@@ -493,6 +554,7 @@ String _buildJwt({required DateTime expiresAt}) {
     'sub': 'user-123',
     'email': 'user@evolua.app',
     'roles': const ['ROLE_USER'],
+    'emailVerified': emailVerified,
     'exp': expiresAt.toUtc().millisecondsSinceEpoch ~/ 1000,
   });
 

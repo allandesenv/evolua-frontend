@@ -265,6 +265,37 @@ void main() {
   });
 
   testWidgets(
+    'dashboard shows email verification notice until session refresh confirms it',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(
+          _testSession(emailVerified: false).toJson(),
+        ),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(_dashboardShell());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Confirme seu e-mail para manter sua conta mais segura.'),
+        findsOneWidget,
+      );
+      expect(find.text('Reenviar e-mail'), findsOneWidget);
+      expect(find.text('Ja confirmei'), findsOneWidget);
+
+      await tester.tap(find.text('Ja confirmei'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Confirme seu e-mail para manter sua conta mais segura.'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
     'dashboard opens initial check-in prompt once per day on mobile',
     (tester) async {
       SharedPreferences.setMockInitialValues({
@@ -2541,6 +2572,9 @@ class _FakeAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {}
+
+  @override
+  Future<void> resendEmailVerification({required String accessToken}) async {}
 }
 
 class _FakeProfileRepository implements ProfileRepository {
@@ -3170,6 +3204,7 @@ class _FakeNotificationRepository implements NotificationRepository {
 AuthSession _testSession({
   String email = 'leo@evolua.local',
   List<String> roles = const ['ROLE_USER'],
+  bool emailVerified = true,
 }) {
   return AuthSession(
     userId: 'user-123',
@@ -3180,8 +3215,10 @@ AuthSession _testSession({
       email: email,
       roles: roles,
       expiresAt: DateTime.now().add(const Duration(hours: 1)),
+      emailVerified: emailVerified,
     ),
     refreshToken: 'refresh-token',
+    emailVerified: emailVerified,
   );
 }
 
@@ -3190,6 +3227,7 @@ String _buildJwt({
   required String email,
   required List<String> roles,
   required DateTime expiresAt,
+  bool emailVerified = true,
 }) {
   String encode(Map<String, Object> value) {
     return base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
@@ -3200,6 +3238,7 @@ String _buildJwt({
     'sub': sub,
     'email': email,
     'roles': roles,
+    'emailVerified': emailVerified,
     'exp': expiresAt.toUtc().millisecondsSinceEpoch ~/ 1000,
   });
 
