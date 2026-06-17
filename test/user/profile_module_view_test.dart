@@ -35,6 +35,7 @@ import 'package:evolua_frontend/features/future_message/application/future_messa
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
+import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/notification/domain/entities/notification_job.dart';
@@ -423,6 +424,113 @@ void main() {
   });
 
   testWidgets(
+    'dashboard header check-in shortcut returns to home after successful save',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(
+          _testSession(roles: const ['ROLE_USER', 'ROLE_PREMIUM']).toJson(),
+        ),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(
+          checkInRepository: _FakeCheckInRepository(items: [_todayCheckIn()]),
+          subscriptionRepository: _FakeSubscriptionRepository(premium: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContentModuleView), findsOneWidget);
+      expect(find.byType(HomeHubView), findsNothing);
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CheckInQuickView), findsOneWidget);
+
+      await _submitVisibleCheckIn(tester);
+
+      expect(find.byType(CheckInQuickView), findsNothing);
+      expect(find.byType(HomeHubView), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'dashboard header check-in shortcut cancel keeps current tab',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(
+          _testSession(roles: const ['ROLE_USER', 'ROLE_PREMIUM']).toJson(),
+        ),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(
+          checkInRepository: _FakeCheckInRepository(items: [_todayCheckIn()]),
+          subscriptionRepository: _FakeSubscriptionRepository(premium: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContentModuleView), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CheckInQuickView), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Agora não'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CheckInQuickView), findsNothing);
+      expect(find.byType(ContentModuleView), findsOneWidget);
+      expect(find.byType(HomeHubView), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'dashboard header check-in shortcut with pending credit returns home after save',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(
+          checkInRepository: _FakeCheckInRepository(items: [_todayCheckIn()]),
+          subscriptionRepository: _FakeSubscriptionRepository(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 0,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContentModuleView), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Liberar novo check-in'), findsNothing);
+      expect(find.byType(CheckInQuickView), findsOneWidget);
+
+      await _submitVisibleCheckIn(tester);
+
+      expect(find.byType(CheckInQuickView), findsNothing);
+      expect(find.byType(HomeHubView), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'dashboard header check-in shortcut shows exhausted reward gate',
     (tester) async {
       SharedPreferences.setMockInitialValues({
@@ -443,12 +551,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContentModuleView), findsOneWidget);
+
       await tester.tap(find.byTooltip('Fazer check-in'));
       await tester.pumpAndSettle();
 
       expect(find.text('Check-in extra já usado hoje'), findsOneWidget);
       expect(find.text('Assistir anúncio'), findsNothing);
       expect(find.byType(CheckInQuickView), findsNothing);
+      expect(find.byType(ContentModuleView), findsOneWidget);
+      expect(find.byType(HomeHubView), findsNothing);
       expect(rewarded.showCalls, 0);
     },
   );
@@ -2184,6 +2298,17 @@ Widget _dashboardShellWithFutureMessagesRoute() {
 
 Future<void> _openAvatarMenu(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Abrir menu da conta'));
+}
+
+Future<void> _submitVisibleCheckIn(WidgetTester tester) async {
+  await tester.enterText(
+    find.byType(TextFormField).first,
+    'check-in concluido pelo atalho',
+  );
+  await tester.tap(find.text('Fazer check-in'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _swipeDashboard(
