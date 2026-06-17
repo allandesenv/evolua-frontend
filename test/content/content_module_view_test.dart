@@ -274,7 +274,9 @@ void main() {
         find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
         'Eu começo querendo clareza.',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
+      expect(_saveResponseButton(tester).onPressed, isNotNull);
       await tester.tap(find.text('Salvar resposta'));
       await tester.pump();
       await tester.pumpAndSettle();
@@ -289,7 +291,9 @@ void main() {
         find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
         'Depois eu costumo escolher uma ação pequena.',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
+      expect(_saveResponseButton(tester).onPressed, isNotNull);
       await tester.tap(find.text('Salvar resposta'));
       await tester.pumpAndSettle();
 
@@ -309,14 +313,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Salvar resposta'));
-      await tester.tap(find.text('Salvar resposta'));
-      await tester.pumpAndSettle();
+      final saveButton = _saveResponseButton(tester);
 
+      expect(saveButton.onPressed, isNull);
       expect(trailRepository.saveStepResponseCallCount, 0);
-      expect(
-        find.text('Escreva sua resposta antes de salvar.'),
-        findsOneWidget,
-      );
       expect(find.text('Salvando...'), findsNothing);
     });
 
@@ -333,15 +333,12 @@ void main() {
         find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
         '   \n   ',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
-      await tester.tap(find.text('Salvar resposta'));
-      await tester.pumpAndSettle();
+      final saveButton = _saveResponseButton(tester);
 
+      expect(saveButton.onPressed, isNull);
       expect(trailRepository.saveStepResponseCallCount, 0);
-      expect(
-        find.text('Escreva sua resposta antes de salvar.'),
-        findsOneWidget,
-      );
       expect(find.text('Salvando...'), findsNothing);
     });
 
@@ -358,15 +355,12 @@ void main() {
         find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
         'Toque para responder ao exercício...',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
-      await tester.tap(find.text('Salvar resposta'));
-      await tester.pumpAndSettle();
+      final saveButton = _saveResponseButton(tester);
 
+      expect(saveButton.onPressed, isNull);
       expect(trailRepository.saveStepResponseCallCount, 0);
-      expect(
-        find.text('Escreva sua resposta antes de salvar.'),
-        findsOneWidget,
-      );
     });
 
     testWidgets('unchanged loaded step response is not saved again', (
@@ -383,12 +377,41 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Salvar resposta'));
+      final saveButton = _saveResponseButton(tester);
+
+      expect(saveButton.onPressed, isNull);
+      expect(trailRepository.saveStepResponseCallCount, 0);
+      expect(find.text('Salvando...'), findsNothing);
+    });
+
+    testWidgets('loaded step response can be removed by saving empty text', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        initialResponses: const {
+          (trailId: 1, stepIndex: 0): 'Resposta existente.',
+        },
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        '',
+      );
+      await tester.pump();
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      final saveButton = _saveResponseButton(tester);
+      expect(saveButton.onPressed, isNotNull);
+
       await tester.tap(find.text('Salvar resposta'));
       await tester.pumpAndSettle();
 
-      expect(trailRepository.saveStepResponseCallCount, 0);
-      expect(find.text('Altere sua resposta antes de salvar.'), findsOneWidget);
-      expect(find.text('Salvando...'), findsNothing);
+      expect(trailRepository.saveStepResponseCallCount, 1);
+      expect(trailRepository.savedResponses[(trailId: 1, stepIndex: 0)], '');
+      expect(find.text('Resposta removida.'), findsOneWidget);
     });
 
     testWidgets('save failure keeps typed step response visible', (
@@ -405,7 +428,9 @@ void main() {
         'Toque para responder ao exercício...',
       );
       await tester.enterText(field, 'Texto que nao pode se perder.');
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
+      expect(_saveResponseButton(tester).onPressed, isNotNull);
       await tester.tap(find.text('Salvar resposta'));
       await tester.pumpAndSettle();
 
@@ -442,7 +467,9 @@ void main() {
         find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
         'Consigo responder mesmo assim.',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
+      expect(_saveResponseButton(tester).onPressed, isNotNull);
       await tester.tap(find.text('Salvar resposta'));
       await tester.pumpAndSettle();
 
@@ -466,7 +493,9 @@ void main() {
         find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
         'Uma resposta com rede lenta.',
       );
+      await tester.pump();
       await tester.ensureVisible(find.text('Salvar resposta'));
+      expect(_saveResponseButton(tester).onPressed, isNotNull);
       await tester.tap(find.text('Salvar resposta'));
       await tester.tap(find.text('Salvar resposta'));
       await tester.pump();
@@ -1203,6 +1232,17 @@ void main() {
 Future<void> _setCompactSurface(WidgetTester tester) async {
   await tester.binding.setSurfaceSize(const Size(390, 820));
   addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
+ButtonStyleButton _saveResponseButton(WidgetTester tester) {
+  return tester.widget<ButtonStyleButton>(
+    find.ancestor(
+      of: find.text('Salvar resposta'),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is ButtonStyleButton,
+      ),
+    ),
+  );
 }
 
 Widget _testApp({

@@ -1444,6 +1444,24 @@ class _TrailStepResponseEditorState
         widget.userId;
   }
 
+  String get _currentNormalizedResponse {
+    final normalized = _controller.text.trim();
+    return normalized == _responseHint ? '' : normalized;
+  }
+
+  String get _savedNormalizedResponse => _lastSavedNormalized ?? '';
+
+  bool get _hadSavedResponseContent => _savedNormalizedResponse.isNotEmpty;
+
+  bool get _hasResponseChange =>
+      _currentNormalizedResponse != _savedNormalizedResponse;
+
+  bool get _canSaveResponse {
+    return !_isSaving &&
+        _hasResponseChange &&
+        (_currentNormalizedResponse.isNotEmpty || _hadSavedResponseContent);
+  }
+
   @override
   void dispose() {
     _draftSaveTimer?.cancel();
@@ -1455,14 +1473,14 @@ class _TrailStepResponseEditorState
     if (_isSaving || !_hasCurrentSession) {
       return;
     }
-    final normalizedResponse = _controller.text.trim();
-    if (!_isValidResponse(normalizedResponse)) {
-      _showResponseValidationMessage('Escreva sua resposta antes de salvar.');
+    final normalizedResponse = _currentNormalizedResponse;
+    final hadSavedResponseContent = _hadSavedResponseContent;
+    if (!_hasResponseChange) {
+      _showResponseValidationMessage('Altere sua resposta antes de salvar.');
       return;
     }
-    if (_lastSavedNormalized != null &&
-        normalizedResponse == _lastSavedNormalized) {
-      _showResponseValidationMessage('Altere sua resposta antes de salvar.');
+    if (normalizedResponse.isEmpty && !hadSavedResponseContent) {
+      _showResponseValidationMessage('Escreva sua resposta antes de salvar.');
       return;
     }
 
@@ -1482,8 +1500,11 @@ class _TrailStepResponseEditorState
       if (!mounted) {
         return;
       }
+      final feedback = saved.responseText.trim().isEmpty
+          ? 'Resposta removida.'
+          : 'Resposta salva no seu diário.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Resposta salva no seu diário.')),
+        SnackBar(content: Text(feedback)),
       );
     } catch (_) {
       if (!mounted) {
@@ -1501,10 +1522,6 @@ class _TrailStepResponseEditorState
         setState(() => _isSaving = false);
       }
     }
-  }
-
-  bool _isValidResponse(String normalizedResponse) {
-    return normalizedResponse.isNotEmpty && normalizedResponse != _responseHint;
   }
 
   void _showResponseValidationMessage(String message) {
@@ -1533,7 +1550,16 @@ class _TrailStepResponseEditorState
         _controller.text.isNotEmpty) {
       return;
     }
-    _controller.text = draft;
+    setState(() {
+      _controller.text = draft;
+    });
+  }
+
+  void _handleResponseChanged(String value) {
+    _scheduleDraftSave(value);
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _scheduleDraftSave(String value) {
@@ -1644,7 +1670,7 @@ class _TrailStepResponseEditorState
             TextField(
               controller: _controller,
               enabled: !_isSaving,
-              onChanged: _scheduleDraftSave,
+              onChanged: _handleResponseChanged,
               textCapitalization: TextCapitalization.sentences,
               keyboardType: TextInputType.multiline,
               scrollPadding: EdgeInsets.only(
@@ -1665,7 +1691,7 @@ class _TrailStepResponseEditorState
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.icon(
-                onPressed: _isSaving ? null : _save,
+                onPressed: _canSaveResponse ? _save : null,
                 icon: _isSaving
                     ? const SizedBox.square(
                         dimension: 18,

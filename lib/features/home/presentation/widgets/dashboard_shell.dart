@@ -202,7 +202,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     });
   }
 
-  Future<void> _openCheckIn({required bool compact}) async {
+  Future<void> _openCheckIn({
+    required bool compact,
+    bool redirectHomeOnCompleted = false,
+  }) async {
     if (_checkInOpening) {
       return;
     }
@@ -215,6 +218,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       if (!mounted) {
         return;
       }
+      var completed = false;
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -232,6 +236,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
             child: SingleChildScrollView(
               child: CheckInQuickView(
                 onCompleted: () {
+                  completed = true;
                   if (sheetContext.mounted) {
                     Navigator.of(sheetContext).pop();
                   }
@@ -252,17 +257,34 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
           ),
         ),
       );
+      if (completed && redirectHomeOnCompleted && mounted) {
+        _returnHomeAfterHeaderCheckIn();
+      }
     } finally {
       _checkInOpening = false;
     }
   }
 
-  Future<void> _openCheckInSafely({required bool compact}) {
+  void _returnHomeAfterHeaderCheckIn() {
+    setState(() {
+      _selectedIndex = 0;
+      _history.clear();
+      _suggestedTrailIdToOpen = null;
+    });
+  }
+
+  Future<void> _openCheckInSafely({
+    required bool compact,
+    bool redirectHomeOnCompleted = false,
+  }) {
     return _safeCheckInLauncher.open(
       context: context,
       ref: ref,
       isMounted: () => mounted,
-      openCheckIn: () => _openCheckIn(compact: compact),
+      openCheckIn: () => _openCheckIn(
+        compact: compact,
+        redirectHomeOnCompleted: redirectHomeOnCompleted,
+      ),
       onOpenPremium: () =>
           _openProfileSection(ProfileModuleSection.plansSubscriptions),
     );
@@ -738,6 +760,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenAdminSection: _openAdminSection,
       onOpenFutureMessages: () => context.push('/future-messages'),
       onOpenCheckIn: () => _openCheckInSafely(compact: isCompact),
+      onOpenHeaderCheckIn: () => _openCheckInSafely(
+        compact: isCompact,
+        redirectHomeOnCompleted: true,
+      ),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
       onResendEmailVerification: _resendEmailVerification,
       onRefreshEmailVerification: _refreshEmailVerificationStatus,
@@ -1068,6 +1094,7 @@ class _DashboardContent extends ConsumerWidget {
     required this.onOpenAdminSection,
     required this.onOpenFutureMessages,
     required this.onOpenCheckIn,
+    required this.onOpenHeaderCheckIn,
     required this.onLogout,
     required this.onResendEmailVerification,
     required this.onRefreshEmailVerification,
@@ -1092,6 +1119,7 @@ class _DashboardContent extends ConsumerWidget {
   final void Function(AdminPanelSection section) onOpenAdminSection;
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onOpenCheckIn;
+  final VoidCallback onOpenHeaderCheckIn;
   final VoidCallback onLogout;
   final Future<void> Function() onResendEmailVerification;
   final Future<void> Function() onRefreshEmailVerification;
@@ -1216,7 +1244,7 @@ class _DashboardContent extends ConsumerWidget {
                   notificationBell: const NotificationBellButton(),
                   session: session,
                   profile: profile,
-                  onOpenCheckIn: onOpenCheckIn,
+                  onOpenCheckIn: onOpenHeaderCheckIn,
                   onOpenProfileSection: onOpenProfileSection,
                   onOpenAdminPanel: session?.isAdmin == true
                       ? () => onOpenAdminSection(AdminPanelSection.overview)
