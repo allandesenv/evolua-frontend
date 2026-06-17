@@ -4,10 +4,8 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
-import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
-import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
@@ -19,6 +17,7 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_i
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/home/presentation/widgets/safe_check_in_launcher.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -26,12 +25,6 @@ import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-enum _ExtraCheckInGateAccessDecision {
-  openCheckIn,
-  exhaustedToday,
-  watchRewarded,
-}
 
 class HomeHubView extends ConsumerStatefulWidget {
   const HomeHubView({
@@ -58,6 +51,7 @@ class HomeHubView extends ConsumerStatefulWidget {
     this.mentorPremiumPassEndsAt,
     this.now,
     this.deferSecondaryProviders = false,
+    this.checkInGateHandledExternally = false,
   });
 
   final int profilesCount;
@@ -82,6 +76,7 @@ class HomeHubView extends ConsumerStatefulWidget {
   final DateTime? mentorPremiumPassEndsAt;
   final DateTime? now;
   final bool deferSecondaryProviders;
+  final bool checkInGateHandledExternally;
 
   @override
   ConsumerState<HomeHubView> createState() => _HomeHubViewState();
@@ -90,15 +85,11 @@ class HomeHubView extends ConsumerStatefulWidget {
 class _HomeHubViewState extends ConsumerState<HomeHubView> {
   static const _ritualAlreadyExistsMessage =
       'Você já possui um ritual criado para hoje. Edite o ritual atual ou remova-o antes de gerar outro.';
-  static const _extraCheckInGateRecheckAttempts = 3;
-  static const _extraCheckInGateRecheckDelay = Duration(milliseconds: 1500);
-
   bool _isRewardLoading = false;
   ReadingActionLoading? _readingActionLoading;
   bool _isGeneratingDailyRitualFromCheckIn = false;
-  bool _isExtraCheckInRewardLoading = false;
   bool _secondaryProvidersEnabled = true;
-  int _extraCheckInGateAttemptSequence = 0;
+  final SafeCheckInLauncher _safeCheckInLauncher = SafeCheckInLauncher();
   final Map<int, int> _readingVariationCounts = {};
 
   @override
@@ -488,415 +479,15 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     }
   }
 
-  Future<void> _showExtraCheckInGateSheet() async {
-    if (_isExtraCheckInRewardLoading) {
-      return;
-    }
-
-    var openCheckInAfterGate = false;
-    final initialAttemptId = ++_extraCheckInGateAttemptSequence;
-    final initialDecision = await _extraCheckInGateAccessDecision(
-      attemptId: initialAttemptId,
-      source: 'open_gate_access_check',
+  Future<void> _openCheckInWithGate() {
+    return _safeCheckInLauncher.open(
+      context: context,
+      ref: ref,
+      isMounted: () => mounted,
+      openCheckIn: widget.onOpenCheckIn,
+      onOpenPremium: widget.onOpenPremium,
+      now: widget.now,
     );
-    if (!mounted) {
-      return;
-    }
-    if (initialDecision == _ExtraCheckInGateAccessDecision.openCheckIn) {
-      _logExtraCheckInGateFinalDecision(
-        attemptId: initialAttemptId,
-        openCheckIn: true,
-      );
-      openCheckInAfterGate = true;
-    } else {
-      RewardedAdResult? rewardFailure;
-      var rewardExhaustedToday =
-          initialDecision == _ExtraCheckInGateAccessDecision.exhaustedToday;
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        builder: (sheetContext) {
-          return StatefulBuilder(
-            builder: (context, setSheetState) {
-              final currentFailure = rewardFailure;
-              final isPendingConfirmation = _isExtraCheckInPendingConfirmation(
-                currentFailure,
-              );
-              final bottomPadding = rewardExhaustedToday ? 24.0 : 16.0;
-              return SafeArea(
-                top: false,
-                left: false,
-                right: false,
-                bottom: true,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    16,
-                    16,
-                    bottomPadding +
-                        MediaQuery.of(sheetContext).viewInsets.bottom,
-                  ),
-                  child: RewardedAdPrompt(
-                    title: rewardExhaustedToday
-                        ? 'Check-in extra já usado hoje'
-                        : _extraCheckInGateTitle(currentFailure),
-                    message: rewardExhaustedToday
-                        ? 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.'
-                        : _extraCheckInGateMessage(currentFailure),
-                    rewardLabel: rewardExhaustedToday
-                        ? ''
-                        : isPendingConfirmation
-                        ? 'Vamos conferir se seu check-in já foi liberado.'
-                        : 'Assistir anúncio libera mais um check-in hoje.',
-                    rewardedAdAvailable: !rewardExhaustedToday,
-                    isRewardLoading: _isExtraCheckInRewardLoading,
-                    watchLabel: isPendingConfirmation
-                        ? 'Verificar liberação'
-                        : 'Assistir anúncio',
-                    loadingLabel: isPendingConfirmation
-                        ? 'Verificando'
-                        : 'Carregando anúncio',
-                    premiumLabel: 'Ver Premium',
-                    secondaryLabel: 'Agora não',
-                    onWatchRewardedAd: rewardExhaustedToday
-                        ? null
-                        : () async {
-                            if (_isExtraCheckInRewardLoading) {
-                              return;
-                            }
-                            setState(() => _isExtraCheckInRewardLoading = true);
-                            final pendingResult =
-                                _isExtraCheckInPendingConfirmation(
-                                  rewardFailure,
-                                )
-                                ? rewardFailure
-                                : null;
-                            setSheetState(() {
-                              if (pendingResult == null) {
-                                rewardFailure = null;
-                              }
-                              rewardExhaustedToday = false;
-                            });
-                            final attemptId =
-                                ++_extraCheckInGateAttemptSequence;
-                            debugPrint(
-                              'Evolua gate extra check-in attemptId=$attemptId started',
-                            );
-                            var result =
-                                pendingResult ?? RewardedAdResult.loadFailed;
-                            var openCheckIn = false;
-                            try {
-                              if (pendingResult != null) {
-                                openCheckIn =
-                                    await _shouldOpenExtraCheckInAfterReward(
-                                      pendingResult,
-                                      attemptId: attemptId,
-                                    );
-                              } else {
-                                final accessDecision =
-                                    await _extraCheckInGateAccessDecision(
-                                      attemptId: attemptId,
-                                      source: 'pre_reward_access_check',
-                                    );
-                                if (accessDecision ==
-                                    _ExtraCheckInGateAccessDecision
-                                        .openCheckIn) {
-                                  openCheckIn = true;
-                                  _logExtraCheckInGateFinalDecision(
-                                    attemptId: attemptId,
-                                    openCheckIn: true,
-                                  );
-                                } else if (accessDecision ==
-                                    _ExtraCheckInGateAccessDecision
-                                        .exhaustedToday) {
-                                  rewardExhaustedToday = true;
-                                  _logExtraCheckInGateFinalDecision(
-                                    attemptId: attemptId,
-                                    openCheckIn: false,
-                                  );
-                                } else {
-                                  result = await ref
-                                      .read(
-                                        monetizationAccessControllerProvider
-                                            .notifier,
-                                      )
-                                      .unlockWithRewardedAdResult(
-                                        resource: RewardResources.extraCheckIn,
-                                      );
-                                  openCheckIn =
-                                      await _shouldOpenExtraCheckInAfterReward(
-                                        result,
-                                        attemptId: attemptId,
-                                      );
-                                  if (!openCheckIn &&
-                                      result == RewardedAdResult.loadFailed) {
-                                    rewardExhaustedToday =
-                                        await _isExtraCheckInRewardExhaustedToday(
-                                          attemptId: attemptId,
-                                          source:
-                                              'post_reward_gate_state_check',
-                                        );
-                                  }
-                                }
-                              }
-                            } catch (error) {
-                              debugPrint(
-                                'Evolua gate extra check-in attemptId=$attemptId '
-                                'failed before result error=$error',
-                              );
-                              result = RewardedAdResult.loadFailed;
-                              openCheckIn = false;
-                            } finally {
-                              if (mounted) {
-                                setState(
-                                  () => _isExtraCheckInRewardLoading = false,
-                                );
-                              }
-                            }
-                            if (!mounted || !sheetContext.mounted) {
-                              return;
-                            }
-                            if (openCheckIn) {
-                              openCheckInAfterGate = true;
-                              Navigator.of(sheetContext).pop();
-                              return;
-                            }
-                            setSheetState(() {
-                              rewardFailure = result;
-                            });
-                          },
-                    onOpenPremium: widget.onOpenPremium == null
-                        ? null
-                        : () {
-                            Navigator.of(sheetContext).maybePop();
-                            widget.onOpenPremium?.call();
-                          },
-                    onSecondary: () => Navigator.of(sheetContext).maybePop(),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
-    }
-
-    if (mounted && _isExtraCheckInRewardLoading) {
-      setState(() => _isExtraCheckInRewardLoading = false);
-    }
-    if (mounted && openCheckInAfterGate) {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      await WidgetsBinding.instance.endOfFrame;
-      if (mounted) {
-        widget.onOpenCheckIn();
-      }
-    }
-  }
-
-  Future<bool> _shouldOpenExtraCheckInAfterReward(
-    RewardedAdResult result, {
-    required int attemptId,
-  }) async {
-    debugPrint(
-      'Evolua gate extra check-in attemptId=$attemptId '
-      'reward result=${result.name}',
-    );
-    if (result == RewardedAdResult.rewarded) {
-      _logExtraCheckInGateFinalDecision(
-        attemptId: attemptId,
-        openCheckIn: true,
-      );
-      return true;
-    }
-
-    if (result == RewardedAdResult.loadFailed) {
-      final hasAccess = await _hasExtraCheckInAccess(
-        attemptId: attemptId,
-        source: 'load_failed_access_recheck',
-      );
-      _logExtraCheckInGateFinalDecision(
-        attemptId: attemptId,
-        openCheckIn: hasAccess,
-      );
-      return hasAccess;
-    }
-
-    final shouldRecheck =
-        result == RewardedAdResult.rewardConfirmedButAccessDenied ||
-        result == RewardedAdResult.timeout;
-    if (!shouldRecheck) {
-      _logExtraCheckInGateFinalDecision(
-        attemptId: attemptId,
-        openCheckIn: false,
-      );
-      return false;
-    }
-
-    for (
-      var attempt = 1;
-      attempt <= _extraCheckInGateRecheckAttempts;
-      attempt++
-    ) {
-      if (attempt > 1) {
-        await Future<void>.delayed(_extraCheckInGateRecheckDelay);
-      }
-      if (!mounted) {
-        _logExtraCheckInGateFinalDecision(
-          attemptId: attemptId,
-          openCheckIn: false,
-        );
-        return false;
-      }
-
-      try {
-        final access = await ref
-            .read(monetizationAccessControllerProvider.notifier)
-            .access(resource: RewardResources.extraCheckIn);
-        final hasPendingRewardCredit =
-            access.rewardedCreditsGrantedToday >
-            access.rewardedCreditsUsedToday;
-        debugPrint(
-          'Evolua gate extra check-in attemptId=$attemptId '
-          'recheck attempt number=$attempt '
-          'access.allowed=${access.allowed} '
-          'rewardedCreditsGrantedToday=${access.rewardedCreditsGrantedToday} '
-          'rewardedCreditsUsedToday=${access.rewardedCreditsUsedToday} '
-          'hasPendingRewardCredit=$hasPendingRewardCredit',
-        );
-
-        if (access.allowed ||
-            access.entitlementExpiresAt != null ||
-            hasPendingRewardCredit) {
-          _logExtraCheckInGateFinalDecision(
-            attemptId: attemptId,
-            openCheckIn: true,
-          );
-          return true;
-        }
-      } catch (error) {
-        debugPrint(
-          'Evolua gate extra check-in attemptId=$attemptId '
-          'recheck attempt number=$attempt '
-          'failed error=$error',
-        );
-      }
-    }
-
-    _logExtraCheckInGateFinalDecision(attemptId: attemptId, openCheckIn: false);
-    return false;
-  }
-
-  Future<bool> _hasExtraCheckInAccess({
-    required int attemptId,
-    required String source,
-  }) async {
-    final decision = await _extraCheckInGateAccessDecision(
-      attemptId: attemptId,
-      source: source,
-    );
-    return decision == _ExtraCheckInGateAccessDecision.openCheckIn;
-  }
-
-  Future<bool> _isExtraCheckInRewardExhaustedToday({
-    required int attemptId,
-    required String source,
-  }) async {
-    final decision = await _extraCheckInGateAccessDecision(
-      attemptId: attemptId,
-      source: source,
-    );
-    return decision == _ExtraCheckInGateAccessDecision.exhaustedToday;
-  }
-
-  Future<_ExtraCheckInGateAccessDecision> _extraCheckInGateAccessDecision({
-    required int attemptId,
-    required String source,
-  }) async {
-    try {
-      final access = await ref
-          .read(monetizationAccessControllerProvider.notifier)
-          .access(resource: RewardResources.extraCheckIn);
-      final hasPendingRewardCredit =
-          access.rewardedCreditsGrantedToday > access.rewardedCreditsUsedToday;
-      final rewardExhaustedToday =
-          access.rewardedCreditsGrantedToday > 0 &&
-          access.rewardedCreditsGrantedToday <= access.rewardedCreditsUsedToday;
-      debugPrint(
-        'Evolua gate extra check-in attemptId=$attemptId '
-        '$source '
-        'access.allowed=${access.allowed} '
-        'rewardedCreditsGrantedToday=${access.rewardedCreditsGrantedToday} '
-        'rewardedCreditsUsedToday=${access.rewardedCreditsUsedToday} '
-        'hasPendingRewardCredit=$hasPendingRewardCredit '
-        'rewardExhaustedToday=$rewardExhaustedToday',
-      );
-      if (access.allowed ||
-          access.entitlementExpiresAt != null ||
-          hasPendingRewardCredit) {
-        return _ExtraCheckInGateAccessDecision.openCheckIn;
-      }
-      if (rewardExhaustedToday) {
-        return _ExtraCheckInGateAccessDecision.exhaustedToday;
-      }
-      return _ExtraCheckInGateAccessDecision.watchRewarded;
-    } catch (error) {
-      debugPrint(
-        'Evolua gate extra check-in attemptId=$attemptId '
-        '$source failed error=$error',
-      );
-      return _ExtraCheckInGateAccessDecision.watchRewarded;
-    }
-  }
-
-  void _logExtraCheckInGateFinalDecision({
-    required int attemptId,
-    required bool openCheckIn,
-  }) {
-    debugPrint(
-      'Evolua gate extra check-in attemptId=$attemptId '
-      'final decision openCheckIn=$openCheckIn',
-    );
-  }
-
-  bool _isExtraCheckInPendingConfirmation(RewardedAdResult? result) {
-    return result == RewardedAdResult.timeout ||
-        result == RewardedAdResult.rewardConfirmedButAccessDenied;
-  }
-
-  String _extraCheckInGateTitle(RewardedAdResult? result) {
-    return switch (result) {
-      RewardedAdResult.rewardConfirmedButAccessDenied =>
-        'Confirmação em andamento',
-      RewardedAdResult.dismissedWithoutReward => 'Anúncio não concluído',
-      RewardedAdResult.noFill => 'Nenhum anúncio disponível agora',
-      RewardedAdResult.loadFailed => 'Não conseguimos carregar o anúncio agora',
-      RewardedAdResult.showFailed => 'Não conseguimos abrir o anúncio agora',
-      RewardedAdResult.unsupported => 'Anúncio indisponível neste dispositivo',
-      RewardedAdResult.timeout => 'Confirmação em andamento',
-      RewardedAdResult.rewarded || null => 'Liberar novo check-in',
-    };
-  }
-
-  String _extraCheckInGateMessage(RewardedAdResult? result) {
-    return switch (result) {
-      RewardedAdResult.rewardConfirmedButAccessDenied =>
-        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente novamente em alguns segundos.',
-      RewardedAdResult.dismissedWithoutReward =>
-        'Para liberar outro check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
-      RewardedAdResult.timeout =>
-        'A confirmação do anúncio demorou mais que o esperado. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
-      RewardedAdResult.noFill =>
-        'Nenhum anúncio disponível agora. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
-      RewardedAdResult.loadFailed =>
-        'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
-      RewardedAdResult.showFailed =>
-        'Não conseguimos abrir o anúncio neste momento. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
-      RewardedAdResult.unsupported =>
-        'Anúncios não estão disponíveis neste dispositivo. Você pode ver o Premium ou voltar amanhã.',
-      RewardedAdResult.rewarded || null =>
-        'Você já fez seu check-in gratuito de hoje. Para registrar outro agora, você pode assistir a um anúncio, ver o Premium ou voltar amanhã.',
-    };
   }
 
   bool get _isEveningPeriod {
@@ -1015,22 +606,16 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       recentItems: recentItems,
       now: currentTime,
     );
-    final subscriptionLoaded = subscriptionState.hasValue;
-    final currentSubscription = subscriptionState.asData?.value.current;
-    final isPremium =
-        session?.isPremium == true || currentSubscription?.premium == true;
-    final shouldGateExtraCheckIn =
-        session != null &&
-        checkInState.hasValue &&
-        canUseCheckInState &&
-        todayCheckIn != null &&
-        !isPremium &&
-        subscriptionLoaded &&
-        currentSubscription?.premium != true;
-    final openCheckInFromHome = shouldGateExtraCheckIn
-        ? _showExtraCheckInGateSheet
-        : widget.onOpenCheckIn;
-    final checkInButtonLabel = shouldGateExtraCheckIn
+    final shouldGateExtraCheckInToday = shouldGateExtraCheckInFromState(
+      session: session,
+      subscriptionState: subscriptionState,
+      checkInState: checkInState,
+      now: currentTime,
+    );
+    final openCheckInFromHome = widget.checkInGateHandledExternally
+        ? widget.onOpenCheckIn
+        : _openCheckInWithGate;
+    final checkInButtonLabel = shouldGateExtraCheckInToday
         ? 'Novo check-in'
         : 'Fazer check-in';
     final showMirrorReward =
@@ -1055,7 +640,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           isGeneratingFromCheckIn: _isGeneratingDailyRitualFromCheckIn,
           checkInLabel: checkInButtonLabel,
           onCheckIn: openCheckInFromHome,
-          gateExtraCheckIn: shouldGateExtraCheckIn,
+          gateExtraCheckIn: shouldGateExtraCheckInToday,
           onGenerateFromCheckIn: todayCheckIn == null
               ? null
               : () => _createDailyRitualFromCheckIn(todayCheckIn.id),
@@ -1463,9 +1048,9 @@ class _DailyJourneyCardModel {
           primaryLabel: l10n.homeDailyViewRitual,
           primaryIcon: Icons.visibility_rounded,
           primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
-          secondaryLabel: l10n.homeDailyEveningSecondary,
-          secondaryIcon: Icons.edit_note_rounded,
-          secondaryAction: onOpenReflection,
+          secondaryLabel: checkInLabel,
+          secondaryIcon: Icons.favorite_rounded,
+          secondaryAction: onCheckIn,
         );
       }
       if (todayCheckIn != null && onGenerateFromCheckIn != null) {
@@ -1476,9 +1061,9 @@ class _DailyJourneyCardModel {
           primaryLabel: l10n.homeDailyEveningPrimary,
           primaryIcon: Icons.nightlight_round,
           primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
-          secondaryLabel: l10n.homeDailyEveningSecondary,
-          secondaryIcon: Icons.edit_note_rounded,
-          secondaryAction: onOpenReflection,
+          secondaryLabel: checkInLabel,
+          secondaryIcon: Icons.favorite_rounded,
+          secondaryAction: onCheckIn,
         );
       }
       return _DailyJourneyCardModel(
@@ -1487,9 +1072,9 @@ class _DailyJourneyCardModel {
         primaryLabel: l10n.homeDailyEveningPrimary,
         primaryIcon: Icons.nightlight_round,
         primaryAction: () => onOpenDailyRitual(DailyRitualType.evening),
-        secondaryLabel: l10n.homeDailyEveningSecondary,
-        secondaryIcon: Icons.edit_note_rounded,
-        secondaryAction: onOpenReflection,
+        secondaryLabel: checkInLabel,
+        secondaryIcon: Icons.favorite_rounded,
+        secondaryAction: onCheckIn,
       );
     }
 

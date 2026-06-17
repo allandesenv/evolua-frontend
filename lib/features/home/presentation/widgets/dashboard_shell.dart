@@ -18,6 +18,7 @@ import 'package:evolua_frontend/features/emotional/application/check_in_day.dart
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
+import 'package:evolua_frontend/features/home/presentation/widgets/safe_check_in_launcher.dart';
 import 'package:evolua_frontend/features/notification/presentation/widgets/notification_module_view.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/social/presentation/widgets/social_module_view.dart';
@@ -68,6 +69,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   VoidCallback? _spacesInternalBackAction;
   bool _resendingEmailVerification = false;
   bool _refreshingEmailVerification = false;
+  final SafeCheckInLauncher _safeCheckInLauncher = SafeCheckInLauncher();
 
   static const _spacesIndex = 2;
   static const _mirrorIndex = 3;
@@ -253,6 +255,17 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     } finally {
       _checkInOpening = false;
     }
+  }
+
+  Future<void> _openCheckInSafely({required bool compact}) {
+    return _safeCheckInLauncher.open(
+      context: context,
+      ref: ref,
+      isMounted: () => mounted,
+      openCheckIn: () => _openCheckIn(compact: compact),
+      onOpenPremium: () =>
+          _openProfileSection(ProfileModuleSection.plansSubscriptions),
+    );
   }
 
   Future<void> _resendEmailVerification() async {
@@ -724,7 +737,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenProfileSection: _openProfileSection,
       onOpenAdminSection: _openAdminSection,
       onOpenFutureMessages: () => context.push('/future-messages'),
-      onOpenCheckIn: () => _openCheckIn(compact: isCompact),
+      onOpenCheckIn: () => _openCheckInSafely(compact: isCompact),
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
       onResendEmailVerification: _resendEmailVerification,
       onRefreshEmailVerification: _refreshEmailVerificationStatus,
@@ -1126,6 +1139,7 @@ class _DashboardContent extends ConsumerWidget {
             currentSubscription?.mentorPremiumPassActive ?? false,
         mentorPremiumPassEndsAt: currentSubscription?.mentorPremiumPassEndsAt,
         deferSecondaryProviders: true,
+        checkInGateHandledExternally: true,
         onOpenTrails: () => onNavigate(1),
         onOpenSuggestedTrail: onOpenSuggestedTrail,
         onOpenFeed: () => onOpenSpacesSection(SocialModuleTab.reflections),

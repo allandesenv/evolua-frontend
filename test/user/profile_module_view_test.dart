@@ -5,6 +5,8 @@ import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
@@ -28,6 +30,7 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
@@ -372,6 +375,107 @@ void main() {
 
     expect(find.text('Começar check-in'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Agora não'), findsOneWidget);
+  });
+
+  testWidgets('dashboard header check-in shortcut opens gate for free user', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Fazer check-in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Liberar novo check-in'), findsOneWidget);
+    expect(find.byType(CheckInQuickView), findsNothing);
+  });
+
+  testWidgets('dashboard header check-in shortcut opens with pending credit', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        subscriptionRepository: _FakeSubscriptionRepository(
+          rewardedCreditsGrantedToday: 1,
+          rewardedCreditsUsedToday: 0,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Fazer check-in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Liberar novo check-in'), findsNothing);
+    expect(find.byType(CheckInQuickView), findsOneWidget);
+  });
+
+  testWidgets(
+    'dashboard header check-in shortcut shows exhausted reward gate',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final rewarded = _FakeRewardedAdService();
+      await tester.pumpWidget(
+        _dashboardShell(
+          subscriptionRepository: _FakeSubscriptionRepository(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 1,
+          ),
+          rewardedAdService: rewarded,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check-in extra já usado hoje'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
+      expect(find.byType(CheckInQuickView), findsNothing);
+      expect(rewarded.showCalls, 0);
+    },
+  );
+
+  testWidgets('dashboard header check-in shortcut opens directly for premium', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(
+        _testSession(roles: const ['ROLE_USER', 'ROLE_PREMIUM']).toJson(),
+      ),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        subscriptionRepository: _FakeSubscriptionRepository(premium: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Fazer check-in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Liberar novo check-in'), findsNothing);
+    expect(find.byType(CheckInQuickView), findsOneWidget);
   });
 
   testWidgets(
@@ -1970,6 +2074,8 @@ Widget _dashboardShell({
   Size size = const Size(390, 900),
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
+  SubscriptionRepository? subscriptionRepository,
+  RewardedAdService? rewardedAdService,
   NotificationRepository? notificationRepository,
   CommunityRepository? communityRepository,
 }) {
@@ -1981,7 +2087,7 @@ Widget _dashboardShell({
       ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
       subscriptionRepositoryProvider.overrideWithValue(
-        _FakeSubscriptionRepository(),
+        subscriptionRepository ?? _FakeSubscriptionRepository(),
       ),
       trailRepositoryProvider.overrideWithValue(
         trailRepository ?? _FakeTrailRepository(),
@@ -2007,6 +2113,8 @@ Widget _dashboardShell({
       dailyRitualRepositoryProvider.overrideWithValue(
         const _FakeDailyRitualRepository(),
       ),
+      if (rewardedAdService != null)
+        rewardedAdServiceProvider.overrideWithValue(rewardedAdService),
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
       ).overrideWithValue(_fakeUserDio()),
@@ -2629,9 +2737,20 @@ class _FakeProfileRepository implements ProfileRepository {
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
-  _FakeSubscriptionRepository({this.premium = false});
+  _FakeSubscriptionRepository({
+    this.premium = false,
+    this.rewardedCreditsGrantedToday = 0,
+    this.rewardedCreditsUsedToday = 0,
+    List<MonetizationAccessStatus>? accessStatuses,
+  }) : _accessStatuses = List<MonetizationAccessStatus>.of(
+         accessStatuses ?? const [],
+       );
 
   final bool premium;
+  final int rewardedCreditsGrantedToday;
+  final int rewardedCreditsUsedToday;
+  final List<MonetizationAccessStatus> _accessStatuses;
+  int accessCalls = 0;
 
   @override
   Future<List<PlanView>> listPlans() async {
@@ -2742,15 +2861,37 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
     required String resource,
     String? contextId,
   }) async {
+    accessCalls++;
+    if (_accessStatuses.isNotEmpty) {
+      return _accessStatuses.removeAt(0);
+    }
     return MonetizationAccessStatus(
       resource: resource,
       contextId: contextId,
-      allowed: false,
-      premium: false,
-      rewardedAdAvailable: true,
-      upgradeRecommended: true,
+      allowed: premium,
+      premium: premium,
+      rewardedAdAvailable: !premium,
+      upgradeRecommended: !premium,
       limitMessage: null,
+      rewardedCreditsGrantedToday: rewardedCreditsGrantedToday,
+      rewardedCreditsUsedToday: rewardedCreditsUsedToday,
     );
+  }
+}
+
+class _FakeRewardedAdService implements RewardedAdService {
+  int showCalls = 0;
+  String? rewardType;
+
+  @override
+  Future<RewardedAdResult> showRewardedAd({
+    required String rewardType,
+    String? contextId,
+    void Function()? onAdClosed,
+  }) async {
+    showCalls++;
+    this.rewardType = rewardType;
+    return RewardedAdResult.rewarded;
   }
 }
 
