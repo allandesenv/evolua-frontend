@@ -18,6 +18,8 @@ enum ExtraCheckInGateAccessDecision {
   watchRewarded,
 }
 
+enum _SafeCheckInInitialDecision { openDirect, showGate, loadFailed }
+
 bool shouldGateExtraCheckIn(WidgetRef ref, {DateTime? now}) {
   return shouldGateExtraCheckInFromState(
     session: ref.read(authControllerProvider).asData?.value,
@@ -69,6 +71,7 @@ String checkInEntryLabel(WidgetRef ref, {DateTime? now}) {
 class SafeCheckInLauncher {
   static const _recheckAttempts = 3;
   static const _recheckDelay = Duration(milliseconds: 1500);
+  static const _gateStateTimeout = Duration(seconds: 8);
 
   bool _busy = false;
   int _attemptSequence = 0;
@@ -79,14 +82,10 @@ class SafeCheckInLauncher {
     required bool Function() isMounted,
     required FutureOr<void> Function() openCheckIn,
     VoidCallback? onOpenPremium,
+    VoidCallback? onBlockingUiPresented,
     DateTime? now,
   }) async {
     if (_busy) {
-      return;
-    }
-
-    if (!shouldGateExtraCheckIn(ref, now: now)) {
-      await Future<void>.sync(openCheckIn);
       return;
     }
 
@@ -94,6 +93,26 @@ class SafeCheckInLauncher {
     try {
       var openCheckInAfterGate = false;
       final initialAttemptId = ++_attemptSequence;
+      final initialOpenDecision = await _resolveInitialOpenDecision(
+        ref: ref,
+        attemptId: initialAttemptId,
+        now: now,
+      );
+      if (!isMounted() || !context.mounted) {
+        return;
+      }
+      if (initialOpenDecision == _SafeCheckInInitialDecision.openDirect) {
+        _logFinalDecision(attemptId: initialAttemptId, openCheckIn: true);
+        onBlockingUiPresented?.call();
+        await Future<void>.sync(openCheckIn);
+        return;
+      }
+      if (initialOpenDecision == _SafeCheckInInitialDecision.loadFailed) {
+        _logFinalDecision(attemptId: initialAttemptId, openCheckIn: false);
+        _showGateStateLoadFailure(context);
+        return;
+      }
+
       final initialDecision = await _extraCheckInGateAccessDecision(
         ref: ref,
         attemptId: initialAttemptId,
@@ -110,6 +129,7 @@ class SafeCheckInLauncher {
         var rewardExhaustedToday =
             initialDecision == ExtraCheckInGateAccessDecision.exhaustedToday;
         var isRewardLoading = false;
+        onBlockingUiPresented?.call();
         await showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,
@@ -288,12 +308,146 @@ class SafeCheckInLauncher {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         await WidgetsBinding.instance.endOfFrame;
         if (isMounted()) {
+          onBlockingUiPresented?.call();
           await Future<void>.sync(openCheckIn);
         }
       }
     } finally {
       _busy = false;
     }
+  }
+
+  Future<_SafeCheckInInitialDecision> _resolveInitialOpenDecision({
+    required WidgetRef ref,
+    required int attemptId,
+    DateTime? now,
+  }) async {
+    final session = ref.read(authControllerProvider).asData?.value;
+    if (session == null) {
+      _logInitialState(
+        attemptId: attemptId,
+        sessionUserId: null,
+        subscriptionState: ref.read(subscriptionControllerProvider),
+        checkInState: ref.read(checkInControllerProvider),
+        historyBelongsToUser: false,
+        decision: 'loadFailed',
+      );
+      return _SafeCheckInInitialDecision.loadFailed;
+    }
+
+    if (session.isPremium == true) {
+      _logInitialState(
+        attemptId: attemptId,
+        sessionUserId: session.userId,
+        subscriptionState: ref.read(subscriptionControllerProvider),
+        checkInState: ref.read(checkInControllerProvider),
+        historyBelongsToUser: null,
+        decision: 'openDirect',
+      );
+      return _SafeCheckInInitialDecision.openDirect;
+    }
+
+    try {
+      final subscription = await _loadSubscriptionState(ref);
+      final currentSubscription = subscription.current;
+      if (currentSubscription?.premium == true) {
+        _logInitialState(
+          attemptId: attemptId,
+          sessionUserId: session.userId,
+          subscriptionState: ref.read(subscriptionControllerProvider),
+          checkInState: ref.read(checkInControllerProvider),
+          historyBelongsToUser: null,
+          decision: 'openDirect',
+        );
+        return _SafeCheckInInitialDecision.openDirect;
+      }
+
+      final history = await _loadCheckInHistoryState(
+        ref: ref,
+        sessionUserId: session.userId,
+        forceRefreshWhenStale: true,
+      );
+      final belongsToUser = history.belongsToUser(session.userId);
+      if (!belongsToUser) {
+        _logInitialState(
+          attemptId: attemptId,
+          sessionUserId: session.userId,
+          subscriptionState: ref.read(subscriptionControllerProvider),
+          checkInState: ref.read(checkInControllerProvider),
+          historyBelongsToUser: false,
+          decision: 'loadFailed',
+        );
+        return _SafeCheckInInitialDecision.loadFailed;
+      }
+
+      final hasToday = hasCheckInToday(
+        history.result.items,
+        latestCreatedCheckIn: history.latestCreatedCheckIn,
+        now: now,
+      );
+      final decision = hasToday
+          ? _SafeCheckInInitialDecision.showGate
+          : _SafeCheckInInitialDecision.openDirect;
+      _logInitialState(
+        attemptId: attemptId,
+        sessionUserId: session.userId,
+        subscriptionState: ref.read(subscriptionControllerProvider),
+        checkInState: ref.read(checkInControllerProvider),
+        historyBelongsToUser: belongsToUser,
+        decision: hasToday ? 'gate' : 'openDirect',
+      );
+      return decision;
+    } catch (error) {
+      debugPrint(
+        'Evolua gate extra check-in attemptId=$attemptId '
+        'initial state failed sessionUserId=${session.userId} error=$error',
+      );
+      _logInitialState(
+        attemptId: attemptId,
+        sessionUserId: session.userId,
+        subscriptionState: ref.read(subscriptionControllerProvider),
+        checkInState: ref.read(checkInControllerProvider),
+        historyBelongsToUser: null,
+        decision: 'loadFailed',
+      );
+      return _SafeCheckInInitialDecision.loadFailed;
+    }
+  }
+
+  Future<SubscriptionScreenState> _loadSubscriptionState(WidgetRef ref) async {
+    final state = ref.read(subscriptionControllerProvider);
+    if (state.hasValue && state.asData?.value != null) {
+      return state.requireValue;
+    }
+    return ref
+        .read(subscriptionControllerProvider.future)
+        .timeout(_gateStateTimeout);
+  }
+
+  Future<CheckInHistoryState> _loadCheckInHistoryState({
+    required WidgetRef ref,
+    required String sessionUserId,
+    required bool forceRefreshWhenStale,
+  }) async {
+    final state = ref.read(checkInControllerProvider);
+    if (state.hasValue &&
+        state.asData?.value != null &&
+        state.requireValue.belongsToUser(sessionUserId)) {
+      return state.requireValue;
+    }
+
+    var history = await ref
+        .read(checkInControllerProvider.future)
+        .timeout(_gateStateTimeout);
+    if (history.belongsToUser(sessionUserId) || !forceRefreshWhenStale) {
+      return history;
+    }
+
+    ref.invalidate(checkInControllerProvider);
+    history = await ref
+        .read(checkInControllerProvider.future)
+        .timeout(_gateStateTimeout);
+    return history;
   }
 
   Future<bool> _shouldOpenAfterReward({
@@ -447,6 +601,34 @@ class SafeCheckInLauncher {
     );
   }
 
+  void _logInitialState({
+    required int attemptId,
+    required String? sessionUserId,
+    required AsyncValue<SubscriptionScreenState> subscriptionState,
+    required AsyncValue<CheckInHistoryState> checkInState,
+    required bool? historyBelongsToUser,
+    required String decision,
+  }) {
+    debugPrint(
+      'Evolua gate extra check-in attemptId=$attemptId '
+      'sessionUserId=${sessionUserId ?? 'none'} '
+      'subscriptionState.hasValue=${subscriptionState.hasValue} '
+      'checkInState.hasValue=${checkInState.hasValue} '
+      'historyBelongsToUser=$historyBelongsToUser '
+      'decision=$decision',
+    );
+  }
+
+  void _showGateStateLoadFailure(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Não conseguimos verificar seu limite agora. Tente novamente em instantes.',
+        ),
+      ),
+    );
+  }
+
   bool _isPendingConfirmation(RewardedAdResult? result) {
     return result == RewardedAdResult.timeout ||
         result == RewardedAdResult.rewardConfirmedButAccessDenied;
@@ -461,7 +643,7 @@ class SafeCheckInLauncher {
       RewardedAdResult.loadFailed => 'Não conseguimos carregar o anúncio agora',
       RewardedAdResult.showFailed => 'Não conseguimos abrir o anúncio agora',
       RewardedAdResult.unsupported => 'Anúncio indisponível neste dispositivo',
-      RewardedAdResult.timeout => 'Confirmação em andamento',
+      RewardedAdResult.timeout => 'Verificando liberação',
       RewardedAdResult.rewarded || null => 'Liberar novo check-in',
     };
   }
@@ -473,7 +655,7 @@ class SafeCheckInLauncher {
       RewardedAdResult.dismissedWithoutReward =>
         'Para liberar outro check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
       RewardedAdResult.timeout =>
-        'A confirmação do anúncio demorou mais que o esperado. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
+        'Não conseguimos confirmar a liberação do anúncio a tempo. Tente verificar novamente em alguns instantes, veja o Premium ou volte amanhã.',
       RewardedAdResult.noFill =>
         'Nenhum anúncio disponível agora. Tente novamente em alguns instantes, veja o Premium ou volte amanhã.',
       RewardedAdResult.loadFailed =>

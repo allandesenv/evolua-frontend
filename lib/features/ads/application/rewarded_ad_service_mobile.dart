@@ -21,6 +21,7 @@ class MobileRewardedAdService implements RewardedAdService {
   static const _ssvConfirmationAttempts = 8;
   static const _ssvConfirmationDelay = Duration(seconds: 2);
   static const _ssvMaxWaitAfterAd = Duration(seconds: 30);
+  static const _adOpenWaitTimeout = Duration(seconds: 20);
 
   static const _extraCheckInRewardTypes = {RewardResources.extraCheckIn};
   static const _aiRewardTypes = {
@@ -56,15 +57,22 @@ class MobileRewardedAdService implements RewardedAdService {
 
     final adUnitId = _adUnitIdFor(rewardType);
     final logicalAdUnit = _logicalAdUnitNameFor(rewardType);
+    final platform = _platformLabel();
+    final usingTestAds = AppConfig.adMobUseTestAds;
+    final loadStopwatch = Stopwatch()..start();
 
     debugPrint(
       'Evolua rewarded load requested: rewardType=$normalizedRewardType '
-      'logicalAdUnit=$logicalAdUnit adUnitId=${_maskAdUnitId(adUnitId)}',
+      'logicalAdUnit=$logicalAdUnit '
+      'adUnitId=${_maskAdUnitId(adUnitId)} '
+      'platform=$platform usingTestAds=$usingTestAds '
+      'sessionId=${_maskIdentifier(session.id)}',
     );
     await adMobInitializationService.ensureInitialized();
     debugPrint(
       'Evolua rewarded MobileAds initialized: '
-      'rewardType=$normalizedRewardType logicalAdUnit=$logicalAdUnit',
+      'rewardType=$normalizedRewardType logicalAdUnit=$logicalAdUnit '
+      'platform=$platform usingTestAds=$usingTestAds',
     );
 
     final completer = Completer<_RewardedAdOutcome>();
@@ -87,7 +95,8 @@ class MobileRewardedAdService implements RewardedAdService {
 
       debugPrint(
         'Evolua rewarded completed: source=$source '
-        'opened=$opened earned=$earned rewardType=$normalizedRewardType',
+        'opened=$opened earned=$earned rewardType=$normalizedRewardType '
+        'logicalAdUnit=$logicalAdUnit elapsedMs=${loadStopwatch.elapsedMilliseconds}',
       );
 
       completer.complete(
@@ -142,6 +151,13 @@ class MobileRewardedAdService implements RewardedAdService {
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
             rewardedAd = ad;
+            final responseInfo = ad.responseInfo;
+            debugPrint(
+              'Evolua rewarded loaded: rewardType=$normalizedRewardType '
+              'logicalAdUnit=$logicalAdUnit '
+              'responseId=${responseInfo?.responseId} '
+              'mediationAdapter=${responseInfo?.mediationAdapterClassName}',
+            );
 
             ad.setServerSideOptions(
               ServerSideVerificationOptions(customData: session.customData),
@@ -151,13 +167,16 @@ class MobileRewardedAdService implements RewardedAdService {
               onAdShowedFullScreenContent: (ad) {
                 openedFullScreen = true;
                 debugPrint(
-                  'Evolua rewarded showed: rewardType=$normalizedRewardType',
+                  'Evolua rewarded showed: rewardType=$normalizedRewardType '
+                  'logicalAdUnit=$logicalAdUnit',
                 );
               },
               onAdDismissedFullScreenContent: (ad) {
                 debugPrint(
                   'Evolua rewarded dismissed: '
-                  'rewardType=$normalizedRewardType earned=$earnedReward',
+                  'rewardType=$normalizedRewardType '
+                  'logicalAdUnit=$logicalAdUnit '
+                  'opened=$openedFullScreen earned=$earnedReward',
                 );
 
                 ad.dispose();
@@ -171,8 +190,14 @@ class MobileRewardedAdService implements RewardedAdService {
               },
               onAdFailedToShowFullScreenContent: (ad, error) {
                 debugPrint(
-                  'Evolua rewarded failed to show: '
-                  'rewardType=$normalizedRewardType error=$error',
+                  _describeShowError(
+                    error,
+                    normalizedRewardType,
+                    adUnitId,
+                    logicalAdUnit,
+                    platform,
+                    usingTestAds,
+                  ),
                 );
 
                 ad.dispose();
@@ -198,6 +223,8 @@ class MobileRewardedAdService implements RewardedAdService {
                 debugPrint(
                   'Evolua rewarded earned: '
                   'rewardType=$normalizedRewardType '
+                  'logicalAdUnit=$logicalAdUnit '
+                  'opened=$openedFullScreen earned=$earnedReward '
                   'amount=${reward.amount} type=${reward.type}',
                 );
               },
@@ -205,7 +232,14 @@ class MobileRewardedAdService implements RewardedAdService {
           },
           onAdFailedToLoad: (error) {
             debugPrint(
-              _describeLoadError(error, rewardType, adUnitId, logicalAdUnit),
+              _describeLoadError(
+                error,
+                normalizedRewardType,
+                adUnitId,
+                logicalAdUnit,
+                platform,
+                usingTestAds,
+              ),
             );
 
             completeOutcome(
@@ -221,12 +255,15 @@ class MobileRewardedAdService implements RewardedAdService {
       );
 
       final outcome = await completer.future.timeout(
-        const Duration(seconds: 20),
+        _adOpenWaitTimeout,
         onTimeout: () {
           debugPrint(
             'Evolua rewarded timeout: '
             'rewardType=$normalizedRewardType '
-            'opened=$openedFullScreen earned=$earnedReward',
+            'logicalAdUnit=$logicalAdUnit '
+            'opened=$openedFullScreen earned=$earnedReward '
+            'waitMs=${_adOpenWaitTimeout.inMilliseconds} '
+            'elapsedMs=${loadStopwatch.elapsedMilliseconds}',
           );
 
           rewardedAd?.dispose();
@@ -373,6 +410,8 @@ class MobileRewardedAdService implements RewardedAdService {
     String rewardType,
     String adUnitId,
     String logicalAdUnit,
+    String platform,
+    bool usingTestAds,
   ) {
     final hint = switch (error.code) {
       2 =>
@@ -395,6 +434,7 @@ class MobileRewardedAdService implements RewardedAdService {
     return 'AdMob rewarded load failed: resource=$rewardType '
         'logicalAdUnit=$logicalAdUnit '
         'adUnitId=${_maskAdUnitId(adUnitId)} '
+        'platform=$platform usingTestAds=$usingTestAds '
         'code=${error.code} domain=${error.domain} '
         'message=${error.message} '
         'responseId=${responseInfo?.responseId} '
@@ -404,12 +444,50 @@ class MobileRewardedAdService implements RewardedAdService {
         'hint=$hint';
   }
 
+  String _describeShowError(
+    AdError error,
+    String rewardType,
+    String adUnitId,
+    String logicalAdUnit,
+    String platform,
+    bool usingTestAds,
+  ) {
+    return 'AdMob rewarded show failed: resource=$rewardType '
+        'logicalAdUnit=$logicalAdUnit '
+        'adUnitId=${_maskAdUnitId(adUnitId)} '
+        'platform=$platform usingTestAds=$usingTestAds '
+        'code=${error.code} domain=${error.domain} '
+        'message=${error.message}';
+  }
+
+  String _platformLabel() {
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+    return Platform.operatingSystem;
+  }
+
   String _maskAdUnitId(String adUnitId) {
     final trimmed = adUnitId.trim();
     if (trimmed.length <= 8) {
       return trimmed.isEmpty ? '<empty>' : '***';
     }
     return '${trimmed.substring(0, 6)}...'
+        '${trimmed.substring(trimmed.length - 4)}';
+  }
+
+  String _maskIdentifier(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '<empty>';
+    }
+    if (trimmed.length <= 8) {
+      return '***';
+    }
+    return '${trimmed.substring(0, 4)}...'
         '${trimmed.substring(trimmed.length - 4)}';
   }
 
@@ -496,6 +574,9 @@ RewardedAdResult? rewardedResultBeforeSsv({
     return null;
   }
   if (!openedFullScreen) {
+    if (outcomeResult == RewardedAdResult.timeout) {
+      return RewardedAdResult.showFailed;
+    }
     return outcomeResult ?? RewardedAdResult.loadFailed;
   }
   return outcomeResult == RewardedAdResult.timeout

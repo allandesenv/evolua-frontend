@@ -69,6 +69,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   VoidCallback? _spacesInternalBackAction;
   bool _resendingEmailVerification = false;
   bool _refreshingEmailVerification = false;
+  bool _headerCheckInLoading = false;
   final SafeCheckInLauncher _safeCheckInLauncher = SafeCheckInLauncher();
 
   static const _spacesIndex = 2;
@@ -276,6 +277,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Future<void> _openCheckInSafely({
     required bool compact,
     bool redirectHomeOnCompleted = false,
+    VoidCallback? onBlockingUiPresented,
   }) {
     return _safeCheckInLauncher.open(
       context: context,
@@ -287,7 +289,33 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       ),
       onOpenPremium: () =>
           _openProfileSection(ProfileModuleSection.plansSubscriptions),
+      onBlockingUiPresented: onBlockingUiPresented,
     );
+  }
+
+  Future<void> _openHeaderCheckInSafely({required bool compact}) async {
+    if (_headerCheckInLoading) {
+      return;
+    }
+    setState(() => _headerCheckInLoading = true);
+    var loadingCleared = false;
+    void clearLoading() {
+      if (loadingCleared || !mounted) {
+        return;
+      }
+      loadingCleared = true;
+      setState(() => _headerCheckInLoading = false);
+    }
+
+    try {
+      await _openCheckInSafely(
+        compact: compact,
+        redirectHomeOnCompleted: true,
+        onBlockingUiPresented: clearLoading,
+      );
+    } finally {
+      clearLoading();
+    }
   }
 
   Future<void> _resendEmailVerification() async {
@@ -760,10 +788,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       onOpenAdminSection: _openAdminSection,
       onOpenFutureMessages: () => context.push('/future-messages'),
       onOpenCheckIn: () => _openCheckInSafely(compact: isCompact),
-      onOpenHeaderCheckIn: () => _openCheckInSafely(
-        compact: isCompact,
-        redirectHomeOnCompleted: true,
-      ),
+      onOpenHeaderCheckIn: () => _openHeaderCheckInSafely(compact: isCompact),
+      isHeaderCheckInLoading: _headerCheckInLoading,
       onLogout: () => ref.read(authControllerProvider.notifier).logout(),
       onResendEmailVerification: _resendEmailVerification,
       onRefreshEmailVerification: _refreshEmailVerificationStatus,
@@ -1095,6 +1121,7 @@ class _DashboardContent extends ConsumerWidget {
     required this.onOpenFutureMessages,
     required this.onOpenCheckIn,
     required this.onOpenHeaderCheckIn,
+    required this.isHeaderCheckInLoading,
     required this.onLogout,
     required this.onResendEmailVerification,
     required this.onRefreshEmailVerification,
@@ -1120,6 +1147,7 @@ class _DashboardContent extends ConsumerWidget {
   final VoidCallback onOpenFutureMessages;
   final VoidCallback onOpenCheckIn;
   final VoidCallback onOpenHeaderCheckIn;
+  final bool isHeaderCheckInLoading;
   final VoidCallback onLogout;
   final Future<void> Function() onResendEmailVerification;
   final Future<void> Function() onRefreshEmailVerification;
@@ -1245,6 +1273,7 @@ class _DashboardContent extends ConsumerWidget {
                   session: session,
                   profile: profile,
                   onOpenCheckIn: onOpenHeaderCheckIn,
+                  isCheckInLoading: isHeaderCheckInLoading,
                   onOpenProfileSection: onOpenProfileSection,
                   onOpenAdminPanel: session?.isAdmin == true
                       ? () => onOpenAdminSection(AdminPanelSection.overview)
@@ -1582,6 +1611,7 @@ class _HeaderActions extends StatelessWidget {
     required this.session,
     required this.profile,
     required this.onOpenCheckIn,
+    required this.isCheckInLoading,
     required this.onOpenProfileSection,
     required this.onOpenAdminPanel,
     required this.onOpenFutureMessages,
@@ -1593,6 +1623,7 @@ class _HeaderActions extends StatelessWidget {
   final AuthSession? session;
   final Profile? profile;
   final VoidCallback onOpenCheckIn;
+  final bool isCheckInLoading;
   final void Function(ProfileModuleSection section) onOpenProfileSection;
   final VoidCallback? onOpenAdminPanel;
   final VoidCallback onOpenFutureMessages;
@@ -1607,7 +1638,10 @@ class _HeaderActions extends StatelessWidget {
       children: [
         notificationBell,
         const SizedBox(width: 8),
-        _CheckInHeaderButton(onPressed: onOpenCheckIn),
+        _CheckInHeaderButton(
+          onPressed: onOpenCheckIn,
+          isLoading: isCheckInLoading,
+        ),
         const SizedBox(width: 8),
         _AccountMenuButton(
           session: session,
@@ -1624,43 +1658,55 @@ class _HeaderActions extends StatelessWidget {
 }
 
 class _CheckInHeaderButton extends StatelessWidget {
-  const _CheckInHeaderButton({required this.onPressed});
+  const _CheckInHeaderButton({
+    required this.onPressed,
+    required this.isLoading,
+  });
 
   final VoidCallback onPressed;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final tooltip = isLoading
+        ? 'Verificando check-in'
+        : l10n.homeDailyDayPrimary;
     return IconButton(
-      tooltip: l10n.homeDailyDayPrimary,
-      onPressed: onPressed,
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(Icons.favorite_rounded),
-          Positioned(
-            right: -3,
-            bottom: -3,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.accent,
-                border: Border.all(
-                  color: context.evoluaColors.surface,
-                  width: 1.5,
+      tooltip: tooltip,
+      onPressed: isLoading ? null : onPressed,
+      icon: isLoading
+          ? const SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.favorite_rounded),
+                Positioned(
+                  right: -3,
+                  bottom: -3,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.accent,
+                      border: Border.all(
+                        color: context.evoluaColors.surface,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 10,
+                      color: context.evoluaColors.background,
+                    ),
+                  ),
                 ),
-              ),
-              child: Icon(
-                Icons.check_rounded,
-                size: 10,
-                color: context.evoluaColors.background,
-              ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
