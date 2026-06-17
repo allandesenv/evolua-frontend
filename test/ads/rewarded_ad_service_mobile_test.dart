@@ -23,8 +23,14 @@ void main() {
         isIOS: false,
         useTestAds: false,
       );
+      final logicalName = MobileRewardedAdService.logicalAdUnitNameFor(
+        rewardType: 'EXTRA_CHECK_IN',
+        isIOS: false,
+        useTestAds: false,
+      );
 
       expect(adUnitId, AppConfig.adMobAndroidRewardedExtraCheckInAdUnitId);
+      expect(logicalName, 'android_rewarded_extra_check_in');
     });
 
     test('extra check-in block falls back to AI extra by default', () {
@@ -109,7 +115,17 @@ void main() {
       expect(result, isNull);
     });
 
-    test('keeps timeout only when no reward was earned', () {
+    test('timeout before opening becomes show failed', () {
+      final result = rewardedResultBeforeSsv(
+        openedFullScreen: false,
+        earnedReward: false,
+        outcomeResult: RewardedAdResult.timeout,
+      );
+
+      expect(result, RewardedAdResult.showFailed);
+    });
+
+    test('keeps timeout when ad opened but no reward was earned', () {
       final result = rewardedResultBeforeSsv(
         openedFullScreen: true,
         earnedReward: false,
