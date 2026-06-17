@@ -68,21 +68,67 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
   bool get _isEvening => widget.type == DailyRitualType.evening;
 
   @override
+  void initState() {
+    super.initState();
+    for (final controller in _answers) {
+      controller.addListener(_handleAnswerChanged);
+    }
+  }
+
+  @override
   void dispose() {
     for (final controller in _answers) {
+      controller.removeListener(_handleAnswerChanged);
       controller.dispose();
     }
     super.dispose();
   }
 
+  void _handleAnswerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  bool _isAnswerValid(String value, AppLocalizations l10n) {
+    final normalized = value.trim();
+    return normalized.isNotEmpty &&
+        normalized != l10n.dailyRitualAnswerLabel.trim();
+  }
+
+  bool _isCurrentAnswerValid(AppLocalizations l10n) {
+    if (_step < 0 || _step >= _answers.length) {
+      return true;
+    }
+    return _isAnswerValid(_answers[_step].text, l10n);
+  }
+
+  bool _areAllAnswersValid(AppLocalizations l10n) {
+    return _answers.every(
+      (controller) => _isAnswerValid(controller.text, l10n),
+    );
+  }
+
+  void _showMissingAnswerMessage(AppLocalizations l10n) {
+    AppSnackBar.show(
+      context,
+      message: 'Escreva sua resposta antes de continuar.',
+      icon: Icons.edit_note_rounded,
+    );
+  }
+
+  Future<void> _nextStep(AppLocalizations l10n) async {
+    if (!_isCurrentAnswerValid(l10n)) {
+      _showMissingAnswerMessage(l10n);
+      return;
+    }
+    setState(() => _step++);
+  }
+
   Future<void> _submit() async {
     final l10n = context.l10n;
-    if (_answers.any((controller) => controller.text.trim().isEmpty)) {
-      AppSnackBar.show(
-        context,
-        message: l10n.dailyRitualAnswerAllSteps,
-        icon: Icons.edit_note_rounded,
-      );
+    if (!_isCurrentAnswerValid(l10n) || !_areAllAnswersValid(l10n)) {
+      _showMissingAnswerMessage(l10n);
       return;
     }
 
@@ -148,8 +194,9 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
           step: _step,
           controller: _answers[_step],
           isSubmitting: _isSubmitting,
+          canContinue: _isCurrentAnswerValid(l10n),
           onBack: _step == 0 ? null : () => setState(() => _step--),
-          onNext: _step == 3 ? _submit : () => setState(() => _step++),
+          onNext: _step == 3 ? _submit : () => _nextStep(l10n),
         );
       },
       loading: () => const PrimaryPanel(child: LinearProgressIndicator()),
@@ -253,6 +300,7 @@ class _DailyRitualFlow extends StatelessWidget {
     required this.step,
     required this.controller,
     required this.isSubmitting,
+    required this.canContinue,
     required this.onBack,
     required this.onNext,
   });
@@ -262,6 +310,7 @@ class _DailyRitualFlow extends StatelessWidget {
   final int step;
   final TextEditingController controller;
   final bool isSubmitting;
+  final bool canContinue;
   final VoidCallback? onBack;
   final FutureOr<void> Function()? onNext;
 
@@ -310,7 +359,7 @@ class _DailyRitualFlow extends StatelessWidget {
                 ),
               const Spacer(),
               EvoluaAsyncButton.filled(
-                onPressed: isSubmitting ? null : onNext,
+                onPressed: isSubmitting || !canContinue ? null : onNext,
                 isBusy: isSubmitting,
                 icon: step == 3
                     ? Icons.check_rounded
