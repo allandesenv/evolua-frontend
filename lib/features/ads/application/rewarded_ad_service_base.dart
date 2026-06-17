@@ -18,6 +18,7 @@ abstract final class RewardResources {
   static const extraCheckIn = 'EXTRA_CHECK_IN';
   static const aiExtra = 'AI_ACTION';
   static const premiumPass = 'PREMIUM_PASS';
+  static const checkInHistoryFull = 'CHECK_IN_HISTORY_FULL';
 }
 
 abstract class RewardedAdService {
