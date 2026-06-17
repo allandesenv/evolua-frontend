@@ -556,7 +556,13 @@ void main() {
           expect(openedCheckIn, isFalse);
           expect(rewarded.showCalls, 1);
           expect(subscriptions.accessCalls, 5);
-          expect(find.text('Confirmação em andamento'), findsOneWidget);
+          if (result == RewardedAdResult.timeout) {
+            expect(find.text('Verificando liberação'), findsOneWidget);
+            expect(find.text('Confirmação em andamento'), findsNothing);
+          } else {
+            expect(find.text('Confirmação em andamento'), findsOneWidget);
+            expect(find.text('Verificando liberação'), findsNothing);
+          }
           expect(find.text('Verificar liberação'), findsOneWidget);
           expect(find.text('Assistir anúncio'), findsNothing);
 
@@ -688,7 +694,8 @@ void main() {
             expect(find.text('Não foi possível liberar agora'), findsNothing);
             expect(subscriptions.accessCalls, 5);
           } else if (result == RewardedAdResult.timeout) {
-            expect(find.text('Confirmação em andamento'), findsOneWidget);
+            expect(find.text('Verificando liberação'), findsOneWidget);
+            expect(find.text('Confirmação em andamento'), findsNothing);
             expect(find.text('Verificar liberação'), findsOneWidget);
             expect(find.text('Assistir anúncio'), findsNothing);
             expect(find.text('Não foi possível liberar agora'), findsNothing);

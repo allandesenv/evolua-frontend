@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -397,6 +398,141 @@ void main() {
     expect(find.byType(CheckInQuickView), findsNothing);
   });
 
+  testWidgets(
+    'dashboard header check-in shortcut shows loading while verifying limits',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final gate = Completer<void>();
+      final checkIns = _BlockingCheckInRepository(
+        gate: gate,
+        items: [_todayCheckIn()],
+      );
+      await tester.pumpWidget(_dashboardShell(checkInRepository: checkIns));
+      await tester.pump();
+
+      expect(find.byTooltip('Fazer check-in'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pump();
+
+      expect(find.byTooltip('Verificando check-in'), findsOneWidget);
+      expect(find.byType(CheckInQuickView), findsNothing);
+
+      await tester.tap(find.byTooltip('Verificando check-in'));
+      await tester.pump();
+      expect(checkIns.listCalls, 1);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liberar novo check-in'), findsOneWidget);
+      expect(find.byTooltip('Fazer check-in'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'dashboard header check-in shortcut reloads stale history before gating',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      var builds = 0;
+      await tester.pumpWidget(
+        _dashboardShell(
+          checkInControllerFactory: () => _SequenceCheckInController(() {
+            builds++;
+            if (builds == 1) {
+              return _historyState(
+                ownerUserId: 'previous-user',
+                items: const <CheckIn>[],
+              );
+            }
+            return _historyState(
+              ownerUserId: 'user-123',
+              items: [_todayCheckIn()],
+            );
+          }),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(builds, greaterThanOrEqualTo(2));
+      expect(find.text('Liberar novo check-in'), findsOneWidget);
+      expect(find.byType(CheckInQuickView), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'dashboard header check-in shortcut fails closed when limit verification times out',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(
+          checkInControllerFactory: _NeverCompletingCheckInController.new,
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pump();
+      expect(find.byTooltip('Verificando check-in'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 9));
+      await tester.pump();
+
+      expect(find.textContaining('verificar seu limite'), findsOneWidget);
+      expect(find.byTooltip('Fazer check-in'), findsOneWidget);
+      expect(find.byType(CheckInQuickView), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'dashboard header check-in shortcut opens directly after confirmed empty history',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'evolua.auth.session': jsonEncode(_testSession().toJson()),
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _dashboardShell(
+          checkInRepository: _FakeCheckInRepository(items: [_pastCheckIn()]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final initialPromptDismiss = find.textContaining('Agora');
+      if (initialPromptDismiss.evaluate().isNotEmpty) {
+        await tester.tap(initialPromptDismiss);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.tap(find.byTooltip('Fazer check-in'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liberar novo check-in'), findsNothing);
+      expect(find.byType(CheckInQuickView), findsOneWidget);
+    },
+  );
+
   testWidgets('dashboard header check-in shortcut opens with pending credit', (
     tester,
   ) async {
@@ -458,41 +594,40 @@ void main() {
     },
   );
 
-  testWidgets(
-    'dashboard header check-in shortcut cancel keeps current tab',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({
-        'evolua.auth.session': jsonEncode(
-          _testSession(roles: const ['ROLE_USER', 'ROLE_PREMIUM']).toJson(),
-        ),
-      });
-      await tester.binding.setSurfaceSize(const Size(390, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('dashboard header check-in shortcut cancel keeps current tab', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(
+        _testSession(roles: const ['ROLE_USER', 'ROLE_PREMIUM']).toJson(),
+      ),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await tester.pumpWidget(
-        _dashboardShell(
-          checkInRepository: _FakeCheckInRepository(items: [_todayCheckIn()]),
-          subscriptionRepository: _FakeSubscriptionRepository(premium: true),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      _dashboardShell(
+        checkInRepository: _FakeCheckInRepository(items: [_todayCheckIn()]),
+        subscriptionRepository: _FakeSubscriptionRepository(premium: true),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ContentModuleView), findsOneWidget);
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Trilhas'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ContentModuleView), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Fazer check-in'));
-      await tester.pumpAndSettle();
-      expect(find.byType(CheckInQuickView), findsOneWidget);
+    await tester.tap(find.byTooltip('Fazer check-in'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CheckInQuickView), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Agora não'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Agora não'));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(CheckInQuickView), findsNothing);
-      expect(find.byType(ContentModuleView), findsOneWidget);
-      expect(find.byType(HomeHubView), findsNothing);
-    },
-  );
+    expect(find.byType(CheckInQuickView), findsNothing);
+    expect(find.byType(ContentModuleView), findsOneWidget);
+    expect(find.byType(HomeHubView), findsNothing);
+  });
 
   testWidgets(
     'dashboard header check-in shortcut with pending credit returns home after save',
@@ -2192,6 +2327,7 @@ Widget _dashboardShell({
   RewardedAdService? rewardedAdService,
   NotificationRepository? notificationRepository,
   CommunityRepository? communityRepository,
+  CheckInController Function()? checkInControllerFactory,
 }) {
   return ProviderScope(
     overrides: [
@@ -2229,6 +2365,8 @@ Widget _dashboardShell({
       ),
       if (rewardedAdService != null)
         rewardedAdServiceProvider.overrideWithValue(rewardedAdService),
+      if (checkInControllerFactory != null)
+        checkInControllerProvider.overrideWith(checkInControllerFactory),
       authenticatedDioProvider(
         AppConfig.userBaseUrl,
       ).overrideWithValue(_fakeUserDio()),
@@ -3020,6 +3158,22 @@ class _FakeRewardedAdService implements RewardedAdService {
   }
 }
 
+class _SequenceCheckInController extends CheckInController {
+  _SequenceCheckInController(this._nextState);
+
+  final CheckInHistoryState Function() _nextState;
+
+  @override
+  Future<CheckInHistoryState> build() async => _nextState();
+}
+
+class _NeverCompletingCheckInController extends CheckInController {
+  @override
+  Future<CheckInHistoryState> build() {
+    return Completer<CheckInHistoryState>().future;
+  }
+}
+
 class _FakeTrailRepository implements TrailRepository {
   const _FakeTrailRepository({
     Trail? currentJourney,
@@ -3173,6 +3327,63 @@ class _FakeTrailRepository implements TrailRepository {
     required List<TrailStep> steps,
   }) {
     throw UnimplementedError();
+  }
+}
+
+CheckInHistoryState _historyState({
+  required String ownerUserId,
+  required List<CheckIn> items,
+}) {
+  return CheckInHistoryState(
+    result: PaginatedResponse<CheckIn>(
+      items: items,
+      page: 0,
+      size: 6,
+      totalItems: items.length,
+      totalPages: 1,
+      hasNext: false,
+      hasPrevious: false,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+      filters: const {},
+    ),
+    selectedGrouping: 'monthly',
+    ownerUserId: ownerUserId,
+    latestCreatedCheckIn: items.isEmpty ? null : items.first,
+  );
+}
+
+class _BlockingCheckInRepository extends _FakeCheckInRepository {
+  _BlockingCheckInRepository({required this.gate, super.items});
+
+  final Completer<void> gate;
+  int listCalls = 0;
+
+  @override
+  Future<PaginatedResponse<CheckIn>> list({
+    required int page,
+    required int size,
+    String? search,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
+    String? mood,
+    String? energyRange,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    listCalls++;
+    await gate.future;
+    return super.list(
+      page: page,
+      size: size,
+      search: search,
+      sortBy: sortBy,
+      sortDir: sortDir,
+      mood: mood,
+      energyRange: energyRange,
+      from: from,
+      to: to,
+    );
   }
 }
 
