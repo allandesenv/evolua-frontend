@@ -1417,9 +1417,12 @@ class _TrailStepResponseEditor extends ConsumerStatefulWidget {
 
 class _TrailStepResponseEditorState
     extends ConsumerState<_TrailStepResponseEditor> {
+  static const _responseHint = 'Toque para responder ao exercício...';
+
   final _controller = TextEditingController();
   Timer? _draftSaveTimer;
   DateTime? _loadedUpdatedAt;
+  String? _lastSavedNormalized;
   bool _draftLoaded = false;
   bool _isSaving = false;
 
@@ -1452,6 +1455,17 @@ class _TrailStepResponseEditorState
     if (_isSaving || !_hasCurrentSession) {
       return;
     }
+    final normalizedResponse = _controller.text.trim();
+    if (!_isValidResponse(normalizedResponse)) {
+      _showResponseValidationMessage('Escreva sua resposta antes de salvar.');
+      return;
+    }
+    if (_lastSavedNormalized != null &&
+        normalizedResponse == _lastSavedNormalized) {
+      _showResponseValidationMessage('Altere sua resposta antes de salvar.');
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       final saved = await ref
@@ -1460,9 +1474,10 @@ class _TrailStepResponseEditorState
             userId: widget.userId,
             trailId: widget.trailId,
             stepIndex: widget.step.index,
-            responseText: _controller.text,
+            responseText: normalizedResponse,
           );
       _loadedUpdatedAt = saved.updatedAt;
+      _lastSavedNormalized = saved.responseText.trim();
       await _clearDraft();
       if (!mounted) {
         return;
@@ -1486,6 +1501,19 @@ class _TrailStepResponseEditorState
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  bool _isValidResponse(String normalizedResponse) {
+    return normalizedResponse.isNotEmpty && normalizedResponse != _responseHint;
+  }
+
+  void _showResponseValidationMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _loadDraftIfNeeded() async {
@@ -1556,6 +1584,7 @@ class _TrailStepResponseEditorState
         }
         _loadedUpdatedAt = response.updatedAt;
         _draftLoaded = true;
+        _lastSavedNormalized = response.responseText.trim();
         _controller.text = response.responseText;
         unawaited(_clearDraft());
       });
@@ -1627,7 +1656,7 @@ class _TrailStepResponseEditorState
               minLines: 3,
               maxLines: 6,
               decoration: const InputDecoration(
-                hintText: 'Toque para responder ao exercício...',
+                hintText: _responseHint,
                 alignLabelWithHint: true,
                 prefixIcon: Icon(Icons.edit_note_rounded),
               ),

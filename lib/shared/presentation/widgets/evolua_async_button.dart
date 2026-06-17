@@ -78,7 +78,7 @@ class _EvoluaAsyncButtonState extends State<EvoluaAsyncButton> {
     final label = Text(
       busy ? widget.loadingLabel ?? context.l10n.commonLoading : widget.label,
     );
-    final onPressed = busy ? null : _handlePressed;
+    final onPressed = busy || widget.onPressed == null ? null : _handlePressed;
     final button = switch (widget.variant) {
       EvoluaAsyncButtonVariant.filled => FilledButton.icon(
         onPressed: onPressed,

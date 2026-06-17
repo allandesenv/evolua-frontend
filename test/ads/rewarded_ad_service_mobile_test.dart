@@ -56,6 +56,24 @@ void main() {
       expect(adUnitId, AppConfig.adMobAndroidRewardedPremiumPassAdUnitId);
     });
 
+    test('uses premium pass block for full check-in history timeline', () {
+      final adUnitId = MobileRewardedAdService.adUnitIdFor(
+        rewardType: RewardResources.checkInHistoryFull,
+        isAndroid: true,
+        isIOS: false,
+        useTestAds: false,
+      );
+      final logicalName = MobileRewardedAdService.logicalAdUnitNameFor(
+        rewardType: RewardResources.checkInHistoryFull,
+        isIOS: false,
+        useTestAds: false,
+      );
+
+      expect(adUnitId, AppConfig.adMobAndroidRewardedPremiumPassAdUnitId);
+      expect(logicalName, 'android_rewarded_premium_pass');
+      expect(logicalName, isNot('unknown_rewarded'));
+    });
+
     test('uses official test block when test ads are enabled', () {
       final adUnitId = MobileRewardedAdService.adUnitIdFor(
         rewardType: 'ADVANCED_MIRROR',

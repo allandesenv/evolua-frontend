@@ -2,9 +2,12 @@ import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
+import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const checkInHistoryFullResource = 'CHECK_IN_HISTORY_FULL';
+const checkInHistoryFullResource = RewardResources.checkInHistoryFull;
 
 final consciousnessTimelineProvider =
     AsyncNotifierProvider<
@@ -85,6 +88,8 @@ class ConsciousnessTimelineState {
 class ConsciousnessTimelineController
     extends AsyncNotifier<ConsciousnessTimelineState> {
   static const int defaultPageSize = 20;
+  static const int _unlockRecheckAttempts = 3;
+  static const Duration _unlockRecheckDelay = Duration(milliseconds: 1500);
 
   @override
   Future<ConsciousnessTimelineState> build() => loadInitial();
@@ -154,15 +159,56 @@ class ConsciousnessTimelineController
       applyFilters(const ConsciousnessTimelineFilters());
 
   Future<bool> unlockFullWithReward() async {
-    final unlocked = await ref
-        .read(monetizationAccessControllerProvider.notifier)
-        .unlockWithRewardedAd(resource: checkInHistoryFullResource);
+    final controller = ref.read(monetizationAccessControllerProvider.notifier);
+    final result = await controller.unlockWithRewardedAdResult(
+      resource: checkInHistoryFullResource,
+    );
+    debugPrint('Evolua timeline full unlock reward result=${result.name}');
+
+    final unlocked =
+        result == RewardedAdResult.rewarded ||
+        await _recheckFullAccessIfPending(result, controller);
+
     if (unlocked) {
       final filters =
           state.asData?.value.filters ?? const ConsciousnessTimelineFilters();
       await loadInitial(filters: filters);
     }
     return unlocked;
+  }
+
+  Future<bool> _recheckFullAccessIfPending(
+    RewardedAdResult result,
+    MonetizationAccessController controller,
+  ) async {
+    if (result != RewardedAdResult.timeout &&
+        result != RewardedAdResult.rewardConfirmedButAccessDenied) {
+      return false;
+    }
+
+    for (var attempt = 0; attempt < _unlockRecheckAttempts; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(_unlockRecheckDelay);
+      }
+      try {
+        final access = await controller.access(
+          resource: checkInHistoryFullResource,
+        );
+        if (_timelineFullAccessGranted(access)) {
+          return true;
+        }
+      } catch (error) {
+        debugPrint(
+          'Evolua timeline full unlock recheck failed: '
+          'attempt=${attempt + 1} error=$error',
+        );
+      }
+    }
+    return false;
+  }
+
+  bool _timelineFullAccessGranted(MonetizationAccessStatus access) {
+    return access.allowed || access.entitlementExpiresAt != null;
   }
 
   Future<void> refreshFull() async {

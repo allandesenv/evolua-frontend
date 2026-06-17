@@ -14,9 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class ConsciousnessTimelinePage extends ConsumerStatefulWidget {
-  const ConsciousnessTimelinePage({super.key, this.now});
+  const ConsciousnessTimelinePage({super.key, this.now, this.onOpenPremium});
 
   final DateTime? now;
+  final VoidCallback? onOpenPremium;
 
   @override
   ConsumerState<ConsciousnessTimelinePage> createState() =>
@@ -89,8 +90,7 @@ class _ConsciousnessTimelinePageState
                           .loadMore();
                     },
                     onUnlockFull: _unlockFull,
-                    onOpenPremium: () =>
-                        context.go('/home?profileSection=plans'),
+                    onOpenPremium: widget.onOpenPremium ?? _openPremium,
                     onOpenItem: _openItemDetail,
                   ),
                 ),
@@ -140,8 +140,8 @@ class _ConsciousnessTimelinePageState
       AppSnackBar.show(
         context,
         message: unlocked
-            ? 'Histórico completo liberado para esta jornada.'
-            : 'Não conseguimos carregar o anúncio agora. Você ainda pode ver seus últimos registros ou tentar novamente em instantes.',
+            ? 'Linha do Tempo completa liberada.'
+            : 'Não conseguimos carregar o anúncio agora. Tente novamente em instantes ou veja o Premium.',
         icon: unlocked ? Icons.lock_open_rounded : Icons.wifi_off_rounded,
       );
     } catch (_) {
@@ -151,7 +151,7 @@ class _ConsciousnessTimelinePageState
       AppSnackBar.show(
         context,
         message:
-            'Não conseguimos carregar o anúncio agora. Você ainda pode ver seus últimos registros ou tentar novamente em instantes.',
+            'Não conseguimos carregar o anúncio agora. Tente novamente em instantes ou veja o Premium.',
         icon: Icons.wifi_off_rounded,
       );
     } finally {
@@ -321,6 +321,10 @@ class _ConsciousnessTimelinePageState
     } else {
       context.go('/home');
     }
+  }
+
+  void _openPremium() {
+    context.go('/home?profileSection=plans');
   }
 }
 
@@ -594,7 +598,7 @@ class _TimelineUnlockCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             message ??
-                'Você está vendo um resumo recente. O histórico completo pode ser liberado com anúncio recompensado ou Premium.',
+                'Você está vendo um resumo recente. O histórico completo pode ser liberado com anúncio ou Premium.',
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -610,12 +614,14 @@ class _TimelineUnlockCard extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.play_circle_rounded),
-                  label: Text(isLoading ? 'Carregando...' : 'Assistir anúncio'),
+                  label: Text(
+                    isLoading ? 'Abrindo anúncio' : 'Assistir anúncio',
+                  ),
                 ),
               OutlinedButton.icon(
                 onPressed: isLoading ? null : onOpenPremium,
                 icon: const Icon(Icons.workspace_premium_rounded),
-                label: const Text('Conhecer Premium'),
+                label: const Text('Ver Premium'),
               ),
             ],
           ),

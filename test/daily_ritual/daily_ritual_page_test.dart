@@ -2,6 +2,7 @@ import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_c
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/repositories/daily_ritual_repository.dart';
 import 'package:evolua_frontend/features/daily_ritual/presentation/pages/daily_ritual_page.dart';
+import 'package:evolua_frontend/shared/presentation/widgets/evolua_async_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,6 +61,78 @@ void main() {
     expect(find.text('Intenção escolhida'), findsOneWidget);
     expect(find.text('Microação escolhida'), findsOneWidget);
   });
+
+  testWidgets('morning continue starts disabled and enables with valid text', (
+    tester,
+  ) async {
+    final repository = _FakeDailyRitualRepository();
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Começar agora'));
+    await tester.pumpAndSettle();
+
+    expect(_ritualActionButton(tester).onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), '   \n  ');
+    await tester.pumpAndSettle();
+    expect(_ritualActionButton(tester).onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), 'presente');
+    await tester.pumpAndSettle();
+    expect(_ritualActionButton(tester).onPressed, isNotNull);
+
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pumpAndSettle();
+    expect(_ritualActionButton(tester).onPressed, isNull);
+    expect(repository.createCallCount, 0);
+  });
+
+  testWidgets('evening continue requires valid response text', (tester) async {
+    final repository = _FakeDailyRitualRepository();
+
+    await tester.pumpWidget(
+      _testApp(repository, type: DailyRitualType.evening),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Começar agora'));
+    await tester.pumpAndSettle();
+
+    expect(_ritualActionButton(tester).onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), 'cansado');
+    await tester.pumpAndSettle();
+    expect(_ritualActionButton(tester).onPressed, isNotNull);
+
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(_ritualActionButton(tester).onPressed, isNull);
+    expect(repository.createCallCount, 0);
+  });
+
+  testWidgets('final submit is disabled without valid ritual response', (
+    tester,
+  ) async {
+    final repository = _FakeDailyRitualRepository();
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Começar agora'));
+    await tester.pumpAndSettle();
+
+    await _answerStep(tester, 'calmo');
+    await _answerStep(tester, 'clareza');
+    await _answerStep(tester, 'agir com calma');
+
+    expect(_ritualActionButton(tester).onPressed, isNull);
+
+    expect(repository.createCallCount, 0);
+    expect(find.text('Salvando...'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'pausar antes de reagir');
+    await tester.pumpAndSettle();
+    expect(_ritualActionButton(tester).onPressed, isNotNull);
+  });
 }
 
 Future<void> _answerStep(
@@ -68,8 +141,13 @@ Future<void> _answerStep(
   bool submit = false,
 }) async {
   await tester.enterText(find.byType(TextField), answer);
+  await tester.pumpAndSettle();
   await tester.tap(find.text(submit ? 'Concluir' : 'Continuar'));
   await tester.pumpAndSettle();
+}
+
+EvoluaAsyncButton _ritualActionButton(WidgetTester tester) {
+  return tester.widget<EvoluaAsyncButton>(find.byType(EvoluaAsyncButton));
 }
 
 Widget _testApp(
@@ -91,6 +169,7 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
 
   DailyRitual? morning;
   DailyRitual? evening;
+  int createCallCount = 0;
 
   @override
   Future<DailyRitual?> today({
@@ -102,6 +181,7 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
 
   @override
   Future<DailyRitual> create(DailyRitualDraft draft) async {
+    createCallCount++;
     final created = DailyRitual(
       id: 1,
       localDate: draft.localDate,

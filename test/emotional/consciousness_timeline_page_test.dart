@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/emotional/presentation/pages/consciousness_timeline_page.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -29,6 +32,8 @@ void main() {
 
     expect(find.text('Linha do Tempo da Consciência'), findsOneWidget);
     expect(find.text('Ver histórico completo'), findsOneWidget);
+    expect(find.text('Assistir anúncio'), findsOneWidget);
+    expect(find.text('Ver Premium'), findsOneWidget);
     expect(find.text('Quando o corpo pede pausa'), findsOneWidget);
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
@@ -92,11 +97,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      _app(
-        adapter: adapter,
-        rewardedAdResult: RewardedAdResult.loadFailed,
-        accessAllowedAfterReward: true,
-      ),
+      _app(adapter: adapter, rewardedAdResult: RewardedAdResult.loadFailed),
     );
     await tester.pumpAndSettle();
 
@@ -108,10 +109,79 @@ void main() {
     expect(find.text('Preview livre'), findsOneWidget);
     expect(
       find.text(
-        'Não conseguimos carregar o anúncio agora. Você ainda pode ver seus últimos registros ou tentar novamente em instantes.',
+        'Não conseguimos carregar o anúncio agora. Tente novamente em instantes ou veja o Premium.',
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('reward success unlocks full timeline and hides unlock card', (
+    tester,
+  ) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: false,
+      rewardedAdAvailable: true,
+      pages: [
+        [_item(title: 'Preview livre')],
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(
+        adapter: adapter,
+        rewardedAdResult: RewardedAdResult.rewarded,
+        accessAllowedAfterReward: true,
+        unlocksTimelineAfterReward: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Assistir anúncio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Linha do Tempo completa liberada.'), findsOneWidget);
+    expect(find.text('Ver histórico completo'), findsNothing);
+    expect(adapter.pagesRequested.length, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('premium history does not show unlock card', (tester) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: true,
+      premium: true,
+      pages: [
+        [_item(title: 'Histórico completo')],
+      ],
+    );
+
+    await tester.pumpWidget(_app(adapter: adapter));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Histórico completo'), findsOneWidget);
+    expect(find.text('Ver histórico completo'), findsNothing);
+    expect(find.text('Assistir anúncio'), findsNothing);
+    expect(find.text('Ver Premium'), findsNothing);
+  });
+
+  testWidgets('premium button navigates to plans', (tester) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: false,
+      rewardedAdAvailable: true,
+      pages: [
+        [_item(title: 'Preview livre')],
+      ],
+    );
+
+    await tester.pumpWidget(_app(adapter: adapter));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Ver Premium'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver Premium'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Planos e assinaturas'), findsOneWidget);
   });
 
   testWidgets('shows clear feedback when timeline ritual already exists', (
@@ -126,7 +196,9 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(_app(adapter: adapter));
+    await tester.pumpWidget(
+      _app(adapter: adapter, now: DateTime(2026, 6, 8, 10)),
+    );
     await tester.pumpAndSettle();
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
@@ -223,6 +295,7 @@ Widget _app({
   required _TimelineAdapter adapter,
   RewardedAdResult rewardedAdResult = RewardedAdResult.rewarded,
   bool accessAllowedAfterReward = false,
+  bool unlocksTimelineAfterReward = false,
   DateTime? now,
 }) {
   final dio = Dio()..httpClientAdapter = adapter;
@@ -237,6 +310,14 @@ Widget _app({
         builder: (context, state) =>
             Text('ritual-${state.uri.queryParameters['type']}'),
       ),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => Text(
+          state.uri.queryParameters['profileSection'] == 'plans'
+              ? 'Planos e assinaturas'
+              : 'Home',
+        ),
+      ),
     ],
   );
   return ProviderScope(
@@ -245,7 +326,15 @@ Widget _app({
         AppConfig.emotionalBaseUrl,
       ).overrideWithValue(dio),
       rewardedAdServiceProvider.overrideWithValue(
-        _FakeRewardedAdService(result: rewardedAdResult),
+        _FakeRewardedAdService(
+          result: rewardedAdResult,
+          onRewarded: unlocksTimelineAfterReward
+              ? () => adapter.fullAccess = true
+              : null,
+        ),
+      ),
+      interstitialAdServiceProvider.overrideWithValue(
+        _FakeInterstitialAdService(),
       ),
       subscriptionRepositoryProvider.overrideWithValue(
         _FakeSubscriptionRepository(accessAllowed: accessAllowedAfterReward),
@@ -295,7 +384,7 @@ class _TimelineAdapter implements HttpClientAdapter {
   });
 
   final List<List<Map<String, Object?>>> pages;
-  final bool fullAccess;
+  bool fullAccess;
   final bool premium;
   final bool rewardedAdAvailable;
   final Map<String, Object?>? existingRitual;
@@ -366,9 +455,10 @@ class _TimelineAdapter implements HttpClientAdapter {
 }
 
 class _FakeRewardedAdService implements RewardedAdService {
-  const _FakeRewardedAdService({required this.result});
+  const _FakeRewardedAdService({required this.result, this.onRewarded});
 
   final RewardedAdResult result;
+  final VoidCallback? onRewarded;
 
   @override
   Future<RewardedAdResult> showRewardedAd({
@@ -376,8 +466,30 @@ class _FakeRewardedAdService implements RewardedAdService {
     String? contextId,
     void Function()? onAdClosed,
   }) async {
+    if (result == RewardedAdResult.rewarded) {
+      onRewarded?.call();
+    }
     return result;
   }
+}
+
+class _FakeInterstitialAdService implements InterstitialAdService {
+  @override
+  void dispose() {}
+
+  @override
+  Future<bool> maybeShow({
+    required InterstitialTrigger trigger,
+    required AuthSession? session,
+  }) async {
+    return false;
+  }
+
+  @override
+  Future<void> preload() async {}
+
+  @override
+  Future<void> recordRewardedAdShown({AuthSession? session}) async {}
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
