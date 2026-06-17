@@ -21,7 +21,7 @@ class MobileRewardedAdService implements RewardedAdService {
   static const _ssvConfirmationAttempts = 8;
   static const _ssvConfirmationDelay = Duration(seconds: 2);
   static const _ssvMaxWaitAfterAd = Duration(seconds: 30);
-  static const _adOpenWaitTimeout = Duration(seconds: 20);
+  static const _adOpenWaitTimeout = Duration(seconds: 75);
 
   static const _extraCheckInRewardTypes = {RewardResources.extraCheckIn};
   static const _aiRewardTypes = {
