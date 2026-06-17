@@ -299,6 +299,98 @@ void main() {
       );
     });
 
+    testWidgets('empty step response is blocked before repository call', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.saveStepResponseCallCount, 0);
+      expect(
+        find.text('Escreva sua resposta antes de salvar.'),
+        findsOneWidget,
+      );
+      expect(find.text('Salvando...'), findsNothing);
+    });
+
+    testWidgets('whitespace step response is blocked before repository call', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        '   \n   ',
+      );
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.saveStepResponseCallCount, 0);
+      expect(
+        find.text('Escreva sua resposta antes de salvar.'),
+        findsOneWidget,
+      );
+      expect(find.text('Salvando...'), findsNothing);
+    });
+
+    testWidgets('placeholder text is not accepted as step response', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository();
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Toque para responder ao exercício...'),
+        'Toque para responder ao exercício...',
+      );
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.saveStepResponseCallCount, 0);
+      expect(
+        find.text('Escreva sua resposta antes de salvar.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('unchanged loaded step response is not saved again', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final trailRepository = _FakeTrailRepository(
+        initialResponses: const {
+          (trailId: 1, stepIndex: 0): 'Resposta existente.',
+        },
+      );
+
+      await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Salvar resposta'));
+      await tester.tap(find.text('Salvar resposta'));
+      await tester.pumpAndSettle();
+
+      expect(trailRepository.saveStepResponseCallCount, 0);
+      expect(find.text('Altere sua resposta antes de salvar.'), findsOneWidget);
+      expect(find.text('Salvando...'), findsNothing);
+    });
+
     testWidgets('save failure keeps typed step response visible', (
       tester,
     ) async {

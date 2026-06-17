@@ -32,6 +32,7 @@ class MobileRewardedAdService implements RewardedAdService {
     'SMART_RECOMMENDATION',
     'SPECIAL_REPORT',
     'PREMIUM_TRAIL_STEP',
+    RewardResources.checkInHistoryFull,
   };
 
   final SubscriptionRepository _repository;
@@ -294,22 +295,33 @@ class MobileRewardedAdService implements RewardedAdService {
   }
 
   String _logicalAdUnitNameFor(String rewardType) {
+    return logicalAdUnitNameFor(
+      rewardType: rewardType,
+      isIOS: Platform.isIOS,
+      useTestAds: AppConfig.adMobUseTestAds,
+    );
+  }
+
+  @visibleForTesting
+  static String logicalAdUnitNameFor({
+    required String rewardType,
+    required bool isIOS,
+    required bool useTestAds,
+  }) {
     final normalized = rewardType.trim().toUpperCase();
-    if (AppConfig.adMobUseTestAds) {
-      return Platform.isIOS ? 'ios_rewarded_test' : 'android_rewarded_test';
+    if (useTestAds) {
+      return isIOS ? 'ios_rewarded_test' : 'android_rewarded_test';
     }
     if (_extraCheckInRewardTypes.contains(normalized)) {
-      return Platform.isIOS
+      return isIOS
           ? 'ios_rewarded_extra_check_in'
           : 'android_rewarded_extra_check_in';
     }
     if (_aiRewardTypes.contains(normalized)) {
-      return Platform.isIOS
-          ? 'ios_rewarded_ai_extra'
-          : 'android_rewarded_ai_extra';
+      return isIOS ? 'ios_rewarded_ai_extra' : 'android_rewarded_ai_extra';
     }
     if (_premiumPassRewardTypes.contains(normalized)) {
-      return Platform.isIOS
+      return isIOS
           ? 'ios_rewarded_premium_pass'
           : 'android_rewarded_premium_pass';
     }
