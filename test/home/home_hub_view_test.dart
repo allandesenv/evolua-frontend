@@ -1473,28 +1473,85 @@ void main() {
 
     testWidgets('shows evening closing entry point', (tester) async {
       String? openedType;
-      var openedReflections = false;
+      var openedCheckIn = false;
 
       await tester.pumpWidget(
         _testApp(
           now: DateTime(2026, 5, 7, 20),
           onOpenDailyRitual: (type) => openedType = type,
-          onOpenFeed: () => openedReflections = true,
+          onOpenCheckIn: () => openedCheckIn = true,
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.text('Vamos fechar o dia?'), findsOneWidget);
       expect(find.text('Fazer Fechamento do Dia'), findsOneWidget);
-      expect(find.text('Escrever reflexão'), findsOneWidget);
+      expect(find.text('Fazer check-in'), findsOneWidget);
+      expect(find.text('Escrever reflexão'), findsNothing);
 
       await tester.tap(find.text('Fazer Fechamento do Dia'));
       await tester.pumpAndSettle();
       expect(openedType, DailyRitualType.evening);
 
-      await tester.tap(find.text('Escrever reflexão'));
+      await tester.tap(find.text('Fazer check-in'));
       await tester.pumpAndSettle();
-      expect(openedReflections, isTrue);
+      expect(openedCheckIn, isTrue);
+    });
+
+    testWidgets('evening secondary check-in uses gate for free user', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 20),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 142, createdAt: DateTime(2026, 5, 7, 10))],
+          ),
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Criar fechamento do dia'), findsOneWidget);
+      expect(find.text('Novo check-in'), findsOneWidget);
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+
+      expect(openedCheckIn, isFalse);
+      expect(find.text('Liberar novo check-in'), findsOneWidget);
+    });
+
+    testWidgets('evening secondary check-in shows exhausted reward gate', (
+      tester,
+    ) async {
+      var openedCheckIn = false;
+
+      await tester.pumpWidget(
+        _testApp(
+          now: DateTime(2026, 5, 7, 20),
+          checkInRepository: _FakeCheckInRepository(
+            items: [_testCheckIn(id: 143, createdAt: DateTime(2026, 5, 7, 10))],
+          ),
+          subscriptionRepository: _FakeSubscriptionRepository(
+            rewardedCreditsGrantedToday: 1,
+            rewardedCreditsUsedToday: 1,
+          ),
+          onOpenCheckIn: () => openedCheckIn = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Novo check-in'), findsOneWidget);
+
+      await tester.tap(find.text('Novo check-in'));
+      await tester.pumpAndSettle();
+
+      expect(openedCheckIn, isFalse);
+      expect(find.text('Check-in extra já usado hoje'), findsOneWidget);
+      expect(find.text('Assistir anúncio'), findsNothing);
     });
 
     testWidgets('opens manual evening closing after today check-in after 18h', (
