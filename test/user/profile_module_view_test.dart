@@ -3546,6 +3546,14 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
   }
 
   @override
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    return const [];
+  }
+
+  @override
   Future<DailyRitual> create(DailyRitualDraft draft) {
     throw UnimplementedError();
   }
