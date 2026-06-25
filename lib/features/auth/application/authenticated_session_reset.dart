@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:evolua_frontend/app/startup/app_startup_controller.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/care/application/care_recommendation_handler.dart';
@@ -49,6 +50,7 @@ final authenticatedSessionResetObserverProvider = Provider<void>((ref) {
 });
 
 Future<void> resetAuthenticatedSessionState(Ref ref) async {
+  ref.read(appStartupControllerProvider).reset();
   _invalidateAuthenticatedProviders(ref);
 
   await SocialPostController.clearOfflineCache(ref);
