@@ -126,6 +126,18 @@ void main() {
       expect(openedMessageId, 77);
     });
 
+    testWidgets('loads current subscription without loading plan catalog', (
+      tester,
+    ) async {
+      final subscriptions = _FakeSubscriptionRepository();
+
+      await tester.pumpWidget(_testApp(subscriptionRepository: subscriptions));
+      await tester.pumpAndSettle();
+
+      expect(subscriptions.currentCalls, 1);
+      expect(subscriptions.listPlansCalls, 0);
+    });
+
     testWidgets(
       'shows daytime check-in action when user has no check-in today',
       (tester) async {
@@ -2758,21 +2770,29 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   final int rewardedCreditsUsedToday;
   final List<MonetizationAccessStatus> _accessStatuses;
   int accessCalls = 0;
+  int currentCalls = 0;
+  int listPlansCalls = 0;
 
   @override
-  Future<List<PlanView>> listPlans() async => const [];
+  Future<List<PlanView>> listPlans() async {
+    listPlansCalls++;
+    return const [];
+  }
 
   @override
-  Future<CurrentSubscription?> current() async => CurrentSubscription(
-    planCode: premium ? 'premium-monthly' : 'essential-free',
-    status: 'ACTIVE',
-    billingCycle: 'MONTHLY',
-    premium: premium,
-    adsEnabled: !premium,
-    aiQuotaRemainingToday: premium ? 999 : 0,
-    mentorPremiumPassActive: false,
-    mentorRewardedAdAvailable: false,
-  );
+  Future<CurrentSubscription?> current() async {
+    currentCalls++;
+    return CurrentSubscription(
+      planCode: premium ? 'premium-monthly' : 'essential-free',
+      status: 'ACTIVE',
+      billingCycle: 'MONTHLY',
+      premium: premium,
+      adsEnabled: !premium,
+      aiQuotaRemainingToday: premium ? 999 : 0,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: false,
+    );
+  }
 
   @override
   Future<CurrentSubscription?> cancel() async => current();

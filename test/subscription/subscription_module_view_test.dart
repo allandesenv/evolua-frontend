@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/theme/app_theme.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/subscription/application/google_play_billing_service.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -10,6 +14,282 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('planCatalogProvider', () {
+    test('deduplicates concurrent catalog reads', () async {
+      final completer = Completer<List<PlanView>>();
+      final repository = _FakeSubscriptionRepository(
+        plans: _plans(),
+        listPlansCompleter: completer,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          subscriptionRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final first = container.read(planCatalogProvider.future);
+      final second = container.read(planCatalogProvider.future);
+
+      expect(repository.listPlansCalls, 1);
+      completer.complete(_plans());
+
+      await expectLater(first, completion(hasLength(_plans().length)));
+      await expectLater(second, completion(hasLength(_plans().length)));
+      expect(repository.listPlansCalls, 1);
+    });
+
+    test('keeps catalog across users while TTL is valid', () async {
+      var now = DateTime(2026, 1, 1, 10);
+      final repository = _FakeSubscriptionRepository(plans: _plans());
+      final authController = _MutableFakeAuthController(userId: 'user-a');
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(() => authController),
+          subscriptionRepositoryProvider.overrideWithValue(repository),
+          planCatalogClockProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.future);
+      await container.read(planCatalogProvider.future);
+      authController.switchUser('user-b');
+      container.read(authSessionGenerationProvider.notifier).bump();
+      now = now.add(const Duration(hours: 11, minutes: 59));
+
+      await container.read(planCatalogProvider.notifier).load();
+
+      expect(repository.listPlansCalls, 1);
+    });
+
+    test(
+      'expires after 12 hours and failed refresh does not renew loadedAt',
+      () async {
+        var now = DateTime(2026, 1, 1, 10);
+        final repository = _FakeSubscriptionRepository(plans: _plans());
+        final container = ProviderContainer(
+          overrides: [
+            subscriptionRepositoryProvider.overrideWithValue(repository),
+            planCatalogClockProvider.overrideWithValue(() => now),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(planCatalogProvider.future);
+        final firstLoadedAt = container
+            .read(planCatalogProvider.notifier)
+            .loadedAtForTesting;
+
+        now = now.add(const Duration(hours: 12, seconds: 1));
+        repository.listPlansError = StateError('catalog unavailable');
+
+        Object? thrown;
+        try {
+          await container.read(planCatalogProvider.notifier).load();
+        } catch (error) {
+          thrown = error;
+        }
+        expect(thrown, isA<StateError>());
+
+        expect(repository.listPlansCalls, 2);
+        expect(
+          container.read(planCatalogProvider.notifier).loadedAtForTesting,
+          firstLoadedAt,
+        );
+
+        repository.listPlansError = null;
+        now = now.add(const Duration(minutes: 1));
+        await container.read(planCatalogProvider.notifier).load(force: true);
+
+        expect(repository.listPlansCalls, 3);
+        expect(
+          container.read(planCatalogProvider.notifier).loadedAtForTesting,
+          now,
+        );
+      },
+    );
+
+    test(
+      'documents catalog is not localized by language in current backend contract',
+      () async {
+        final repository = _FakeSubscriptionRepository(plans: _plans());
+        final container = ProviderContainer(
+          overrides: [
+            subscriptionRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(planCatalogProvider.future);
+        await container.read(planCatalogProvider.notifier).load();
+
+        expect(repository.listPlansCalls, 1);
+      },
+    );
+  });
+
+  group('currentSubscriptionProvider', () {
+    test('does not request current subscription without user', () async {
+      final repository = _FakeSubscriptionRepository(plans: _plans());
+      final container = ProviderContainer(
+        overrides: [
+          authControllerProvider.overrideWith(() => _FakeAuthController(null)),
+          subscriptionRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container.read(currentSubscriptionProvider.future),
+        completion(isNull),
+      );
+      expect(repository.currentCalls, 0);
+    });
+
+    test(
+      'ignores stale publication after user or generation changes',
+      () async {
+        final repository = _FakeSubscriptionRepository(
+          plans: _plans(),
+          currentSubscription: _premiumSubscription,
+        );
+        final authController = _MutableFakeAuthController(userId: 'user-a');
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(() => authController),
+            subscriptionRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(currentSubscriptionProvider.future);
+        final oldGeneration = container.read(authSessionGenerationProvider);
+
+        authController.switchUser('user-b');
+        container.read(authSessionGenerationProvider.notifier).bump();
+        container
+            .read(currentSubscriptionProvider.notifier)
+            .publishForSession(
+              expectedUserId: 'user-a',
+              expectedGeneration: oldGeneration,
+              current: null,
+            );
+
+        expect(
+          container.read(currentSubscriptionProvider).asData?.value?.premium,
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'refresh preserves last premium value on error and deduplicates calls',
+      () async {
+        final repository = _FakeSubscriptionRepository(
+          plans: _plans(),
+          currentSubscription: _premiumSubscription,
+        );
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _MutableFakeAuthController(userId: 'user-a'),
+            ),
+            subscriptionRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(currentSubscriptionProvider.future);
+        expect(repository.currentCalls, 1);
+
+        final completer = Completer<CurrentSubscription?>();
+        repository.currentCompleter = completer;
+        final first = container
+            .read(currentSubscriptionProvider.notifier)
+            .refresh();
+        final second = container
+            .read(currentSubscriptionProvider.notifier)
+            .refresh();
+        await Future<void>.delayed(Duration.zero);
+        expect(repository.currentCalls, 2);
+        completer.complete(_premiumSubscription);
+        await Future.wait([first, second]);
+        expect(repository.currentCalls, 2);
+
+        repository.currentCompleter = null;
+        repository.currentError = StateError('temporary');
+        await expectLater(
+          container.read(currentSubscriptionProvider.notifier).refresh(),
+          throwsStateError,
+        );
+
+        expect(
+          container.read(currentSubscriptionProvider).asData?.value?.premium,
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'can publish null after successful cancel for the same session',
+      () async {
+        final repository = _FakeSubscriptionRepository(
+          plans: _plans(),
+          currentSubscription: _premiumSubscription,
+        );
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _MutableFakeAuthController(userId: 'user-a'),
+            ),
+            subscriptionRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(currentSubscriptionProvider.future);
+        final context = await container
+            .read(currentSubscriptionProvider.notifier)
+            .sessionContext();
+
+        container
+            .read(currentSubscriptionProvider.notifier)
+            .publishForSession(
+              expectedUserId: context!.userId,
+              expectedGeneration: context.generation,
+              current: null,
+            );
+
+        expect(
+          container.read(currentSubscriptionProvider).asData?.value,
+          isNull,
+        );
+      },
+    );
+  });
+
+  test('subscription screen refresh reuses catalog inside TTL', () async {
+    final repository = _FakeSubscriptionRepository(plans: _plans());
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(
+          () => _MutableFakeAuthController(userId: 'user-a'),
+        ),
+        subscriptionRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(subscriptionControllerProvider.future);
+    repository.resetCounters();
+
+    await container.read(subscriptionControllerProvider.notifier).refresh();
+
+    expect(repository.currentCalls, 1);
+    expect(repository.listPlansCalls, 0);
+  });
+
   testWidgets(
     'keeps existing plans and shows prices without raw technical labels',
     (tester) async {
@@ -260,6 +540,28 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     },
   );
+
+  testWidgets('Google Play checkout does not perform extra current sync', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await _setDesktopSurface(tester);
+
+    final repository = _FakeSubscriptionRepository(plans: _plans());
+    final googlePlay = _FakeGooglePlayBillingGateway();
+    await tester.pumpWidget(
+      _testApp(repository: repository, googlePlayBilling: googlePlay),
+    );
+    await tester.pumpAndSettle();
+
+    repository.resetCounters();
+    await tester.tap(find.text('Aprofundar jornada'));
+    await tester.pumpAndSettle();
+
+    expect(repository.verifiedProductIds, ['premium_mensal']);
+    expect(repository.currentCalls, 1);
+    debugDefaultTargetPlatformOverride = null;
+  });
 }
 
 Widget _testApp({
@@ -268,6 +570,9 @@ Widget _testApp({
 }) {
   return ProviderScope(
     overrides: [
+      authControllerProvider.overrideWith(
+        () => _MutableFakeAuthController(userId: 'user-123'),
+      ),
       subscriptionRepositoryProvider.overrideWithValue(repository),
       if (googlePlayBilling != null)
         googlePlayBillingServiceProvider.overrideWithValue(googlePlayBilling),
@@ -367,6 +672,60 @@ List<PlanView> _plans() {
   ];
 }
 
+const _freeSubscription = CurrentSubscription(
+  planCode: 'essential-free',
+  status: 'ACTIVE',
+  billingCycle: 'MONTHLY',
+  premium: false,
+  adsEnabled: true,
+  aiQuotaRemainingToday: 1,
+  mentorPremiumPassActive: false,
+  mentorRewardedAdAvailable: false,
+);
+
+const _premiumSubscription = CurrentSubscription(
+  planCode: 'premium-monthly',
+  status: 'ACTIVE',
+  billingCycle: 'MONTHLY',
+  premium: true,
+  adsEnabled: false,
+  aiQuotaRemainingToday: 10,
+  mentorPremiumPassActive: false,
+  mentorRewardedAdAvailable: false,
+);
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController(this.session);
+
+  final AuthSession? session;
+
+  @override
+  Future<AuthSession?> build() async => session;
+}
+
+class _MutableFakeAuthController extends AuthController {
+  _MutableFakeAuthController({required String userId}) : _userId = userId;
+
+  String _userId;
+
+  @override
+  Future<AuthSession?> build() async => _session();
+
+  void switchUser(String userId) {
+    _userId = userId;
+    state = AsyncData(_session());
+  }
+
+  AuthSession _session() {
+    return AuthSession(
+      userId: _userId,
+      email: '$_userId@evolua.test',
+      roles: const ['ROLE_USER'],
+      accessToken: 'test-token',
+    );
+  }
+}
+
 class _FakeGooglePlayBillingGateway implements GooglePlayBillingGateway {
   _FakeGooglePlayBillingGateway({this.error});
 
@@ -394,30 +753,56 @@ class _FakeGooglePlayBillingGateway implements GooglePlayBillingGateway {
 class _FakeSubscriptionRepository implements SubscriptionRepository {
   _FakeSubscriptionRepository({
     required this.plans,
-    this.currentSubscription = const CurrentSubscription(
-      planCode: 'essential-free',
-      status: 'ACTIVE',
-      billingCycle: 'MONTHLY',
-      premium: false,
-      adsEnabled: true,
-      aiQuotaRemainingToday: 1,
-      mentorPremiumPassActive: false,
-      mentorRewardedAdAvailable: false,
-    ),
+    this.currentSubscription = _freeSubscription,
+    this.listPlansCompleter,
   });
 
   final List<PlanView> plans;
-  final CurrentSubscription? currentSubscription;
+  CurrentSubscription? currentSubscription;
+  Completer<List<PlanView>>? listPlansCompleter;
+  Completer<CurrentSubscription?>? currentCompleter;
+  Object? listPlansError;
+  Object? currentError;
+  int listPlansCalls = 0;
+  int currentCalls = 0;
+  int cancelCalls = 0;
   final List<String> verifiedProductIds = [];
 
   @override
-  Future<List<PlanView>> listPlans() async => plans;
+  Future<List<PlanView>> listPlans() async {
+    listPlansCalls++;
+    final error = listPlansError;
+    if (error != null) {
+      throw error;
+    }
+    final completer = listPlansCompleter;
+    if (completer != null) {
+      listPlansCompleter = null;
+      return completer.future;
+    }
+    return plans;
+  }
 
   @override
-  Future<CurrentSubscription?> current() async => currentSubscription;
+  Future<CurrentSubscription?> current() async {
+    currentCalls++;
+    final error = currentError;
+    if (error != null) {
+      throw error;
+    }
+    final completer = currentCompleter;
+    if (completer != null) {
+      currentCompleter = null;
+      return completer.future;
+    }
+    return currentSubscription;
+  }
 
   @override
-  Future<CurrentSubscription?> cancel() async => currentSubscription;
+  Future<CurrentSubscription?> cancel() async {
+    cancelCalls++;
+    return currentSubscription;
+  }
 
   @override
   Future<CheckoutSession> checkoutStatus(String checkoutId) {
@@ -473,5 +858,11 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
     required String frontendBaseUrl,
   }) {
     throw UnimplementedError();
+  }
+
+  void resetCounters() {
+    listPlansCalls = 0;
+    currentCalls = 0;
+    cancelCalls = 0;
   }
 }

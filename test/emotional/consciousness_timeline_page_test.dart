@@ -372,6 +372,11 @@ Widget _app({
       interstitialAdServiceProvider.overrideWithValue(
         _FakeInterstitialAdService(),
       ),
+      currentSubscriptionProvider.overrideWith(
+        () => _FakeCurrentSubscriptionController(
+          premium: accessAllowedAfterReward || adapter.premium,
+        ),
+      ),
       subscriptionRepositoryProvider.overrideWithValue(
         _FakeSubscriptionRepository(accessAllowed: accessAllowedAfterReward),
       ),
@@ -408,6 +413,31 @@ Map<String, Object?> _ritual() {
     'microAction': 'Respirar por dois minutos.',
     'createdAt': DateTime.now().toIso8601String(),
   };
+}
+
+class _FakeCurrentSubscriptionController extends CurrentSubscriptionController {
+  _FakeCurrentSubscriptionController({required this.premium});
+
+  final bool premium;
+
+  @override
+  Future<CurrentSubscription?> build() async => _current();
+
+  @override
+  Future<CurrentSubscription?> refresh() async => _current();
+
+  CurrentSubscription _current() {
+    return CurrentSubscription(
+      planCode: premium ? 'premium' : 'free',
+      status: 'ACTIVE',
+      billingCycle: 'MONTHLY',
+      premium: premium,
+      adsEnabled: !premium,
+      aiQuotaRemainingToday: premium ? 99 : 0,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: false,
+    );
+  }
 }
 
 class _TimelineAdapter implements HttpClientAdapter {

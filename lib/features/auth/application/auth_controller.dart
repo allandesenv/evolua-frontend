@@ -52,6 +52,18 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession?>(AuthController.new);
 
+final authSessionGenerationProvider =
+    NotifierProvider<AuthSessionGenerationController, int>(
+      AuthSessionGenerationController.new,
+    );
+
+class AuthSessionGenerationController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
 class AuthController extends AsyncNotifier<AuthSession?> {
   Future<AuthSession?>? _refreshInFlight;
 

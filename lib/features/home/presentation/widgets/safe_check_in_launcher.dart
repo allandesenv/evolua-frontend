@@ -23,7 +23,7 @@ enum _SafeCheckInInitialDecision { openDirect, showGate, loadFailed }
 bool shouldGateExtraCheckIn(WidgetRef ref, {DateTime? now}) {
   return shouldGateExtraCheckInFromState(
     session: ref.read(authControllerProvider).asData?.value,
-    subscriptionState: ref.read(subscriptionControllerProvider),
+    subscriptionState: ref.read(currentSubscriptionProvider),
     checkInState: ref.read(checkInControllerProvider),
     now: now,
   );
@@ -31,7 +31,7 @@ bool shouldGateExtraCheckIn(WidgetRef ref, {DateTime? now}) {
 
 bool shouldGateExtraCheckInFromState({
   required AuthSession? session,
-  required AsyncValue<SubscriptionScreenState> subscriptionState,
+  required AsyncValue<CurrentSubscription?> subscriptionState,
   required AsyncValue<CheckInHistoryState> checkInState,
   DateTime? now,
 }) {
@@ -42,7 +42,7 @@ bool shouldGateExtraCheckInFromState({
   if (!subscriptionState.hasValue) {
     return false;
   }
-  final currentSubscription = subscriptionState.asData?.value.current;
+  final currentSubscription = subscriptionState.asData?.value;
   if (currentSubscription?.premium == true) {
     return false;
   }
@@ -327,7 +327,7 @@ class SafeCheckInLauncher {
       _logInitialState(
         attemptId: attemptId,
         sessionUserId: null,
-        subscriptionState: ref.read(subscriptionControllerProvider),
+        subscriptionState: ref.read(currentSubscriptionProvider),
         checkInState: ref.read(checkInControllerProvider),
         historyBelongsToUser: false,
         decision: 'loadFailed',
@@ -339,7 +339,7 @@ class SafeCheckInLauncher {
       _logInitialState(
         attemptId: attemptId,
         sessionUserId: session.userId,
-        subscriptionState: ref.read(subscriptionControllerProvider),
+        subscriptionState: ref.read(currentSubscriptionProvider),
         checkInState: ref.read(checkInControllerProvider),
         historyBelongsToUser: null,
         decision: 'openDirect',
@@ -348,13 +348,12 @@ class SafeCheckInLauncher {
     }
 
     try {
-      final subscription = await _loadSubscriptionState(ref);
-      final currentSubscription = subscription.current;
+      final currentSubscription = await _loadSubscriptionState(ref);
       if (currentSubscription?.premium == true) {
         _logInitialState(
           attemptId: attemptId,
           sessionUserId: session.userId,
-          subscriptionState: ref.read(subscriptionControllerProvider),
+          subscriptionState: ref.read(currentSubscriptionProvider),
           checkInState: ref.read(checkInControllerProvider),
           historyBelongsToUser: null,
           decision: 'openDirect',
@@ -372,7 +371,7 @@ class SafeCheckInLauncher {
         _logInitialState(
           attemptId: attemptId,
           sessionUserId: session.userId,
-          subscriptionState: ref.read(subscriptionControllerProvider),
+          subscriptionState: ref.read(currentSubscriptionProvider),
           checkInState: ref.read(checkInControllerProvider),
           historyBelongsToUser: false,
           decision: 'loadFailed',
@@ -391,7 +390,7 @@ class SafeCheckInLauncher {
       _logInitialState(
         attemptId: attemptId,
         sessionUserId: session.userId,
-        subscriptionState: ref.read(subscriptionControllerProvider),
+        subscriptionState: ref.read(currentSubscriptionProvider),
         checkInState: ref.read(checkInControllerProvider),
         historyBelongsToUser: belongsToUser,
         decision: hasToday ? 'gate' : 'openDirect',
@@ -405,7 +404,7 @@ class SafeCheckInLauncher {
       _logInitialState(
         attemptId: attemptId,
         sessionUserId: session.userId,
-        subscriptionState: ref.read(subscriptionControllerProvider),
+        subscriptionState: ref.read(currentSubscriptionProvider),
         checkInState: ref.read(checkInControllerProvider),
         historyBelongsToUser: null,
         decision: 'loadFailed',
@@ -414,13 +413,13 @@ class SafeCheckInLauncher {
     }
   }
 
-  Future<SubscriptionScreenState> _loadSubscriptionState(WidgetRef ref) async {
-    final state = ref.read(subscriptionControllerProvider);
+  Future<CurrentSubscription?> _loadSubscriptionState(WidgetRef ref) async {
+    final state = ref.read(currentSubscriptionProvider);
     if (state.hasValue && state.asData?.value != null) {
       return state.requireValue;
     }
     return ref
-        .read(subscriptionControllerProvider.future)
+        .read(currentSubscriptionProvider.future)
         .timeout(_gateStateTimeout);
   }
 
@@ -604,7 +603,7 @@ class SafeCheckInLauncher {
   void _logInitialState({
     required int attemptId,
     required String? sessionUserId,
-    required AsyncValue<SubscriptionScreenState> subscriptionState,
+    required AsyncValue<CurrentSubscription?> subscriptionState,
     required AsyncValue<CheckInHistoryState> checkInState,
     required bool? historyBelongsToUser,
     required String decision,

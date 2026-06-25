@@ -51,6 +51,7 @@ final authenticatedSessionResetObserverProvider = Provider<void>((ref) {
 });
 
 Future<void> resetAuthenticatedSessionState(Ref ref) async {
+  ref.read(authSessionGenerationProvider.notifier).bump();
   ref.read(appStartupControllerProvider).reset();
   _invalidateAuthenticatedProviders(ref);
 
@@ -79,6 +80,7 @@ void _invalidateAuthenticatedProviders(Ref ref) {
     ..invalidate(futureMessageReadySummaryControllerProvider)
     ..invalidate(socialPostControllerProvider)
     ..invalidate(communityControllerProvider)
+    ..invalidate(currentSubscriptionProvider)
     ..invalidate(subscriptionControllerProvider)
     ..invalidate(monetizationAccessControllerProvider)
     ..invalidate(notificationUnreadCountControllerProvider)

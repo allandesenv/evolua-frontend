@@ -441,7 +441,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
       if (!mounted) {
         return;
       }
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
+      await ref.read(currentSubscriptionProvider.notifier).refresh();
       if (!mounted) {
         return;
       }
@@ -517,7 +517,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final compact = ResponsiveBreakpoints.isCompact(context);
     final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
-    final subscriptionState = ref.watch(subscriptionControllerProvider);
+    final subscriptionState = ref.watch(currentSubscriptionProvider);
     final dailyRitualState = _secondaryProvidersEnabled
         ? ref.watch(dailyRitualControllerProvider)
         : const AsyncData(DailyRitualState());

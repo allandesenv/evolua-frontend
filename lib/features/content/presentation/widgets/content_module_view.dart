@@ -243,10 +243,9 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     final session = ref.watch(authControllerProvider).asData?.value;
     final profile = ref.watch(currentProfileProvider);
     final currentSubscription = ref
-        .watch(subscriptionControllerProvider)
+        .watch(currentSubscriptionProvider)
         .asData
-        ?.value
-        .current;
+        ?.value;
     final loadMoreState = ref.watch(trailCatalogLoadMoreStateProvider);
     final hasPremiumAccess =
         (session?.isPremium ?? false) ||
@@ -1503,9 +1502,9 @@ class _TrailStepResponseEditorState
       final feedback = saved.responseText.trim().isEmpty
           ? 'Resposta removida.'
           : 'Resposta salva no seu diário.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(feedback)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(feedback)));
     } catch (_) {
       if (!mounted) {
         return;

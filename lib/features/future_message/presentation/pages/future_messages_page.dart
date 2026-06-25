@@ -69,11 +69,7 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   }
 
   Future<void> _create() async {
-    final subscription = ref
-        .read(subscriptionControllerProvider)
-        .asData
-        ?.value
-        .current;
+    final subscription = ref.read(currentSubscriptionProvider).asData?.value;
     final messages = ref.read(futureMessageControllerProvider).asData?.value;
     final activeCount =
         messages?.result.items.where((item) => item.isScheduled).length ?? 0;
@@ -170,11 +166,7 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(futureMessageControllerProvider);
-    final subscription = ref
-        .watch(subscriptionControllerProvider)
-        .asData
-        ?.value
-        .current;
+    final subscription = ref.watch(currentSubscriptionProvider).asData?.value;
 
     return Center(
       child: ConstrainedBox(

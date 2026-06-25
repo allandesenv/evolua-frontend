@@ -285,6 +285,9 @@ void main() {
 Widget _testApp({required Widget child, required bool premium}) {
   return ProviderScope(
     overrides: [
+      currentSubscriptionProvider.overrideWith(
+        () => _FakeCurrentSubscriptionController(premium: premium),
+      ),
       subscriptionRepositoryProvider.overrideWithValue(
         _FakeSubscriptionRepository(premium: premium),
       ),
@@ -337,6 +340,31 @@ CheckInAiInsight _structuredInsight() {
     possibleNewState: 'Eu posso trocar controle por cuidado.',
     microAction: 'Respire por dois minutos antes de decidir o próximo passo.',
   );
+}
+
+class _FakeCurrentSubscriptionController extends CurrentSubscriptionController {
+  _FakeCurrentSubscriptionController({required this.premium});
+
+  final bool premium;
+
+  @override
+  Future<CurrentSubscription?> build() async => _current();
+
+  @override
+  Future<CurrentSubscription?> refresh() async => _current();
+
+  CurrentSubscription _current() {
+    return CurrentSubscription(
+      planCode: premium ? 'premium' : 'free',
+      status: 'ACTIVE',
+      billingCycle: 'MONTHLY',
+      premium: premium,
+      adsEnabled: !premium,
+      aiQuotaRemainingToday: premium ? 99 : 0,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: false,
+    );
+  }
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {

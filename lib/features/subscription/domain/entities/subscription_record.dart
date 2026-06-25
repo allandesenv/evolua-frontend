@@ -165,6 +165,7 @@ class SubscriptionScreenState {
   SubscriptionScreenState copyWith({
     List<PlanView>? plans,
     CurrentSubscription? current,
+    bool clearCurrent = false,
     CheckoutSession? pendingCheckout,
     bool clearPendingCheckout = false,
     bool? isBusy,
@@ -175,7 +176,7 @@ class SubscriptionScreenState {
   }) {
     return SubscriptionScreenState(
       plans: plans ?? this.plans,
-      current: current ?? this.current,
+      current: clearCurrent ? null : (current ?? this.current),
       pendingCheckout: clearPendingCheckout
           ? null
           : (pendingCheckout ?? this.pendingCheckout),
