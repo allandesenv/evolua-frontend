@@ -39,7 +39,6 @@ class FutureMessageController extends AsyncNotifier<FutureMessageState> {
 
   Future<FutureMessageState> _load() async {
     final repository = ref.read(futureMessageRepositoryProvider);
-    await repository.heartbeat();
     final result = await repository.list(page: 0, size: _pageSize);
     final delivered = await repository.delivered(page: 0, size: _pageSize);
     return FutureMessageState(result: result, delivered: delivered);
