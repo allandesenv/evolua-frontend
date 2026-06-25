@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/app_update/application/app_update_platform.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:flutter/foundation.dart';
@@ -13,7 +14,17 @@ final packageInfoProvider = FutureProvider<PackageInfo>((ref) {
 });
 
 final appVersionDioProvider = Provider<Dio>((ref) {
-  return Dio(BaseOptions(baseUrl: AppConfig.versionStatusBaseUrl));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: AppConfig.versionStatusBaseUrl,
+      extra: const {httpInstrumentationOriginExtraKey: 'app_update'},
+    ),
+  );
+  attachHttpInstrumentation(
+    dio,
+    recorder: ref.read(httpInstrumentationRecorderProvider),
+  );
+  return dio;
 });
 
 final appUpdateClockProvider = Provider<DateTime Function()>((ref) {

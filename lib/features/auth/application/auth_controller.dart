@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/app/startup/startup_diagnostics.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
@@ -36,7 +37,13 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      extra: const {httpInstrumentationOriginExtraKey: 'auth'},
     ),
+  );
+
+  attachHttpInstrumentation(
+    dio,
+    recorder: ref.read(httpInstrumentationRecorderProvider),
   );
 
   return AuthRepositoryImpl(dio);

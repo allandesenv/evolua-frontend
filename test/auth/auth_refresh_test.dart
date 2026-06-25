@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
@@ -198,7 +199,10 @@ void main() {
         _sessionStorageKey: jsonEncode(current.toJson()),
       });
       final repository = _FakeAuthRepository(refreshSession: refreshed);
-      final container = _container(repository);
+      final recorder = LimitedHttpInstrumentationRecorder(
+        keepDetailedEvents: true,
+      );
+      final container = _container(repository, recorder: recorder);
       addTearDown(container.dispose);
       await container.read(authControllerProvider.future);
 
@@ -224,6 +228,11 @@ void main() {
         adapter.requests[1].headers['Authorization'],
         'Bearer $newAccessToken',
       );
+      final metrics = recorder.snapshot();
+      expect(metrics.logicalRequests, 1);
+      expect(metrics.httpAttempts, 2);
+      expect(metrics.retries, 1);
+      expect(metrics.routes['GET /v1/profiles/me']?.attempts, 2);
     });
 
     test('does not refresh public auth endpoints', () async {
@@ -436,9 +445,16 @@ void main() {
   });
 }
 
-ProviderContainer _container(_FakeAuthRepository repository) {
+ProviderContainer _container(
+  _FakeAuthRepository repository, {
+  HttpInstrumentationRecorder? recorder,
+}) {
   return ProviderContainer(
-    overrides: [authRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      authRepositoryProvider.overrideWithValue(repository),
+      if (recorder != null)
+        httpInstrumentationRecorderProvider.overrideWithValue(recorder),
+    ],
   );
 }
 
