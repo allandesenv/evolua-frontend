@@ -21,7 +21,9 @@ class MobileRewardedAdService implements RewardedAdService {
   static const _ssvConfirmationAttempts = 8;
   static const _ssvConfirmationDelay = Duration(seconds: 2);
   static const _ssvMaxWaitAfterAd = Duration(seconds: 30);
-  static const _adOpenWaitTimeout = Duration(seconds: 75);
+  static const _adLoadOpenWaitTimeout = Duration(seconds: 20);
+  static const _adFullScreenWaitTimeout = Duration(minutes: 2);
+  static const _adLifecyclePollInterval = Duration(milliseconds: 250);
 
   static const _extraCheckInRewardTypes = {RewardResources.extraCheckIn};
   static const _aiRewardTypes = {
@@ -254,19 +256,25 @@ class MobileRewardedAdService implements RewardedAdService {
         ),
       );
 
-      final outcome = await completer.future.timeout(
-        _adOpenWaitTimeout,
+      final outcome = await _waitForRewardedLifecycleOutcome(
+        completer.future,
+        openedFullScreen: () => openedFullScreen,
         onTimeout: () {
+          final waitLimit = openedFullScreen
+              ? _adFullScreenWaitTimeout
+              : _adLoadOpenWaitTimeout;
           debugPrint(
             'Evolua rewarded timeout: '
             'rewardType=$normalizedRewardType '
             'logicalAdUnit=$logicalAdUnit '
             'opened=$openedFullScreen earned=$earnedReward '
-            'waitMs=${_adOpenWaitTimeout.inMilliseconds} '
+            'waitMs=${waitLimit.inMilliseconds} '
             'elapsedMs=${loadStopwatch.elapsedMilliseconds}',
           );
 
-          rewardedAd?.dispose();
+          if (!openedFullScreen) {
+            rewardedAd?.dispose();
+          }
 
           return _RewardedAdOutcome(
             openedFullScreen: openedFullScreen,
@@ -528,6 +536,36 @@ class MobileRewardedAdService implements RewardedAdService {
       await Future<void>.delayed(_ssvConfirmationDelay);
     }
   }
+
+  Future<_RewardedAdOutcome> _waitForRewardedLifecycleOutcome(
+    Future<_RewardedAdOutcome> future, {
+    required bool Function() openedFullScreen,
+    required _RewardedAdOutcome Function() onTimeout,
+  }) async {
+    final waitStopwatch = Stopwatch()..start();
+    Stopwatch? fullScreenStopwatch;
+
+    while (true) {
+      if (openedFullScreen()) {
+        fullScreenStopwatch ??= Stopwatch()..start();
+      }
+
+      if (rewardedLifecycleTimedOut(
+        elapsedSinceWaitStart: waitStopwatch.elapsed,
+        openedFullScreen: openedFullScreen(),
+        elapsedSinceOpen: fullScreenStopwatch?.elapsed,
+      )) {
+        return onTimeout();
+      }
+
+      try {
+        return await future.timeout(_adLifecyclePollInterval);
+      } on TimeoutException {
+        // Keep polling so the short load/open timeout stops applying after the
+        // rewarded ad is actually visible.
+      }
+    }
+  }
 }
 
 class _RewardedAdLifecycleFallback extends WidgetsBindingObserver {
@@ -582,4 +620,19 @@ RewardedAdResult? rewardedResultBeforeSsv({
   return outcomeResult == RewardedAdResult.timeout
       ? RewardedAdResult.timeout
       : RewardedAdResult.dismissedWithoutReward;
+}
+
+@visibleForTesting
+bool rewardedLifecycleTimedOut({
+  required Duration elapsedSinceWaitStart,
+  required bool openedFullScreen,
+  Duration? elapsedSinceOpen,
+}) {
+  if (!openedFullScreen) {
+    return elapsedSinceWaitStart >=
+        MobileRewardedAdService._adLoadOpenWaitTimeout;
+  }
+
+  final visibleElapsed = elapsedSinceOpen ?? Duration.zero;
+  return visibleElapsed >= MobileRewardedAdService._adFullScreenWaitTimeout;
 }

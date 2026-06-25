@@ -105,6 +105,35 @@ void main() {
   });
 
   group('MobileRewardedAdService rewarded outcome policy', () {
+    test('does not time out an opened full-screen ad after 20 seconds', () {
+      final timedOut = rewardedLifecycleTimedOut(
+        elapsedSinceWaitStart: const Duration(seconds: 45),
+        openedFullScreen: true,
+        elapsedSinceOpen: const Duration(seconds: 26),
+      );
+
+      expect(timedOut, isFalse);
+    });
+
+    test('times out while waiting for the rewarded ad to open', () {
+      final timedOut = rewardedLifecycleTimedOut(
+        elapsedSinceWaitStart: const Duration(seconds: 20),
+        openedFullScreen: false,
+      );
+
+      expect(timedOut, isTrue);
+    });
+
+    test('keeps a full-screen safety timeout', () {
+      final timedOut = rewardedLifecycleTimedOut(
+        elapsedSinceWaitStart: const Duration(minutes: 3),
+        openedFullScreen: true,
+        elapsedSinceOpen: const Duration(minutes: 2),
+      );
+
+      expect(timedOut, isTrue);
+    });
+
     test('continues to SSV when reward was earned before timeout', () {
       final result = rewardedResultBeforeSsv(
         openedFullScreen: true,

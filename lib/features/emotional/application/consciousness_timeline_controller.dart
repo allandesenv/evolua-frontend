@@ -88,8 +88,8 @@ class ConsciousnessTimelineState {
 class ConsciousnessTimelineController
     extends AsyncNotifier<ConsciousnessTimelineState> {
   static const int defaultPageSize = 20;
-  static const int _unlockRecheckAttempts = 3;
   static const Duration _unlockRecheckDelay = Duration(milliseconds: 1500);
+  static const Duration _unlockRecheckMaxWait = Duration(seconds: 30);
 
   @override
   Future<ConsciousnessTimelineState> build() => loadInitial();
@@ -159,51 +159,63 @@ class ConsciousnessTimelineController
       applyFilters(const ConsciousnessTimelineFilters());
 
   Future<bool> unlockFullWithReward() async {
+    final filters =
+        state.asData?.value.filters ?? const ConsciousnessTimelineFilters();
     final controller = ref.read(monetizationAccessControllerProvider.notifier);
     final result = await controller.unlockWithRewardedAdResult(
       resource: checkInHistoryFullResource,
     );
     debugPrint('Evolua timeline full unlock reward result=${result.name}');
 
-    final unlocked =
-        result == RewardedAdResult.rewarded ||
-        await _recheckFullAccessIfPending(result, controller);
-
-    if (unlocked) {
-      final filters =
-          state.asData?.value.filters ?? const ConsciousnessTimelineFilters();
-      await loadInitial(filters: filters);
+    if (result == RewardedAdResult.rewarded) {
+      final refreshed = await loadInitial(filters: filters);
+      return refreshed.fullAccess;
     }
-    return unlocked;
+
+    return _recheckFullAccessIfPending(result, controller, filters);
   }
 
   Future<bool> _recheckFullAccessIfPending(
     RewardedAdResult result,
     MonetizationAccessController controller,
+    ConsciousnessTimelineFilters filters,
   ) async {
     if (result != RewardedAdResult.timeout &&
         result != RewardedAdResult.rewardConfirmedButAccessDenied) {
       return false;
     }
 
-    for (var attempt = 0; attempt < _unlockRecheckAttempts; attempt++) {
+    final deadline = DateTime.now().add(_unlockRecheckMaxWait);
+    var attempt = 0;
+
+    while (DateTime.now().isBefore(deadline)) {
       if (attempt > 0) {
         await Future<void>.delayed(_unlockRecheckDelay);
       }
+      attempt++;
+
       try {
         final access = await controller.access(
           resource: checkInHistoryFullResource,
         );
         if (_timelineFullAccessGranted(access)) {
-          return true;
+          final refreshed = await loadInitial(filters: filters);
+          if (refreshed.fullAccess) {
+            return true;
+          }
         }
       } catch (error) {
         debugPrint(
           'Evolua timeline full unlock recheck failed: '
-          'attempt=${attempt + 1} error=$error',
+          'attempt=$attempt error=$error',
         );
       }
     }
+
+    debugPrint(
+      'Evolua timeline full unlock not confirmed after wait: '
+      'result=${result.name} attempts=$attempt',
+    );
     return false;
   }
 
