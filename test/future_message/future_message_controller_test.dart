@@ -1,6 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_ready_summary_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +29,7 @@ void main() {
 
       expect(repository.listCalls, 1);
       expect(repository.deliveredCalls, 1);
+      expect(repository.readySummaryCalls, 0);
       expect(repository.heartbeatCalls, 0);
       expect(initialState.delivered.items, repository.deliveredMessages);
       expect(initialState.readyToRead.map((message) => message.id), [2]);
@@ -59,6 +64,7 @@ void main() {
       expect(repository.markReadIds, [2]);
       expect(repository.listCalls, 1);
       expect(repository.deliveredCalls, 1);
+      expect(repository.readySummaryCalls, 0);
       expect(repository.heartbeatCalls, 0);
 
       repository.resetCounters();
@@ -71,6 +77,86 @@ void main() {
       expect(repository.heartbeatCalls, 0);
     },
   );
+
+  test('ready summary does not request without authenticated user', () async {
+    final repository = _CountingFutureMessageRepository();
+    final container = ProviderContainer(
+      overrides: [
+        authSessionStorageProvider.overrideWithValue(
+          _MemoryAuthSessionStorage(null),
+        ),
+        futureMessageRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final summary = await _readSummary(container);
+
+    expect(summary.hasReady, isFalse);
+    expect(summary.firstMessageId, isNull);
+    expect(repository.readySummaryCalls, 0);
+    expect(repository.deliveredCalls, 0);
+  });
+
+  test(
+    'ready summary falls back only for unsupported endpoint responses',
+    () async {
+      for (final statusCode in [404, 405, 501]) {
+        final repository = _CountingFutureMessageRepository(
+          readySummaryError: _dioStatus(statusCode),
+          deliveredMessages: [
+            _message(id: 1, status: 'READ'),
+            _message(id: 2, status: 'DELIVERED'),
+          ],
+        );
+        final summary = await loadFutureMessageReadySummaryWithFallback(
+          repository,
+        );
+
+        expect(summary.hasReady, isTrue);
+        expect(summary.firstMessageId, 2);
+        expect(repository.readySummaryCalls, 1);
+        expect(repository.deliveredCalls, 1);
+      }
+    },
+  );
+
+  test('ready summary empty fallback keeps hasReady false', () async {
+    final repository = _CountingFutureMessageRepository(
+      readySummaryError: _dioStatus(404),
+      deliveredMessages: [_message(id: 1, status: 'READ')],
+    );
+    final summary = await loadFutureMessageReadySummaryWithFallback(repository);
+
+    expect(summary.hasReady, isFalse);
+    expect(summary.firstMessageId, isNull);
+    expect(repository.readySummaryCalls, 1);
+    expect(repository.deliveredCalls, 1);
+  });
+
+  test('ready summary does not fall back for other errors', () async {
+    for (final statusCode in [401, 403, 500]) {
+      final repository = _CountingFutureMessageRepository(
+        readySummaryError: _dioStatus(statusCode),
+      );
+      await expectLater(
+        loadFutureMessageReadySummaryWithFallback(repository),
+        throwsA(isA<DioException>()),
+      );
+
+      expect(repository.readySummaryCalls, 1);
+      expect(repository.deliveredCalls, 0);
+    }
+  });
+}
+
+Future<FutureMessageReadySummary> _readSummary(ProviderContainer container) {
+  final subscription = container.listen(
+    futureMessageReadySummaryControllerProvider,
+    (_, _) {},
+  );
+  addTearDown(subscription.close);
+  return container.read(futureMessageReadySummaryControllerProvider.future);
 }
 
 FutureMessageDraft _draft() {
@@ -83,12 +169,23 @@ FutureMessageDraft _draft() {
 }
 
 class _CountingFutureMessageRepository implements FutureMessageRepository {
-  _CountingFutureMessageRepository({this.throwOnHeartbeat = false});
+  _CountingFutureMessageRepository({
+    this.throwOnHeartbeat = false,
+    this.readySummaryError,
+    List<FutureMessage>? deliveredMessages,
+  }) : deliveredMessages =
+           deliveredMessages ??
+           [
+             _message(id: 2, status: 'DELIVERED'),
+             _message(id: 3, status: 'READ'),
+           ];
 
   final bool throwOnHeartbeat;
+  final Object? readySummaryError;
 
   int listCalls = 0;
   int deliveredCalls = 0;
+  int readySummaryCalls = 0;
   int heartbeatCalls = 0;
   int createCalls = 0;
   int getCalls = 0;
@@ -100,14 +197,12 @@ class _CountingFutureMessageRepository implements FutureMessageRepository {
   final List<int> reactIds = [];
   final List<String> reactions = [];
 
-  final deliveredMessages = [
-    _message(id: 2, status: 'DELIVERED'),
-    _message(id: 3, status: 'READ'),
-  ];
+  final List<FutureMessage> deliveredMessages;
 
   void resetCounters() {
     listCalls = 0;
     deliveredCalls = 0;
+    readySummaryCalls = 0;
     heartbeatCalls = 0;
     createCalls = 0;
     getCalls = 0;
@@ -142,6 +237,16 @@ class _CountingFutureMessageRepository implements FutureMessageRepository {
       page: page,
       size: size,
     ).copyWith(items: deliveredMessages);
+  }
+
+  @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    readySummaryCalls += 1;
+    final error = readySummaryError;
+    if (error != null) {
+      throw error;
+    }
+    return const FutureMessageReadySummary.empty();
   }
 
   @override
@@ -202,4 +307,36 @@ FutureMessage _message({
     readAt: status == 'READ' ? DateTime(2026, 6, 3) : null,
     reaction: reaction,
   );
+}
+
+DioException _dioStatus(int statusCode) {
+  final requestOptions = RequestOptions(
+    path: '/v1/future-messages/ready-summary',
+  );
+  return DioException(
+    requestOptions: requestOptions,
+    response: Response<dynamic>(
+      requestOptions: requestOptions,
+      statusCode: statusCode,
+    ),
+  );
+}
+
+class _MemoryAuthSessionStorage implements AuthSessionStorage {
+  _MemoryAuthSessionStorage(this.value);
+
+  String? value;
+
+  @override
+  Future<void> clear() async {
+    value = null;
+  }
+
+  @override
+  Future<String?> read() async => value;
+
+  @override
+  Future<void> write(String value) async {
+    this.value = value;
+  }
 }

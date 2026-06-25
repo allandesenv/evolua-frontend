@@ -34,6 +34,7 @@ import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
@@ -3502,6 +3503,11 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
       sortDir: 'desc',
       filters: const {},
     );
+  }
+
+  @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    return const FutureMessageReadySummary.empty();
   }
 
   @override

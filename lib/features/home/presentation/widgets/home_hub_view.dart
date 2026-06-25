@@ -1,6 +1,5 @@
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/network/api_error_message.dart';
-import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
@@ -15,8 +14,7 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/emotional/presentation/widgets/check_in_ai_insight_card.dart';
-import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
-import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_ready_summary_controller.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/safe_check_in_launcher.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
@@ -108,13 +106,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
   bool get _isWidgetTestBinding {
     return WidgetsBinding.instance.runtimeType.toString().contains(
       'TestWidgetsFlutterBinding',
-    );
-  }
-
-  FutureMessageState _emptyFutureMessageState() {
-    return FutureMessageState(
-      result: PaginatedResponse.empty(page: 0, size: 20),
-      delivered: PaginatedResponse.empty(page: 0, size: 20),
     );
   }
 
@@ -527,9 +518,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final session = ref.watch(authControllerProvider).asData?.value;
     final checkInState = ref.watch(checkInControllerProvider);
     final subscriptionState = ref.watch(subscriptionControllerProvider);
-    final futureMessageState = _secondaryProvidersEnabled
-        ? ref.watch(futureMessageControllerProvider)
-        : AsyncData(_emptyFutureMessageState());
     final dailyRitualState = _secondaryProvidersEnabled
         ? ref.watch(dailyRitualControllerProvider)
         : const AsyncData(DailyRitualState());
@@ -621,11 +609,19 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
     final showMirrorReward =
         latestCreatedCheckIn != null &&
         _isSameLocalDay(latestCreatedCheckIn.createdAt, currentTime);
-    final readyFutureMessage =
-        futureMessageState.asData?.value.readyToRead.firstOrNull;
-    final showFutureMessage =
-        readyFutureMessage != null &&
-        _isDifficultCheckIn(latestCreatedCheckIn ?? recentItems.firstOrNull);
+    final futureMessageTriggerCheckIn =
+        latestCreatedCheckIn ?? recentItems.firstOrNull;
+    final shouldLoadFutureMessageSummary =
+        session != null &&
+        _secondaryProvidersEnabled &&
+        _isDifficultCheckIn(futureMessageTriggerCheckIn);
+    final futureMessageSummary = shouldLoadFutureMessageSummary
+        ? ref.watch(futureMessageReadySummaryControllerProvider).asData?.value
+        : null;
+    final readyFutureMessageId = futureMessageSummary?.hasReady == true
+        ? futureMessageSummary?.firstMessageId
+        : null;
+    final showFutureMessage = readyFutureMessageId != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -663,8 +659,7 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
         if (showFutureMessage) ...[
           const SizedBox(height: 14),
           _FutureMessageReadyCard(
-            message: readyFutureMessage,
-            onOpen: () => widget.onOpenFutureMessage(readyFutureMessage.id),
+            onOpen: () => widget.onOpenFutureMessage(readyFutureMessageId),
           ),
         ],
         const SizedBox(height: 18),
@@ -1147,9 +1142,8 @@ class _DailyJourneyCardModel {
 }
 
 class _FutureMessageReadyCard extends StatelessWidget {
-  const _FutureMessageReadyCard({required this.message, required this.onOpen});
+  const _FutureMessageReadyCard({required this.onOpen});
 
-  final FutureMessage message;
   final VoidCallback onOpen;
 
   @override

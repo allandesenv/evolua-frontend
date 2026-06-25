@@ -29,6 +29,7 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_i
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
@@ -60,6 +61,69 @@ void main() {
 
       expect(insightTop, lessThan(nextStepTop));
       expect(nextStepTop, lessThan(rhythmTop));
+    });
+
+    testWidgets(
+      'does not load future messages when check-in is not difficult',
+      (tester) async {
+        final futureMessages = _FakeFutureMessageRepository(
+          readySummaryResult: const FutureMessageReadySummary(
+            hasReady: true,
+            firstMessageId: 77,
+          ),
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                _testCheckIn(
+                  id: 50,
+                  createdAt: DateTime.now(),
+                  mood: 'calmo',
+                  energyLevel: 8,
+                ),
+              ],
+            ),
+            futureMessageRepository: futureMessages,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(futureMessages.readySummaryCalls, 0);
+        expect(futureMessages.listCalls, 0);
+        expect(futureMessages.deliveredCalls, 0);
+        expect(find.text('Ha uma mensagem sua pronta'), findsNothing);
+      },
+    );
+
+    testWidgets('loads ready summary for difficult check-in and opens its id', (
+      tester,
+    ) async {
+      int? openedMessageId;
+      final futureMessages = _FakeFutureMessageRepository(
+        readySummaryResult: const FutureMessageReadySummary(
+          hasReady: true,
+          firstMessageId: 77,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          futureMessageRepository: futureMessages,
+          onOpenFutureMessage: (id) => openedMessageId = id,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(futureMessages.readySummaryCalls, 1);
+      expect(futureMessages.listCalls, 0);
+      expect(futureMessages.deliveredCalls, 0);
+      expect(find.text('Ha uma mensagem sua pronta'), findsOneWidget);
+
+      await tester.tap(find.text('Quero ler'));
+
+      expect(openedMessageId, 77);
     });
 
     testWidgets(
@@ -2040,6 +2104,7 @@ Widget _testApp({
     delay: Duration.zero,
   ),
   TrailRepository? trailRepository,
+  FutureMessageRepository? futureMessageRepository,
   DailyRitualRepository? dailyRitualRepository,
   SubscriptionRepository? subscriptionRepository,
   RewardedAdService? rewardedAdService,
@@ -2052,6 +2117,7 @@ Widget _testApp({
   VoidCallback? onOpenCommunity,
   VoidCallback? onOpenEvolutionMirror,
   VoidCallback? onOpenFutureMessages,
+  ValueChanged<int>? onOpenFutureMessage,
   VoidCallback? onOpenCareShare,
   ValueChanged<String>? onOpenDailyRitual,
   VoidCallback? onOpenCheckIn,
@@ -2073,7 +2139,7 @@ Widget _testApp({
         trailRepository ?? _FakeTrailRepository(currentJourney: _testTrail()),
       ),
       futureMessageRepositoryProvider.overrideWithValue(
-        _FakeFutureMessageRepository(),
+        futureMessageRepository ?? _FakeFutureMessageRepository(),
       ),
       dailyRitualRepositoryProvider.overrideWithValue(
         dailyRitualRepository ?? _FakeDailyRitualRepository(),
@@ -2107,7 +2173,7 @@ Widget _testApp({
             onOpenProfile: () {},
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
             onOpenFutureMessages: onOpenFutureMessages ?? () {},
-            onOpenFutureMessage: (_) {},
+            onOpenFutureMessage: onOpenFutureMessage ?? (_) {},
             onOpenCareShare: onOpenCareShare ?? () {},
             onOpenDailyRitual: onOpenDailyRitual ?? (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},
@@ -2514,12 +2580,22 @@ class _FakeTrailRepository implements TrailRepository {
 }
 
 class _FakeFutureMessageRepository implements FutureMessageRepository {
+  _FakeFutureMessageRepository({
+    this.readySummaryResult = const FutureMessageReadySummary.empty(),
+  });
+
+  final FutureMessageReadySummary readySummaryResult;
+  int readySummaryCalls = 0;
+  int listCalls = 0;
+  int deliveredCalls = 0;
+
   @override
   Future<PaginatedResponse<FutureMessage>> list({
     required int page,
     required int size,
     List<String>? statuses,
   }) async {
+    listCalls += 1;
     return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
   }
 
@@ -2528,7 +2604,14 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
     required int page,
     required int size,
   }) async {
+    deliveredCalls += 1;
     return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    readySummaryCalls += 1;
+    return readySummaryResult;
   }
 
   @override

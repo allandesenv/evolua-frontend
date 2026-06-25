@@ -1,5 +1,6 @@
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 
 abstract class FutureMessageRepository {
   Future<PaginatedResponse<FutureMessage>> list({
@@ -12,6 +13,8 @@ abstract class FutureMessageRepository {
     required int page,
     required int size,
   });
+
+  Future<FutureMessageReadySummary> readySummary();
 
   Future<FutureMessage> get(int id);
 

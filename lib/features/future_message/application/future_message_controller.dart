@@ -1,15 +1,10 @@
-import 'package:evolua_frontend/core/config/app_config.dart';
-import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
-import 'package:evolua_frontend/features/future_message/data/repositories/future_message_repository_impl.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_repository_provider.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_ready_summary_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
-import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final futureMessageRepositoryProvider = Provider<FutureMessageRepository>((ref) {
-  final dio = ref.watch(authenticatedDioProvider(AppConfig.emotionalBaseUrl));
-  return FutureMessageRepositoryImpl(dio);
-});
+export 'package:evolua_frontend/features/future_message/application/future_message_repository_provider.dart';
 
 final futureMessageControllerProvider =
     AsyncNotifierProvider<FutureMessageController, FutureMessageState>(
@@ -17,10 +12,7 @@ final futureMessageControllerProvider =
     );
 
 class FutureMessageState {
-  const FutureMessageState({
-    required this.result,
-    required this.delivered,
-  });
+  const FutureMessageState({required this.result, required this.delivered});
 
   final PaginatedResponse<FutureMessage> result;
   final PaginatedResponse<FutureMessage> delivered;
@@ -61,7 +53,10 @@ class FutureMessageController extends AsyncNotifier<FutureMessageState> {
   }
 
   Future<FutureMessage> markRead(int id) async {
-    final updated = await ref.read(futureMessageRepositoryProvider).markRead(id);
+    final updated = await ref
+        .read(futureMessageRepositoryProvider)
+        .markRead(id);
+    ref.invalidate(futureMessageReadySummaryControllerProvider);
     await refresh();
     return updated;
   }

@@ -12,6 +12,7 @@ import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_c
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/consciousness_timeline_controller.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
+import 'package:evolua_frontend/features/future_message/application/future_message_ready_summary_controller.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/notification/application/notification_controller.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
@@ -75,6 +76,7 @@ void _invalidateAuthenticatedProviders(Ref ref) {
     ..invalidate(consciousnessTimelineProvider)
     ..invalidate(evolutionMirrorSummaryProvider)
     ..invalidate(futureMessageControllerProvider)
+    ..invalidate(futureMessageReadySummaryControllerProvider)
     ..invalidate(socialPostControllerProvider)
     ..invalidate(communityControllerProvider)
     ..invalidate(subscriptionControllerProvider)
