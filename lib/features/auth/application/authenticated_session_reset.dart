@@ -79,6 +79,7 @@ void _invalidateAuthenticatedProviders(Ref ref) {
     ..invalidate(communityControllerProvider)
     ..invalidate(subscriptionControllerProvider)
     ..invalidate(monetizationAccessControllerProvider)
+    ..invalidate(notificationUnreadCountControllerProvider)
     ..invalidate(notificationInboxControllerProvider)
     ..invalidate(dailyCheckInReminderControllerProvider)
     ..invalidate(careShareControllerProvider)

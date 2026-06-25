@@ -61,16 +61,15 @@ void main() {
       expect(await handler.applyEnvelope(envelope), isTrue);
       expect(await handler.applyEnvelope(envelope), isTrue);
 
-      final notifications = container
-          .read(notificationInboxControllerProvider)
-          .asData
-          ?.value;
+      final notifications = await container
+          .read(localCareNotificationServiceProvider)
+          .load('user-a');
 
       expect(dailyRepository.created, hasLength(1));
       expect(careRepository.acknowledged, ['rx-1']);
-      expect(notifications, isNotNull);
       expect(notifications, hasLength(1));
-      expect(notifications!.single.id, 'care-prescription-rx-1');
+      expect(notificationRepository.listCalls, 0);
+      expect(notifications.single.id, 'care-prescription-rx-1');
       expect(notifications.single.userId, 'user-a');
       expect(notifications.single.title, 'Novo ritual do terapeuta');
       expect(
@@ -141,6 +140,52 @@ void main() {
       expect(applied, isTrue);
       expect(updated.morning?.intention, 'começar com presença');
       expect(updated.morning?.microAction, 'respirar por dois minutos');
+    },
+  );
+
+  test(
+    'care notification failure does not fail an applied prescription',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final secret = base64UrlEncode(
+        List<int>.generate(32, (index) => index + 1),
+      );
+      final careRepository = _FakeCareRepository();
+      final dailyRepository = _FakeDailyRitualRepository();
+      final container = ProviderContainer(
+        overrides: [
+          careSecretStoreProvider.overrideWithValue(
+            _FakeCareSecretStore({'share-1': secret}),
+          ),
+          careRepositoryProvider.overrideWithValue(careRepository),
+          dailyRitualRepositoryProvider.overrideWithValue(dailyRepository),
+          notificationRepositoryProvider.overrideWithValue(
+            _FakeNotificationRepository(),
+          ),
+          localCareNotificationServiceProvider.overrideWith(
+            (ref) => _ThrowingLocalCareNotificationService(ref),
+          ),
+          authControllerProvider.overrideWith(
+            () => _FakeAuthController(userId: 'user-a'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final envelope = await _encryptedEnvelope(
+        container: container,
+        secretBase64: secret,
+        prescriptionId: 'rx-notification-fails',
+      );
+
+      final result = await container
+          .read(carePrescriptionHandlerProvider)
+          .applyEnvelopeDetailed(envelope);
+
+      expect(result.applied, isTrue);
+      expect(result.failed, isFalse);
+      expect(dailyRepository.created, hasLength(1));
+      expect(careRepository.acknowledged, ['rx-notification-fails']);
     },
   );
 
@@ -480,6 +525,8 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
 }
 
 class _FakeNotificationRepository implements NotificationRepository {
+  var listCalls = 0;
+
   @override
   Future<NotificationJob> createAdmin({
     required String targetUserId,
@@ -492,8 +539,10 @@ class _FakeNotificationRepository implements NotificationRepository {
   }
 
   @override
-  Future<List<NotificationJob>> list({bool unreadOnly = false}) async =>
-      const [];
+  Future<List<NotificationJob>> list({bool unreadOnly = false}) async {
+    listCalls++;
+    return const [];
+  }
 
   @override
   Future<int> markAllAsRead() async => 0;
@@ -505,4 +554,18 @@ class _FakeNotificationRepository implements NotificationRepository {
 
   @override
   Future<int> unreadCount() async => 0;
+}
+
+class _ThrowingLocalCareNotificationService
+    extends LocalCareNotificationService {
+  const _ThrowingLocalCareNotificationService(super.ref);
+
+  @override
+  Future<LocalCareMutationResult> addPrescription({
+    required String userId,
+    required String prescriptionId,
+    required String ritualType,
+  }) {
+    throw StateError('storage unavailable');
+  }
 }
