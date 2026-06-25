@@ -109,7 +109,43 @@ void main() {
     expect(find.text('Preview livre'), findsOneWidget);
     expect(
       find.text(
-        'Não conseguimos carregar o anúncio agora. Tente novamente em instantes ou veja o Premium.',
+        'A confirmação do anúncio ainda não foi concluída. Tente atualizar em instantes ou veja o Premium.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('rewarded result without full access does not show success', (
+    tester,
+  ) async {
+    final adapter = _TimelineAdapter(
+      fullAccess: false,
+      rewardedAdAvailable: true,
+      pages: [
+        [_item(title: 'Preview livre')],
+      ],
+    );
+
+    await tester.pumpWidget(
+      _app(
+        adapter: adapter,
+        rewardedAdResult: RewardedAdResult.rewarded,
+        accessAllowedAfterReward: true,
+        unlocksTimelineAfterReward: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -280));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Assistir anúncio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Linha do Tempo completa liberada.'), findsNothing);
+    expect(find.text('Ver histórico completo'), findsOneWidget);
+    expect(
+      find.text(
+        'A confirmação do anúncio ainda não foi concluída. Tente atualizar em instantes ou veja o Premium.',
       ),
       findsOneWidget,
     );

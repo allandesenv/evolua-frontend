@@ -141,8 +141,8 @@ class _ConsciousnessTimelinePageState
         context,
         message: unlocked
             ? 'Linha do Tempo completa liberada.'
-            : 'Não conseguimos carregar o anúncio agora. Tente novamente em instantes ou veja o Premium.',
-        icon: unlocked ? Icons.lock_open_rounded : Icons.wifi_off_rounded,
+            : 'A confirmação do anúncio ainda não foi concluída. Tente atualizar em instantes ou veja o Premium.',
+        icon: unlocked ? Icons.lock_open_rounded : Icons.info_outline_rounded,
       );
     } catch (_) {
       if (!mounted) {
