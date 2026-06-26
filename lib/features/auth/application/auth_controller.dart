@@ -172,7 +172,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
-  Future<void> completeGoogleLogin({required String code}) async {
+  Future<AuthSession?> completeGoogleLogin({required String code}) async {
     final repository = ref.read(authRepositoryProvider);
 
     state = const AsyncLoading();
@@ -186,6 +186,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     if (nextState.hasValue && nextState.value != null) {
       unawaited(_syncGoogleProfile(nextState.value!));
     }
+    return nextState.asData?.value;
   }
 
   Future<void> forgotPassword({required String email}) {

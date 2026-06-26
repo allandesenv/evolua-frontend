@@ -640,6 +640,75 @@ void main() {
     );
 
     testWidgets(
+      'google callback rebuilds errored auth state with previous value',
+      (tester) async {
+        final state = _CallbackAuthControllerState(session: _testSession());
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _CallbackAuthController(state),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authControllerProvider.future);
+        final controller =
+            container.read(authControllerProvider.notifier)
+                as _CallbackAuthController;
+        controller.publishErrorWithPrevious(_testSession());
+
+        await _pumpGoogleCallbackWithContainer(
+          tester,
+          container: container,
+          initialLocation: '/auth/google/callback?code=google-code',
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback does not exchange when previous-value error rebuild fails',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failSecondBuild: true,
+        );
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _CallbackAuthController(state),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authControllerProvider.future);
+        final controller =
+            container.read(authControllerProvider.notifier)
+                as _CallbackAuthController;
+        controller.publishErrorWithPrevious(_testSession());
+
+        await _pumpGoogleCallbackWithContainer(
+          tester,
+          container: container,
+          initialLocation: '/auth/google/callback?code=google-code',
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
       'google callback rebuilds errored auth provider once before exchange',
       (tester) async {
         final state = _CallbackAuthControllerState(
@@ -656,6 +725,52 @@ void main() {
         expect(state.buildCalls, 2);
         expect(state.completeCalls, 1);
         expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback recovers when auth provider build throws UnsupportedError',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failFirstBuild: true,
+          buildError: UnsupportedError('auth provider unavailable'),
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          initialLocation: '/auth/google/callback?code=google-code',
+          state: state,
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback does not exchange when UnsupportedError rebuild fails',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failEveryBuild: true,
+          buildError: UnsupportedError('auth provider unavailable'),
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          initialLocation: '/auth/google/callback?code=google-code',
+          state: state,
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
       },
     );
 
@@ -976,6 +1091,22 @@ Future<GoRouter> _pumpGoogleCallbackWithAuthController(
   );
   addTearDown(container.dispose);
 
+  return _pumpGoogleCallbackWithContainer(
+    tester,
+    container: container,
+    initialLocation: initialLocation,
+    completionTimeout: completionTimeout,
+    settle: settle,
+  );
+}
+
+Future<GoRouter> _pumpGoogleCallbackWithContainer(
+  WidgetTester tester, {
+  required ProviderContainer container,
+  required String initialLocation,
+  Duration completionTimeout = const Duration(seconds: 15),
+  bool settle = true,
+}) async {
   final authRouterNotifier = _bindAuthRouterNotifier(container);
   addTearDown(authRouterNotifier.dispose);
   final router = _buildGoogleCallbackRouter(
@@ -1001,14 +1132,18 @@ class _CallbackAuthControllerState {
   _CallbackAuthControllerState({
     required this.session,
     this.failFirstBuild = false,
+    this.failSecondBuild = false,
     this.failEveryBuild = false,
     this.firstBuildCompleter,
+    this.buildError,
   });
 
   final AuthSession session;
   final bool failFirstBuild;
+  final bool failSecondBuild;
   final bool failEveryBuild;
   final Completer<void>? firstBuildCompleter;
+  final Object? buildError;
   int buildCalls = 0;
   int completeCalls = 0;
 }
@@ -1025,16 +1160,27 @@ class _CallbackAuthController extends AuthController {
       await fakeState.firstBuildCompleter?.future;
     }
     if (fakeState.failEveryBuild ||
-        (fakeState.failFirstBuild && fakeState.buildCalls == 1)) {
-      throw StateError('auth bootstrap failed');
+        (fakeState.failFirstBuild && fakeState.buildCalls == 1) ||
+        (fakeState.failSecondBuild && fakeState.buildCalls == 2)) {
+      throw fakeState.buildError ?? StateError('auth bootstrap failed');
     }
     return null;
   }
 
+  void publishErrorWithPrevious(AuthSession previous) {
+    final error = AsyncError<AuthSession?>(
+      StateError('auth bootstrap failed'),
+      StackTrace.current,
+    );
+    // ignore: invalid_use_of_internal_member
+    state = error.copyWithPrevious(AsyncData<AuthSession?>(previous));
+  }
+
   @override
-  Future<void> completeGoogleLogin({required String code}) async {
+  Future<AuthSession?> completeGoogleLogin({required String code}) async {
     fakeState.completeCalls++;
     state = AsyncData(fakeState.session);
+    return fakeState.session;
   }
 }
 

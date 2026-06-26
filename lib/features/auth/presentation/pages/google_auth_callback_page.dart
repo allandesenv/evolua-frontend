@@ -69,10 +69,9 @@ class _GoogleAuthCallbackPageState
       }
 
       try {
-        await _completeGoogleCallback(code).timeout(widget.completionTimeout);
-
-        final authState = ref.read(authControllerProvider);
-        final session = authState.asData?.value;
+        final session = await _completeGoogleCallback(
+          code,
+        ).timeout(widget.completionTimeout);
 
         if (!mounted) {
           return;
@@ -99,7 +98,11 @@ class _GoogleAuthCallbackPageState
         });
       } catch (error) {
         if (kDebugMode) {
-          debugPrint('Google OAuth callback failed (${error.runtimeType}).');
+          debugPrint(
+            'Google OAuth callback failed '
+            '(errorType=${error.runtimeType}, '
+            'providerErrorType=${_providerExceptionType(error)}).',
+          );
         }
         if (!mounted) {
           return;
@@ -113,74 +116,146 @@ class _GoogleAuthCallbackPageState
     });
   }
 
-  Future<void> _completeGoogleCallback(String code) async {
+  Future<AuthSession?> _completeGoogleCallback(String code) async {
     await _ensureAuthControllerReady();
     if (!mounted) {
-      return;
+      return null;
     }
-    await ref
-        .read(authControllerProvider.notifier)
-        .completeGoogleLogin(code: code);
+
+    late AuthController controller;
+    try {
+      controller = ref.read(authControllerProvider.notifier);
+    } catch (error) {
+      _logAuthPreparationFailure(
+        stage: 'notifier_read',
+        error: error,
+        authState: _readAuthState(),
+      );
+      try {
+        await _rebuildAuthController();
+        controller = ref.read(authControllerProvider.notifier);
+      } catch (rebuildError) {
+        _logAuthPreparationFailure(
+          stage: 'notifier_read_after_rebuild',
+          error: rebuildError,
+          authState: _readAuthState(),
+        );
+        throw StateError('AuthController indisponivel para concluir OAuth.');
+      }
+    }
+
+    try {
+      return await controller.completeGoogleLogin(code: code);
+    } catch (error) {
+      _logAuthPreparationFailure(
+        stage: 'exchange',
+        error: error,
+        authState: _readAuthState(),
+      );
+      rethrow;
+    }
   }
 
   Future<void> _ensureAuthControllerReady() async {
-    var authState = ref.read(authControllerProvider);
+    var authState = _readAuthState();
+    Object? initialReadError = authState.readError;
     Object? bootstrapError;
     Object? rebuildError;
 
-    if (authState.isLoading && !authState.hasValue) {
+    if (authState.isLoadingWithoutData) {
       try {
         await ref.read(authControllerProvider.future);
       } catch (error) {
         bootstrapError = error;
       }
-      authState = ref.read(authControllerProvider);
+      authState = _readAuthState();
+      initialReadError ??= authState.readError;
     }
 
-    if (authState.hasValue) {
+    if (authState.isUsable) {
       return;
     }
 
-    if (authState.hasError) {
+    if (authState.hasError || authState.isUnreadable) {
       try {
-        final rebuilt = ref.refresh(authControllerProvider.future);
-        await rebuilt;
+        await _rebuildAuthController();
       } catch (error) {
         rebuildError = error;
       }
 
-      authState = ref.read(authControllerProvider);
-      if (authState.hasValue) {
+      authState = _readAuthState();
+      if (authState.isUsable) {
         return;
       }
     }
 
-    if (kDebugMode) {
-      final failedStage = rebuildError != null
+    _logAuthPreparationFailure(
+      stage: initialReadError != null
+          ? 'initial_state_read'
+          : rebuildError != null
           ? 'rebuild'
           : bootstrapError != null
           ? 'initial_bootstrap'
-          : 'state_check';
-      final errorType =
-          rebuildError?.runtimeType ?? bootstrapError?.runtimeType;
-      debugPrint(
-        'Google OAuth auth preparation failed '
-        '(stage=$failedStage, errorType=$errorType, '
-        'finalState=${_describeAuthState(authState)}).',
-      );
-    }
+          : 'state_check',
+      error: initialReadError ?? rebuildError ?? bootstrapError,
+      authState: authState,
+    );
 
     throw StateError('AuthController indisponivel para concluir OAuth.');
   }
 
-  String _describeAuthState(AsyncValue<AuthSession?> authState) {
-    if (authState.hasValue) {
-      return 'value';
+  Future<void> _rebuildAuthController() async {
+    final rebuild = ref.refresh(authControllerProvider.future);
+    await rebuild;
+  }
+
+  _AuthStateSnapshot _readAuthState() {
+    try {
+      return _AuthStateSnapshot(ref.read(authControllerProvider));
+    } catch (error) {
+      return _AuthStateSnapshot.unreadable(error);
     }
-    if (authState.hasError) {
+  }
+
+  void _logAuthPreparationFailure({
+    required String stage,
+    required Object? error,
+    required _AuthStateSnapshot authState,
+  }) {
+    if (!kDebugMode) {
+      return;
+    }
+
+    debugPrint(
+      'Google OAuth auth preparation failed '
+      '(stage=$stage, errorType=${error?.runtimeType}, '
+      'providerErrorType=${_providerExceptionType(error)}, '
+      'finalState=${_describeAuthState(authState)}).',
+    );
+  }
+
+  String? _providerExceptionType(Object? error) {
+    try {
+      final dynamic providerException = error;
+      final Object? inner = providerException.exception as Object?;
+      return inner?.runtimeType.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _describeAuthState(_AuthStateSnapshot authState) {
+    if (authState.isUnreadable) {
+      return 'unreadable';
+    }
+    final state = authState.value!;
+    if (state.hasError) {
       return 'error';
     }
-    if (authState.isLoading) {
+    if (state.asData != null) {
+      return 'data';
+    }
+    if (state.isLoading) {
       return 'loading';
     }
     return 'unknown';
@@ -188,8 +263,6 @@ class _GoogleAuthCallbackPageState
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(authControllerProvider);
-
     return GradientScaffold(
       child: Center(
         child: ConstrainedBox(
@@ -233,5 +306,31 @@ class _GoogleAuthCallbackPageState
         ),
       ),
     );
+  }
+}
+
+class _AuthStateSnapshot {
+  const _AuthStateSnapshot(this.value) : readError = null;
+
+  const _AuthStateSnapshot.unreadable(this.readError) : value = null;
+
+  final AsyncValue<AuthSession?>? value;
+  final Object? readError;
+
+  bool get isUnreadable => value == null;
+
+  bool get isLoadingWithoutData {
+    final state = value;
+    return state != null && state.isLoading && state.asData == null;
+  }
+
+  bool get hasError {
+    final state = value;
+    return readError != null || (state != null && state.hasError);
+  }
+
+  bool get isUsable {
+    final state = value;
+    return state != null && state.asData != null && !state.hasError;
   }
 }
