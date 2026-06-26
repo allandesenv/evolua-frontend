@@ -5,11 +5,17 @@ class SocialFeedState {
   const SocialFeedState({
     required this.result,
     this.isFromCache = false,
+    this.isRefreshing = false,
+    this.isStale = false,
+    this.refreshError,
     this.offlineMessage,
   });
 
   final PaginatedResponse<SocialPost> result;
   final bool isFromCache;
+  final bool isRefreshing;
+  final bool isStale;
+  final Object? refreshError;
   final String? offlineMessage;
 
   int get totalItems => result.totalItems;
@@ -22,6 +28,7 @@ class SocialFeedState {
     return SocialFeedState(
       result: result,
       isFromCache: true,
+      isStale: true,
       offlineMessage:
           'Você está vendo reflexões salvas deste recorte enquanto a conexão volta.',
     );
@@ -43,8 +50,33 @@ class SocialFeedState {
         filters: filters,
       ),
       isFromCache: true,
+      isStale: true,
       offlineMessage:
           'Não encontramos reflexões salvas neste recorte. Quando a conexão voltar, atualize para carregar o feed.',
+    );
+  }
+
+  SocialFeedState copyWith({
+    PaginatedResponse<SocialPost>? result,
+    bool? isFromCache,
+    bool? isRefreshing,
+    bool? isStale,
+    Object? refreshError,
+    bool clearRefreshError = false,
+    String? offlineMessage,
+    bool clearOfflineMessage = false,
+  }) {
+    return SocialFeedState(
+      result: result ?? this.result,
+      isFromCache: isFromCache ?? this.isFromCache,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      isStale: isStale ?? this.isStale,
+      refreshError: clearRefreshError
+          ? null
+          : refreshError ?? this.refreshError,
+      offlineMessage: clearOfflineMessage
+          ? null
+          : offlineMessage ?? this.offlineMessage,
     );
   }
 }

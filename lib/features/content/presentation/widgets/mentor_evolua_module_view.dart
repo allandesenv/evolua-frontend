@@ -32,10 +32,9 @@ class MentorEvoluaModuleView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentJourney = ref.watch(currentJourneyTrailProvider);
     final currentSubscription = ref
-        .watch(subscriptionControllerProvider)
+        .watch(currentSubscriptionProvider)
         .asData
-        ?.value
-        .current;
+        ?.value;
     final premium = currentSubscription?.premium ?? false;
 
     return currentJourney.when(
@@ -149,8 +148,8 @@ class _MentorPremiumGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final subscriptionState = ref.watch(subscriptionControllerProvider);
-    final current = subscriptionState.asData?.value.current;
+    final subscriptionState = ref.watch(currentSubscriptionProvider);
+    final current = subscriptionState.asData?.value;
     final premium = current?.premium ?? false;
 
     final title = premium
@@ -334,7 +333,7 @@ class _MentorEvoluaChatCardState extends ConsumerState<MentorEvoluaChatCard> {
       if (!mounted) {
         return;
       }
-      await ref.read(subscriptionControllerProvider.notifier).refresh();
+      await ref.read(currentSubscriptionProvider.notifier).refresh();
       if (!mounted) {
         return;
       }

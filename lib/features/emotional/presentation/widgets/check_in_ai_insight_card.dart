@@ -45,12 +45,7 @@ class CheckInAiInsightCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isPremium = onRegenerate == null
         ? true
-        : ref
-                  .watch(subscriptionControllerProvider)
-                  .asData
-                  ?.value
-                  .current
-                  ?.premium ??
+        : ref.watch(currentSubscriptionProvider).asData?.value?.premium ??
               false;
     final riskColor = switch (insight.riskLevel.toLowerCase()) {
       'high' => AppColors.accentWarm,

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
@@ -70,6 +72,47 @@ void main() {
       state?.latestCreatedCheckIn?.aiInsight?.insight,
       'Leitura enriquecida.',
     );
+    expect(repository.getByIdCalls, 0);
+  });
+
+  test('create with ready insight does not start polling', () async {
+    final createdWithInsight = _checkIn(
+      id: 98,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(insight: 'Leitura pronta no POST.'),
+    );
+    final listedWithoutInsight = _checkIn(
+      id: 98,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: null,
+    );
+    final repository = _FakeCheckInRepository(
+      createResult: createdWithInsight,
+      lists: [
+        const <CheckIn>[],
+        [listedWithoutInsight],
+      ],
+    );
+    final container = _container(
+      repository,
+      pollingConfig: const CheckInInsightPollingConfig(
+        delays: [Duration(milliseconds: 1)],
+      ),
+    );
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: null, energyLevel: 7);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    final state = container.read(checkInControllerProvider).asData?.value;
+    expect(
+      state?.latestCreatedCheckIn?.aiInsight?.insight,
+      'Leitura pronta no POST.',
+    );
+    expect(repository.getByIdCalls, 0);
   });
 
   test('create succeeds when refresh after saved check-in fails', () async {
@@ -203,18 +246,21 @@ void main() {
       );
       final repository = _FakeCheckInRepository(
         createResult: createdWithoutInsight,
-        lists: [
-          const <CheckIn>[],
-          const <CheckIn>[],
-          const <CheckIn>[],
-          [listedWithInsight],
+        getByIdResults: [
+          createdWithoutInsight,
+          createdWithoutInsight,
+          listedWithInsight,
         ],
+        lists: [const <CheckIn>[], const <CheckIn>[]],
       );
       final container = _container(
         repository,
         pollingConfig: const CheckInInsightPollingConfig(
-          attempts: 3,
-          delay: Duration(milliseconds: 1),
+          delays: [
+            Duration(milliseconds: 1),
+            Duration(milliseconds: 1),
+            Duration(milliseconds: 1),
+          ],
         ),
       );
       addTearDown(container.dispose);
@@ -232,6 +278,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 120));
 
       state = container.read(checkInControllerProvider).asData?.value;
+      expect(repository.getByIdCalls, 3);
+      expect(repository.listCalls, 2);
       expect(
         state?.latestCreatedCheckIn?.aiInsight?.insight,
         'Leitura chegou depois.',
@@ -250,17 +298,16 @@ void main() {
       );
       final repository = _FakeCheckInRepository(
         createResult: createdWithoutInsight,
+        getByIdResults: [createdWithoutInsight],
         lists: [
           const <CheckIn>[],
-          [createdWithoutInsight],
           [createdWithoutInsight],
         ],
       );
       final container = _container(
         repository,
         pollingConfig: const CheckInInsightPollingConfig(
-          attempts: 1,
-          delay: Duration(milliseconds: 1),
+          delays: [Duration(milliseconds: 1)],
         ),
       );
       addTearDown(container.dispose);
@@ -276,12 +323,204 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 80));
 
       state = container.read(checkInControllerProvider).asData?.value;
+      expect(repository.getByIdCalls, 1);
       expect(state?.pendingInsightCheckInId, isNull);
       expect(state?.unavailableInsightCheckInId, 41);
       expect(state?.isLatestInsightPending, isFalse);
       expect(state?.isLatestInsightUnavailable, isTrue);
     },
   );
+
+  test(
+    'polling keeps state visible across transient errors before ready',
+    () async {
+      final createdWithoutInsight = _checkIn(
+        id: 43,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: null,
+      );
+      final ready = _checkIn(
+        id: 43,
+        createdAt: DateTime(2026, 5, 5, 10),
+        aiInsight: _insight(insight: 'Leitura depois de instabilidade.'),
+      );
+      final repository = _FakeCheckInRepository(
+        createResult: createdWithoutInsight,
+        getByIdErrors: [
+          DioException.connectionTimeout(
+            requestOptions: RequestOptions(path: '/v1/check-ins/43'),
+            timeout: const Duration(seconds: 1),
+          ),
+          DioException.badResponse(
+            statusCode: 503,
+            requestOptions: RequestOptions(path: '/v1/check-ins/43'),
+            response: Response<void>(
+              requestOptions: RequestOptions(path: '/v1/check-ins/43'),
+              statusCode: 503,
+            ),
+          ),
+        ],
+        getByIdResults: [createdWithoutInsight, createdWithoutInsight, ready],
+        lists: [
+          const <CheckIn>[],
+          [createdWithoutInsight],
+        ],
+      );
+      final container = _container(
+        repository,
+        pollingConfig: const CheckInInsightPollingConfig(
+          delays: [
+            Duration(milliseconds: 1),
+            Duration(milliseconds: 1),
+            Duration(milliseconds: 1),
+          ],
+        ),
+      );
+      addTearDown(container.dispose);
+      await container.read(checkInControllerProvider.future);
+
+      await container
+          .read(checkInControllerProvider.notifier)
+          .create(mood: 'calmo', reflection: null, energyLevel: 7);
+
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final state = container.read(checkInControllerProvider);
+      expect(state.hasError, isFalse);
+      expect(repository.getByIdCalls, 3);
+      expect(repository.listCalls, 2);
+      expect(
+        state.asData?.value.latestCreatedCheckIn?.aiInsight?.insight,
+        'Leitura depois de instabilidade.',
+      );
+    },
+  );
+
+  test('dispose cancels pending polling before the next getById', () async {
+    final createdWithoutInsight = _checkIn(
+      id: 44,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: null,
+    );
+    final repository = _FakeCheckInRepository(
+      createResult: createdWithoutInsight,
+      lists: [
+        const <CheckIn>[],
+        [createdWithoutInsight],
+      ],
+    );
+    final container = _container(
+      repository,
+      pollingConfig: const CheckInInsightPollingConfig(
+        delays: [Duration(milliseconds: 50)],
+      ),
+    );
+    await container.read(checkInControllerProvider.future);
+
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: null, energyLevel: 7);
+    container.dispose();
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    expect(repository.getByIdCalls, 0);
+  });
+
+  test('multiple listeners share a single polling sequence', () async {
+    final createdWithoutInsight = _checkIn(
+      id: 45,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: null,
+    );
+    final ready = _checkIn(
+      id: 45,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(insight: 'Uma sequencia compartilhada.'),
+    );
+    final repository = _FakeCheckInRepository(
+      createResult: createdWithoutInsight,
+      getByIdResults: [ready],
+      lists: [
+        const <CheckIn>[],
+        [createdWithoutInsight],
+      ],
+    );
+    final container = _container(
+      repository,
+      pollingConfig: const CheckInInsightPollingConfig(
+        delays: [Duration(milliseconds: 1)],
+      ),
+    );
+    addTearDown(container.dispose);
+    final subA = container.listen(checkInControllerProvider, (_, _) {});
+    final subB = container.listen(checkInControllerProvider, (_, _) {});
+    addTearDown(subA.close);
+    addTearDown(subB.close);
+    await container.read(checkInControllerProvider.future);
+
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: null, energyLevel: 7);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    expect(repository.getByIdCalls, 1);
+    expect(
+      container
+          .read(checkInControllerProvider)
+          .asData
+          ?.value
+          .latestCreatedCheckIn
+          ?.aiInsight
+          ?.insight,
+      'Uma sequencia compartilhada.',
+    );
+  });
+
+  test('session change ignores delayed polling response', () async {
+    final createdWithoutInsight = _checkIn(
+      id: 46,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: null,
+    );
+    final ready = _checkIn(
+      id: 46,
+      createdAt: DateTime(2026, 5, 5, 10),
+      aiInsight: _insight(insight: 'Resposta antiga.'),
+    );
+    final getByIdGate = Completer<CheckIn>();
+    final repository = _FakeCheckInRepository(
+      createResult: createdWithoutInsight,
+      getByIdCompleters: [getByIdGate],
+      lists: [
+        const <CheckIn>[],
+        [createdWithoutInsight],
+      ],
+    );
+    final container = _container(
+      repository,
+      pollingConfig: const CheckInInsightPollingConfig(
+        delays: [Duration(milliseconds: 1)],
+      ),
+    );
+    addTearDown(container.dispose);
+    await container.read(checkInControllerProvider.future);
+
+    await container
+        .read(checkInControllerProvider.notifier)
+        .create(mood: 'calmo', reflection: null, energyLevel: 7);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    (container.read(authControllerProvider.notifier) as _FakeAuthController)
+        .setSession(_session(userId: 'user-456'));
+    container.read(authSessionGenerationProvider.notifier).bump();
+    getByIdGate.complete(ready);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    final state = container.read(checkInControllerProvider).asData?.value;
+    expect(repository.getByIdCalls, 1);
+    expect(state?.latestCreatedCheckIn?.aiInsight, isNull);
+    expect(state?.isLatestInsightPending, isTrue);
+  });
 
   test(
     'refresh replaces partial latest check-in with listed full version',
@@ -518,16 +757,43 @@ void main() {
 ProviderContainer _container(
   CheckInRepository repository, {
   CheckInInsightPollingConfig pollingConfig = const CheckInInsightPollingConfig(
-    attempts: 0,
-    delay: Duration.zero,
+    delays: [],
   ),
 }) {
   return ProviderContainer(
     overrides: [
+      authControllerProvider.overrideWith(
+        () => _FakeAuthController(_session(userId: 'user-123')),
+      ),
       checkInRepositoryProvider.overrideWithValue(repository),
       checkInInsightPollingConfigProvider.overrideWithValue(pollingConfig),
       trailRepositoryProvider.overrideWithValue(_FakeTrailRepository()),
     ],
+  );
+}
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController(this._session);
+
+  AuthSession _session;
+
+  @override
+  Future<AuthSession?> build() async => _session;
+
+  void setSession(AuthSession session) {
+    _session = session;
+    state = AsyncData(session);
+  }
+}
+
+AuthSession _session({required String userId}) {
+  return AuthSession(
+    userId: userId,
+    email: '$userId@evolua.test',
+    roles: const ['ROLE_USER'],
+    accessToken: 'fake.$userId.token',
+    refreshToken: 'refresh-$userId',
+    expiresAt: DateTime.now().add(const Duration(hours: 1)),
   );
 }
 
@@ -538,6 +804,9 @@ class _FakeCheckInRepository implements CheckInRepository {
     this.createError,
     this.createErrors = const [],
     this.listErrors = const [],
+    this.getByIdResults = const [],
+    this.getByIdErrors = const [],
+    this.getByIdCompleters = const [],
     this.createGate,
     this.deepReadingResult,
     this.deepReadingError,
@@ -549,6 +818,9 @@ class _FakeCheckInRepository implements CheckInRepository {
   final Object? createError;
   final List<Object> createErrors;
   final List<Object> listErrors;
+  final List<CheckIn> getByIdResults;
+  final List<Object> getByIdErrors;
+  final List<Completer<CheckIn>> getByIdCompleters;
   final Completer<void>? createGate;
   final CheckIn? deepReadingResult;
   final Object? deepReadingError;
@@ -558,6 +830,7 @@ class _FakeCheckInRepository implements CheckInRepository {
   final List<int> ritualReadingIds = [];
   int createCalls = 0;
   int listCalls = 0;
+  int getByIdCalls = 0;
 
   @override
   Future<PaginatedResponse<CheckIn>> list({
@@ -589,6 +862,26 @@ class _FakeCheckInRepository implements CheckInRepository {
       sortDir: sortDir,
       filters: const {},
     );
+  }
+
+  @override
+  Future<CheckIn> getById(int checkInId) async {
+    getByIdCalls++;
+    if (getByIdCompleters.length >= getByIdCalls) {
+      return getByIdCompleters[getByIdCalls - 1].future;
+    }
+    if (getByIdErrors.length >= getByIdCalls) {
+      throw getByIdErrors[getByIdCalls - 1];
+    }
+    if (getByIdResults.length >= getByIdCalls) {
+      return getByIdResults[getByIdCalls - 1];
+    }
+    return createResult ??
+        _checkIn(
+          id: checkInId,
+          createdAt: DateTime(2026, 5, 5, 10),
+          aiInsight: null,
+        );
   }
 
   @override

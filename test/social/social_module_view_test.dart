@@ -18,6 +18,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('SocialModuleView spaces UX', () {
+    testWidgets('loads communities and feed once while providers stay valid', (
+      tester,
+    ) async {
+      await _setCompactSurface(tester);
+      final communities = _FakeCommunityRepository();
+      final posts = _FakeSocialPostRepository();
+
+      await tester.pumpWidget(_testApp(communities: communities, posts: posts));
+      await tester.pumpAndSettle();
+
+      expect(communities.listCalls, 1);
+      expect(posts.listCalls, 1);
+
+      await tester.pumpWidget(_testApp(communities: communities, posts: posts));
+      await tester.pumpAndSettle();
+
+      expect(communities.listCalls, 1);
+      expect(posts.listCalls, 1);
+    });
+
     testWidgets('renders spaces without internal tabs or future messages', (
       tester,
     ) async {
@@ -504,6 +524,7 @@ class _FakeCommunityRepository implements CommunityRepository {
   final Map<int, PaginatedResponse<Community>> pages;
   final requestedPages = <int>[];
   var _listCalls = 0;
+  int get listCalls => _listCalls;
 
   @override
   Future<PaginatedResponse<Community>> list({
@@ -582,6 +603,7 @@ class _FakeSocialPostRepository implements SocialPostRepository {
   String? lastCreatedContent;
   String? lastUpdatedId;
   String? lastDeletedId;
+  var listCalls = 0;
 
   @override
   Future<PaginatedResponse<SocialPost>> list({
@@ -594,6 +616,7 @@ class _FakeSocialPostRepository implements SocialPostRepository {
     String? visibility,
     bool? mine,
   }) async {
+    listCalls += 1;
     lastListedCommunity = community;
     final items = community == null
         ? const <SocialPost>[]

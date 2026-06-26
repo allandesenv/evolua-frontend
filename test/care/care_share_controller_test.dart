@@ -486,6 +486,27 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
   }) async {
     return type == DailyRitualType.morning ? morning : null;
   }
+
+  @override
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    return [if (morning != null) _withLocalDate(morning!, start)];
+  }
+}
+
+DailyRitual _withLocalDate(DailyRitual ritual, DateTime localDate) {
+  return DailyRitual(
+    id: ritual.id,
+    localDate: localDate,
+    type: ritual.type,
+    emotionalState: ritual.emotionalState,
+    dayNeed: ritual.dayNeed,
+    intention: ritual.intention,
+    microAction: ritual.microAction,
+    createdAt: ritual.createdAt,
+  );
 }
 
 class _FakeNotificationRepository implements NotificationRepository {

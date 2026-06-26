@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/care/application/care_claim_secret_reader.dart';
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
@@ -167,7 +168,12 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        extra: const {httpInstrumentationOriginExtraKey: 'care_claim'},
       ),
+    );
+    attachHttpInstrumentation(
+      _dio,
+      recorder: ref.read(httpInstrumentationRecorderProvider),
     );
 
     final link = CareClaimLink.fromUri(Uri.base);

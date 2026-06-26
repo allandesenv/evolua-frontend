@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/cache/stable_resource_cache.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
@@ -35,6 +36,16 @@ class SupportConfig {
       return null;
     }
     return Uri.tryParse(raw);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'helpCenterUrl': helpCenterUrl?.toString(),
+      'supportUrl': supportUrl?.toString(),
+      'professionalHelpUrl': professionalHelpUrl?.toString(),
+      'emotionalResourcesUrl': emotionalResourcesUrl?.toString(),
+      'aiLimitsUrl': aiLimitsUrl?.toString(),
+    };
   }
 }
 
@@ -112,7 +123,9 @@ class SupportRepository {
       '/v1/support/tickets',
       data: {'category': category, 'subject': subject, 'message': message},
     );
-    return SupportTicketResult.fromJson(ApiPayloadParser.dataMap(response.data));
+    return SupportTicketResult.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    );
   }
 }
 
@@ -123,9 +136,31 @@ final supportRepositoryProvider = Provider<SupportRepository>((ref) {
 });
 
 final supportConfigProvider = FutureProvider<SupportConfig>((ref) {
-  return ref.watch(supportRepositoryProvider).loadConfig();
+  return _loadCachedSupportConfig(ref);
 });
 
 final supportStatusProvider = FutureProvider<List<SupportStatusItem>>((ref) {
   return ref.watch(supportRepositoryProvider).loadStatus();
 });
+
+Future<SupportConfig> _loadCachedSupportConfig(Ref ref) async {
+  final cache = await ref.read(stableResourceCacheProvider.future);
+  final context = await ref.read(stableResourceCacheContextProvider.future);
+  return cache.getOrFetch<SupportConfig>(
+    resource: StableResource.supportConfig,
+    dio: ref.read(authenticatedDioProvider(AppConfig.userBaseUrl)),
+    path: '/v1/support/config',
+    appVersion: context.appVersion,
+    locale: context.locale,
+    ttl: const Duration(hours: 6),
+    maxStale: const Duration(hours: 24),
+    force: false,
+    extractPayload: ApiPayloadParser.dataMap,
+    decodePayload: (payload) {
+      if (payload is! Map) {
+        throw const FormatException('Configuracao de suporte invalida.');
+      }
+      return SupportConfig.fromJson(Map<String, dynamic>.from(payload));
+    },
+  );
+}

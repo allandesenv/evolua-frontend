@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const _authRetryExtraKey = 'evolua.auth.retry';
 const _localePreferenceStorageKey = 'evolua.locale_preference.v1';
 
 final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
@@ -24,6 +24,11 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
       },
       responseDecoder: _utf8ResponseDecoder,
     ),
+  );
+
+  attachHttpInstrumentation(
+    dio,
+    recorder: ref.read(httpInstrumentationRecorderProvider),
   );
 
   dio.interceptors.add(
@@ -84,7 +89,7 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
             ...original.headers,
             'Authorization': refreshedAuthorization,
           },
-          extra: {...original.extra, _authRetryExtraKey: true},
+          extra: {...original.extra, httpInstrumentationRetryExtraKey: true},
         );
 
         try {
@@ -123,7 +128,7 @@ bool _shouldRefresh(DioException error) {
   }
 
   final request = error.requestOptions;
-  if (request.extra[_authRetryExtraKey] == true) {
+  if (request.extra[httpInstrumentationRetryExtraKey] == true) {
     return false;
   }
 

@@ -48,7 +48,11 @@ class MonetizationAccessController extends AsyncNotifier<void> {
             .recordRewardedAdShown(
               session: ref.read(authControllerProvider).asData?.value,
             );
-        await ref.read(subscriptionControllerProvider.notifier).refresh();
+        try {
+          await ref.read(currentSubscriptionProvider.notifier).refresh();
+        } catch (_) {
+          // The protected action still verifies access after the reward.
+        }
       }
     });
     if (state.hasError || !result.isRewarded) {
@@ -84,7 +88,7 @@ class MonetizationAccessController extends AsyncNotifier<void> {
             session: ref.read(authControllerProvider).asData?.value,
           );
       try {
-        await ref.read(subscriptionControllerProvider.notifier).refresh();
+        await ref.read(currentSubscriptionProvider.notifier).refresh();
       } catch (_) {
         // The reward can still be consumed by the protected action even if
         // refreshing subscription UI state fails transiently.

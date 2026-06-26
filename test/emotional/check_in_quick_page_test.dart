@@ -117,39 +117,44 @@ void main() {
       expect(find.textContaining('leitura aparecer'), findsOneWidget);
     });
 
-    testWidgets('quota-limited saved check-in completes without reward prompt', (
-      tester,
-    ) async {
-      var completed = false;
-      final repository = _FakeCheckInRepository(createQuotaLimitedInsight: true);
-      final rewarded = _FakeRewardedAdService(result: RewardedAdResult.rewarded);
+    testWidgets(
+      'quota-limited saved check-in completes without reward prompt',
+      (tester) async {
+        var completed = false;
+        final repository = _FakeCheckInRepository(
+          createQuotaLimitedInsight: true,
+        );
+        final rewarded = _FakeRewardedAdService(
+          result: RewardedAdResult.rewarded,
+        );
 
-      await tester.pumpWidget(
-        _testApp(
-          checkInRepository: repository,
-          rewardedAdService: rewarded,
-          onCompleted: () => completed = true,
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          _testApp(
+            checkInRepository: repository,
+            rewardedAdService: rewarded,
+            onCompleted: () => completed = true,
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.byType(TextFormField).first,
-        'quero salvar sem outro anuncio',
-      );
-      await tester.tap(find.text('Fazer check-in'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'quero salvar sem outro anuncio',
+        );
+        await tester.tap(find.text('Fazer check-in'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
 
-      expect(repository.createCalls, 1);
-      expect(completed, isTrue);
-      expect(rewarded.showCalls, 0);
-      expect(find.byType(RewardedAdPrompt), findsNothing);
-      expect(
-        find.textContaining('leitura aprofundada pode ser liberada depois'),
-        findsOneWidget,
-      );
-    });
+        expect(repository.createCalls, 1);
+        expect(completed, isTrue);
+        expect(rewarded.showCalls, 0);
+        expect(find.byType(RewardedAdPrompt), findsNothing);
+        expect(
+          find.textContaining('leitura aprofundada pode ser liberada depois'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('network failure shows friendly server message', (
       tester,
@@ -903,6 +908,9 @@ Widget _testApp({
       ),
       if (rewardedAdService != null)
         rewardedAdServiceProvider.overrideWithValue(rewardedAdService),
+      currentSubscriptionProvider.overrideWith(
+        _FakeCurrentSubscriptionController.new,
+      ),
       if (subscriptionRepository != null)
         subscriptionRepositoryProvider.overrideWithValue(
           subscriptionRepository,
@@ -929,6 +937,27 @@ Widget _testApp({
       ),
     ),
   );
+}
+
+class _FakeCurrentSubscriptionController extends CurrentSubscriptionController {
+  @override
+  Future<CurrentSubscription?> build() async => _current();
+
+  @override
+  Future<CurrentSubscription?> refresh() async => _current();
+
+  CurrentSubscription _current() {
+    return const CurrentSubscription(
+      planCode: 'free',
+      status: 'ACTIVE',
+      billingCycle: 'MONTHLY',
+      premium: false,
+      adsEnabled: true,
+      aiQuotaRemainingToday: 0,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: false,
+    );
+  }
 }
 
 class _FakeDailyReminderScheduler implements DailyCheckInReminderScheduler {
@@ -1130,6 +1159,23 @@ class _FakeCheckInRepository implements CheckInRepository {
           ? null
           : _insight(quotaLimited: createQuotaLimitedInsight),
       createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<CheckIn> getById(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por dois minutos.',
+        aiInsight: _insight(),
+        createdAt: DateTime.now(),
+      ),
     );
   }
 

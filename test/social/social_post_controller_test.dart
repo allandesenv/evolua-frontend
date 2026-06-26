@@ -18,7 +18,11 @@ void main() {
     test(
       'stores successful feed and returns cached posts on network error',
       () async {
-        SharedPreferences.setMockInitialValues({});
+        SharedPreferences.setMockInitialValues({
+          _sessionStorageKey: jsonEncode(
+            _session(userId: 'user-a', email: 'a@evolua.test').toJson(),
+          ),
+        });
         final onlineContainer = ProviderContainer(
           overrides: [
             socialPostRepositoryProvider.overrideWithValue(
@@ -27,6 +31,7 @@ void main() {
           ],
         );
         addTearDown(onlineContainer.dispose);
+        await onlineContainer.read(authControllerProvider.future);
 
         final onlineState = await onlineContainer.read(
           socialPostControllerProvider.future,
@@ -43,6 +48,7 @@ void main() {
           ],
         );
         addTearDown(offlineContainer.dispose);
+        await offlineContainer.read(authControllerProvider.future);
 
         final offlineState = await offlineContainer.read(
           socialPostControllerProvider.future,
@@ -125,7 +131,11 @@ void main() {
     });
 
     test('returns friendly offline empty state when no cache exists', () async {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        _sessionStorageKey: jsonEncode(
+          _session(userId: 'user-a', email: 'a@evolua.test').toJson(),
+        ),
+      });
       final container = ProviderContainer(
         overrides: [
           socialPostRepositoryProvider.overrideWithValue(
@@ -134,6 +144,7 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      await container.read(authControllerProvider.future);
 
       final state = await container.read(socialPostControllerProvider.future);
 
@@ -213,9 +224,9 @@ class _FakeSocialPostRepository implements SocialPostRepository {
     required String id,
     required String content,
   }) async {
-    return _posts().firstWhere((post) => post.id == id).copyWith(
-      content: content,
-    );
+    return _posts()
+        .firstWhere((post) => post.id == id)
+        .copyWith(content: content);
   }
 
   @override

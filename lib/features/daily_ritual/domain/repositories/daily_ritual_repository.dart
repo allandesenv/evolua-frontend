@@ -6,5 +6,10 @@ abstract class DailyRitualRepository {
     required DateTime localDate,
   });
 
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  });
+
   Future<DailyRitual> create(DailyRitualDraft draft);
 }

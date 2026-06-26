@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
@@ -9,6 +10,7 @@ import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_c
 import 'package:evolua_frontend/features/emotional/data/repositories/check_in_repository_impl.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final checkInRepositoryProvider = Provider<CheckInRepository>((ref) {
@@ -24,19 +26,20 @@ final checkInControllerProvider =
 final checkInInsightPollingConfigProvider =
     Provider<CheckInInsightPollingConfig>(
       (ref) => const CheckInInsightPollingConfig(
-        attempts: 8,
-        delay: Duration(seconds: 2),
+        delays: [
+          Duration(seconds: 1),
+          Duration(seconds: 2),
+          Duration(seconds: 3),
+          Duration(seconds: 4),
+          Duration(seconds: 6),
+        ],
       ),
     );
 
 class CheckInInsightPollingConfig {
-  const CheckInInsightPollingConfig({
-    required this.attempts,
-    required this.delay,
-  });
+  const CheckInInsightPollingConfig({required this.delays});
 
-  final int attempts;
-  final Duration delay;
+  final List<Duration> delays;
 }
 
 class CheckInHistoryState {
@@ -93,8 +96,13 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
   String _selectedGrouping = 'monthly';
   CheckIn? _latestKnownCheckIn;
   int? _activeInsightPollId;
+  int _pollGeneration = 0;
+  Future<void>? _activeInsightPollFuture;
   Timer? _pollDelayTimer;
   Completer<void>? _pollDelayCompleter;
+  Completer<void>? _resumeCompleter;
+  AppLifecycleListener? _lifecycleListener;
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
   Future<void>? _createInFlight;
   bool _disposeRegistered = false;
   bool _disposed = false;
@@ -545,40 +553,55 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         current.unavailableInsightCheckInId == latest.id) {
       return;
     }
-    if (_activeInsightPollId == latest.id) {
+    if (_activeInsightPollId == latest.id && _activeInsightPollFuture != null) {
       return;
     }
 
+    final authState = ref.read(authControllerProvider);
+    final userId = authState.asData?.value?.userId ?? current.ownerUserId;
+    if (userId == null || latest.userId != userId) {
+      return;
+    }
+
+    _pollGeneration++;
     _activeInsightPollId = latest.id;
+    final context = _InsightPollContext(
+      checkInId: latest.id,
+      userId: userId,
+      authSessionGeneration: ref.read(authSessionGenerationProvider),
+      pollGeneration: _pollGeneration,
+    );
+    final future = _pollForInsight(context);
+    _activeInsightPollFuture = future;
     unawaited(
-      _pollForInsight(latest.id).whenComplete(() {
-        if (_activeInsightPollId == latest.id) {
+      future.whenComplete(() {
+        if (_isActivePollIdentity(context) &&
+            identical(_activeInsightPollFuture, future)) {
           _activeInsightPollId = null;
+          _activeInsightPollFuture = null;
         }
       }),
     );
   }
 
-  Future<void> _pollForInsight(int checkInId) async {
+  Future<void> _pollForInsight(_InsightPollContext context) async {
     final pollingConfig = ref.read(checkInInsightPollingConfigProvider);
-    for (var attempt = 0; attempt < pollingConfig.attempts; attempt++) {
-      await _waitForPollDelay(pollingConfig.delay);
-      if (_disposed) {
-        return;
-      }
-      if (state.asData?.value.pendingInsightCheckInId != checkInId) {
+    final repository = ref.read(checkInRepositoryProvider);
+    for (final delay in pollingConfig.delays) {
+      final canAttempt = await _waitForResumedDelay(delay, context);
+      if (!canAttempt || !_isCurrentPollContext(context)) {
         return;
       }
       try {
-        final result = await _fetch(page: 0);
-        final listed = result.items
-            .where((item) => item.id == checkInId)
-            .firstOrNull;
-        if (listed?.aiInsight != null) {
+        final checkIn = await repository.getById(context.checkInId);
+        if (!_isCurrentPollContext(context)) {
+          return;
+        }
+        if (checkIn.aiInsight != null) {
           state = AsyncData(
-            _stateFromResult(
-              result,
-              latestCreatedCheckIn: listed,
+            _stateWithUpdatedCheckIn(
+              state.asData!.value,
+              checkIn,
               pendingInsightCheckInId: null,
               unavailableInsightCheckInId: null,
             ),
@@ -587,13 +610,26 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
           ref.invalidate(trailControllerProvider);
           return;
         }
-      } catch (_) {
+      } catch (error) {
+        if (!_isCurrentPollContext(context)) {
+          return;
+        }
+        if (_isTerminalPollingError(error)) {
+          _markInsightUnavailable(context);
+          return;
+        }
         // Keep the current state visible while the backend finishes processing.
       }
     }
 
+    if (_isCurrentPollContext(context)) {
+      _markInsightUnavailable(context);
+    }
+  }
+
+  void _markInsightUnavailable(_InsightPollContext context) {
     final current = state.asData?.value;
-    if (current == null || current.pendingInsightCheckInId != checkInId) {
+    if (current == null || !_isCurrentPollContext(context)) {
       return;
     }
     state = AsyncData(
@@ -603,7 +639,7 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         ownerUserId: current.ownerUserId,
         latestCreatedCheckIn: current.latestCreatedCheckIn,
         pendingInsightCheckInId: null,
-        unavailableInsightCheckInId: checkInId,
+        unavailableInsightCheckInId: context.checkInId,
         search: current.search,
         mood: current.mood,
         energyRange: current.energyRange,
@@ -612,6 +648,49 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         isCreatingCheckIn: false,
       ),
     );
+  }
+
+  CheckInHistoryState _stateWithUpdatedCheckIn(
+    CheckInHistoryState current,
+    CheckIn updated, {
+    int? pendingInsightCheckInId,
+    int? unavailableInsightCheckInId,
+  }) {
+    final items = current.result.items
+        .map((item) => item.id == updated.id ? updated : item)
+        .toList(growable: false);
+    final result = current.result.copyWith(items: items);
+    _latestKnownCheckIn = updated;
+    return CheckInHistoryState(
+      result: result,
+      selectedGrouping: current.selectedGrouping,
+      ownerUserId: current.ownerUserId,
+      latestCreatedCheckIn: updated,
+      pendingInsightCheckInId: pendingInsightCheckInId,
+      unavailableInsightCheckInId: unavailableInsightCheckInId,
+      search: current.search,
+      mood: current.mood,
+      energyRange: current.energyRange,
+      from: current.from,
+      to: current.to,
+      isCreatingCheckIn: current.isCreatingCheckIn,
+    );
+  }
+
+  bool _isTerminalPollingError(Object error) {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode == null) {
+        return false;
+      }
+      if (statusCode == 408 || statusCode == 429 || statusCode >= 500) {
+        return false;
+      }
+      return statusCode == 404 ||
+          statusCode == 410 ||
+          (statusCode >= 400 && statusCode < 500);
+    }
+    return true;
   }
 
   String? _normalizeText(String? value) {
@@ -635,12 +714,86 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       return;
     }
     _disposeRegistered = true;
+    _ensureLifecycleListener();
     ref.onDispose(() {
       _disposed = true;
+      _pollGeneration++;
+      _activeInsightPollId = null;
+      _activeInsightPollFuture = null;
       _pollDelayTimer?.cancel();
       final completer = _pollDelayCompleter;
       if (completer != null && !completer.isCompleted) {
         completer.complete();
+      }
+      final resumeCompleter = _resumeCompleter;
+      if (resumeCompleter != null && !resumeCompleter.isCompleted) {
+        resumeCompleter.complete();
+      }
+      _lifecycleListener?.dispose();
+      _lifecycleListener = null;
+    });
+  }
+
+  void _ensureLifecycleListener() {
+    if (_lifecycleListener != null) {
+      return;
+    }
+    final WidgetsBinding binding;
+    try {
+      binding = WidgetsBinding.instance;
+    } catch (_) {
+      _lifecycleState = AppLifecycleState.resumed;
+      return;
+    }
+    _lifecycleState = binding.lifecycleState ?? AppLifecycleState.resumed;
+    _lifecycleListener = AppLifecycleListener(
+      onStateChange: (state) {
+        _lifecycleState = state;
+        if (state == AppLifecycleState.resumed) {
+          final completer = _resumeCompleter;
+          if (completer != null && !completer.isCompleted) {
+            completer.complete();
+          }
+        }
+      },
+    );
+  }
+
+  Future<bool> _waitForResumedDelay(
+    Duration delay,
+    _InsightPollContext context,
+  ) async {
+    while (_isCurrentPollContext(context)) {
+      if (!_isResumed) {
+        await _waitForResume();
+        continue;
+      }
+      await _waitForPollDelay(delay);
+      if (!_isCurrentPollContext(context)) {
+        return false;
+      }
+      if (_isResumed) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool get _isResumed => _lifecycleState == AppLifecycleState.resumed;
+
+  Future<void> _waitForResume() {
+    if (_isResumed || _disposed) {
+      return Future<void>.value();
+    }
+    final existing = _resumeCompleter;
+    if (existing != null) {
+      return existing.future;
+    }
+    final completer = Completer<void>();
+    _resumeCompleter = completer;
+    return completer.future.whenComplete(() {
+      if (identical(_resumeCompleter, completer)) {
+        _resumeCompleter = null;
       }
     });
   }
@@ -661,4 +814,39 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
       }
     });
   }
+
+  bool _isCurrentPollContext(_InsightPollContext context) {
+    if (!_isActivePollIdentity(context)) {
+      return false;
+    }
+    final current = state.asData?.value;
+    if (current?.pendingInsightCheckInId != context.checkInId) {
+      return false;
+    }
+    final session = ref.read(authControllerProvider).asData?.value;
+    return session?.userId == context.userId &&
+        ref.read(authSessionGenerationProvider) ==
+            context.authSessionGeneration;
+  }
+
+  bool _isActivePollIdentity(_InsightPollContext context) {
+    return !_disposed &&
+        ref.mounted &&
+        _activeInsightPollId == context.checkInId &&
+        _pollGeneration == context.pollGeneration;
+  }
+}
+
+class _InsightPollContext {
+  const _InsightPollContext({
+    required this.checkInId,
+    required this.userId,
+    required this.authSessionGeneration,
+    required this.pollGeneration,
+  });
+
+  final int checkInId;
+  final String userId;
+  final int authSessionGeneration;
+  final int pollGeneration;
 }
