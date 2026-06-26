@@ -26,4 +26,34 @@ class Profile {
   final String? avatarUrl;
   final DateTime createdAt;
   final String? personalGoals;
+
+  Profile copyWith({
+    int? id,
+    String? userId,
+    String? displayName,
+    String? bio,
+    int? journeyLevel,
+    bool? premium,
+    DateTime? birthDate,
+    String? gender,
+    String? customGender,
+    String? avatarUrl,
+    DateTime? createdAt,
+    String? personalGoals,
+  }) {
+    return Profile(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      displayName: displayName ?? this.displayName,
+      bio: bio ?? this.bio,
+      journeyLevel: journeyLevel ?? this.journeyLevel,
+      premium: premium ?? this.premium,
+      birthDate: birthDate ?? this.birthDate,
+      gender: gender ?? this.gender,
+      customGender: customGender ?? this.customGender,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      createdAt: createdAt ?? this.createdAt,
+      personalGoals: personalGoals ?? this.personalGoals,
+    );
+  }
 }

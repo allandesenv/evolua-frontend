@@ -290,6 +290,218 @@ void main() {
     expect(repository.listPlansCalls, 0);
   });
 
+  group('trackCheckout polling', () {
+    test('approved on third status calls current only once', () async {
+      final repository = _FakeSubscriptionRepository(
+        plans: _plans(),
+        checkoutStatuses: [
+          _checkout('checkout-1', status: 'PENDING_PAYMENT'),
+          _checkout('checkout-1', status: 'PENDING_PAYMENT'),
+          _checkout('checkout-1', status: 'APPROVED'),
+        ],
+      );
+      final container = _subscriptionContainer(repository);
+      addTearDown(container.dispose);
+      await container.read(subscriptionControllerProvider.future);
+      repository.resetCounters();
+
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .trackCheckout('checkout-1');
+
+      expect(repository.checkoutStatusCalls, 3);
+      expect(repository.currentCalls, 1);
+      final state = container
+          .read(subscriptionControllerProvider)
+          .asData!
+          .value;
+      expect(state.pendingCheckout?.isApproved, isTrue);
+      expect(state.isBusy, isFalse);
+      expect(state.message, 'Pagamento confirmado e plano liberado.');
+    });
+
+    test('simultaneous calls for same checkout share polling', () async {
+      final firstStatus = Completer<CheckoutSession>();
+      final repository = _FakeSubscriptionRepository(
+        plans: _plans(),
+        checkoutStatusCompleter: firstStatus,
+        checkoutStatuses: [_checkout('checkout-1', status: 'APPROVED')],
+      );
+      final container = _subscriptionContainer(repository);
+      addTearDown(container.dispose);
+      await container.read(subscriptionControllerProvider.future);
+      repository.resetCounters();
+
+      final first = container
+          .read(subscriptionControllerProvider.notifier)
+          .trackCheckout('checkout-1');
+      final second = container
+          .read(subscriptionControllerProvider.notifier)
+          .trackCheckout('checkout-1');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.checkoutStatusCalls, 1);
+      firstStatus.complete(_checkout('checkout-1', status: 'PENDING_PAYMENT'));
+      await Future.wait([first, second]);
+
+      expect(repository.checkoutStatusCalls, 2);
+      expect(repository.currentCalls, 1);
+    });
+
+    test(
+      'final rejected checkout stops polling and refreshes current once',
+      () async {
+        final repository = _FakeSubscriptionRepository(
+          plans: _plans(),
+          checkoutStatuses: [
+            _checkout('checkout-1', status: 'PENDING_PAYMENT'),
+            _checkout(
+              'checkout-1',
+              status: 'REJECTED',
+              failureReason: 'cartao recusado',
+            ),
+          ],
+        );
+        final container = _subscriptionContainer(repository);
+        addTearDown(container.dispose);
+        await container.read(subscriptionControllerProvider.future);
+        repository.resetCounters();
+
+        await container
+            .read(subscriptionControllerProvider.notifier)
+            .trackCheckout('checkout-1');
+
+        expect(repository.checkoutStatusCalls, 2);
+        expect(repository.currentCalls, 1);
+        final state = container
+            .read(subscriptionControllerProvider)
+            .asData!
+            .value;
+        expect(state.pendingCheckout?.status, 'REJECTED');
+        expect(state.message, contains('cartao recusado'));
+      },
+    );
+
+    test('timeout keeps pending checkout and refreshes current once', () async {
+      final repository = _FakeSubscriptionRepository(
+        plans: _plans(),
+        checkoutStatuses: [_checkout('checkout-1', status: 'PENDING_PAYMENT')],
+      );
+      final container = _subscriptionContainer(
+        repository,
+        timeout: Duration.zero,
+      );
+      addTearDown(container.dispose);
+      await container.read(subscriptionControllerProvider.future);
+      repository.resetCounters();
+
+      await container
+          .read(subscriptionControllerProvider.notifier)
+          .trackCheckout('checkout-1');
+
+      expect(repository.checkoutStatusCalls, 1);
+      expect(repository.currentCalls, 1);
+      final state = container
+          .read(subscriptionControllerProvider)
+          .asData!
+          .value;
+      expect(state.pendingCheckout?.isPending, isTrue);
+      expect(state.isBusy, isFalse);
+      expect(state.message, 'Ainda estamos confirmando o pagamento.');
+    });
+
+    test('pending checkout remains visible while polling continues', () async {
+      final secondStatus = Completer<CheckoutSession>();
+      final repository = _FakeSubscriptionRepository(
+        plans: _plans(),
+        checkoutStatusResponses: [
+          _checkout('checkout-1', status: 'PENDING_PAYMENT'),
+          secondStatus.future,
+        ],
+      );
+      final container = _subscriptionContainer(repository);
+      addTearDown(container.dispose);
+      await container.read(subscriptionControllerProvider.future);
+      repository.resetCounters();
+
+      final tracking = container
+          .read(subscriptionControllerProvider.notifier)
+          .trackCheckout('checkout-1');
+      await Future<void>.delayed(Duration.zero);
+
+      final pendingState = container
+          .read(subscriptionControllerProvider)
+          .asData!
+          .value;
+      expect(pendingState.pendingCheckout?.isPending, isTrue);
+      expect(pendingState.isBusy, isTrue);
+      expect(repository.currentCalls, 0);
+
+      secondStatus.complete(_checkout('checkout-1', status: 'APPROVED'));
+      await tracking;
+    });
+
+    test(
+      'disposed controller does not publish after polling resumes',
+      () async {
+        final secondStatus = Completer<CheckoutSession>();
+        final repository = _FakeSubscriptionRepository(
+          plans: _plans(),
+          checkoutStatusResponses: [
+            _checkout('checkout-1', status: 'PENDING_PAYMENT'),
+            secondStatus.future,
+          ],
+        );
+        final container = _subscriptionContainer(repository);
+        await container.read(subscriptionControllerProvider.future);
+        repository.resetCounters();
+
+        final tracking = container
+            .read(subscriptionControllerProvider.notifier)
+            .trackCheckout('checkout-1');
+        await Future<void>.delayed(Duration.zero);
+        container.dispose();
+        secondStatus.complete(_checkout('checkout-1', status: 'APPROVED'));
+
+        await tracking;
+        expect(repository.currentCalls, 0);
+      },
+    );
+
+    test(
+      'background lifecycle pauses status calls and resumes safely',
+      () async {
+        final lifecycle = _FakeCheckoutPollingLifecycle(resumed: false);
+        final repository = _FakeSubscriptionRepository(
+          plans: _plans(),
+          checkoutStatuses: [
+            _checkout('checkout-1', status: 'PENDING_PAYMENT'),
+            _checkout('checkout-1', status: 'APPROVED'),
+          ],
+        );
+        final container = _subscriptionContainer(
+          repository,
+          lifecycle: lifecycle,
+        );
+        addTearDown(container.dispose);
+        await container.read(subscriptionControllerProvider.future);
+        repository.resetCounters();
+
+        final tracking = container
+            .read(subscriptionControllerProvider.notifier)
+            .trackCheckout('checkout-1');
+        await Future<void>.delayed(Duration.zero);
+
+        expect(repository.checkoutStatusCalls, 1);
+        lifecycle.resume();
+        await tracking;
+
+        expect(repository.checkoutStatusCalls, 2);
+        expect(repository.currentCalls, 1);
+      },
+    );
+  });
+
   testWidgets(
     'keeps existing plans and shows prices without raw technical labels',
     (tester) async {
@@ -589,6 +801,26 @@ Widget _testApp({
   );
 }
 
+ProviderContainer _subscriptionContainer(
+  _FakeSubscriptionRepository repository, {
+  Duration timeout = const Duration(seconds: 30),
+  CheckoutPollingLifecycle? lifecycle,
+}) {
+  return ProviderContainer(
+    overrides: [
+      authControllerProvider.overrideWith(
+        () => _MutableFakeAuthController(userId: 'user-123'),
+      ),
+      subscriptionRepositoryProvider.overrideWithValue(repository),
+      checkoutPollingDelaysProvider.overrideWithValue(const [Duration.zero]),
+      checkoutPollingTimeoutProvider.overrideWithValue(timeout),
+      checkoutPollingLifecycleProvider.overrideWithValue(
+        lifecycle ?? _FakeCheckoutPollingLifecycle(),
+      ),
+    ],
+  );
+}
+
 Future<void> _setDesktopSurface(WidgetTester tester) async {
   await tester.binding.setSurfaceSize(const Size(1280, 1200));
   tester.view.physicalSize = const Size(1280, 1200);
@@ -694,6 +926,48 @@ const _premiumSubscription = CurrentSubscription(
   mentorRewardedAdAvailable: false,
 );
 
+CheckoutSession _checkout(
+  String id, {
+  required String status,
+  String? failureReason,
+}) {
+  return CheckoutSession(
+    id: id,
+    planCode: 'premium-monthly',
+    billingCycle: 'MONTHLY',
+    status: status,
+    premium: true,
+    failureReason: failureReason,
+  );
+}
+
+class _FakeCheckoutPollingLifecycle implements CheckoutPollingLifecycle {
+  _FakeCheckoutPollingLifecycle({bool resumed = true}) : _resumed = resumed;
+
+  bool _resumed;
+  Completer<void>? _resumeCompleter;
+
+  @override
+  bool get isResumed => _resumed;
+
+  @override
+  Future<void> waitUntilResumed() {
+    if (_resumed) {
+      return Future<void>.value();
+    }
+    return (_resumeCompleter ??= Completer<void>()).future;
+  }
+
+  void resume() {
+    _resumed = true;
+    final completer = _resumeCompleter;
+    _resumeCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+}
+
 class _FakeAuthController extends AuthController {
   _FakeAuthController(this.session);
 
@@ -755,17 +1029,29 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
     required this.plans,
     this.currentSubscription = _freeSubscription,
     this.listPlansCompleter,
-  });
+    this.checkoutStatusCompleter,
+    List<CheckoutSession>? checkoutStatuses,
+    List<FutureOr<CheckoutSession>>? checkoutStatusResponses,
+  }) : checkoutStatusResponses =
+           checkoutStatusResponses ??
+           [
+             if (checkoutStatusCompleter != null)
+               checkoutStatusCompleter.future,
+             ...?checkoutStatuses,
+           ];
 
   final List<PlanView> plans;
+  final List<FutureOr<CheckoutSession>> checkoutStatusResponses;
   CurrentSubscription? currentSubscription;
   Completer<List<PlanView>>? listPlansCompleter;
   Completer<CurrentSubscription?>? currentCompleter;
+  Completer<CheckoutSession>? checkoutStatusCompleter;
   Object? listPlansError;
   Object? currentError;
   int listPlansCalls = 0;
   int currentCalls = 0;
   int cancelCalls = 0;
+  int checkoutStatusCalls = 0;
   final List<String> verifiedProductIds = [];
 
   @override
@@ -805,8 +1091,16 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   }
 
   @override
-  Future<CheckoutSession> checkoutStatus(String checkoutId) {
-    throw UnimplementedError();
+  Future<CheckoutSession> checkoutStatus(String checkoutId) async {
+    checkoutStatusCalls++;
+    if (checkoutStatusResponses.isNotEmpty) {
+      final response = checkoutStatusResponses.removeAt(0);
+      if (response is Future<CheckoutSession>) {
+        return response;
+      }
+      return response;
+    }
+    return _checkout(checkoutId, status: 'PENDING_PAYMENT');
   }
 
   @override
@@ -864,5 +1158,6 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
     listPlansCalls = 0;
     currentCalls = 0;
     cancelCalls = 0;
+    checkoutStatusCalls = 0;
   }
 }

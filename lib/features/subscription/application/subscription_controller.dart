@@ -8,6 +8,7 @@ import 'package:evolua_frontend/features/subscription/data/repositories/subscrip
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
@@ -36,6 +37,76 @@ final subscriptionControllerProvider =
       SubscriptionController,
       SubscriptionScreenState
     >(SubscriptionController.new);
+
+final checkoutPollingDelaysProvider = Provider<List<Duration>>((ref) {
+  return const [
+    Duration(seconds: 2),
+    Duration(seconds: 3),
+    Duration(seconds: 5),
+  ];
+});
+
+final checkoutPollingTimeoutProvider = Provider<Duration>((ref) {
+  return const Duration(seconds: 30);
+});
+
+final checkoutPollingLifecycleProvider = Provider<CheckoutPollingLifecycle>((
+  ref,
+) {
+  final lifecycle = AppCheckoutPollingLifecycle();
+  ref.onDispose(lifecycle.dispose);
+  return lifecycle;
+});
+
+abstract class CheckoutPollingLifecycle {
+  bool get isResumed;
+
+  Future<void> waitUntilResumed();
+}
+
+class AppCheckoutPollingLifecycle
+    with WidgetsBindingObserver
+    implements CheckoutPollingLifecycle {
+  AppCheckoutPollingLifecycle() {
+    _state = WidgetsBinding.instance.lifecycleState;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  AppLifecycleState? _state;
+  Completer<void>? _resumeCompleter;
+
+  @override
+  bool get isResumed => _state == null || _state == AppLifecycleState.resumed;
+
+  @override
+  Future<void> waitUntilResumed() {
+    if (isResumed) {
+      return Future<void>.value();
+    }
+    return (_resumeCompleter ??= Completer<void>()).future;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _state = state;
+    if (isResumed) {
+      final completer = _resumeCompleter;
+      _resumeCompleter = null;
+      if (completer != null && !completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
+
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    final completer = _resumeCompleter;
+    _resumeCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+}
 
 class SubscriptionSessionContext {
   const SubscriptionSessionContext({
@@ -219,6 +290,8 @@ class PlanCatalogController extends AsyncNotifier<List<PlanView>> {
 }
 
 class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
+  final _trackCheckoutInFlight = <String, Future<void>>{};
+
   @override
   Future<SubscriptionScreenState> build() async {
     final currentFuture = ref.read(currentSubscriptionProvider.future);
@@ -369,26 +442,62 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
   }
 
   Future<void> trackCheckout(String checkoutId) async {
+    final inFlight = _trackCheckoutInFlight[checkoutId];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _trackCheckout(checkoutId);
+    _trackCheckoutInFlight[checkoutId] = future;
+    unawaited(
+      future
+          .whenComplete(() {
+            if (identical(_trackCheckoutInFlight[checkoutId], future)) {
+              _trackCheckoutInFlight.remove(checkoutId);
+            }
+          })
+          .catchError((_) => null),
+    );
+    return future;
+  }
+
+  Future<void> _trackCheckout(String checkoutId) async {
     final keepAlive = ref.keepAlive();
     try {
       final context = await _captureSessionContext();
       final repository = ref.read(subscriptionRepositoryProvider);
+      final startedAt = DateTime.now();
+      final timeout = ref.read(checkoutPollingTimeoutProvider);
       _publishIfSession(
         context,
         _currentState().copyWith(isBusy: true, clearMessage: true),
       );
 
       CheckoutSession checkout = await repository.checkoutStatus(checkoutId);
-      CurrentSubscription? current = await repository.current();
+      _publishPendingCheckout(context, checkout);
 
-      var attempts = 0;
-      while (checkout.isPending && attempts < 8 && _isCurrentSession(context)) {
-        await Future<void>.delayed(const Duration(seconds: 2));
+      var attempt = 0;
+      while (checkout.isPending && _isCurrentSession(context)) {
+        final elapsed = DateTime.now().difference(startedAt);
+        if (elapsed >= timeout) {
+          break;
+        }
+        await _waitForNextCheckoutPoll(attempt, timeout - elapsed);
+        if (!_isCurrentSession(context)) {
+          return;
+        }
+        if (DateTime.now().difference(startedAt) >= timeout) {
+          break;
+        }
         checkout = await repository.checkoutStatus(checkoutId);
-        current = await repository.current();
-        attempts++;
+        _publishPendingCheckout(context, checkout);
+        attempt++;
       }
 
+      if (!_isCurrentSession(context)) {
+        return;
+      }
+      final current = await repository.current();
       if (!_isCurrentSession(context)) {
         return;
       }
@@ -409,6 +518,30 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
       );
     } finally {
       keepAlive.close();
+    }
+  }
+
+  Future<void> _waitForNextCheckoutPoll(
+    int attempt,
+    Duration remainingTimeout,
+  ) async {
+    final delays = ref.read(checkoutPollingDelaysProvider);
+    final fallbackDelay = delays.isEmpty ? Duration.zero : delays.last;
+    final configuredDelay = attempt < delays.length
+        ? delays[attempt]
+        : fallbackDelay;
+    final delay = configuredDelay <= remainingTimeout
+        ? configuredDelay
+        : remainingTimeout;
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
+    if (!ref.mounted) {
+      return;
+    }
+    final lifecycle = ref.read(checkoutPollingLifecycleProvider);
+    if (!lifecycle.isResumed) {
+      await lifecycle.waitUntilResumed();
     }
   }
 
@@ -465,9 +598,11 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
   }
 
   bool _isCurrentSession(SubscriptionSessionContext context) {
+    if (!ref.mounted) {
+      return false;
+    }
     final session = ref.read(authControllerProvider).asData?.value;
-    return ref.mounted &&
-        session?.userId == context.userId &&
+    return session?.userId == context.userId &&
         ref.read(authSessionGenerationProvider) == context.generation;
   }
 
@@ -491,6 +626,19 @@ class SubscriptionController extends AsyncNotifier<SubscriptionScreenState> {
     if (_isCurrentSession(context)) {
       state = AsyncData(next);
     }
+  }
+
+  void _publishPendingCheckout(
+    SubscriptionSessionContext context,
+    CheckoutSession checkout,
+  ) {
+    if (!checkout.isPending) {
+      return;
+    }
+    _publishIfSession(
+      context,
+      _currentState().copyWith(pendingCheckout: checkout, isBusy: true),
+    );
   }
 
   String _friendlyCheckoutError(Object error) {
