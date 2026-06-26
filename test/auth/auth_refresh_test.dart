@@ -54,6 +54,65 @@ void main() {
       },
     );
 
+    test(
+      'storage read failure completes with null and clears best effort',
+      () async {
+        final storage = _ThrowingAuthSessionStorage();
+        final container = _container(
+          _FakeAuthRepository(refreshSession: _testSession()),
+          storage: storage,
+        );
+        addTearDown(container.dispose);
+
+        final session = await container.read(authControllerProvider.future);
+        final state = container.read(authControllerProvider);
+
+        expect(session, isNull);
+        expect(state.hasError, isFalse);
+        expect(state.asData?.value, isNull);
+        expect(storage.clearCalls, 1);
+      },
+    );
+
+    test('storage read and clear failures still complete with null', () async {
+      final storage = _ThrowingAuthSessionStorage(clearFails: true);
+      final container = _container(
+        _FakeAuthRepository(refreshSession: _testSession()),
+        storage: storage,
+      );
+      addTearDown(container.dispose);
+
+      final session = await container.read(authControllerProvider.future);
+      final state = container.read(authControllerProvider);
+
+      expect(session, isNull);
+      expect(state.hasError, isFalse);
+      expect(state.asData?.value, isNull);
+      expect(storage.clearCalls, 1);
+    });
+
+    test(
+      'invalid stored session json clears storage without provider error',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          _sessionStorageKey: '{invalid-json',
+        });
+        final container = _container(
+          _FakeAuthRepository(refreshSession: _testSession()),
+        );
+        addTearDown(container.dispose);
+
+        final session = await container.read(authControllerProvider.future);
+        final state = container.read(authControllerProvider);
+        final preferences = await SharedPreferences.getInstance();
+
+        expect(session, isNull);
+        expect(state.hasError, isFalse);
+        expect(state.asData?.value, isNull);
+        expect(preferences.getString(_sessionStorageKey), isNull);
+      },
+    );
+
     test('clears expired session when refresh token is missing', () async {
       final expired = _testSession(
         accessToken: _buildJwt(
@@ -448,14 +507,40 @@ void main() {
 ProviderContainer _container(
   _FakeAuthRepository repository, {
   HttpInstrumentationRecorder? recorder,
+  AuthSessionStorage? storage,
 }) {
   return ProviderContainer(
     overrides: [
       authRepositoryProvider.overrideWithValue(repository),
+      if (storage != null)
+        authSessionStorageProvider.overrideWithValue(storage),
       if (recorder != null)
         httpInstrumentationRecorderProvider.overrideWithValue(recorder),
     ],
   );
+}
+
+class _ThrowingAuthSessionStorage implements AuthSessionStorage {
+  _ThrowingAuthSessionStorage({this.clearFails = false});
+
+  final bool clearFails;
+  int clearCalls = 0;
+
+  @override
+  Future<String?> read() async {
+    throw StateError('storage unavailable');
+  }
+
+  @override
+  Future<void> write(String value) async {}
+
+  @override
+  Future<void> clear() async {
+    clearCalls++;
+    if (clearFails) {
+      throw StateError('clear unavailable');
+    }
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {

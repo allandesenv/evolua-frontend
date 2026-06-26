@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
-import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,14 +34,6 @@ class _GoogleAuthCallbackPageState
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    debugPrint(
-      'GoogleAuthCallbackPage didChangeDependencies: '
-      'started=$_started, '
-      'hasCode=${widget.code != null && widget.code!.isNotEmpty}, '
-      'codeLength=${widget.code?.length ?? 0}, '
-      'error=${widget.error}',
-    );
-
     if (_started) {
       return;
     }
@@ -50,13 +41,7 @@ class _GoogleAuthCallbackPageState
     _started = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      debugPrint('Google OAuth callback post-frame started.');
-
       if (widget.error != null && widget.error!.isNotEmpty) {
-        debugPrint(
-          'Google OAuth callback received provider error: ${widget.error}',
-        );
-
         if (!mounted) {
           return;
         }
@@ -70,15 +55,7 @@ class _GoogleAuthCallbackPageState
 
       final code = widget.code;
 
-      debugPrint(
-        'Google OAuth callback code checked: '
-        'hasCode=${code != null && code.isNotEmpty}, '
-        'codeLength=${code?.length ?? 0}',
-      );
-
       if (code == null || code.isEmpty) {
-        debugPrint('Google OAuth callback stopped: code is missing.');
-
         if (!mounted) {
           return;
         }
@@ -91,45 +68,10 @@ class _GoogleAuthCallbackPageState
       }
 
       try {
-        debugPrint(
-          'Google OAuth exchange starting: '
-          '${AppConfig.authBaseUrl}/v1/public/auth/google/exchange',
-        );
-
-        await ref
-            .read(authControllerProvider.notifier)
-            .completeGoogleLogin(code: code)
-            .timeout(widget.completionTimeout);
-
-        debugPrint('Google OAuth completeGoogleLogin returned.');
+        await _completeGoogleCallback(code).timeout(widget.completionTimeout);
 
         final authState = ref.read(authControllerProvider);
-        final authError = authState.error;
         final session = authState.asData?.value;
-
-        debugPrint(
-          'Google OAuth exchange state: '
-          'hasValue=${authState.hasValue}, '
-          'hasError=${authState.hasError}, '
-          'hasSession=${session != null}, '
-          'errorType=${authError?.runtimeType}',
-        );
-
-        if (authError is DioException) {
-          debugPrint(
-            'Google OAuth exchange Dio failure: '
-            'url=${authError.requestOptions.uri}, '
-            'type=${authError.type}, '
-            'status=${authError.response?.statusCode}, '
-            'data=${authError.response?.data}, '
-            'message=${authError.message}',
-          );
-        } else if (authError != null) {
-          debugPrint(
-            'Google OAuth exchange failure: '
-            '${authError.runtimeType} - $authError',
-          );
-        }
 
         if (!mounted) {
           return;
@@ -143,11 +85,8 @@ class _GoogleAuthCallbackPageState
           return;
         }
 
-        debugPrint('Google OAuth login succeeded. Navigating to /home.');
         context.go('/home');
       } on TimeoutException {
-        debugPrint('Google OAuth exchange timed out.');
-
         if (!mounted) {
           return;
         }
@@ -157,13 +96,10 @@ class _GoogleAuthCallbackPageState
           _errorMessage =
               'O login com Google demorou mais que o esperado. Tente novamente.';
         });
-      } catch (error, stackTrace) {
-        debugPrint(
-          'Google OAuth callback exception: '
-          '${error.runtimeType} - $error',
-        );
-        debugPrintStack(stackTrace: stackTrace);
-
+      } catch (error) {
+        if (kDebugMode) {
+          debugPrint('Google OAuth callback failed (${error.runtimeType}).');
+        }
         if (!mounted) {
           return;
         }
@@ -174,6 +110,29 @@ class _GoogleAuthCallbackPageState
         });
       }
     });
+  }
+
+  Future<void> _completeGoogleCallback(String code) async {
+    await _ensureAuthControllerReady();
+    if (!mounted) {
+      return;
+    }
+    await ref
+        .read(authControllerProvider.notifier)
+        .completeGoogleLogin(code: code);
+  }
+
+  Future<void> _ensureAuthControllerReady() async {
+    var authState = ref.read(authControllerProvider);
+    if (authState.isLoading && !authState.hasValue) {
+      await ref.read(authControllerProvider.future);
+      authState = ref.read(authControllerProvider);
+    }
+
+    if (authState.hasError && !authState.hasValue) {
+      final rebuilt = ref.refresh(authControllerProvider.future);
+      await rebuilt;
+    }
   }
 
   @override

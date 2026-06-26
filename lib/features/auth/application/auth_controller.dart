@@ -323,17 +323,30 @@ class AuthController extends AsyncNotifier<AuthSession?> {
   }
 
   Future<AuthSession?> _readStoredSession(AuthSessionStorage storage) async {
-    final rawSession = await storage.read();
-    if (rawSession == null || rawSession.isEmpty) {
-      return null;
-    }
-
     try {
+      final rawSession = await storage.read();
+      if (rawSession == null || rawSession.isEmpty) {
+        return null;
+      }
+
       final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
       return AuthSession.fromJson(decoded);
-    } catch (_) {
-      await storage.clear();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Auth local session ignored (${error.runtimeType}).');
+      }
+      await _clearStoredSessionBestEffort(storage);
       return null;
+    }
+  }
+
+  Future<void> _clearStoredSessionBestEffort(AuthSessionStorage storage) async {
+    try {
+      await storage.clear();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Auth local session clear ignored (${error.runtimeType}).');
+      }
     }
   }
 
