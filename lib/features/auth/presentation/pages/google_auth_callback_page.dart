@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -124,15 +125,65 @@ class _GoogleAuthCallbackPageState
 
   Future<void> _ensureAuthControllerReady() async {
     var authState = ref.read(authControllerProvider);
+    Object? bootstrapError;
+    Object? rebuildError;
+
     if (authState.isLoading && !authState.hasValue) {
-      await ref.read(authControllerProvider.future);
+      try {
+        await ref.read(authControllerProvider.future);
+      } catch (error) {
+        bootstrapError = error;
+      }
       authState = ref.read(authControllerProvider);
     }
 
-    if (authState.hasError && !authState.hasValue) {
-      final rebuilt = ref.refresh(authControllerProvider.future);
-      await rebuilt;
+    if (authState.hasValue) {
+      return;
     }
+
+    if (authState.hasError) {
+      try {
+        final rebuilt = ref.refresh(authControllerProvider.future);
+        await rebuilt;
+      } catch (error) {
+        rebuildError = error;
+      }
+
+      authState = ref.read(authControllerProvider);
+      if (authState.hasValue) {
+        return;
+      }
+    }
+
+    if (kDebugMode) {
+      final failedStage = rebuildError != null
+          ? 'rebuild'
+          : bootstrapError != null
+          ? 'initial_bootstrap'
+          : 'state_check';
+      final errorType =
+          rebuildError?.runtimeType ?? bootstrapError?.runtimeType;
+      debugPrint(
+        'Google OAuth auth preparation failed '
+        '(stage=$failedStage, errorType=$errorType, '
+        'finalState=${_describeAuthState(authState)}).',
+      );
+    }
+
+    throw StateError('AuthController indisponivel para concluir OAuth.');
+  }
+
+  String _describeAuthState(AsyncValue<AuthSession?> authState) {
+    if (authState.hasValue) {
+      return 'value';
+    }
+    if (authState.hasError) {
+      return 'error';
+    }
+    if (authState.isLoading) {
+      return 'loading';
+    }
+    return 'unknown';
   }
 
   @override

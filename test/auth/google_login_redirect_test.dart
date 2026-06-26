@@ -576,6 +576,70 @@ void main() {
     });
 
     testWidgets(
+      'google callback recovers when loading bootstrap ends in error',
+      (tester) async {
+        final firstBuild = Completer<void>();
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failFirstBuild: true,
+          firstBuildCompleter: firstBuild,
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          state: state,
+          initialLocation: '/auth/google/callback?code=google-code',
+          settle: false,
+        );
+        await tester.pump();
+
+        expect(state.buildCalls, 1);
+        expect(state.completeCalls, 0);
+
+        firstBuild.complete();
+        await tester.pumpAndSettle();
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback fails once when loading bootstrap and rebuild fail',
+      (tester) async {
+        final firstBuild = Completer<void>();
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failEveryBuild: true,
+          firstBuildCompleter: firstBuild,
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          state: state,
+          initialLocation: '/auth/google/callback?code=google-code',
+          settle: false,
+        );
+        await tester.pump();
+
+        expect(state.buildCalls, 1);
+        expect(state.completeCalls, 0);
+
+        firstBuild.complete();
+        await tester.pumpAndSettle();
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
       'google callback rebuilds errored auth provider once before exchange',
       (tester) async {
         final state = _CallbackAuthControllerState(
@@ -903,6 +967,7 @@ Future<GoRouter> _pumpGoogleCallbackWithAuthController(
   required _CallbackAuthControllerState state,
   required String initialLocation,
   Duration completionTimeout = const Duration(seconds: 15),
+  bool settle = true,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -926,7 +991,9 @@ Future<GoRouter> _pumpGoogleCallbackWithAuthController(
     ),
   );
   await tester.pump();
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  }
   return router;
 }
 
@@ -935,11 +1002,13 @@ class _CallbackAuthControllerState {
     required this.session,
     this.failFirstBuild = false,
     this.failEveryBuild = false,
+    this.firstBuildCompleter,
   });
 
   final AuthSession session;
   final bool failFirstBuild;
   final bool failEveryBuild;
+  final Completer<void>? firstBuildCompleter;
   int buildCalls = 0;
   int completeCalls = 0;
 }
@@ -952,6 +1021,9 @@ class _CallbackAuthController extends AuthController {
   @override
   Future<AuthSession?> build() async {
     fakeState.buildCalls++;
+    if (fakeState.buildCalls == 1) {
+      await fakeState.firstBuildCompleter?.future;
+    }
     if (fakeState.failEveryBuild ||
         (fakeState.failFirstBuild && fakeState.buildCalls == 1)) {
       throw StateError('auth bootstrap failed');
