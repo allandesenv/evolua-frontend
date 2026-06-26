@@ -17,6 +17,28 @@ class PlanView {
     this.sortOrder = 0,
   });
 
+  factory PlanView.fromJson(Map<String, dynamic> json) {
+    return PlanView(
+      planCode: json['planCode'].toString(),
+      title: json['title'].toString(),
+      subtitle: json['subtitle'].toString(),
+      billingCycle: json['billingCycle'].toString(),
+      premium: json['premium'] as bool? ?? false,
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+      currency: json['currency']?.toString() ?? 'BRL',
+      benefits: (json['benefits'] as List? ?? const [])
+          .map((item) => item.toString())
+          .toList(),
+      active: json['active'] as bool? ?? true,
+      planFamily: json['planFamily']?.toString() ?? 'STANDARD',
+      badge: json['badge']?.toString(),
+      highlighted: json['highlighted'] as bool? ?? false,
+      availabilityNote: json['availabilityNote']?.toString(),
+      providerProductId: json['providerProductId']?.toString(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   final String planCode;
   final String title;
   final String subtitle;
@@ -34,6 +56,26 @@ class PlanView {
   final int sortOrder;
 
   bool get isFounder => planFamily.toUpperCase() == 'FOUNDER';
+
+  Map<String, dynamic> toJson() {
+    return {
+      'planCode': planCode,
+      'title': title,
+      'subtitle': subtitle,
+      'billingCycle': billingCycle,
+      'premium': premium,
+      'price': price,
+      'currency': currency,
+      'benefits': benefits,
+      'active': active,
+      'planFamily': planFamily,
+      'badge': badge,
+      'highlighted': highlighted,
+      'availabilityNote': availabilityNote,
+      'providerProductId': providerProductId,
+      'sortOrder': sortOrder,
+    };
+  }
 }
 
 class CurrentSubscription {

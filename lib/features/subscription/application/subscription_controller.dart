@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:evolua_frontend/core/cache/stable_resource_cache.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/subscription/application/google_play_billing_service.dart';
 import 'package:evolua_frontend/features/subscription/data/repositories/subscription_repository_impl.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -213,9 +216,24 @@ class CurrentSubscriptionController
         generation != expectedGeneration) {
       return;
     }
+    final previous = state.asData?.value;
+    final shouldInvalidateTrails =
+        previous != null && _subscriptionAccessChanged(previous, current);
     _stateUserId = expectedUserId;
     _stateGeneration = expectedGeneration;
     state = AsyncData(current);
+    if (shouldInvalidateTrails) {
+      unawaited(invalidateTrailCatalogCacheForCurrentUser(ref));
+    }
+  }
+
+  bool _subscriptionAccessChanged(
+    CurrentSubscription? previous,
+    CurrentSubscription? current,
+  ) {
+    return previous?.premium != current?.premium ||
+        previous?.planCode != current?.planCode ||
+        previous?.status != current?.status;
   }
 
   bool _matches(SubscriptionSessionContext context) {
@@ -248,7 +266,45 @@ class PlanCatalogController extends AsyncNotifier<List<PlanView>> {
     return load();
   }
 
-  Future<List<PlanView>> load({bool force = false}) {
+  Future<List<PlanView>> load({bool force = false}) async {
+    final repository = ref.read(subscriptionRepositoryProvider);
+    if (repository is! SubscriptionRepositoryImpl) {
+      return _loadFromRepository(repository, force: force);
+    }
+
+    final cache = await ref.read(stableResourceCacheProvider.future);
+    final context = await ref.read(stableResourceCacheContextProvider.future);
+    final plans = await cache.getOrFetch<List<PlanView>>(
+      resource: StableResource.planCatalog,
+      dio: ref.read(authenticatedDioProvider(AppConfig.subscriptionBaseUrl)),
+      path: '/v1/plans',
+      appVersion: context.appVersion,
+      locale: context.locale,
+      ttl: ttl,
+      maxStale: const Duration(hours: 24),
+      force: force,
+      extractPayload: ApiPayloadParser.dataList,
+      decodePayload: (payload) {
+        if (payload is! List) {
+          throw const FormatException('Catalogo de planos invalido.');
+        }
+        return payload
+            .whereType<Map>()
+            .map((item) => PlanView.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      },
+    );
+    _loadedAt = ref.read(planCatalogClockProvider)();
+    if (ref.mounted) {
+      state = AsyncData(plans);
+    }
+    return plans;
+  }
+
+  Future<List<PlanView>> _loadFromRepository(
+    SubscriptionRepository repository, {
+    required bool force,
+  }) {
     final now = ref.read(planCatalogClockProvider)();
     final cached = _items;
     final loadedAt = _loadedAt;
@@ -262,7 +318,14 @@ class PlanCatalogController extends AsyncNotifier<List<PlanView>> {
     if (!force && inFlight != null) {
       return inFlight;
     }
-    final future = _fetch();
+    final future = repository.listPlans().then((plans) {
+      _items = plans;
+      _loadedAt = ref.read(planCatalogClockProvider)();
+      if (ref.mounted) {
+        state = AsyncData(plans);
+      }
+      return plans;
+    });
     _inFlight = future;
     unawaited(
       future
@@ -274,16 +337,6 @@ class PlanCatalogController extends AsyncNotifier<List<PlanView>> {
           .catchError((_) => const <PlanView>[]),
     );
     return future;
-  }
-
-  Future<List<PlanView>> _fetch() async {
-    final plans = await ref.read(subscriptionRepositoryProvider).listPlans();
-    _items = plans;
-    _loadedAt = ref.read(planCatalogClockProvider)();
-    if (ref.mounted) {
-      state = AsyncData(plans);
-    }
-    return plans;
   }
 
   DateTime? get loadedAtForTesting => _loadedAt;

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:evolua_frontend/core/cache/stable_resource_cache.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/http_instrumentation.dart';
@@ -47,6 +48,7 @@ final disabledAppFeaturesProvider = Provider<List<String>>((ref) {
 
 class AppVersionStatusController extends AsyncNotifier<AppVersionCheckState> {
   static const Duration requiredCacheTtl = Duration(hours: 24);
+  static const Duration successfulStatusTtl = Duration(minutes: 5);
 
   @override
   Future<AppVersionCheckState> build() async {
@@ -66,19 +68,7 @@ class AppVersionStatusController extends AsyncNotifier<AppVersionCheckState> {
     final preferences = await ref.watch(sharedPreferencesProvider.future);
     final cache = RequiredUpdateCache(preferences);
 
-    try {
-      final dio = ref.read(appVersionDioProvider);
-      final response = await dio.get<dynamic>(
-        '/v1/app/version-status',
-        queryParameters: {
-          'platform': platform,
-          'versionCode': versionCode,
-          'versionName': versionName,
-        },
-      );
-      final status = AppVersionStatus.fromJson(
-        ApiPayloadParser.dataMap(response.data),
-      );
+    Future<void> syncRequiredCache(AppVersionStatus status) async {
       if (status.updateRequired) {
         await cache.write(
           key: cacheKey,
@@ -88,6 +78,37 @@ class AppVersionStatusController extends AsyncNotifier<AppVersionCheckState> {
       } else {
         await cache.clear(cacheKey);
       }
+    }
+
+    try {
+      final stableCache = await ref.read(stableResourceCacheProvider.future);
+      final cacheContext = await ref.read(
+        stableResourceCacheContextProvider.future,
+      );
+      final queryParameters = {
+        'platform': platform,
+        'versionCode': versionCode,
+        'versionName': versionName,
+      };
+      final status = await stableCache.getOrFetch<AppVersionStatus>(
+        resource: StableResource.appVersionStatus,
+        dio: ref.read(appVersionDioProvider),
+        path: '/v1/app/version-status',
+        queryParameters: queryParameters,
+        appVersion: '${cacheContext.appVersion}.$versionCode.$versionName',
+        locale: cacheContext.locale,
+        ttl: successfulStatusTtl,
+        maxStale: Duration.zero,
+        force: false,
+        extractPayload: ApiPayloadParser.dataMap,
+        decodePayload: (payload) {
+          if (payload is! Map) {
+            throw const FormatException('Status de versao invalido.');
+          }
+          return AppVersionStatus.fromJson(Map<String, dynamic>.from(payload));
+        },
+      );
+      await syncRequiredCache(status);
       return AppVersionCheckState(
         status: status,
         platform: platform,
@@ -99,7 +120,7 @@ class AppVersionStatusController extends AsyncNotifier<AppVersionCheckState> {
         disabled: false,
       );
     } catch (error) {
-      _debugLog('version status failed: $error');
+      _debugLog('version status failed: ${error.runtimeType}');
       final cached = cache.read(
         key: cacheKey,
         now: ref.read(appUpdateClockProvider)(),

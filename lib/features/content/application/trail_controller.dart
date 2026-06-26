@@ -1,6 +1,9 @@
+import 'package:evolua_frontend/core/cache/stable_resource_cache.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/data/repositories/trail_repository_impl.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
@@ -93,6 +96,31 @@ final trailJourneyActionProvider = Provider<TrailJourneyActions>((ref) {
   return TrailJourneyActions(ref);
 });
 
+Future<void> invalidateTrailCatalogCache(Ref ref) async {
+  try {
+    final cache = await ref.read(stableResourceCacheProvider.future);
+    await cache.invalidateResource(StableResource.trailCatalog);
+  } catch (_) {
+    // Cache invalidation must not fail the product action.
+  }
+}
+
+Future<void> invalidateTrailCatalogCacheForCurrentUser(Ref ref) async {
+  final userId = ref.read(authControllerProvider).asData?.value?.userId;
+  if (userId == null || userId.isEmpty) {
+    return;
+  }
+  try {
+    final cache = await ref.read(stableResourceCacheProvider.future);
+    await cache.invalidateUserResource(
+      resource: StableResource.trailCatalog,
+      userId: userId,
+    );
+  } catch (_) {
+    // Cache invalidation must not fail the product action.
+  }
+}
+
 class TrailJourneyActions {
   const TrailJourneyActions(this._ref);
 
@@ -105,6 +133,7 @@ class TrailJourneyActions {
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
     _ref.invalidate(inProgressTrailJourneysProvider);
+    await invalidateTrailCatalogCacheForCurrentUser(_ref);
     return journey;
   }
 
@@ -115,6 +144,7 @@ class TrailJourneyActions {
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
     _ref.invalidate(inProgressTrailJourneysProvider);
+    await invalidateTrailCatalogCacheForCurrentUser(_ref);
     return journey;
   }
 
@@ -135,6 +165,7 @@ class TrailJourneyActions {
     _ref.invalidate(trailJourneyProvider(trailId));
     _ref.invalidate(currentJourneyTrailProvider);
     _ref.invalidate(inProgressTrailJourneysProvider);
+    await invalidateTrailCatalogCacheForCurrentUser(_ref);
     return journey;
   }
 
@@ -183,7 +214,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
   Future<void> refresh() async {
     _resetLoadMoreState();
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: 0));
+    state = await AsyncValue.guard(() async => _fetch(page: 0, force: true));
   }
 
   Future<void> applyFilters({
@@ -269,6 +300,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
         steps: steps,
       );
 
+      await invalidateTrailCatalogCache(ref);
       return _fetch(page: 0);
     });
   }
@@ -301,6 +333,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
       ref.invalidate(trailJourneyProvider(id));
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(inProgressTrailJourneysProvider);
+      await invalidateTrailCatalogCache(ref);
       return _fetch(page: currentPage);
     });
   }
@@ -314,20 +347,81 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
       ref.invalidate(trailJourneyProvider(id));
       ref.invalidate(currentJourneyTrailProvider);
       ref.invalidate(inProgressTrailJourneysProvider);
+      await invalidateTrailCatalogCache(ref);
       return _fetch(page: currentPage);
     });
   }
 
-  Future<PaginatedResponse<Trail>> _fetch({required int page}) {
-    return ref
-        .read(trailRepositoryProvider)
-        .list(
-          page: page,
-          size: _pageSize,
-          search: _search,
-          premium: _premium,
-          category: _category,
-        );
+  Future<PaginatedResponse<Trail>> _fetch({
+    required int page,
+    bool force = false,
+  }) async {
+    final repository = ref.read(trailRepositoryProvider);
+    if (repository is! TrailRepositoryImpl || !_isDefaultCatalogRequest(page)) {
+      return repository.list(
+        page: page,
+        size: _pageSize,
+        search: _search,
+        premium: _premium,
+        category: _category,
+      );
+    }
+
+    final session = ref.read(authControllerProvider).asData?.value;
+    if (session == null) {
+      return repository.list(page: page, size: _pageSize);
+    }
+    final userId = session.userId;
+    final generation = ref.read(authSessionGenerationProvider);
+    final cache = await ref.read(stableResourceCacheProvider.future);
+    final context = await ref.read(stableResourceCacheContextProvider.future);
+    final query = const <String, Object?>{
+      'page': 0,
+      'size': _pageSize,
+      'sortBy': 'createdAt',
+      'sortDir': 'desc',
+    };
+
+    bool sessionStillValid() {
+      final current = ref.read(authControllerProvider).asData?.value;
+      return ref.mounted &&
+          current?.userId == userId &&
+          ref.read(authSessionGenerationProvider) == generation;
+    }
+
+    final catalog = await cache.getOrFetch<PaginatedResponse<Trail>>(
+      resource: StableResource.trailCatalog,
+      dio: ref.read(authenticatedDioProvider(AppConfig.contentBaseUrl)),
+      path: '/v1/trails',
+      queryParameters: query,
+      appVersion: context.appVersion,
+      locale: context.locale,
+      userId: userId,
+      ttl: const Duration(minutes: 30),
+      maxStale: const Duration(hours: 2),
+      force: force,
+      extractPayload: (data) => ApiPayloadParser.dataMap(data),
+      decodePayload: (payload) {
+        if (payload is! Map) {
+          throw const FormatException('Catalogo de trilhas invalido.');
+        }
+        return ApiPayloadParser.paginatedData({
+          'data': Map<String, dynamic>.from(payload),
+        }, (item) => TrailDto.fromJson(item).toEntity());
+      },
+      canWrite: sessionStillValid,
+    );
+    if (!sessionStillValid()) {
+      throw StateError('Sessao invalida para carregar catalogo de trilhas.');
+    }
+    return catalog;
+  }
+
+  bool _isDefaultCatalogRequest(int page) {
+    return page == 0 &&
+        _search == null &&
+        _premium == null &&
+        _category == null;
   }
 
   void _resetLoadMoreState() {
