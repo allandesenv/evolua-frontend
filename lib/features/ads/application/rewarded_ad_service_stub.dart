@@ -1,7 +1,7 @@
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 
-RewardedAdService createRewardedAdService(Ref ref) {
+RewardedAdService createRewardedAdService(SubscriptionRepository repository) {
   return const WebRewardedAdService();
 }
 
