@@ -68,6 +68,15 @@ class CheckInRepositoryImpl implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    final response = await _dio.get<dynamic>('/v1/check-ins/$checkInId');
+
+    return CheckInDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
+  }
+
+  @override
   Future<CheckIn> generateDeepReading(
     int checkInId, {
     String style = 'deep',

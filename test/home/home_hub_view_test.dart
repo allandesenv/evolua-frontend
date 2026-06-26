@@ -1253,8 +1253,7 @@ void main() {
         _testApp(
           checkInRepository: repository,
           pollingConfig: const CheckInInsightPollingConfig(
-            attempts: 2,
-            delay: Duration(milliseconds: 50),
+            delays: [Duration(milliseconds: 50), Duration(milliseconds: 50)],
           ),
           now: DateTime(2026, 5, 7, 13),
         ),
@@ -1317,8 +1316,7 @@ void main() {
         _testApp(
           checkInRepository: repository,
           pollingConfig: const CheckInInsightPollingConfig(
-            attempts: 1,
-            delay: Duration(milliseconds: 20),
+            delays: [Duration(milliseconds: 20)],
           ),
           now: DateTime(2026, 5, 7, 13),
         ),
@@ -2112,8 +2110,7 @@ void main() {
 Widget _testApp({
   CheckInRepository? checkInRepository,
   CheckInInsightPollingConfig pollingConfig = const CheckInInsightPollingConfig(
-    attempts: 0,
-    delay: Duration.zero,
+    delays: [],
   ),
   TrailRepository? trailRepository,
   FutureMessageRepository? futureMessageRepository,
@@ -2256,6 +2253,23 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por dois minutos.',
+        aiInsight: _insight(),
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
   Future<CheckIn> generateDeepReading(
     int checkInId, {
     String style = 'deep',
@@ -2343,6 +2357,14 @@ class _MutableCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    return listedAfterCreate.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => created,
+    );
+  }
+
+  @override
   Future<CheckIn> generateDeepReading(
     int checkInId, {
     String style = 'deep',
@@ -2411,6 +2433,15 @@ class _EventuallyConsistentCheckInRepository implements CheckInRepository {
     required int energyLevel,
   }) async {
     return created;
+  }
+
+  @override
+  Future<CheckIn> getById(int checkInId) async {
+    final items = _lists.isEmpty ? const <CheckIn>[] : _lists.removeAt(0);
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => created,
+    );
   }
 
   @override

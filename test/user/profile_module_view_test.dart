@@ -3420,6 +3420,23 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por alguns minutos.',
+        aiInsight: null,
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    );
+  }
+
+  @override
   Future<CheckIn> create({
     required String mood,
     String? reflection,
@@ -3442,19 +3459,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     int checkInId, {
     String style = 'deep',
   }) async {
-    return items.firstWhere(
-      (item) => item.id == checkInId,
-      orElse: () => CheckIn(
-        id: checkInId,
-        userId: 'user-123',
-        mood: 'calmo',
-        reflection: '',
-        energyLevel: 7,
-        recommendedPractice: 'Respire por alguns minutos.',
-        aiInsight: null,
-        createdAt: DateTime(2026, 1, 1),
-      ),
-    );
+    return getById(checkInId);
   }
 
   @override

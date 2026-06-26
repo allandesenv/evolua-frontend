@@ -288,6 +288,11 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<CheckIn> create({
     required String mood,
     String? reflection,

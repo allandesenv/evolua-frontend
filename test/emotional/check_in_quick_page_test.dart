@@ -1163,6 +1163,23 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por dois minutos.',
+        aiInsight: _insight(),
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
   Future<CheckIn> generateDeepReading(
     int checkInId, {
     String style = 'deep',
