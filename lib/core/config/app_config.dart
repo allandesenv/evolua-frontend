@@ -5,7 +5,8 @@ class AppConfig {
 
   static const apiBaseUrl = String.fromEnvironment(
     'EVOLUA_API_BASE_URL',
-    defaultValue: 'https://evolua-api-production.up.railway.app',
+    defaultValue: 'https://evolua-api-hml-production.up.railway.app',
+    //defaultValue: 'https://evolua-api-production.up.railway.app',
     //defaultValue: 'http://192.168.0.47:8080',
   );
 

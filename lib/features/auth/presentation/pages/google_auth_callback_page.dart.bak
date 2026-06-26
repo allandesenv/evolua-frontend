@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
-import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 
 class GoogleAuthCallbackPage extends ConsumerStatefulWidget {
   const GoogleAuthCallbackPage({
@@ -34,33 +33,16 @@ class _GoogleAuthCallbackPageState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    debugPrint(
-      'GoogleAuthCallbackPage didChangeDependencies: '
-      'started=$_started, '
-      'hasCode=${widget.code != null && widget.code!.isNotEmpty}, '
-      'codeLength=${widget.code?.length ?? 0}, '
-      'error=${widget.error}',
-    );
-
     if (_started) {
       return;
     }
 
     _started = true;
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      debugPrint('Google OAuth callback post-frame started.');
-
       if (widget.error != null && widget.error!.isNotEmpty) {
-        debugPrint(
-          'Google OAuth callback received provider error: ${widget.error}',
-        );
-
         if (!mounted) {
           return;
         }
-
         setState(() {
           _isCompleting = false;
           _errorMessage = 'Nao foi possivel autenticar com Google.';
@@ -69,20 +51,10 @@ class _GoogleAuthCallbackPageState
       }
 
       final code = widget.code;
-
-      debugPrint(
-        'Google OAuth callback code checked: '
-        'hasCode=${code != null && code.isNotEmpty}, '
-        'codeLength=${code?.length ?? 0}',
-      );
-
       if (code == null || code.isEmpty) {
-        debugPrint('Google OAuth callback stopped: code is missing.');
-
         if (!mounted) {
           return;
         }
-
         setState(() {
           _isCompleting = false;
           _errorMessage = 'Callback de autenticacao sem codigo.';
@@ -91,50 +63,29 @@ class _GoogleAuthCallbackPageState
       }
 
       try {
-        debugPrint(
-          'Google OAuth exchange starting: '
-          '${AppConfig.authBaseUrl}/v1/public/auth/google/exchange',
-        );
-
         await ref
             .read(authControllerProvider.notifier)
             .completeGoogleLogin(code: code)
             .timeout(widget.completionTimeout);
-
-        debugPrint('Google OAuth completeGoogleLogin returned.');
-
         final authState = ref.read(authControllerProvider);
         final authError = authState.error;
-        final session = authState.asData?.value;
-
-        debugPrint(
-          'Google OAuth exchange state: '
-          'hasValue=${authState.hasValue}, '
-          'hasError=${authState.hasError}, '
-          'hasSession=${session != null}, '
-          'errorType=${authError?.runtimeType}',
-        );
-
         if (authError is DioException) {
           debugPrint(
-            'Google OAuth exchange Dio failure: '
-            'url=${authError.requestOptions.uri}, '
-            'type=${authError.type}, '
-            'status=${authError.response?.statusCode}, '
-            'data=${authError.response?.data}, '
-            'message=${authError.message}',
+            'Google OAuth exchange failed: '
+            'url=${authError.requestOptions.uri} '
+            'status=${authError.response?.statusCode} '
+            'data=${authError.response?.data}',
           );
         } else if (authError != null) {
           debugPrint(
-            'Google OAuth exchange failure: '
+            'Google OAuth exchange failed: '
             '${authError.runtimeType} - $authError',
           );
         }
-
         if (!mounted) {
           return;
         }
-
+        final session = authState.asData?.value;
         if (session == null) {
           setState(() {
             _isCompleting = false;
@@ -142,32 +93,20 @@ class _GoogleAuthCallbackPageState
           });
           return;
         }
-
-        debugPrint('Google OAuth login succeeded. Navigating to /home.');
         context.go('/home');
       } on TimeoutException {
-        debugPrint('Google OAuth exchange timed out.');
-
         if (!mounted) {
           return;
         }
-
         setState(() {
           _isCompleting = false;
           _errorMessage =
               'O login com Google demorou mais que o esperado. Tente novamente.';
         });
-      } catch (error, stackTrace) {
-        debugPrint(
-          'Google OAuth callback exception: '
-          '${error.runtimeType} - $error',
-        );
-        debugPrintStack(stackTrace: stackTrace);
-
+      } catch (_) {
         if (!mounted) {
           return;
         }
-
         setState(() {
           _isCompleting = false;
           _errorMessage = 'Falha ao concluir o login com Google.';
