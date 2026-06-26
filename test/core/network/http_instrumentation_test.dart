@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/http_instrumentation.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -237,6 +239,40 @@ void main() {
         dio.interceptors.whereType<HttpInstrumentationInterceptor>(),
         hasLength(1),
       );
+    });
+
+    test('attaches instrumentation when BaseOptions.extra is immutable', () {
+      final recorder = LimitedHttpInstrumentationRecorder(
+        keepDetailedEvents: true,
+      );
+
+      final dio = Dio(
+        BaseOptions(extra: const {httpInstrumentationOriginExtraKey: 'auth'}),
+      );
+
+      expect(
+        () => attachHttpInstrumentation(dio, recorder: recorder),
+        returnsNormally,
+      );
+      expect(dio.options.extra[httpInstrumentationOriginExtraKey], 'auth');
+      expect(
+        dio.interceptors.whereType<HttpInstrumentationInterceptor>(),
+        hasLength(1),
+      );
+
+      attachHttpInstrumentation(dio, recorder: recorder);
+
+      expect(
+        dio.interceptors.whereType<HttpInstrumentationInterceptor>(),
+        hasLength(1),
+      );
+    });
+
+    test('authRepositoryProvider builds without ProviderException', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(() => container.read(authRepositoryProvider), returnsNormally);
     });
 
     test('release default is noop and release flag keeps aggregate only', () {

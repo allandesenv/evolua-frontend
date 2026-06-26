@@ -11,7 +11,6 @@ const httpInstrumentationLogicalRequestIdExtraKey =
     'evolua.http.logicalRequestId';
 
 const _attemptStopwatchExtraKey = 'evolua.http.instrumentation.stopwatch';
-const _instrumentationAttachedExtraKey = 'evolua.http.instrumentation.attached';
 
 const _releaseInstrumentationEnabled = bool.fromEnvironment(
   'EVOLUA_HTTP_INSTRUMENTATION_ENABLED',
@@ -45,14 +44,12 @@ void attachHttpInstrumentation(
   Dio dio, {
   required HttpInstrumentationRecorder recorder,
 }) {
-  if (dio.options.extra[_instrumentationAttachedExtraKey] == true ||
-      dio.interceptors.any(
-        (interceptor) => interceptor is HttpInstrumentationInterceptor,
-      )) {
+  if (dio.interceptors.any(
+    (interceptor) => interceptor is HttpInstrumentationInterceptor,
+  )) {
     return;
   }
 
-  dio.options.extra[_instrumentationAttachedExtraKey] = true;
   dio.interceptors.add(HttpInstrumentationInterceptor(recorder));
 }
 

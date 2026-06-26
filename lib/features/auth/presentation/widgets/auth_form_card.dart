@@ -327,9 +327,6 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
     try {
       if (kDebugMode) {
         debugPrint('Google OAuth start requested.');
-        debugPrint('OAuth start URL: $startUri');
-        debugPrint('API base URL: ${AppConfig.apiBaseUrl}');
-        debugPrint('Auth base URL: ${AppConfig.authBaseUrl}');
       }
       await ref.read(googleOAuthLauncherProvider)(startUri.toString());
       if (!kIsWeb && mounted) {
