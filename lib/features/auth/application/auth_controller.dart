@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/app/startup/startup_diagnostics.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
@@ -36,7 +37,13 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      extra: const {httpInstrumentationOriginExtraKey: 'auth'},
     ),
+  );
+
+  attachHttpInstrumentation(
+    dio,
+    recorder: ref.read(httpInstrumentationRecorderProvider),
   );
 
   return AuthRepositoryImpl(dio);
@@ -44,6 +51,18 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession?>(AuthController.new);
+
+final authSessionGenerationProvider =
+    NotifierProvider<AuthSessionGenerationController, int>(
+      AuthSessionGenerationController.new,
+    );
+
+class AuthSessionGenerationController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
 
 class AuthController extends AsyncNotifier<AuthSession?> {
   Future<AuthSession?>? _refreshInFlight;
@@ -153,7 +172,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
   }
 
-  Future<void> completeGoogleLogin({required String code}) async {
+  Future<AuthSession?> completeGoogleLogin({required String code}) async {
     final repository = ref.read(authRepositoryProvider);
 
     state = const AsyncLoading();
@@ -167,6 +186,7 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     if (nextState.hasValue && nextState.value != null) {
       unawaited(_syncGoogleProfile(nextState.value!));
     }
+    return nextState.asData?.value;
   }
 
   Future<void> forgotPassword({required String email}) {
@@ -304,17 +324,30 @@ class AuthController extends AsyncNotifier<AuthSession?> {
   }
 
   Future<AuthSession?> _readStoredSession(AuthSessionStorage storage) async {
-    final rawSession = await storage.read();
-    if (rawSession == null || rawSession.isEmpty) {
-      return null;
-    }
-
     try {
+      final rawSession = await storage.read();
+      if (rawSession == null || rawSession.isEmpty) {
+        return null;
+      }
+
       final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
       return AuthSession.fromJson(decoded);
-    } catch (_) {
-      await storage.clear();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Auth local session ignored (${error.runtimeType}).');
+      }
+      await _clearStoredSessionBestEffort(storage);
       return null;
+    }
+  }
+
+  Future<void> _clearStoredSessionBestEffort(AuthSessionStorage storage) async {
+    try {
+      await storage.clear();
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Auth local session clear ignored (${error.runtimeType}).');
+      }
     }
   }
 

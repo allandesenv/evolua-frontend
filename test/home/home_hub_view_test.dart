@@ -29,6 +29,7 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_i
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
@@ -60,6 +61,81 @@ void main() {
 
       expect(insightTop, lessThan(nextStepTop));
       expect(nextStepTop, lessThan(rhythmTop));
+    });
+
+    testWidgets(
+      'does not load future messages when check-in is not difficult',
+      (tester) async {
+        final futureMessages = _FakeFutureMessageRepository(
+          readySummaryResult: const FutureMessageReadySummary(
+            hasReady: true,
+            firstMessageId: 77,
+          ),
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            checkInRepository: _FakeCheckInRepository(
+              items: [
+                _testCheckIn(
+                  id: 50,
+                  createdAt: DateTime.now(),
+                  mood: 'calmo',
+                  energyLevel: 8,
+                ),
+              ],
+            ),
+            futureMessageRepository: futureMessages,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(futureMessages.readySummaryCalls, 0);
+        expect(futureMessages.listCalls, 0);
+        expect(futureMessages.deliveredCalls, 0);
+        expect(find.text('Ha uma mensagem sua pronta'), findsNothing);
+      },
+    );
+
+    testWidgets('loads ready summary for difficult check-in and opens its id', (
+      tester,
+    ) async {
+      int? openedMessageId;
+      final futureMessages = _FakeFutureMessageRepository(
+        readySummaryResult: const FutureMessageReadySummary(
+          hasReady: true,
+          firstMessageId: 77,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _testApp(
+          futureMessageRepository: futureMessages,
+          onOpenFutureMessage: (id) => openedMessageId = id,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(futureMessages.readySummaryCalls, 1);
+      expect(futureMessages.listCalls, 0);
+      expect(futureMessages.deliveredCalls, 0);
+      expect(find.text('Ha uma mensagem sua pronta'), findsOneWidget);
+
+      await tester.tap(find.text('Quero ler'));
+
+      expect(openedMessageId, 77);
+    });
+
+    testWidgets('loads current subscription without loading plan catalog', (
+      tester,
+    ) async {
+      final subscriptions = _FakeSubscriptionRepository();
+
+      await tester.pumpWidget(_testApp(subscriptionRepository: subscriptions));
+      await tester.pumpAndSettle();
+
+      expect(subscriptions.currentCalls, 1);
+      expect(subscriptions.listPlansCalls, 0);
     });
 
     testWidgets(
@@ -1177,8 +1253,7 @@ void main() {
         _testApp(
           checkInRepository: repository,
           pollingConfig: const CheckInInsightPollingConfig(
-            attempts: 2,
-            delay: Duration(milliseconds: 50),
+            delays: [Duration(milliseconds: 50), Duration(milliseconds: 50)],
           ),
           now: DateTime(2026, 5, 7, 13),
         ),
@@ -1241,8 +1316,7 @@ void main() {
         _testApp(
           checkInRepository: repository,
           pollingConfig: const CheckInInsightPollingConfig(
-            attempts: 1,
-            delay: Duration(milliseconds: 20),
+            delays: [Duration(milliseconds: 20)],
           ),
           now: DateTime(2026, 5, 7, 13),
         ),
@@ -2036,10 +2110,10 @@ void main() {
 Widget _testApp({
   CheckInRepository? checkInRepository,
   CheckInInsightPollingConfig pollingConfig = const CheckInInsightPollingConfig(
-    attempts: 0,
-    delay: Duration.zero,
+    delays: [],
   ),
   TrailRepository? trailRepository,
+  FutureMessageRepository? futureMessageRepository,
   DailyRitualRepository? dailyRitualRepository,
   SubscriptionRepository? subscriptionRepository,
   RewardedAdService? rewardedAdService,
@@ -2052,6 +2126,7 @@ Widget _testApp({
   VoidCallback? onOpenCommunity,
   VoidCallback? onOpenEvolutionMirror,
   VoidCallback? onOpenFutureMessages,
+  ValueChanged<int>? onOpenFutureMessage,
   VoidCallback? onOpenCareShare,
   ValueChanged<String>? onOpenDailyRitual,
   VoidCallback? onOpenCheckIn,
@@ -2073,7 +2148,7 @@ Widget _testApp({
         trailRepository ?? _FakeTrailRepository(currentJourney: _testTrail()),
       ),
       futureMessageRepositoryProvider.overrideWithValue(
-        _FakeFutureMessageRepository(),
+        futureMessageRepository ?? _FakeFutureMessageRepository(),
       ),
       dailyRitualRepositoryProvider.overrideWithValue(
         dailyRitualRepository ?? _FakeDailyRitualRepository(),
@@ -2107,7 +2182,7 @@ Widget _testApp({
             onOpenProfile: () {},
             onOpenEvolutionMirror: onOpenEvolutionMirror ?? () {},
             onOpenFutureMessages: onOpenFutureMessages ?? () {},
-            onOpenFutureMessage: (_) {},
+            onOpenFutureMessage: onOpenFutureMessage ?? (_) {},
             onOpenCareShare: onOpenCareShare ?? () {},
             onOpenDailyRitual: onOpenDailyRitual ?? (_) {},
             onOpenCheckIn: onOpenCheckIn ?? () {},
@@ -2174,6 +2249,23 @@ class _FakeCheckInRepository implements CheckInRepository {
       recommendedPractice: 'Respire por dois minutos.',
       aiInsight: _insight(),
       createdAt: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<CheckIn> getById(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por dois minutos.',
+        aiInsight: _insight(),
+        createdAt: DateTime.now(),
+      ),
     );
   }
 
@@ -2265,6 +2357,14 @@ class _MutableCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    return listedAfterCreate.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => created,
+    );
+  }
+
+  @override
   Future<CheckIn> generateDeepReading(
     int checkInId, {
     String style = 'deep',
@@ -2333,6 +2433,15 @@ class _EventuallyConsistentCheckInRepository implements CheckInRepository {
     required int energyLevel,
   }) async {
     return created;
+  }
+
+  @override
+  Future<CheckIn> getById(int checkInId) async {
+    final items = _lists.isEmpty ? const <CheckIn>[] : _lists.removeAt(0);
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => created,
+    );
   }
 
   @override
@@ -2514,12 +2623,22 @@ class _FakeTrailRepository implements TrailRepository {
 }
 
 class _FakeFutureMessageRepository implements FutureMessageRepository {
+  _FakeFutureMessageRepository({
+    this.readySummaryResult = const FutureMessageReadySummary.empty(),
+  });
+
+  final FutureMessageReadySummary readySummaryResult;
+  int readySummaryCalls = 0;
+  int listCalls = 0;
+  int deliveredCalls = 0;
+
   @override
   Future<PaginatedResponse<FutureMessage>> list({
     required int page,
     required int size,
     List<String>? statuses,
   }) async {
+    listCalls += 1;
     return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
   }
 
@@ -2528,7 +2647,14 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
     required int page,
     required int size,
   }) async {
+    deliveredCalls += 1;
     return PaginatedResponse<FutureMessage>.empty(page: page, size: size);
+  }
+
+  @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    readySummaryCalls += 1;
+    return readySummaryResult;
   }
 
   @override
@@ -2570,9 +2696,33 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
   }
 
   @override
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    return [
+      if (morning != null) _withLocalDate(morning!, start),
+      if (evening != null) _withLocalDate(evening!, start),
+    ];
+  }
+
+  @override
   Future<DailyRitual> create(DailyRitualDraft draft) {
     throw UnimplementedError();
   }
+}
+
+DailyRitual _withLocalDate(DailyRitual ritual, DateTime localDate) {
+  return DailyRitual(
+    id: ritual.id,
+    localDate: localDate,
+    type: ritual.type,
+    emotionalState: ritual.emotionalState,
+    dayNeed: ritual.dayNeed,
+    intention: ritual.intention,
+    microAction: ritual.microAction,
+    createdAt: ritual.createdAt,
+  );
 }
 
 class _StaticCheckInController extends CheckInController {
@@ -2651,21 +2801,29 @@ class _FakeSubscriptionRepository implements SubscriptionRepository {
   final int rewardedCreditsUsedToday;
   final List<MonetizationAccessStatus> _accessStatuses;
   int accessCalls = 0;
+  int currentCalls = 0;
+  int listPlansCalls = 0;
 
   @override
-  Future<List<PlanView>> listPlans() async => const [];
+  Future<List<PlanView>> listPlans() async {
+    listPlansCalls++;
+    return const [];
+  }
 
   @override
-  Future<CurrentSubscription?> current() async => CurrentSubscription(
-    planCode: premium ? 'premium-monthly' : 'essential-free',
-    status: 'ACTIVE',
-    billingCycle: 'MONTHLY',
-    premium: premium,
-    adsEnabled: !premium,
-    aiQuotaRemainingToday: premium ? 999 : 0,
-    mentorPremiumPassActive: false,
-    mentorRewardedAdAvailable: false,
-  );
+  Future<CurrentSubscription?> current() async {
+    currentCalls++;
+    return CurrentSubscription(
+      planCode: premium ? 'premium-monthly' : 'essential-free',
+      status: 'ACTIVE',
+      billingCycle: 'MONTHLY',
+      premium: premium,
+      adsEnabled: !premium,
+      aiQuotaRemainingToday: premium ? 999 : 0,
+      mentorPremiumPassActive: false,
+      mentorRewardedAdAvailable: false,
+    );
+  }
 
   @override
   Future<CurrentSubscription?> cancel() async => current();

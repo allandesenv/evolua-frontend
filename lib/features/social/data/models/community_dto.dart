@@ -37,6 +37,20 @@ class CommunityDto {
     );
   }
 
+  factory CommunityDto.fromEntity(Community community) {
+    return CommunityDto(
+      id: community.id,
+      slug: community.slug,
+      name: community.name,
+      description: community.description,
+      visibility: community.visibility,
+      category: community.category,
+      memberCount: community.memberCount,
+      joined: community.joined,
+      createdAt: community.createdAt,
+    );
+  }
+
   Community toEntity() {
     return Community(
       id: id,
@@ -49,5 +63,19 @@ class CommunityDto {
       joined: joined,
       createdAt: createdAt,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'slug': slug,
+      'name': name,
+      'description': description,
+      'visibility': visibility,
+      'category': category,
+      'memberCount': memberCount,
+      'joined': joined,
+      'createdAt': createdAt.toIso8601String(),
+    };
   }
 }

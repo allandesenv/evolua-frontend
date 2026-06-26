@@ -1,13 +1,14 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
-import 'package:evolua_frontend/features/social/data/repositories/social_post_repository_impl.dart';
-import 'package:evolua_frontend/features/social/data/models/social_post_dto.dart';
 import 'package:evolua_frontend/features/social/application/social_feed_state.dart';
+import 'package:evolua_frontend/features/social/application/social_page_cache.dart';
+import 'package:evolua_frontend/features/social/data/models/social_post_dto.dart';
+import 'package:evolua_frontend/features/social/data/repositories/social_post_repository_impl.dart';
 import 'package:evolua_frontend/features/social/domain/entities/social_post.dart';
 import 'package:evolua_frontend/features/social/domain/repositories/social_post_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,12 +26,16 @@ final socialPostControllerProvider =
 
 class SocialPostController extends AsyncNotifier<SocialFeedState> {
   static const _pageSize = 4;
-  static const _legacyCachePrefix = 'evolua.social_feed_cache.v1';
-  static const _cachePrefix = 'evolua.social_feed_cache.v2';
+  static const _freshTtl = Duration(minutes: 5);
+  static const _maxStaleAge = Duration(minutes: 30);
+
   String? _search;
   String? _community;
   String? _visibility;
   bool? _mine;
+  int _requestRevision = 0;
+  int _mutationGeneration = 0;
+  Timer? _revalidateTimer;
 
   static Future<void> clearOfflineCache(Ref ref) async {
     final preferences = await ref.read(sharedPreferencesProvider.future);
@@ -39,30 +44,69 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
 
   static Future<void> clearOfflineCacheFromPreferences(
     SharedPreferences preferences,
-  ) async {
-    final keys = preferences
-        .getKeys()
-        .where(
-          (key) =>
-              key.startsWith(_legacyCachePrefix) ||
-              key.startsWith(_cachePrefix),
-        )
-        .toList();
-    for (final key in keys) {
-      await preferences.remove(key);
-    }
+  ) {
+    return SocialPageCache.clearAllSocialCaches(preferences);
   }
 
   @override
   Future<SocialFeedState> build() async {
-    return _fetch(page: 0);
+    ref.onDispose(() => _revalidateTimer?.cancel());
+    final context = await _contextFor(page: 0);
+    if (context == null) {
+      return SocialFeedState.fresh(_empty(page: 0));
+    }
+    final cached = await _readCached(context);
+    if (cached != null) {
+      final state = SocialFeedState.cached(
+        cached.result,
+      ).copyWith(isStale: cached.isStale);
+      _scheduleBackgroundRefresh(context);
+      return state;
+    }
+    try {
+      return SocialFeedState.fresh(await _fetchRemote(context));
+    } catch (error) {
+      if (_isNetworkError(error)) {
+        return SocialFeedState.offlineEmpty(
+          page: 0,
+          size: _pageSize,
+          sortBy: 'createdAt',
+          sortDir: 'desc',
+          filters: Map<String, dynamic>.from(_filters()),
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () async => _fetch(page: state.asData?.value.result.page ?? 0),
-    );
+    final current = state.asData?.value;
+    final page = current?.result.page ?? 0;
+    final context = await _contextFor(page: page);
+    if (context == null) {
+      state = AsyncData(SocialFeedState.fresh(_empty(page: page)));
+      return;
+    }
+    if (current != null) {
+      state = AsyncData(
+        current.copyWith(isRefreshing: true, clearRefreshError: true),
+      );
+    } else {
+      state = const AsyncLoading();
+    }
+    try {
+      final result = await _fetchRemote(context);
+      if (!_isCurrent(context)) return;
+      state = AsyncData(SocialFeedState.fresh(result));
+    } catch (error, stackTrace) {
+      if (current != null) {
+        state = AsyncData(
+          current.copyWith(isRefreshing: false, refreshError: error),
+        );
+      } else {
+        state = AsyncError(error, stackTrace);
+      }
+    }
   }
 
   Future<void> applyFilters({
@@ -71,17 +115,17 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
     String? visibility,
     bool? mine,
   }) async {
-    _search = search;
-    _community = community;
-    _visibility = visibility;
+    _requestRevision++;
+    _search = _normalizeText(search);
+    _community = _normalizeText(community);
+    _visibility = _normalizeText(visibility)?.toUpperCase();
     _mine = mine;
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: 0));
+    await _loadPage(page: 0);
   }
 
   Future<void> goToPage(int page) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async => _fetch(page: page));
+    _requestRevision++;
+    await _loadPage(page: page);
   }
 
   Future<SocialPost?> create({
@@ -89,140 +133,367 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
     required String community,
     required String visibility,
   }) async {
+    _mutationGeneration++;
+    final mutationGeneration = _mutationGeneration;
     final repository = ref.read(socialPostRepositoryProvider);
-    SocialPost? createdPost;
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      createdPost = await repository.create(
+    try {
+      final createdPost = await repository.create(
         content: content,
         community: community,
         visibility: visibility,
       );
-
-      return _fetch(page: 0);
-    });
-    return state.hasError ? null : createdPost;
+      if (mutationGeneration != _mutationGeneration) {
+        return createdPost;
+      }
+      await _applyPostMutation(createdPost, operation: _PostOperation.create);
+      return createdPost;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<SocialPost> updatePost({
     required String id,
     required String content,
   }) async {
+    _mutationGeneration++;
+    final mutationGeneration = _mutationGeneration;
     final updatedPost = await ref
         .read(socialPostRepositoryProvider)
         .update(id: id, content: content);
-    _replacePost(updatedPost);
+    if (mutationGeneration == _mutationGeneration) {
+      await _applyPostMutation(updatedPost, operation: _PostOperation.update);
+    }
     return updatedPost;
   }
 
   Future<void> deletePost(String id) async {
+    _mutationGeneration++;
+    final mutationGeneration = _mutationGeneration;
     await ref.read(socialPostRepositoryProvider).delete(id);
-    _removePost(id);
-  }
-
-  Future<SocialFeedState> _fetch({required int page}) async {
-    const sortBy = 'createdAt';
-    const sortDir = 'desc';
-    final filters = _filters();
-    final userId =
-        ref.read(authControllerProvider).asData?.value?.userId ?? 'anonymous';
-    final key = _cacheKey(
-      userId: userId,
-      page: page,
-      size: _pageSize,
-      sortBy: sortBy,
-      sortDir: sortDir,
-      filters: filters,
-    );
-
-    try {
-      final result = await ref
-          .read(socialPostRepositoryProvider)
-          .list(
-            page: page,
-            size: _pageSize,
-            search: _search,
-            community: _community,
-            visibility: _visibility,
-            mine: _mine,
-          );
-      if (result.items.isNotEmpty) {
-        await _writeCache(key, result);
-      }
-      return SocialFeedState.fresh(result);
-    } catch (error) {
-      if (!_isNetworkError(error)) {
-        rethrow;
-      }
-      final cached = await _readCache(key);
-      if (cached != null) {
-        return SocialFeedState.cached(cached);
-      }
-      return SocialFeedState.offlineEmpty(
-        page: page,
-        size: _pageSize,
-        sortBy: sortBy,
-        sortDir: sortDir,
-        filters: filters,
-      );
+    if (mutationGeneration == _mutationGeneration) {
+      await _removePost(id);
     }
   }
 
-  Map<String, dynamic> _filters() {
+  Future<void> _loadPage({required int page}) async {
+    final context = await _contextFor(page: page);
+    if (context == null) {
+      state = AsyncData(SocialFeedState.fresh(_empty(page: page)));
+      return;
+    }
+    final cached = await _readCached(context);
+    if (cached != null) {
+      state = AsyncData(
+        SocialFeedState.cached(
+          cached.result,
+        ).copyWith(isStale: cached.isStale, clearRefreshError: true),
+      );
+      _scheduleBackgroundRefresh(context);
+      return;
+    }
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      try {
+        final result = await _fetchRemote(context);
+        return SocialFeedState.fresh(result);
+      } catch (error) {
+        if (_isNetworkError(error)) {
+          return SocialFeedState.offlineEmpty(
+            page: context.page,
+            size: _pageSize,
+            sortBy: 'createdAt',
+            sortDir: 'desc',
+            filters: Map<String, dynamic>.from(_filters()),
+          );
+        }
+        rethrow;
+      }
+    });
+  }
+
+  Future<PaginatedResponse<SocialPost>> _fetchRemote(
+    _SocialPostRequestContext context,
+  ) async {
+    final cache = await ref.read(socialPageCacheProvider.future);
+    final result = await cache.runDeduplicated<PaginatedResponse<SocialPost>>(
+      context.cacheKey.requestKey,
+      () {
+        return ref
+            .read(socialPostRepositoryProvider)
+            .list(
+              page: context.page,
+              size: _pageSize,
+              search: _search,
+              community: _community,
+              visibility: _visibility,
+              mine: _mine,
+            );
+      },
+    );
+    if (_isCurrent(context)) {
+      await cache.write(
+        key: context.cacheKey,
+        payload: _responseToJson(result),
+        nowUtc: DateTime.now().toUtc(),
+      );
+    }
+    return result;
+  }
+
+  Future<_CachedSocialPosts?> _readCached(
+    _SocialPostRequestContext context,
+  ) async {
+    final cache = await ref.read(socialPageCacheProvider.future);
+    final now = DateTime.now().toUtc();
+    final entry = await cache.read(
+      key: context.cacheKey,
+      nowUtc: now,
+      maxAge: _maxStaleAge,
+    );
+    if (entry == null) return null;
+    try {
+      return _CachedSocialPosts(
+        result: _responseFromJson(entry.payload),
+        isStale: entry.isStale(now, _freshTtl),
+      );
+    } catch (_) {
+      await cache.remove(context.cacheKey);
+      return null;
+    }
+  }
+
+  void _scheduleBackgroundRefresh(_SocialPostRequestContext context) {
+    Future.microtask(() async {
+      if (!_isCurrent(context)) return;
+      final current = state.asData?.value;
+      if (current == null || current.isRefreshing) return;
+      state = AsyncData(
+        current.copyWith(isRefreshing: true, clearRefreshError: true),
+      );
+      try {
+        final result = await _fetchRemote(context);
+        if (!_isCurrent(context)) return;
+        state = AsyncData(SocialFeedState.fresh(result));
+      } catch (error) {
+        if (!_isCurrent(context)) return;
+        final latest = state.asData?.value;
+        if (latest != null) {
+          state = AsyncData(
+            latest.copyWith(isRefreshing: false, refreshError: error),
+          );
+        }
+      }
+    });
+  }
+
+  void _scheduleMutationRevalidation() {
+    _revalidateTimer?.cancel();
+    _revalidateTimer = Timer(
+      ref.read(socialMutationRevalidateDelayProvider),
+      () {
+        if (!ref.mounted) return;
+        final page = state.asData?.value.result.page ?? 0;
+        Future.microtask(() async {
+          if (!ref.mounted) return;
+          final context = await _contextFor(page: page);
+          if (context != null) {
+            _scheduleBackgroundRefresh(context);
+          }
+        });
+      },
+    );
+  }
+
+  Future<void> _applyPostMutation(
+    SocialPost post, {
+    required _PostOperation operation,
+  }) async {
+    final value = state.asData?.value;
+    if (value == null) {
+      _scheduleMutationRevalidation();
+      return;
+    }
+    var result = value.result;
+    if (operation == _PostOperation.create) {
+      if (result.page == 0 && _matchesCurrentFilters(post)) {
+        final items = <SocialPost>[
+          post,
+          ...result.items.where((item) => item.id != post.id),
+        ].take(result.size).toList();
+        result = _withAdjustedTotals(
+          result.copyWith(items: items),
+          totalItems: result.totalItems + 1,
+        );
+      }
+    } else {
+      final items = <SocialPost>[];
+      for (final item in result.items) {
+        if (item.id == post.id) {
+          if (_matchesCurrentFilters(post)) {
+            items.add(post);
+          }
+        } else {
+          items.add(item);
+        }
+      }
+      final removed =
+          result.items.any((item) => item.id == post.id) &&
+          !items.any((item) => item.id == post.id);
+      result = _withAdjustedTotals(
+        result.copyWith(items: items),
+        totalItems: result.totalItems - (removed ? 1 : 0),
+      );
+    }
+    final next = SocialFeedState.fresh(result);
+    state = AsyncData(next);
+    await _invalidateOtherPostCachesAndPersist(next);
+    _scheduleMutationRevalidation();
+  }
+
+  Future<void> _removePost(String id) async {
+    final value = state.asData?.value;
+    if (value == null) {
+      _scheduleMutationRevalidation();
+      return;
+    }
+    final items = value.result.items.where((item) => item.id != id).toList();
+    final removedCount = value.result.items.length - items.length;
+    final result = _withAdjustedTotals(
+      value.result.copyWith(items: items),
+      totalItems: value.result.totalItems - removedCount,
+    );
+    final next = SocialFeedState.fresh(result);
+    state = AsyncData(next);
+    await _invalidateOtherPostCachesAndPersist(next);
+    _scheduleMutationRevalidation();
+  }
+
+  Future<void> _invalidateOtherPostCachesAndPersist(
+    SocialFeedState next,
+  ) async {
+    final context = await _contextFor(page: next.result.page);
+    if (context == null) return;
+    final cache = await ref.read(socialPageCacheProvider.future);
+    await cache.invalidate(
+      resource: SocialPageCacheResource.posts,
+      userId: context.userId,
+    );
+    await cache.write(
+      key: context.cacheKey,
+      payload: _responseToJson(next.result),
+      nowUtc: DateTime.now().toUtc(),
+    );
+  }
+
+  bool _matchesCurrentFilters(SocialPost post) {
+    final search = _search?.toLowerCase();
+    if (search != null && !post.content.toLowerCase().contains(search)) {
+      return false;
+    }
+    if (_community != null && post.community.toLowerCase() != _community) {
+      return false;
+    }
+    if (_visibility != null && post.visibility.toUpperCase() != _visibility) {
+      return false;
+    }
+    final userId = ref.read(authControllerProvider).asData?.value?.userId;
+    if (_mine == true && post.userId != userId) {
+      return false;
+    }
+    return true;
+  }
+
+  PaginatedResponse<SocialPost> _withAdjustedTotals(
+    PaginatedResponse<SocialPost> result, {
+    required int totalItems,
+  }) {
+    final normalizedTotal = totalItems.clamp(0, 1 << 31).toInt();
+    final totalPages = normalizedTotal == 0
+        ? 1
+        : ((normalizedTotal + result.size - 1) ~/ result.size);
+    return result.copyWith(
+      totalItems: normalizedTotal,
+      totalPages: totalPages,
+      hasNext: result.page < totalPages - 1,
+      hasPrevious: result.page > 0,
+    );
+  }
+
+  Future<_SocialPostRequestContext?> _contextFor({required int page}) async {
+    var session = ref.read(authControllerProvider).asData?.value;
+    if (session == null) {
+      try {
+        session = await ref.read(authControllerProvider.future);
+      } catch (_) {
+        return null;
+      }
+    }
+    if (session == null) {
+      return null;
+    }
+    if (!ref.mounted) {
+      return null;
+    }
+    final locale = await effectiveSocialLocale(ref);
+    if (!ref.mounted) {
+      return null;
+    }
+    final cache = await ref.read(socialPageCacheProvider.future);
+    if (!ref.mounted) {
+      return null;
+    }
+    final filters = _filters();
+    return _SocialPostRequestContext(
+      userId: session.userId,
+      generation: ref.read(authSessionGenerationProvider),
+      locale: locale,
+      page: page,
+      requestRevision: _requestRevision,
+      mutationGeneration: _mutationGeneration,
+      cacheKey: cache.key(
+        resource: SocialPageCacheResource.posts,
+        socialBaseUrl: AppConfig.socialBaseUrl,
+        endpoint: '/v1/posts',
+        userId: session.userId,
+        locale: locale,
+        page: page,
+        size: _pageSize,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+        filters: filters,
+      ),
+    );
+  }
+
+  bool _isCurrent(_SocialPostRequestContext context) {
+    if (!ref.mounted) {
+      return false;
+    }
+    final session = ref.read(authControllerProvider).asData?.value;
+    return session?.userId == context.userId &&
+        ref.read(authSessionGenerationProvider) == context.generation &&
+        _requestRevision == context.requestRevision &&
+        _mutationGeneration == context.mutationGeneration;
+  }
+
+  Map<String, Object?> _filters() {
     return {
-      if (_search != null && _search!.trim().isNotEmpty) 'search': _search,
-      if (_community != null) 'community': _community,
-      if (_visibility != null) 'visibility': _visibility,
-      if (_mine != null) 'mine': _mine,
+      'search': _search,
+      'community': _community,
+      'visibility': _visibility,
+      'mine': _mine,
     };
   }
 
-  String _cacheKey({
-    required String userId,
-    required int page,
-    required int size,
-    required String sortBy,
-    required String sortDir,
-    required Map<String, dynamic> filters,
-  }) {
-    final encoded = base64Url.encode(
-      utf8.encode(
-        jsonEncode({
-          'userId': userId,
-          'page': page,
-          'size': size,
-          'sortBy': sortBy,
-          'sortDir': sortDir,
-          'filters': filters,
-        }),
-      ),
+  PaginatedResponse<SocialPost> _empty({required int page}) {
+    return PaginatedResponse.empty(
+      page: page,
+      size: _pageSize,
+      sortBy: 'createdAt',
+      sortDir: 'desc',
+      filters: Map<String, dynamic>.from(_filters()),
     );
-    return '$_cachePrefix.$userId.$encoded';
-  }
-
-  Future<void> _writeCache(
-    String key,
-    PaginatedResponse<SocialPost> result,
-  ) async {
-    final preferences = await ref.read(sharedPreferencesProvider.future);
-    await preferences.setString(key, jsonEncode(_responseToJson(result)));
-  }
-
-  Future<PaginatedResponse<SocialPost>?> _readCache(String key) async {
-    final preferences = await ref.read(sharedPreferencesProvider.future);
-    final raw = preferences.getString(key);
-    if (raw == null || raw.trim().isEmpty) {
-      return null;
-    }
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
-        return null;
-      }
-      return _responseFromJson(decoded);
-    } catch (_) {
-      return null;
-    }
   }
 
   Map<String, dynamic> _responseToJson(PaginatedResponse<SocialPost> result) {
@@ -264,6 +535,11 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
     );
   }
 
+  String? _normalizeText(String? value) {
+    final text = value?.trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+
   bool _isNetworkError(Object error) {
     if (error is! DioException) {
       return false;
@@ -277,34 +553,33 @@ class SocialPostController extends AsyncNotifier<SocialFeedState> {
       _ => false,
     };
   }
-
-  void _replacePost(SocialPost post) {
-    final value = state.asData?.value;
-    if (value == null) {
-      return;
-    }
-    final items = value.result.items
-        .map((item) => item.id == post.id ? post : item)
-        .toList();
-    state = AsyncData(SocialFeedState.fresh(value.result.copyWith(items: items)));
-  }
-
-  void _removePost(String id) {
-    final value = state.asData?.value;
-    if (value == null) {
-      return;
-    }
-    final items = value.result.items.where((item) => item.id != id).toList();
-    final removedCount = value.result.items.length - items.length;
-    state = AsyncData(
-      SocialFeedState.fresh(
-        value.result.copyWith(
-          items: items,
-          totalItems: (value.result.totalItems - removedCount)
-              .clamp(0, 1 << 31)
-              .toInt(),
-        ),
-      ),
-    );
-  }
 }
+
+class _CachedSocialPosts {
+  const _CachedSocialPosts({required this.result, required this.isStale});
+
+  final PaginatedResponse<SocialPost> result;
+  final bool isStale;
+}
+
+class _SocialPostRequestContext {
+  const _SocialPostRequestContext({
+    required this.userId,
+    required this.generation,
+    required this.locale,
+    required this.page,
+    required this.requestRevision,
+    required this.mutationGeneration,
+    required this.cacheKey,
+  });
+
+  final String userId;
+  final int generation;
+  final String locale;
+  final int page;
+  final int requestRevision;
+  final int mutationGeneration;
+  final SocialPageCacheKey cacheKey;
+}
+
+enum _PostOperation { create, update }

@@ -1,6 +1,7 @@
 import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
@@ -55,6 +56,11 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
     List<String>? statuses,
   }) async {
     return PaginatedResponse.empty(page: page, size: size);
+  }
+
+  @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    return const FutureMessageReadySummary.empty();
   }
 
   @override

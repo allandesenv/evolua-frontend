@@ -12,7 +12,9 @@ class NotificationBellButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notificationsState = ref.watch(notificationInboxControllerProvider);
+    final unreadCountState = ref.watch(
+      notificationUnreadCountControllerProvider,
+    );
     final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     return Stack(
@@ -52,7 +54,7 @@ class NotificationBellButton extends ConsumerWidget {
               ),
             ),
           ),
-        if (notificationsState.isLoading && !notificationsState.hasValue)
+        if (!unreadCountState.hasLoaded)
           const Positioned(
             right: -2,
             bottom: -2,

@@ -34,6 +34,7 @@ import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_
 import 'package:evolua_frontend/features/emotional/presentation/pages/check_in_quick_page.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/dashboard_shell.dart';
 import 'package:evolua_frontend/features/home/presentation/widgets/home_hub_view.dart';
@@ -3419,6 +3420,23 @@ class _FakeCheckInRepository implements CheckInRepository {
   }
 
   @override
+  Future<CheckIn> getById(int checkInId) async {
+    return items.firstWhere(
+      (item) => item.id == checkInId,
+      orElse: () => CheckIn(
+        id: checkInId,
+        userId: 'user-123',
+        mood: 'calmo',
+        reflection: '',
+        energyLevel: 7,
+        recommendedPractice: 'Respire por alguns minutos.',
+        aiInsight: null,
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    );
+  }
+
+  @override
   Future<CheckIn> create({
     required String mood,
     String? reflection,
@@ -3441,19 +3459,7 @@ class _FakeCheckInRepository implements CheckInRepository {
     int checkInId, {
     String style = 'deep',
   }) async {
-    return items.firstWhere(
-      (item) => item.id == checkInId,
-      orElse: () => CheckIn(
-        id: checkInId,
-        userId: 'user-123',
-        mood: 'calmo',
-        reflection: '',
-        energyLevel: 7,
-        recommendedPractice: 'Respire por alguns minutos.',
-        aiInsight: null,
-        createdAt: DateTime(2026, 1, 1),
-      ),
-    );
+    return getById(checkInId);
   }
 
   @override
@@ -3505,6 +3511,11 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
   }
 
   @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    return const FutureMessageReadySummary.empty();
+  }
+
+  @override
   Future<FutureMessage> create(FutureMessageDraft draft) {
     throw UnimplementedError();
   }
@@ -3537,6 +3548,14 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
     required DateTime localDate,
   }) async {
     return null;
+  }
+
+  @override
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    return const [];
   }
 
   @override

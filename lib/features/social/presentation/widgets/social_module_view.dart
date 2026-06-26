@@ -435,25 +435,15 @@ class _SocialModuleViewState extends ConsumerState<SocialModuleView> {
 
     setState(() => _joiningCommunityId = community.id);
     try {
-      await ref.read(communityControllerProvider.notifier).join(community.id);
+      final joinedCommunity = await ref
+          .read(communityControllerProvider.notifier)
+          .join(community.id);
       if (!mounted) {
         return;
       }
 
       final state = ref.read(communityControllerProvider);
       if (state.hasError) {
-        return;
-      }
-
-      Community? joinedCommunity;
-      for (final item
-          in state.asData?.value.result.items ?? const <Community>[]) {
-        if (item.id == community.id) {
-          joinedCommunity = item;
-          break;
-        }
-      }
-      if (joinedCommunity == null) {
         return;
       }
 
@@ -876,7 +866,10 @@ class _CommunityReflectionSheetState extends State<_CommunityReflectionSheet> {
                     ),
                     items: const [
                       DropdownMenuItem(value: 'PUBLIC', child: Text('Aberta')),
-                      DropdownMenuItem(value: 'PRIVATE', child: Text('Privada')),
+                      DropdownMenuItem(
+                        value: 'PRIVATE',
+                        child: Text('Privada'),
+                      ),
                     ],
                     onChanged: _submitting
                         ? null

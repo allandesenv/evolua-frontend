@@ -5,14 +5,12 @@ import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/ads/application/ad_mob_initialization_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_access_grant.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
-import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/repositories/subscription_repository.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-RewardedAdService createRewardedAdService(Ref ref) {
-  return MobileRewardedAdService(ref.read(subscriptionRepositoryProvider));
+RewardedAdService createRewardedAdService(SubscriptionRepository repository) {
+  return MobileRewardedAdService(repository);
 }
 
 class MobileRewardedAdService implements RewardedAdService {

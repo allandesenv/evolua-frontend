@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
+import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
@@ -50,6 +51,65 @@ void main() {
         expect(repository.refreshCalls, 1);
         final preferences = await SharedPreferences.getInstance();
         expect(preferences.getString(_sessionStorageKey), isNotNull);
+      },
+    );
+
+    test(
+      'storage read failure completes with null and clears best effort',
+      () async {
+        final storage = _ThrowingAuthSessionStorage();
+        final container = _container(
+          _FakeAuthRepository(refreshSession: _testSession()),
+          storage: storage,
+        );
+        addTearDown(container.dispose);
+
+        final session = await container.read(authControllerProvider.future);
+        final state = container.read(authControllerProvider);
+
+        expect(session, isNull);
+        expect(state.hasError, isFalse);
+        expect(state.asData?.value, isNull);
+        expect(storage.clearCalls, 1);
+      },
+    );
+
+    test('storage read and clear failures still complete with null', () async {
+      final storage = _ThrowingAuthSessionStorage(clearFails: true);
+      final container = _container(
+        _FakeAuthRepository(refreshSession: _testSession()),
+        storage: storage,
+      );
+      addTearDown(container.dispose);
+
+      final session = await container.read(authControllerProvider.future);
+      final state = container.read(authControllerProvider);
+
+      expect(session, isNull);
+      expect(state.hasError, isFalse);
+      expect(state.asData?.value, isNull);
+      expect(storage.clearCalls, 1);
+    });
+
+    test(
+      'invalid stored session json clears storage without provider error',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          _sessionStorageKey: '{invalid-json',
+        });
+        final container = _container(
+          _FakeAuthRepository(refreshSession: _testSession()),
+        );
+        addTearDown(container.dispose);
+
+        final session = await container.read(authControllerProvider.future);
+        final state = container.read(authControllerProvider);
+        final preferences = await SharedPreferences.getInstance();
+
+        expect(session, isNull);
+        expect(state.hasError, isFalse);
+        expect(state.asData?.value, isNull);
+        expect(preferences.getString(_sessionStorageKey), isNull);
       },
     );
 
@@ -198,7 +258,10 @@ void main() {
         _sessionStorageKey: jsonEncode(current.toJson()),
       });
       final repository = _FakeAuthRepository(refreshSession: refreshed);
-      final container = _container(repository);
+      final recorder = LimitedHttpInstrumentationRecorder(
+        keepDetailedEvents: true,
+      );
+      final container = _container(repository, recorder: recorder);
       addTearDown(container.dispose);
       await container.read(authControllerProvider.future);
 
@@ -224,6 +287,11 @@ void main() {
         adapter.requests[1].headers['Authorization'],
         'Bearer $newAccessToken',
       );
+      final metrics = recorder.snapshot();
+      expect(metrics.logicalRequests, 1);
+      expect(metrics.httpAttempts, 2);
+      expect(metrics.retries, 1);
+      expect(metrics.routes['GET /v1/profiles/me']?.attempts, 2);
     });
 
     test('does not refresh public auth endpoints', () async {
@@ -436,10 +504,43 @@ void main() {
   });
 }
 
-ProviderContainer _container(_FakeAuthRepository repository) {
+ProviderContainer _container(
+  _FakeAuthRepository repository, {
+  HttpInstrumentationRecorder? recorder,
+  AuthSessionStorage? storage,
+}) {
   return ProviderContainer(
-    overrides: [authRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      authRepositoryProvider.overrideWithValue(repository),
+      if (storage != null)
+        authSessionStorageProvider.overrideWithValue(storage),
+      if (recorder != null)
+        httpInstrumentationRecorderProvider.overrideWithValue(recorder),
+    ],
   );
+}
+
+class _ThrowingAuthSessionStorage implements AuthSessionStorage {
+  _ThrowingAuthSessionStorage({this.clearFails = false});
+
+  final bool clearFails;
+  int clearCalls = 0;
+
+  @override
+  Future<String?> read() async {
+    throw StateError('storage unavailable');
+  }
+
+  @override
+  Future<void> write(String value) async {}
+
+  @override
+  Future<void> clear() async {
+    clearCalls++;
+    if (clearFails) {
+      throw StateError('clear unavailable');
+    }
+  }
 }
 
 class _FakeAuthRepository implements AuthRepository {

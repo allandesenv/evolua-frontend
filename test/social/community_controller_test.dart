@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/social/application/community_controller.dart';
 import 'package:evolua_frontend/features/social/domain/entities/community.dart';
 import 'package:evolua_frontend/features/social/domain/repositories/community_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('CommunityController performance state', () {
@@ -76,6 +79,7 @@ void main() {
           .read(communityControllerProvider.notifier)
           .loadNextPage();
 
+      await _waitUntil(() => repository.requestedPages.length == 2);
       expect(repository.requestedPages, [0, 1]);
       gate.complete(_page([_community('b')], page: 1, totalPages: 2));
       await Future.wait([first, second]);
@@ -111,9 +115,50 @@ void main() {
 }
 
 ProviderContainer _container(_FakeCommunityRepository repository) {
+  SharedPreferences.setMockInitialValues({});
   return ProviderContainer(
-    overrides: [communityRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      authControllerProvider.overrideWith(
+        () => _FakeAuthController(
+          _session(userId: 'user-a', email: 'a@evolua.test'),
+        ),
+      ),
+      communityRepositoryProvider.overrideWithValue(repository),
+    ],
   );
+}
+
+Future<void> _waitUntil(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 20; attempt++) {
+    if (predicate()) {
+      return;
+    }
+    await Future<void>.delayed(Duration.zero);
+  }
+}
+
+class _FakeAuthController extends AuthController {
+  _FakeAuthController(this._session);
+
+  final AuthSession? _session;
+
+  @override
+  Future<AuthSession?> build() async => _session;
+}
+
+AuthSession _session({required String userId, required String email}) {
+  return AuthSession(
+    userId: userId,
+    email: email,
+    roles: const ['ROLE_USER'],
+    accessToken: _jwt(userId: userId, email: email),
+    refreshToken: 'refresh-$userId',
+    expiresAt: DateTime.now().add(const Duration(hours: 1)),
+  );
+}
+
+String _jwt({required String userId, required String email}) {
+  return 'fake.$userId.$email';
 }
 
 class _FakeCommunityRepository implements CommunityRepository {

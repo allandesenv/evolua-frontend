@@ -180,6 +180,17 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
   }
 
   @override
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    return [
+      if (morning != null) _withLocalDate(morning!, start),
+      if (evening != null) _withLocalDate(evening!, start),
+    ];
+  }
+
+  @override
   Future<DailyRitual> create(DailyRitualDraft draft) async {
     createCallCount++;
     final created = DailyRitual(
@@ -199,6 +210,19 @@ class _FakeDailyRitualRepository implements DailyRitualRepository {
     }
     return created;
   }
+}
+
+DailyRitual _withLocalDate(DailyRitual ritual, DateTime localDate) {
+  return DailyRitual(
+    id: ritual.id,
+    localDate: localDate,
+    type: ritual.type,
+    emotionalState: ritual.emotionalState,
+    dayNeed: ritual.dayNeed,
+    intention: ritual.intention,
+    microAction: ritual.microAction,
+    createdAt: ritual.createdAt,
+  );
 }
 
 DailyRitual _ritual(String type) {

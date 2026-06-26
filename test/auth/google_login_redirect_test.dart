@@ -242,46 +242,42 @@ void main() {
       expect(find.textContaining('Page Not Found'), findsNothing);
     });
 
-    testWidgets(
-      'boot error shows friendly retry instead of auth or not found',
-      (tester) async {
-        SharedPreferences.setMockInitialValues({});
-        final container = ProviderContainer(
-          overrides: [
-            authRepositoryProvider.overrideWithValue(
-              _FakeAuthRepository(googleSession: _testSession()),
-            ),
-            authSessionStorageProvider.overrideWithValue(
-              _FailingAuthSessionStorage(),
-            ),
-            profileRepositoryProvider.overrideWithValue(
-              _FakeProfileRepository(),
-            ),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        final authRouterNotifier = _bindAuthRouterNotifier(container);
-        addTearDown(authRouterNotifier.dispose);
-        final router = _buildTestRouter(authRouterNotifier);
-
-        await tester.pumpWidget(
-          UncontrolledProviderScope(
-            container: container,
-            child: MaterialApp.router(routerConfig: router),
+    testWidgets('boot storage read failure is treated as empty session', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FakeAuthRepository(googleSession: _testSession()),
           ),
-        );
-        await tester.pumpAndSettle();
+          authSessionStorageProvider.overrideWithValue(
+            _FailingAuthSessionStorage(),
+          ),
+          profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
+        ],
+      );
+      addTearDown(container.dispose);
 
-        expect(
-          find.text('Nao conseguimos iniciar o Evolua agora.'),
-          findsOneWidget,
-        );
-        expect(find.text('Tentar novamente'), findsOneWidget);
-        expect(find.text('auth-page'), findsNothing);
-        expect(find.textContaining('Page Not Found'), findsNothing);
-      },
-    );
+      final authRouterNotifier = _bindAuthRouterNotifier(container);
+      addTearDown(authRouterNotifier.dispose);
+      final router = _buildTestRouter(authRouterNotifier);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('auth-page'), findsOneWidget);
+      expect(
+        find.text('Nao conseguimos iniciar o Evolua agora.'),
+        findsNothing,
+      );
+      expect(find.textContaining('Page Not Found'), findsNothing);
+    });
 
     testWidgets('unauthenticated user trying /home is redirected to /auth', (
       tester,
@@ -482,12 +478,11 @@ void main() {
     ) async {
       SharedPreferences.setMockInitialValues({});
       final session = _testSession();
+      final repository = _FakeAuthRepository(googleSession: session);
 
       final container = ProviderContainer(
         overrides: [
-          authRepositoryProvider.overrideWithValue(
-            _FakeAuthRepository(googleSession: session),
-          ),
+          authRepositoryProvider.overrideWithValue(repository),
           authSessionStorageProvider.overrideWithValue(
             _SharedPreferencesAuthSessionStorage(),
           ),
@@ -526,7 +521,282 @@ void main() {
         router.routerDelegate.currentConfiguration.last.matchedLocation,
         '/home',
       );
+      expect(repository.exchangeCalls, 1);
     });
+
+    testWidgets(
+      'google callback waits for auth bootstrap before exchanging code',
+      (tester) async {
+        final storage = _DelayedAuthSessionStorage();
+        final repository = _FakeAuthRepository(googleSession: _testSession());
+
+        await _pumpGoogleCallbackScenario(
+          tester,
+          repository: repository,
+          storage: storage,
+          initialLocation: '/auth/google/callback?code=google-code',
+          settle: false,
+        );
+        await tester.pump();
+
+        expect(repository.exchangeCalls, 0);
+        storage.complete(null);
+        await tester.pumpAndSettle();
+
+        expect(repository.exchangeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets('google callback times out when auth bootstrap stays loading', (
+      tester,
+    ) async {
+      final storage = _DelayedAuthSessionStorage();
+      final repository = _FakeAuthRepository(googleSession: _testSession());
+
+      await _pumpGoogleCallbackScenario(
+        tester,
+        repository: repository,
+        storage: storage,
+        initialLocation: '/auth/google/callback?code=google-code',
+        completionTimeout: const Duration(milliseconds: 20),
+        settle: false,
+      );
+      await tester.pump(const Duration(milliseconds: 30));
+      await tester.pump();
+
+      expect(repository.exchangeCalls, 0);
+      expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+      expect(
+        find.text(
+          'O login com Google demorou mais que o esperado. Tente novamente.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'google callback recovers when loading bootstrap ends in error',
+      (tester) async {
+        final firstBuild = Completer<void>();
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failFirstBuild: true,
+          firstBuildCompleter: firstBuild,
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          state: state,
+          initialLocation: '/auth/google/callback?code=google-code',
+          settle: false,
+        );
+        await tester.pump();
+
+        expect(state.buildCalls, 1);
+        expect(state.completeCalls, 0);
+
+        firstBuild.complete();
+        await tester.pumpAndSettle();
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback fails once when loading bootstrap and rebuild fail',
+      (tester) async {
+        final firstBuild = Completer<void>();
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failEveryBuild: true,
+          firstBuildCompleter: firstBuild,
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          state: state,
+          initialLocation: '/auth/google/callback?code=google-code',
+          settle: false,
+        );
+        await tester.pump();
+
+        expect(state.buildCalls, 1);
+        expect(state.completeCalls, 0);
+
+        firstBuild.complete();
+        await tester.pumpAndSettle();
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'google callback rebuilds errored auth state with previous value',
+      (tester) async {
+        final state = _CallbackAuthControllerState(session: _testSession());
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _CallbackAuthController(state),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authControllerProvider.future);
+        final controller =
+            container.read(authControllerProvider.notifier)
+                as _CallbackAuthController;
+        controller.publishErrorWithPrevious(_testSession());
+
+        await _pumpGoogleCallbackWithContainer(
+          tester,
+          container: container,
+          initialLocation: '/auth/google/callback?code=google-code',
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback does not exchange when previous-value error rebuild fails',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failSecondBuild: true,
+        );
+        final container = ProviderContainer(
+          overrides: [
+            authControllerProvider.overrideWith(
+              () => _CallbackAuthController(state),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authControllerProvider.future);
+        final controller =
+            container.read(authControllerProvider.notifier)
+                as _CallbackAuthController;
+        controller.publishErrorWithPrevious(_testSession());
+
+        await _pumpGoogleCallbackWithContainer(
+          tester,
+          container: container,
+          initialLocation: '/auth/google/callback?code=google-code',
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'google callback rebuilds errored auth provider once before exchange',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failFirstBuild: true,
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          state: state,
+          initialLocation: '/auth/google/callback?code=google-code',
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback recovers when auth provider build throws UnsupportedError',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failFirstBuild: true,
+          buildError: UnsupportedError('auth provider unavailable'),
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          initialLocation: '/auth/google/callback?code=google-code',
+          state: state,
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 1);
+        expect(find.text('home-page'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'google callback does not exchange when UnsupportedError rebuild fails',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failEveryBuild: true,
+          buildError: UnsupportedError('auth provider unavailable'),
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          initialLocation: '/auth/google/callback?code=google-code',
+          state: state,
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'google callback does not exchange when auth provider rebuild still fails',
+      (tester) async {
+        final state = _CallbackAuthControllerState(
+          session: _testSession(),
+          failEveryBuild: true,
+        );
+
+        await _pumpGoogleCallbackWithAuthController(
+          tester,
+          state: state,
+          initialLocation: '/auth/google/callback?code=google-code',
+        );
+
+        expect(state.buildCalls, 2);
+        expect(state.completeCalls, 0);
+        expect(find.text('Nao foi possivel entrar'), findsOneWidget);
+        expect(
+          find.text('Falha ao concluir o login com Google.'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('direct google callback initial route redirects to /home', (
       tester,
@@ -768,6 +1038,7 @@ GoRouter _buildGoogleCallbackRouter(
 Future<GoRouter> _pumpGoogleCallbackScenario(
   WidgetTester tester, {
   _FakeAuthRepository? repository,
+  AuthSessionStorage? storage,
   required String initialLocation,
   Duration completionTimeout = const Duration(seconds: 15),
   bool settle = true,
@@ -778,7 +1049,7 @@ Future<GoRouter> _pumpGoogleCallbackScenario(
         repository ?? _FakeAuthRepository(googleSession: _testSession()),
       ),
       authSessionStorageProvider.overrideWithValue(
-        _SharedPreferencesAuthSessionStorage(),
+        storage ?? _SharedPreferencesAuthSessionStorage(),
       ),
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
     ],
@@ -804,6 +1075,113 @@ Future<GoRouter> _pumpGoogleCallbackScenario(
     await tester.pumpAndSettle();
   }
   return router;
+}
+
+Future<GoRouter> _pumpGoogleCallbackWithAuthController(
+  WidgetTester tester, {
+  required _CallbackAuthControllerState state,
+  required String initialLocation,
+  Duration completionTimeout = const Duration(seconds: 15),
+  bool settle = true,
+}) async {
+  final container = ProviderContainer(
+    overrides: [
+      authControllerProvider.overrideWith(() => _CallbackAuthController(state)),
+    ],
+  );
+  addTearDown(container.dispose);
+
+  return _pumpGoogleCallbackWithContainer(
+    tester,
+    container: container,
+    initialLocation: initialLocation,
+    completionTimeout: completionTimeout,
+    settle: settle,
+  );
+}
+
+Future<GoRouter> _pumpGoogleCallbackWithContainer(
+  WidgetTester tester, {
+  required ProviderContainer container,
+  required String initialLocation,
+  Duration completionTimeout = const Duration(seconds: 15),
+  bool settle = true,
+}) async {
+  final authRouterNotifier = _bindAuthRouterNotifier(container);
+  addTearDown(authRouterNotifier.dispose);
+  final router = _buildGoogleCallbackRouter(
+    authRouterNotifier,
+    initialLocation: initialLocation,
+    completionTimeout: completionTimeout,
+  );
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(routerConfig: router),
+    ),
+  );
+  await tester.pump();
+  if (settle) {
+    await tester.pumpAndSettle();
+  }
+  return router;
+}
+
+class _CallbackAuthControllerState {
+  _CallbackAuthControllerState({
+    required this.session,
+    this.failFirstBuild = false,
+    this.failSecondBuild = false,
+    this.failEveryBuild = false,
+    this.firstBuildCompleter,
+    this.buildError,
+  });
+
+  final AuthSession session;
+  final bool failFirstBuild;
+  final bool failSecondBuild;
+  final bool failEveryBuild;
+  final Completer<void>? firstBuildCompleter;
+  final Object? buildError;
+  int buildCalls = 0;
+  int completeCalls = 0;
+}
+
+class _CallbackAuthController extends AuthController {
+  _CallbackAuthController(this.fakeState);
+
+  final _CallbackAuthControllerState fakeState;
+
+  @override
+  Future<AuthSession?> build() async {
+    fakeState.buildCalls++;
+    if (fakeState.buildCalls == 1) {
+      await fakeState.firstBuildCompleter?.future;
+    }
+    if (fakeState.failEveryBuild ||
+        (fakeState.failFirstBuild && fakeState.buildCalls == 1) ||
+        (fakeState.failSecondBuild && fakeState.buildCalls == 2)) {
+      throw fakeState.buildError ?? StateError('auth bootstrap failed');
+    }
+    return null;
+  }
+
+  void publishErrorWithPrevious(AuthSession previous) {
+    final error = AsyncError<AuthSession?>(
+      StateError('auth bootstrap failed'),
+      StackTrace.current,
+    );
+    // ignore: invalid_use_of_internal_member
+    state = error.copyWithPrevious(AsyncData<AuthSession?>(previous));
+  }
+
+  @override
+  Future<AuthSession?> completeGoogleLogin({required String code}) async {
+    fakeState.completeCalls++;
+    state = AsyncData(fakeState.session);
+    return fakeState.session;
+  }
 }
 
 class _PlaceholderPage extends StatelessWidget {
@@ -872,16 +1250,15 @@ class _FailingAuthSessionStorage implements AuthSessionStorage {
 typedef _ExchangeHandler = Future<AuthSession> Function(String code);
 
 class _FakeAuthRepository implements AuthRepository {
-  const _FakeAuthRepository({
-    required this.googleSession,
-    this.exchangeHandler,
-  });
+  _FakeAuthRepository({required this.googleSession, this.exchangeHandler});
 
   final AuthSession googleSession;
   final _ExchangeHandler? exchangeHandler;
+  int exchangeCalls = 0;
 
   @override
   Future<AuthSession> exchangeGoogleCode({required String code}) async {
+    exchangeCalls++;
     final handler = exchangeHandler;
     if (handler != null) {
       return handler(code);

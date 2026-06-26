@@ -28,6 +28,20 @@ class DailyRitualRepositoryImpl implements DailyRitualRepository {
   }
 
   @override
+  Future<List<DailyRitual>> list({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final response = await _dio.get<dynamic>(
+      '/v1/daily-rituals',
+      queryParameters: {'start': _formatDate(start), 'end': _formatDate(end)},
+    );
+    return ApiPayloadParser.dataList(
+      response.data,
+    ).map((item) => DailyRitualDto.fromJson(item).toEntity()).toList();
+  }
+
+  @override
   Future<DailyRitual> create(DailyRitualDraft draft) async {
     final response = await _dio.post<dynamic>(
       '/v1/daily-rituals',

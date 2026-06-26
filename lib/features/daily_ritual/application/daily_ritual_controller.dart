@@ -34,15 +34,25 @@ class DailyRitualController extends AsyncNotifier<DailyRitualState> {
 
   Future<DailyRitualState> _load(DateTime localDate) async {
     final repository = ref.read(dailyRitualRepositoryProvider);
-    final morning = await repository.today(
-      type: DailyRitualType.morning,
-      localDate: localDate,
-    );
-    final evening = await repository.today(
-      type: DailyRitualType.evening,
-      localDate: localDate,
-    );
+    final day = DateTime(localDate.year, localDate.month, localDate.day);
+    final items = await repository.list(start: day, end: day);
+    DailyRitual? morning;
+    DailyRitual? evening;
+    for (final item in items) {
+      if (!_isSameLocalDay(item.localDate, day)) {
+        continue;
+      }
+      if (item.type == DailyRitualType.morning) {
+        morning = item;
+      } else if (item.type == DailyRitualType.evening) {
+        evening = item;
+      }
+    }
     return DailyRitualState(morning: morning, evening: evening);
+  }
+
+  bool _isSameLocalDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   Future<void> refresh({DateTime? localDate}) async {

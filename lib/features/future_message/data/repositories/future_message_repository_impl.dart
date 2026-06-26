@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/network/pagination_query.dart';
 import 'package:evolua_frontend/features/future_message/data/models/future_message_dto.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
 
 class FutureMessageRepositoryImpl implements FutureMessageRepository {
@@ -43,6 +44,16 @@ class FutureMessageRepositoryImpl implements FutureMessageRepository {
     return ApiPayloadParser.paginatedData(
       response.data,
       (item) => FutureMessageDto.fromJson(item).toEntity(),
+    );
+  }
+
+  @override
+  Future<FutureMessageReadySummary> readySummary() async {
+    final response = await _dio.get<dynamic>(
+      '/v1/future-messages/ready-summary',
+    );
+    return FutureMessageReadySummary.fromJson(
+      ApiPayloadParser.dataMap(response.data),
     );
   }
 

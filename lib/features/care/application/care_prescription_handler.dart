@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
 import 'package:evolua_frontend/features/care/application/care_pending_processing_result.dart';
 import 'package:evolua_frontend/features/care/application/care_repository_provider.dart';
@@ -144,12 +145,10 @@ class CarePrescriptionHandler {
           .read(careRepositoryProvider)
           .acknowledgePrescription(envelope.prescriptionId);
       _appliedPrescriptionIds.add(envelope.prescriptionId);
-      await _ref
-          .read(notificationInboxControllerProvider.notifier)
-          .addCarePrescriptionNotification(
-            prescriptionId: envelope.prescriptionId,
-            ritualType: draft.type,
-          );
+      await _tryAddCareNotification(
+        prescriptionId: envelope.prescriptionId,
+        ritualType: draft.type,
+      );
       _ref.read(carePrescriptionAppliedEventProvider.notifier).emit();
       _ref.invalidate(dailyRitualControllerProvider);
       return const CarePendingProcessingResult(
@@ -167,6 +166,54 @@ class CarePrescriptionHandler {
         attempted: true,
       );
     }
+  }
+
+  Future<void> _tryAddCareNotification({
+    required String prescriptionId,
+    required String ritualType,
+  }) async {
+    final userId = await _resolveCurrentUserId();
+    if (userId == null) {
+      return;
+    }
+    try {
+      final result = await _ref
+          .read(localCareNotificationServiceProvider)
+          .addPrescription(
+            userId: userId,
+            prescriptionId: prescriptionId,
+            ritualType: ritualType,
+          );
+      if (result.changed && _currentUserId == userId) {
+        _ref
+            .read(notificationUnreadCountControllerProvider.notifier)
+            .applyLocalCareDelta(userId, result.unreadDelta);
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Care notification ignored (${error.runtimeType}).');
+      }
+    }
+  }
+
+  String? get _currentUserId {
+    final userId = _ref.read(authControllerProvider).asData?.value?.userId;
+    if (userId == null || userId.isEmpty) {
+      return null;
+    }
+    return userId;
+  }
+
+  Future<String?> _resolveCurrentUserId() async {
+    final current = _currentUserId;
+    if (current != null) {
+      return current;
+    }
+    final userId = (await _ref.read(authControllerProvider.future))?.userId;
+    if (userId == null || userId.isEmpty) {
+      return null;
+    }
+    return userId;
   }
 
   DailyRitualDraft _draftFromJson(Map<String, dynamic> json) {
