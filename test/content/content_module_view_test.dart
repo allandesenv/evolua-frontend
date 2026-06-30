@@ -11,6 +11,7 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
@@ -1238,9 +1239,7 @@ ButtonStyleButton _saveResponseButton(WidgetTester tester) {
   return tester.widget<ButtonStyleButton>(
     find.ancestor(
       of: find.text('Salvar resposta'),
-      matching: find.byWidgetPredicate(
-        (widget) => widget is ButtonStyleButton,
-      ),
+      matching: find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
     ),
   );
 }
@@ -1397,7 +1396,12 @@ class _FakeTrailRepository implements TrailRepository {
   }
 
   @override
-  Future<PaginatedResponse<Trail>> list({
+  Future<Trail> detail(int id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<PaginatedResponse<TrailSummary>> list({
     required int page,
     required int size,
     String? search,
@@ -1434,7 +1438,7 @@ class _FakeTrailRepository implements TrailRepository {
         ? <Trail>[]
         : items.skip(start).take(size).toList();
     return PaginatedResponse(
-      items: pageItems,
+      items: pageItems.map(TrailSummary.fromTrail).toList(),
       page: page,
       size: size,
       totalItems: items.length,

@@ -5,6 +5,41 @@ import 'package:evolua_frontend/features/content/data/repositories/trail_reposit
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'list requests summary projection and parses lightweight payload',
+    () async {
+      final adapter = _TrailAdapter();
+      final dio = Dio()..httpClientAdapter = adapter;
+      final repository = TrailRepositoryImpl(dio);
+
+      final result = await repository.list(page: 0, size: 4);
+
+      expect(
+        adapter.requests.any(
+          (request) =>
+              request.startsWith('/v1/trails?') &&
+              request.contains('projection=summary'),
+        ),
+        isTrue,
+      );
+      expect(result.items, hasLength(1));
+      expect(result.items.single.title, 'Resumo leve');
+      expect(result.items.single.stepCount, 2);
+    },
+  );
+
+  test('detail requests single trail without starting journey', () async {
+    final adapter = _TrailAdapter();
+    final dio = Dio()..httpClientAdapter = adapter;
+    final repository = TrailRepositoryImpl(dio);
+
+    final trail = await repository.detail(7);
+
+    expect(adapter.requests, contains('/v1/trails/7'));
+    expect(adapter.requests, isNot(contains('/v1/trails/7/journey')));
+    expect(trail.title, 'Trilha iniciada');
+  });
+
   test('in-progress journeys falls back to current journey on 404', () async {
     final dio = Dio()..httpClientAdapter = _TrailAdapter();
     final repository = TrailRepositoryImpl(dio);
@@ -18,6 +53,8 @@ void main() {
 }
 
 class _TrailAdapter implements HttpClientAdapter {
+  final requests = <String>[];
+
   @override
   void close({bool force = false}) {}
 
@@ -27,6 +64,45 @@ class _TrailAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requests.add(
+      options.uri.query.isEmpty
+          ? options.path
+          : '${options.path}?${options.uri.query}',
+    );
+    if (options.path == '/v1/trails' &&
+        options.uri.queryParameters['projection'] == 'summary') {
+      return _jsonResponse({
+        'data': {
+          'items': [
+            {
+              'id': 7,
+              'title': 'Resumo leve',
+              'summary': 'Sem conteudo completo.',
+              'category': 'foco',
+              'premium': false,
+              'privateTrail': false,
+              'activeJourney': false,
+              'generatedByAi': false,
+              'stepCount': 2,
+              'estimatedDurationMinutes': 8,
+              'createdAt': '2026-01-01T00:00:00Z',
+            },
+          ],
+          'page': 0,
+          'size': 4,
+          'totalItems': 1,
+          'totalPages': 1,
+          'hasNext': false,
+          'hasPrevious': false,
+          'sortBy': 'createdAt',
+          'sortDir': 'desc',
+          'filters': {},
+        },
+      });
+    }
+    if (options.path == '/v1/trails/7') {
+      return _jsonResponse({'data': _trailJson()});
+    }
     if (options.path == '/v1/trails/journeys/in-progress') {
       return _jsonResponse({'message': 'Not found'}, statusCode: 404);
     }

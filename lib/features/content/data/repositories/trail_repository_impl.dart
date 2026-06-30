@@ -4,12 +4,14 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/network/pagination_query.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_journey_dto.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
+import 'package:evolua_frontend/features/content/data/models/trail_summary_dto.dart';
 import 'package:evolua_frontend/features/content/data/models/trail_step_response_dto.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 
 class TrailRepositoryImpl implements TrailRepository {
@@ -18,7 +20,7 @@ class TrailRepositoryImpl implements TrailRepository {
   final Dio _dio;
 
   @override
-  Future<PaginatedResponse<Trail>> list({
+  Future<PaginatedResponse<TrailSummary>> list({
     required int page,
     required int size,
     String? search,
@@ -40,13 +42,22 @@ class TrailRepositoryImpl implements TrailRepository {
       queryParameters: query.toQueryParameters({
         'category': category,
         'premium': premium,
+        'projection': 'summary',
       }),
     );
 
     return ApiPayloadParser.paginatedData(
       response.data,
-      (item) => TrailDto.fromJson(item).toEntity(),
+      (item) => TrailSummaryDto.fromJson(item).toEntity(),
     );
+  }
+
+  @override
+  Future<Trail> detail(int id) async {
+    final response = await _dio.get<dynamic>('/v1/trails/$id');
+    return TrailDto.fromJson(
+      ApiPayloadParser.dataMap(response.data),
+    ).toEntity();
   }
 
   @override

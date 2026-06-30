@@ -4,9 +4,10 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey.d
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 
 abstract class TrailRepository {
-  Future<PaginatedResponse<Trail>> list({
+  Future<PaginatedResponse<TrailSummary>> list({
     required int page,
     required int size,
     String? search,
@@ -15,6 +16,10 @@ abstract class TrailRepository {
     String? category,
     bool? premium,
   });
+
+  Future<Trail> detail(int id) {
+    throw UnimplementedError();
+  }
 
   Future<Trail> create({
     required String title,
