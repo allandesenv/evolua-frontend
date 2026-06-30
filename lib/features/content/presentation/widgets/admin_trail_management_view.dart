@@ -10,6 +10,8 @@ import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_video.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/guided_empty_state.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/pagination_controls.dart';
@@ -155,7 +157,17 @@ class _AdminTrailManagementViewState
     });
   }
 
-  void _startEditingTrail(Trail trail) {
+  Future<void> _startEditingTrail(TrailSummary summary) async {
+    final session = ref.read(authControllerProvider).asData?.value;
+    if (session == null) {
+      return;
+    }
+    final trail = await ref.read(
+      trailDetailProvider((userId: session.userId, trailId: summary.id)).future,
+    );
+    if (!mounted) {
+      return;
+    }
     _titleController.text = trail.title;
     _summaryController.text = trail.summary;
     _categoryController.text = trail.category;
@@ -185,7 +197,7 @@ class _AdminTrailManagementViewState
     });
   }
 
-  Future<void> _confirmDeleteTrail(Trail trail) async {
+  Future<void> _confirmDeleteTrail(TrailSummary trail) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -265,7 +277,8 @@ class _AdminTrailManagementViewState
         video: step.type == 'VIDEO'
             ? TrailStepVideo(
                 provider: 'YOUTUBE',
-                videoId: _extractYoutubeId(step.videoUrlController.text.trim()) ??
+                videoId:
+                    _extractYoutubeId(step.videoUrlController.text.trim()) ??
                     step.videoIdController.text.trim(),
                 url: step.videoUrlController.text.trim().isEmpty
                     ? null
@@ -273,8 +286,9 @@ class _AdminTrailManagementViewState
                 thumbnailUrl: step.thumbnailController.text.trim().isEmpty
                     ? null
                     : step.thumbnailController.text.trim(),
-                durationSeconds:
-                    int.tryParse(step.videoDurationController.text.trim()),
+                durationSeconds: int.tryParse(
+                  step.videoDurationController.text.trim(),
+                ),
               )
             : null,
         mediaLinks: step.mediaLinks
@@ -351,7 +365,10 @@ class _AdminTrailManagementViewState
       final data = ApiPayloadParser.dataMap(response.data);
       final draftSteps = (data['steps'] as List? ?? const [])
           .whereType<Map>()
-          .map((item) => _EditableTrailStep.fromDraft(Map<String, dynamic>.from(item)))
+          .map(
+            (item) =>
+                _EditableTrailStep.fromDraft(Map<String, dynamic>.from(item)),
+          )
           .toList();
       if (draftSteps.isEmpty) {
         throw const FormatException('Rascunho sem etapas.');
@@ -1209,13 +1226,13 @@ class _AdminTrailList extends StatelessWidget {
     required this.onPageChanged,
   });
 
-  final PaginatedResponse<Trail> result;
+  final PaginatedResponse<TrailSummary> result;
   final TextEditingController searchController;
   final bool? premiumFilter;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<bool?> onPremiumFilterChanged;
-  final ValueChanged<Trail> onEditTrail;
-  final ValueChanged<Trail>? onDeleteTrail;
+  final ValueChanged<TrailSummary> onEditTrail;
+  final ValueChanged<TrailSummary>? onDeleteTrail;
   final ValueChanged<int> onPageChanged;
 
   @override
@@ -1313,7 +1330,7 @@ class _AdminTrailCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  final Trail trail;
+  final TrailSummary trail;
   final VoidCallback onEdit;
   final VoidCallback? onDelete;
 
@@ -1354,38 +1371,18 @@ class _AdminTrailCard extends StatelessWidget {
                 label: trail.premium ? 'Premium' : 'Essencial',
                 color: trail.premium ? AppColors.accentGold : AppColors.accent,
               ),
-              if (trail.mediaLinks.isNotEmpty)
+              if (trail.stepCount > 0)
                 _AdminStatusBadge(
-                  label: '${trail.mediaLinks.length} midias',
+                  label: '${trail.stepCount} etapas',
                   color: AppColors.accentWarm,
                 ),
-              if (trail.sourceStyle != null && trail.sourceStyle!.isNotEmpty)
+              if (trail.estimatedDurationMinutes > 0)
                 _AdminStatusBadge(
-                  label: trail.sourceStyle!,
+                  label: '${trail.estimatedDurationMinutes} min',
                   color: context.evoluaColors.textSecondary,
                 ),
             ],
           ),
-          if (trail.mediaLinks.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: trail.mediaLinks
-                  .map(
-                    (link) => OutlinedButton.icon(
-                      onPressed: null,
-                      icon: Icon(
-                        link.isYoutube || link.type == 'video'
-                            ? Icons.ondemand_video_rounded
-                            : Icons.link_rounded,
-                      ),
-                      label: Text('${link.label} (${link.type})'),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,

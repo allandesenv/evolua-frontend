@@ -13,6 +13,7 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
@@ -2476,9 +2477,13 @@ class _FakeTrailRepository implements TrailRepository {
 
   @override
   Future<List<TrailJourney>> listInProgressJourneys() async => const [];
+  @override
+  Future<Trail> detail(int id) {
+    throw UnimplementedError();
+  }
 
   @override
-  Future<PaginatedResponse<Trail>> list({
+  Future<PaginatedResponse<TrailSummary>> list({
     required int page,
     required int size,
     String? search,
@@ -2488,8 +2493,8 @@ class _FakeTrailRepository implements TrailRepository {
     bool? premium,
   }) async {
     final items = _currentJourney == null
-        ? const <Trail>[]
-        : <Trail>[_currentJourney];
+        ? const <TrailSummary>[]
+        : <TrailSummary>[TrailSummary.fromTrail(_currentJourney)];
     return PaginatedResponse(
       items: items,
       page: page,

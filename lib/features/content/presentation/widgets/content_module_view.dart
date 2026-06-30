@@ -13,6 +13,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_video_progress.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
@@ -62,7 +63,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   Timer? _searchDebounce;
   String? _searchHelperText;
   bool? _premiumFilter;
-  Trail? _selectedCatalogTrail;
+  int? _selectedCatalogTrailId;
   late ContentModuleSection _section;
   int? _openingInitialTrailId;
   bool _catalogIsCompact = false;
@@ -91,7 +92,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
   void _handleCatalogScroll() {
     if (!mounted ||
         _section != ContentModuleSection.catalog ||
-        _selectedCatalogTrail != null ||
+        _selectedCatalogTrailId != null ||
         !_catalogIsCompact ||
         !_catalogScrollController.hasClients) {
       return;
@@ -110,7 +111,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
         _section = widget.section;
         if (_section == ContentModuleSection.catalog &&
             widget.initialTrailId == null) {
-          _selectedCatalogTrail = null;
+          _selectedCatalogTrailId = null;
         }
       });
     }
@@ -140,7 +141,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
 
       setState(() {
         _section = ContentModuleSection.catalog;
-        _selectedCatalogTrail = journey.trail;
+        _selectedCatalogTrailId = journey.trail.id;
       });
     } catch (_) {
       if (mounted) {
@@ -162,7 +163,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     final effectiveSearch = normalizedSearch.length >= _minimumSearchLength
         ? normalizedSearch
         : '';
-    setState(() => _selectedCatalogTrail = null);
+    setState(() => _selectedCatalogTrailId = null);
     return ref
         .read(trailControllerProvider.notifier)
         .applyFilters(
@@ -195,7 +196,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     final normalizedSearch = _searchController.text.trim();
     setState(() {
       _premiumFilter = value;
-      _selectedCatalogTrail = null;
+      _selectedCatalogTrailId = null;
       _searchHelperText =
           normalizedSearch.isNotEmpty &&
               normalizedSearch.length < _minimumSearchLength
@@ -214,7 +215,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     _searchController.clear();
     setState(() {
       _premiumFilter = null;
-      _selectedCatalogTrail = null;
+      _selectedCatalogTrailId = null;
       _searchHelperText = null;
     });
     _applyFilters(searchOverride: null);
@@ -231,7 +232,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
     setState(() {
       _section = targetSection;
       if (targetSection == ContentModuleSection.catalog) {
-        _selectedCatalogTrail = null;
+        _selectedCatalogTrailId = null;
       }
     });
   }
@@ -275,7 +276,7 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
             effectiveSection == ContentModuleSection.journey;
         final showingCatalogJourney =
             effectiveSection == ContentModuleSection.catalog &&
-            _selectedCatalogTrail != null;
+            _selectedCatalogTrailId != null;
 
         final Widget body = switch ((
           showingActiveJourney,
@@ -294,8 +295,8 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
             loading: () => const SizedBox.shrink(),
           ),
           (_, true) => _CatalogJourneyPanel(
-            trail: _selectedCatalogTrail!,
-            onBack: () => setState(() => _selectedCatalogTrail = null),
+            trailId: _selectedCatalogTrailId!,
+            onBack: () => setState(() => _selectedCatalogTrailId = null),
             onOpenMentor: widget.onOpenMentor,
           ),
           (false, _)
@@ -330,12 +331,12 @@ class _ContentModuleViewState extends ConsumerState<ContentModuleView> {
                       onClearFilters: _clearCatalogFilters,
                       onOpenTrail: (trail) => setState(() {
                         _section = ContentModuleSection.catalog;
-                        _selectedCatalogTrail = trail;
+                        _selectedCatalogTrailId = trail.id;
                       }),
                       onOpenPremium: widget.onOpenPremium,
                       onPageChanged: (page) {
                         _searchDebounce?.cancel();
-                        setState(() => _selectedCatalogTrail = null);
+                        setState(() => _selectedCatalogTrailId = null);
                         ref
                             .read(trailControllerProvider.notifier)
                             .goToPage(page);
@@ -607,12 +608,12 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
 
 class _CatalogJourneyPanel extends ConsumerStatefulWidget {
   const _CatalogJourneyPanel({
-    required this.trail,
+    required this.trailId,
     required this.onBack,
     this.onOpenMentor,
   });
 
-  final Trail trail;
+  final int trailId;
   final VoidCallback onBack;
   final VoidCallback? onOpenMentor;
 
@@ -679,7 +680,7 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final journeyState = ref.watch(trailJourneyProvider(widget.trail.id));
+    final journeyState = ref.watch(trailJourneyProvider(widget.trailId));
 
     return journeyState.when(
       data: (journey) => _VisualJourneyPanel(
@@ -692,7 +693,7 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
       ),
       error: (_, _) => PrimaryPanel(
         child: _ContentErrorState(
-          onRetry: () => ref.invalidate(trailJourneyProvider(widget.trail.id)),
+          onRetry: () => ref.invalidate(trailJourneyProvider(widget.trailId)),
         ),
       ),
       loading: () => const PanelSkeleton(rows: 4, tileHeight: 92),
@@ -2591,11 +2592,9 @@ bool _supportsStepResponse(String type) {
   };
 }
 
-bool _isMentorPremiumTrail(Trail trail) {
+bool _isMentorPremiumTrailSummary(TrailSummary trail) {
   final category = trail.category.trim().toLowerCase();
-  final sourceStyle = trail.sourceStyle?.trim().toLowerCase() ?? '';
-  return trail.premium &&
-      (category == 'mentoria' || sourceStyle == 'mentor_exclusive');
+  return trail.premium && category == 'mentoria';
 }
 
 Color _journeyAccentColor(Trail trail) {
@@ -2817,7 +2816,7 @@ class _TrailExplorer extends ConsumerWidget {
     required this.onLoadMoreRetry,
   });
 
-  final PaginatedResponse<Trail> result;
+  final PaginatedResponse<TrailSummary> result;
   final bool hasPremiumAccess;
   final TextEditingController searchController;
   final bool? premiumFilter;
@@ -2825,7 +2824,7 @@ class _TrailExplorer extends ConsumerWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<bool?> onPremiumFilterChanged;
   final VoidCallback onClearFilters;
-  final ValueChanged<Trail> onOpenTrail;
+  final ValueChanged<TrailSummary> onOpenTrail;
   final VoidCallback? onOpenPremium;
   final ValueChanged<int> onPageChanged;
   final bool showPagination;
@@ -2914,7 +2913,7 @@ class _TrailExplorer extends ConsumerWidget {
                     ? hasPremiumAccess
                     : trail.accessible;
                 final lockedMentorTrail =
-                    _isMentorPremiumTrail(trail) && !hasPremiumAccess;
+                    _isMentorPremiumTrailSummary(trail) && !hasPremiumAccess;
                 final journeyState = effectiveAccessible
                     ? ref.watch(trailJourneyProvider(trail.id))
                     : null;
@@ -2959,10 +2958,15 @@ class _TrailExplorer extends ConsumerWidget {
                                   ? AppColors.accentGold
                                   : AppColors.accent,
                             ),
-                            if (trail.mediaLinks.isNotEmpty)
+                            if (trail.stepCount > 0)
                               _StatusBadge(
-                                label: '${trail.mediaLinks.length} links',
+                                label: '${trail.stepCount} etapas',
                                 color: AppColors.accentWarm,
+                              ),
+                            if (trail.estimatedDurationMinutes > 0)
+                              _StatusBadge(
+                                label: '${trail.estimatedDurationMinutes} min',
+                                color: context.evoluaColors.textSecondary,
                               ),
                             if (journeyState?.hasValue ?? false)
                               _StatusBadge(
@@ -3036,7 +3040,6 @@ class _TrailExplorer extends ConsumerWidget {
                                     : () => _showTrailDetails(
                                         context,
                                         trail,
-                                        accessible: effectiveAccessible,
                                         lockedMentorTrail: lockedMentorTrail,
                                       ),
                                 icon: const Icon(Icons.visibility_rounded),
@@ -3074,8 +3077,7 @@ class _TrailExplorer extends ConsumerWidget {
 
   void _showTrailDetails(
     BuildContext context,
-    Trail trail, {
-    required bool accessible,
+    TrailSummary trail, {
     required bool lockedMentorTrail,
   }) {
     showDialog<void>(
@@ -3120,29 +3122,26 @@ class _TrailExplorer extends ConsumerWidget {
                       const SizedBox(height: 18),
                       Expanded(
                         child: SingleChildScrollView(
-                          child: accessible
-                              ? _UnlockedTrailDetails(trail: trail)
-                              : SoftPremiumPrompt(
-                                  icon: Icons.auto_stories_rounded,
-                                  title: lockedMentorTrail
-                                      ? 'Mentoria disponível no Premium'
-                                      : 'Esta trilha aprofunda sua evolução emocional',
-                                  message: lockedMentorTrail
-                                      ? 'O Mentor Evolua e as trilhas de mentoria ficam no Premium para manter uma experiência profunda, contínua e sem anúncios.'
-                                      : 'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua trilha com mais contexto, sem anúncios e sem pressão.',
-                                  benefit:
-                                      'Premium libera trilhas premium, Espelho da Evolução completo, histórico completo e insights avançados.',
-                                  primaryLabel: 'Aprofundar com Premium',
-                                  secondaryLabel: 'Continuar vendo o resumo',
-                                  onOpenPremium: onOpenPremium == null
-                                      ? null
-                                      : () {
-                                          Navigator.of(context).pop();
-                                          onOpenPremium?.call();
-                                        },
-                                  onSecondary: () =>
-                                      Navigator.of(context).pop(),
-                                ),
+                          child: SoftPremiumPrompt(
+                            icon: Icons.auto_stories_rounded,
+                            title: lockedMentorTrail
+                                ? 'Mentoria disponível no Premium'
+                                : 'Esta trilha aprofunda sua evolução emocional',
+                            message: lockedMentorTrail
+                                ? 'O Mentor Evolua e as trilhas de mentoria ficam no Premium para manter uma experiência profunda, contínua e sem anúncios.'
+                                : 'Você pode visualizar o resumo da trilha agora. O conteúdo completo fica no Premium para apoiar sua trilha com mais contexto, sem anúncios e sem pressão.',
+                            benefit:
+                                'Premium libera trilhas premium, Espelho da Evolução completo, histórico completo e insights avançados.',
+                            primaryLabel: 'Aprofundar com Premium',
+                            secondaryLabel: 'Continuar vendo o resumo',
+                            onOpenPremium: onOpenPremium == null
+                                ? null
+                                : () {
+                                    Navigator.of(context).pop();
+                                    onOpenPremium?.call();
+                                  },
+                            onSecondary: () => Navigator.of(context).pop(),
+                          ),
                         ),
                       ),
                     ],
@@ -3164,7 +3163,7 @@ class _InfiniteTrailFooter extends StatelessWidget {
     required this.onRetry,
   });
 
-  final PaginatedResponse<Trail> result;
+  final PaginatedResponse<TrailSummary> result;
   final TrailCatalogLoadMoreState state;
   final VoidCallback onRetry;
 
@@ -3217,109 +3216,6 @@ class _InfiniteTrailFooter extends StatelessWidget {
     }
 
     return const SizedBox(height: 24);
-  }
-}
-
-class _UnlockedTrailDetails extends StatelessWidget {
-  const _UnlockedTrailDetails({required this.trail});
-
-  final Trail trail;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        MarkdownBody(
-          data: trail.content ?? '',
-          selectable: true,
-          onTapLink: (text, href, title) {
-            if (href != null) {
-              launchUrlString(href);
-            }
-          },
-          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: context.evoluaColors.textPrimary,
-            ),
-            h1: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: context.evoluaColors.textPrimary,
-            ),
-            h2: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: context.evoluaColors.textPrimary,
-            ),
-            listBullet: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: AppColors.accent),
-          ),
-        ),
-        if (trail.mediaLinks.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(
-            'Conteúdos de apoio',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: context.evoluaColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...trail.mediaLinks.map(
-            (link) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: InkWell(
-                onTap: () => launchUrlString(link.url),
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: context.evoluaColors.surfaceStrong.withValues(
-                      alpha: 0.4,
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: context.evoluaColors.outline.withValues(
-                        alpha: 0.4,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        link.isYoutube
-                            ? Icons.ondemand_video_rounded
-                            : Icons.link_rounded,
-                        color: link.isYoutube
-                            ? AppColors.danger
-                            : AppColors.accentWarm,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              link.label,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(
-                                    color: context.evoluaColors.textPrimary,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              link.url,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
   }
 }
 

@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/core/cache/stable_resource_cache.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
-import 'package:evolua_frontend/features/content/data/models/trail_dto.dart';
+import 'package:evolua_frontend/features/content/data/models/trail_summary_dto.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/content/data/repositories/trail_repository_impl.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
@@ -11,6 +13,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_journey.d
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,7 +23,7 @@ final trailRepositoryProvider = Provider<TrailRepository>((ref) {
 });
 
 final trailControllerProvider =
-    AsyncNotifierProvider<TrailController, PaginatedResponse<Trail>>(
+    AsyncNotifierProvider<TrailController, PaginatedResponse<TrailSummary>>(
       TrailController.new,
     );
 
@@ -73,6 +76,22 @@ final trailJourneyProvider = FutureProvider.family<TrailJourney, int>((
 ) async {
   return ref.watch(trailRepositoryProvider).journey(trailId);
 });
+
+typedef TrailDetailKey = ({String userId, int trailId});
+
+final trailDetailProvider = FutureProvider.autoDispose
+    .family<Trail, TrailDetailKey>((ref, key) async {
+      final link = ref.keepAlive();
+      final timer = Timer(const Duration(minutes: 2), link.close);
+      ref.onDispose(() {
+        timer.cancel();
+      });
+      final session = ref.watch(authControllerProvider).asData?.value;
+      if (session == null || session.userId != key.userId) {
+        throw StateError('Sessao invalida para carregar detalhe da trilha.');
+      }
+      return ref.watch(trailRepositoryProvider).detail(key.trailId);
+    });
 
 typedef TrailStepResponseKey = ({String userId, int trailId, int stepIndex});
 
@@ -199,7 +218,7 @@ class TrailJourneyActions {
   }
 }
 
-class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
+class TrailController extends AsyncNotifier<PaginatedResponse<TrailSummary>> {
   static const _pageSize = 4;
   static const _minimumSearchLength = 4;
   String? _search;
@@ -207,7 +226,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
   String? _category;
 
   @override
-  Future<PaginatedResponse<Trail>> build() async {
+  Future<PaginatedResponse<TrailSummary>> build() async {
     return _fetch(page: 0);
   }
 
@@ -265,7 +284,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
 
     try {
       final next = await _fetch(page: current.page + 1);
-      final merged = <int, Trail>{
+      final merged = <int, TrailSummary>{
         for (final trail in current.items) trail.id: trail,
       };
       for (final trail in next.items) {
@@ -352,7 +371,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
     });
   }
 
-  Future<PaginatedResponse<Trail>> _fetch({
+  Future<PaginatedResponse<TrailSummary>> _fetch({
     required int page,
     bool force = false,
   }) async {
@@ -380,6 +399,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
       'size': _pageSize,
       'sortBy': 'createdAt',
       'sortDir': 'desc',
+      'projection': 'summary',
     };
 
     bool sessionStillValid() {
@@ -389,7 +409,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
           ref.read(authSessionGenerationProvider) == generation;
     }
 
-    final catalog = await cache.getOrFetch<PaginatedResponse<Trail>>(
+    final catalog = await cache.getOrFetch<PaginatedResponse<TrailSummary>>(
       resource: StableResource.trailCatalog,
       dio: ref.read(authenticatedDioProvider(AppConfig.contentBaseUrl)),
       path: '/v1/trails',
@@ -407,7 +427,7 @@ class TrailController extends AsyncNotifier<PaginatedResponse<Trail>> {
         }
         return ApiPayloadParser.paginatedData({
           'data': Map<String, dynamic>.from(payload),
-        }, (item) => TrailDto.fromJson(item).toEntity());
+        }, (item) => TrailSummaryDto.fromJson(item).toEntity());
       },
       canWrite: sessionStillValid,
     );

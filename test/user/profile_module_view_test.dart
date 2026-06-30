@@ -16,6 +16,7 @@ import 'package:evolua_frontend/features/care/domain/entities/care_access_status
 import 'package:evolua_frontend/features/care/domain/entities/care_share_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail.dart';
+import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_journey_step.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_media_link.dart';
@@ -3196,9 +3197,13 @@ class _FakeTrailRepository implements TrailRepository {
   final Map<int, List<Trail>>? _trailPages;
   final Map<int, TrailJourney>? _journeys;
   final Object? _inProgressError;
+  @override
+  Future<Trail> detail(int id) {
+    throw UnimplementedError();
+  }
 
   @override
-  Future<PaginatedResponse<Trail>> list({
+  Future<PaginatedResponse<TrailSummary>> list({
     required int page,
     required int size,
     String? search,
@@ -3212,8 +3217,8 @@ class _FakeTrailRepository implements TrailRepository {
         _trails ??
         (_currentJourney == null ? const <Trail>[] : [_currentJourney]);
     final totalPages = _trailPages?.length ?? 1;
-    return PaginatedResponse<Trail>(
-      items: items,
+    return PaginatedResponse<TrailSummary>(
+      items: items.map(TrailSummary.fromTrail).toList(),
       page: page,
       size: size,
       totalItems:
