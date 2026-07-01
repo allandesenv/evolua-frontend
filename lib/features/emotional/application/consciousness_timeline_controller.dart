@@ -3,7 +3,6 @@ import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
 import 'package:evolua_frontend/features/ads/application/monetization_access_controller.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
-import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -88,8 +87,6 @@ class ConsciousnessTimelineState {
 class ConsciousnessTimelineController
     extends AsyncNotifier<ConsciousnessTimelineState> {
   static const int defaultPageSize = 20;
-  static const Duration _unlockRecheckDelay = Duration(milliseconds: 1500);
-  static const Duration _unlockRecheckMaxWait = Duration(seconds: 30);
 
   @override
   Future<ConsciousnessTimelineState> build() => loadInitial();
@@ -172,55 +169,7 @@ class ConsciousnessTimelineController
       return refreshed.fullAccess;
     }
 
-    return _recheckFullAccessIfPending(result, controller, filters);
-  }
-
-  Future<bool> _recheckFullAccessIfPending(
-    RewardedAdResult result,
-    MonetizationAccessController controller,
-    ConsciousnessTimelineFilters filters,
-  ) async {
-    if (result != RewardedAdResult.timeout &&
-        result != RewardedAdResult.rewardConfirmedButAccessDenied) {
-      return false;
-    }
-
-    final deadline = DateTime.now().add(_unlockRecheckMaxWait);
-    var attempt = 0;
-
-    while (DateTime.now().isBefore(deadline)) {
-      if (attempt > 0) {
-        await Future<void>.delayed(_unlockRecheckDelay);
-      }
-      attempt++;
-
-      try {
-        final access = await controller.access(
-          resource: checkInHistoryFullResource,
-        );
-        if (_timelineFullAccessGranted(access)) {
-          final refreshed = await loadInitial(filters: filters);
-          if (refreshed.fullAccess) {
-            return true;
-          }
-        }
-      } catch (error) {
-        debugPrint(
-          'Evolua timeline full unlock recheck failed: '
-          'attempt=$attempt error=$error',
-        );
-      }
-    }
-
-    debugPrint(
-      'Evolua timeline full unlock not confirmed after wait: '
-      'result=${result.name} attempts=$attempt',
-    );
     return false;
-  }
-
-  bool _timelineFullAccessGranted(MonetizationAccessStatus access) {
-    return access.allowed || access.entitlementExpiresAt != null;
   }
 
   Future<void> refreshFull() async {

@@ -203,7 +203,9 @@ class TrailRepositoryImpl implements TrailRepository {
 
   @override
   Future<TrailJourney> journey(int trailId) async {
-    final response = await _dio.get<dynamic>('/v1/trails/$trailId/journey');
+    final response = await _dio.get<dynamic>(
+      '/v1/trails/$trailId/journey/state',
+    );
     return TrailJourneyDto.fromJson(
       ApiPayloadParser.dataMap(response.data),
     ).toEntity();
