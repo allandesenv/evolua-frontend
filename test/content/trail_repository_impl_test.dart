@@ -17,7 +17,7 @@ void main() {
       expect(
         adapter.requests.any(
           (request) =>
-              request.startsWith('/v1/trails?') &&
+              request.startsWith('GET /v1/trails?') &&
               request.contains('projection=summary'),
         ),
         isTrue,
@@ -35,13 +35,45 @@ void main() {
 
     final trail = await repository.detail(7);
 
-    expect(adapter.requests, contains('/v1/trails/7'));
-    expect(adapter.requests, isNot(contains('/v1/trails/7/journey')));
+    expect(adapter.requests, contains('GET /v1/trails/7'));
+    expect(adapter.requests, isNot(contains('GET /v1/trails/7/journey')));
     expect(trail.title, 'Trilha iniciada');
   });
 
+  test(
+    'journey requests read-only state and parses missing progress',
+    () async {
+      final adapter = _TrailAdapter();
+      final dio = Dio()..httpClientAdapter = adapter;
+      final repository = TrailRepositoryImpl(dio);
+
+      final journey = await repository.journey(7);
+
+      expect(adapter.requests, contains('GET /v1/trails/7/journey/state'));
+      expect(adapter.requests, isNot(contains('GET /v1/trails/7/journey')));
+      expect(
+        adapter.requests,
+        isNot(contains('POST /v1/trails/7/journey/start')),
+      );
+      expect(journey.progress, isNull);
+      expect(journey.isStarted, isFalse);
+    },
+  );
+
+  test('startJourney keeps explicit POST endpoint', () async {
+    final adapter = _TrailAdapter(startedProgress: true);
+    final dio = Dio()..httpClientAdapter = adapter;
+    final repository = TrailRepositoryImpl(dio);
+
+    final journey = await repository.startJourney(7);
+
+    expect(adapter.requests, contains('POST /v1/trails/7/journey/start'));
+    expect(journey.progress, isNotNull);
+    expect(journey.isStarted, isTrue);
+  });
+
   test('in-progress journeys falls back to current journey on 404', () async {
-    final dio = Dio()..httpClientAdapter = _TrailAdapter();
+    final dio = Dio()..httpClientAdapter = _TrailAdapter(startedProgress: true);
     final repository = TrailRepositoryImpl(dio);
 
     final journeys = await repository.listInProgressJourneys();
@@ -53,6 +85,9 @@ void main() {
 }
 
 class _TrailAdapter implements HttpClientAdapter {
+  _TrailAdapter({this.startedProgress = false});
+
+  final bool startedProgress;
   final requests = <String>[];
 
   @override
@@ -64,11 +99,10 @@ class _TrailAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    requests.add(
-      options.uri.query.isEmpty
-          ? options.path
-          : '${options.path}?${options.uri.query}',
-    );
+    final requestPath = options.uri.query.isEmpty
+        ? options.path
+        : '${options.path}?${options.uri.query}';
+    requests.add('${options.method} $requestPath');
     if (options.path == '/v1/trails' &&
         options.uri.queryParameters['projection'] == 'summary') {
       return _jsonResponse({
@@ -109,54 +143,62 @@ class _TrailAdapter implements HttpClientAdapter {
     if (options.path == '/v1/trails/journey/current') {
       return _jsonResponse({'data': _trailJson()});
     }
-    if (options.path == '/v1/trails/7/journey') {
-      return _jsonResponse({
-        'data': {
-          'trail': _trailJson(),
-          'steps': [
-            {
-              'index': 0,
-              'title': 'Primeiro passo',
-              'type': 'REFLECTION',
-              'summary': '',
-              'content': '',
-              'status': 'completed',
-              'estimatedMinutes': 5,
-              'mediaLinks': [],
-            },
-            {
-              'index': 1,
-              'title': 'Próximo passo',
-              'type': 'REFLECTION',
-              'summary': '',
-              'content': '',
-              'status': 'current',
-              'estimatedMinutes': 5,
-              'mediaLinks': [],
-            },
-          ],
-          'progress': {
+    if (options.path == '/v1/trails/7/journey/state' ||
+        (options.method == 'POST' &&
+            options.path == '/v1/trails/7/journey/start')) {
+      final withProgress =
+          startedProgress || options.path.endsWith('/journey/start');
+      return _jsonResponse({'data': _journeyJson(withProgress: withProgress)});
+    }
+    return _jsonResponse({'message': 'Unexpected request'}, statusCode: 500);
+  }
+}
+
+Map<String, Object?> _journeyJson({required bool withProgress}) {
+  return {
+    'trail': _trailJson(),
+    'steps': [
+      {
+        'index': 0,
+        'title': 'Primeiro passo',
+        'type': 'REFLECTION',
+        'summary': '',
+        'content': '',
+        'status': withProgress ? 'completed' : 'current',
+        'estimatedMinutes': 5,
+        'mediaLinks': [],
+      },
+      {
+        'index': 1,
+        'title': 'Proximo passo',
+        'type': 'REFLECTION',
+        'summary': '',
+        'content': '',
+        'status': withProgress ? 'current' : 'upcoming',
+        'estimatedMinutes': 5,
+        'mediaLinks': [],
+      },
+    ],
+    'progress': withProgress
+        ? {
             'currentStepIndex': 1,
             'completedStepIndexes': [0],
             'startedAt': '2026-01-01T00:00:00Z',
             'updatedAt': '2026-01-02T00:00:00Z',
-          },
-          'progressPercent': 50,
-          'nextStep': {
-            'index': 1,
-            'title': 'Próximo passo',
-            'type': 'REFLECTION',
-            'summary': '',
-            'content': '',
-            'status': 'current',
-            'estimatedMinutes': 5,
-            'mediaLinks': [],
-          },
-        },
-      });
-    }
-    return _jsonResponse({'message': 'Unexpected request'}, statusCode: 500);
-  }
+          }
+        : null,
+    'progressPercent': withProgress ? 50 : 0,
+    'nextStep': {
+      'index': withProgress ? 1 : 0,
+      'title': withProgress ? 'Proximo passo' : 'Primeiro passo',
+      'type': 'REFLECTION',
+      'summary': '',
+      'content': '',
+      'status': 'current',
+      'estimatedMinutes': 5,
+      'mediaLinks': [],
+    },
+  };
 }
 
 Map<String, Object?> _trailJson() {
