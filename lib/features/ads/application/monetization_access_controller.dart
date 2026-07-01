@@ -100,20 +100,22 @@ class MonetizationAccessController extends AsyncNotifier<void> {
           ? RewardedAdResult.rewarded
           : RewardedAdResult.rewardConfirmedButAccessDenied;
     } catch (error, stackTrace) {
-      if (error is DioException) {
-        debugPrint(
-          'Evolua rewarded unlockWithRewardedAdResult failed: '
-          'resource=$resource result=${result?.name} '
-          'statusCode=${error.response?.statusCode} '
-          'path=${error.requestOptions.path} '
-          'responseData=${_safeDioResponseData(error.response?.data)} '
-          'error=$error',
-        );
-      } else {
-        debugPrint(
-          'Evolua rewarded unlockWithRewardedAdResult failed: '
-          'resource=$resource result=${result?.name} error=$error',
-        );
+      if (kDebugMode) {
+        if (error is DioException) {
+          debugPrint(
+            'Evolua rewarded unlockWithRewardedAdResult failed: '
+            'resource=$resource result=${result?.name} '
+            'statusCode=${error.response?.statusCode} '
+            'path=${error.requestOptions.path} '
+            'errorType=${error.runtimeType}',
+          );
+        } else {
+          debugPrint(
+            'Evolua rewarded unlockWithRewardedAdResult failed: '
+            'resource=$resource result=${result?.name} '
+            'errorType=${error.runtimeType}',
+          );
+        }
       }
       state = AsyncError(error, stackTrace);
       if (result?.isRewarded == true) {
@@ -121,14 +123,5 @@ class MonetizationAccessController extends AsyncNotifier<void> {
       }
       return RewardedAdResult.loadFailed;
     }
-  }
-
-  String _safeDioResponseData(Object? data) {
-    final raw = data?.toString() ?? '<empty>';
-    final singleLine = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (singleLine.length <= 800) {
-      return singleLine;
-    }
-    return '${singleLine.substring(0, 800)}...';
   }
 }

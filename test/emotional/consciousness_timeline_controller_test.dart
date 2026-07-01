@@ -51,71 +51,62 @@ void main() {
     },
   );
 
-  test(
-    'timeout rechecks entitlement without firing another rewarded ad',
-    () async {
-      final adapter = _TimelineAdapter(fullAccessAfterFirstRequest: true);
-      final rewarded = _FakeRewardedAdService(result: RewardedAdResult.timeout);
-      final repository = _FakeSubscriptionRepository(
-        accessStatuses: [_access(allowed: true, entitlement: true)],
-      );
-      final container = _container(
-        adapter: adapter,
-        rewarded: rewarded,
-        repository: repository,
-      );
-      addTearDown(container.dispose);
+  test('timeout ends without second entitlement polling', () async {
+    final adapter = _TimelineAdapter(fullAccessAfterFirstRequest: true);
+    final rewarded = _FakeRewardedAdService(result: RewardedAdResult.timeout);
+    final repository = _FakeSubscriptionRepository(
+      accessStatuses: [_access(allowed: true, entitlement: true)],
+    );
+    final container = _container(
+      adapter: adapter,
+      rewarded: rewarded,
+      repository: repository,
+    );
+    addTearDown(container.dispose);
 
-      await container.read(consciousnessTimelineProvider.future);
+    await container.read(consciousnessTimelineProvider.future);
 
-      final unlocked = await container
-          .read(consciousnessTimelineProvider.notifier)
-          .unlockFullWithReward();
+    final unlocked = await container
+        .read(consciousnessTimelineProvider.notifier)
+        .unlockFullWithReward();
 
-      expect(unlocked, isTrue);
-      expect(rewarded.calls, 1);
-      expect(repository.accessResources, [RewardResources.checkInHistoryFull]);
-      expect(adapter.timelineRequests, 2);
-    },
-  );
+    expect(unlocked, isFalse);
+    expect(rewarded.calls, 1);
+    expect(repository.accessResources, isEmpty);
+    expect(adapter.timelineRequests, 1);
+  });
 
-  test(
-    'timeout waits for delayed entitlement without firing another rewarded ad',
-    () async {
-      final adapter = _TimelineAdapter(fullAccessAfterFirstRequest: true);
-      final rewarded = _FakeRewardedAdService(result: RewardedAdResult.timeout);
-      final repository = _FakeSubscriptionRepository(
-        accessStatuses: [
-          _access(allowed: false),
-          _access(allowed: true, entitlement: true),
-        ],
-      );
-      final container = _container(
-        adapter: adapter,
-        rewarded: rewarded,
-        repository: repository,
-      );
-      addTearDown(container.dispose);
+  test('timeout does not keep polling delayed entitlement', () async {
+    final adapter = _TimelineAdapter(fullAccessAfterFirstRequest: true);
+    final rewarded = _FakeRewardedAdService(result: RewardedAdResult.timeout);
+    final repository = _FakeSubscriptionRepository(
+      accessStatuses: [
+        _access(allowed: false),
+        _access(allowed: true, entitlement: true),
+      ],
+    );
+    final container = _container(
+      adapter: adapter,
+      rewarded: rewarded,
+      repository: repository,
+    );
+    addTearDown(container.dispose);
 
-      await container.read(consciousnessTimelineProvider.future);
+    await container.read(consciousnessTimelineProvider.future);
 
-      final unlocked = await container
-          .read(consciousnessTimelineProvider.notifier)
-          .unlockFullWithReward();
+    final unlocked = await container
+        .read(consciousnessTimelineProvider.notifier)
+        .unlockFullWithReward();
 
-      expect(unlocked, isTrue);
-      expect(rewarded.calls, 1);
-      expect(repository.accessResources, [
-        RewardResources.checkInHistoryFull,
-        RewardResources.checkInHistoryFull,
-      ]);
-      expect(adapter.timelineRequests, 2);
-      expect(
-        container.read(consciousnessTimelineProvider).value?.fullAccess,
-        isTrue,
-      );
-    },
-  );
+    expect(unlocked, isFalse);
+    expect(rewarded.calls, 1);
+    expect(repository.accessResources, isEmpty);
+    expect(adapter.timelineRequests, 1);
+    expect(
+      container.read(consciousnessTimelineProvider).value?.fullAccess,
+      isFalse,
+    );
+  });
 
   test(
     'rewarded result returns false when refreshed timeline is still locked',
@@ -152,7 +143,7 @@ void main() {
   );
 
   test(
-    'reward confirmation pending rechecks entitlement without quota credits',
+    'reward confirmation denied ends without timeline recheck loop',
     () async {
       final adapter = _TimelineAdapter(fullAccessAfterFirstRequest: true);
       final rewarded = _FakeRewardedAdService(
@@ -181,10 +172,10 @@ void main() {
           .read(consciousnessTimelineProvider.notifier)
           .unlockFullWithReward();
 
-      expect(unlocked, isTrue);
+      expect(unlocked, isFalse);
       expect(rewarded.calls, 1);
-      expect(repository.accessResources, [RewardResources.checkInHistoryFull]);
-      expect(adapter.timelineRequests, 2);
+      expect(repository.accessResources, isEmpty);
+      expect(adapter.timelineRequests, 1);
     },
   );
 

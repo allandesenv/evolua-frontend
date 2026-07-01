@@ -427,26 +427,13 @@ class MobileRewardedAdService implements RewardedAdService {
       _ => 'Falha ao carregar rewarded ad.',
     };
     final responseInfo = error.responseInfo;
-    final adapterResponses = responseInfo?.adapterResponses
-        ?.map(
-          (adapter) =>
-              '${adapter.adapterClassName}'
-              '(source=${adapter.adSourceName}, '
-              'latencyMs=${adapter.latencyMillis}, '
-              'error=${adapter.adError})',
-        )
-        .join(' | ');
-
     return 'AdMob rewarded load failed: resource=$rewardType '
         'logicalAdUnit=$logicalAdUnit '
         'adUnitId=${_maskAdUnitId(adUnitId)} '
         'platform=$platform usingTestAds=$usingTestAds '
         'code=${error.code} domain=${error.domain} '
-        'message=${error.message} '
         'responseId=${responseInfo?.responseId} '
         'mediationAdapter=${responseInfo?.mediationAdapterClassName} '
-        'responseExtras=${responseInfo?.responseExtras} '
-        'adapterResponses=$adapterResponses '
         'hint=$hint';
   }
 
@@ -462,8 +449,7 @@ class MobileRewardedAdService implements RewardedAdService {
         'logicalAdUnit=$logicalAdUnit '
         'adUnitId=${_maskAdUnitId(adUnitId)} '
         'platform=$platform usingTestAds=$usingTestAds '
-        'code=${error.code} domain=${error.domain} '
-        'message=${error.message}';
+        'code=${error.code} domain=${error.domain}';
   }
 
   String _platformLabel() {
