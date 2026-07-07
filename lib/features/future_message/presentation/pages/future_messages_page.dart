@@ -58,9 +58,6 @@ class FutureMessagesView extends ConsumerStatefulWidget {
 
 class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   final _bodyController = TextEditingController();
-  final _rememberController = TextEditingController();
-  final _feelingController = TextEditingController();
-  final _hopeController = TextEditingController();
   String _triggerType = 'AFTER_DAYS';
   int _afterDays = 30;
   DateTime? _specificDate;
@@ -76,9 +73,6 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   @override
   void dispose() {
     _bodyController.dispose();
-    _rememberController.dispose();
-    _feelingController.dispose();
-    _hopeController.dispose();
     super.dispose();
   }
 
@@ -112,9 +106,9 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
             FutureMessageDraft(
               title: 'Carta para mim mesmo',
               body: _bodyController.text.trim(),
-              promptRemember: _rememberController.text.trim(),
-              promptFeeling: _feelingController.text.trim(),
-              promptHope: _hopeController.text.trim(),
+              promptRemember: null,
+              promptFeeling: null,
+              promptHope: null,
               triggerType: _triggerType,
               triggerConfig: _triggerConfig(),
             ),
@@ -123,9 +117,6 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
         return;
       }
       _bodyController.clear();
-      _rememberController.clear();
-      _feelingController.clear();
-      _hopeController.clear();
       AppSnackBar.show(
         context,
         message: 'Sua carta foi guardada para o momento certo.',
@@ -204,9 +195,6 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
               ],
               _FutureMessageComposer(
                 bodyController: _bodyController,
-                rememberController: _rememberController,
-                feelingController: _feelingController,
-                hopeController: _hopeController,
                 triggerType: _triggerType,
                 afterDays: _afterDays,
                 specificDate: _specificDate,
@@ -345,9 +333,6 @@ class _FutureMessagesHeader extends StatelessWidget {
 class _FutureMessageComposer extends StatelessWidget {
   const _FutureMessageComposer({
     required this.bodyController,
-    required this.rememberController,
-    required this.feelingController,
-    required this.hopeController,
     required this.triggerType,
     required this.afterDays,
     required this.specificDate,
@@ -359,9 +344,6 @@ class _FutureMessageComposer extends StatelessWidget {
   });
 
   final TextEditingController bodyController;
-  final TextEditingController rememberController;
-  final TextEditingController feelingController;
-  final TextEditingController hopeController;
   final String triggerType;
   final int afterDays;
   final DateTime? specificDate;
@@ -387,21 +369,6 @@ class _FutureMessageComposer extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          _GuidedQuestionField(
-            controller: rememberController,
-            label: 'O que voce gostaria de lembrar no futuro?',
-          ),
-          const SizedBox(height: 12),
-          _GuidedQuestionField(
-            controller: feelingController,
-            label: 'O que voce esta sentindo agora?',
-          ),
-          const SizedBox(height: 12),
-          _GuidedQuestionField(
-            controller: hopeController,
-            label: 'O que voce espera de voce daqui a 30 dias?',
-          ),
-          const SizedBox(height: 14),
           TextField(
             controller: bodyController,
             textCapitalization: TextCapitalization.sentences,
@@ -514,27 +481,6 @@ class _FutureMessageComposer extends StatelessWidget {
     final day = value.day.toString().padLeft(2, '0');
     final month = value.month.toString().padLeft(2, '0');
     return '$day/$month/${value.year}';
-  }
-}
-
-class _GuidedQuestionField extends StatelessWidget {
-  const _GuidedQuestionField({required this.controller, required this.label});
-
-  final TextEditingController controller;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      textCapitalization: TextCapitalization.sentences,
-      maxLines: 2,
-      decoration: InputDecoration(
-        labelText: label,
-        alignLabelWithHint: true,
-        prefixIcon: const Icon(Icons.psychology_alt_rounded),
-      ),
-    );
   }
 }
 

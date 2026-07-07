@@ -62,7 +62,7 @@ void main() {
     },
   );
 
-  testWidgets('future message free text fields capitalize sentences', (
+  testWidgets('future message composer keeps only message text field', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -82,11 +82,50 @@ void main() {
 
     final fields = tester.widgetList<TextField>(find.byType(TextField));
 
-    expect(fields, hasLength(4));
+    expect(fields, hasLength(1));
     expect(
       fields.map((field) => field.textCapitalization),
       everyElement(TextCapitalization.sentences),
     );
+    expect(find.text('Sua mensagem'), findsOneWidget);
+    expect(
+      find.text('O que voce gostaria de lembrar no futuro?'),
+      findsNothing,
+    );
+    expect(find.text('O que voce esta sentindo agora?'), findsNothing);
+    expect(
+      find.text('O que voce espera de voce daqui a 30 dias?'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('creating future message sends only body prompt fields null', (
+    tester,
+  ) async {
+    final repository = _FakeFutureMessageRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          futureMessageRepositoryProvider.overrideWithValue(repository),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+        ],
+        child: const MaterialApp(home: FutureMessagesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Uma carta simples.');
+    await tester.ensureVisible(find.text('Guardar mensagem'));
+    await tester.tap(find.text('Guardar mensagem'));
+    await tester.pumpAndSettle();
+
+    expect(repository.createCalls, 1);
+    expect(repository.lastDraft?.body, 'Uma carta simples.');
+    expect(repository.lastDraft?.promptRemember, isNull);
+    expect(repository.lastDraft?.promptFeeling, isNull);
+    expect(repository.lastDraft?.promptHope, isNull);
   });
 
   testWidgets(
@@ -177,6 +216,8 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
   int listCalls = 0;
   int deliveredCalls = 0;
   int readySummaryCalls = 0;
+  int createCalls = 0;
+  FutureMessageDraft? lastDraft;
 
   @override
   Future<PaginatedResponse<FutureMessage>> delivered({
@@ -211,6 +252,8 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
 
   @override
   Future<FutureMessage> create(FutureMessageDraft draft) async {
+    createCalls += 1;
+    lastDraft = draft;
     return FutureMessage(
       id: 1,
       title: draft.title,
@@ -228,7 +271,7 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
 
   @override
   Future<FutureMessage> get(int id) {
-    throw UnimplementedError();
+    return Future.value(_scheduledMessage(id));
   }
 
   @override

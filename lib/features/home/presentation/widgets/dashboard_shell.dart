@@ -81,14 +81,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void initState() {
     super.initState();
-    final initialProfileSection = widget.initialProfileSection;
-    if (initialProfileSection != null) {
-      _profileSection = initialProfileSection;
-      _selectedIndex =
-          initialProfileSection == ProfileModuleSection.evolutionMirror
-          ? _mirrorIndex
-          : _profileIndex;
-    }
+    _applyInitialProfileSection(widget.initialProfileSection);
     _reminderTapSubscription = ref.listenManual(
       dailyCheckInReminderTapProvider,
       (previous, next) {
@@ -133,6 +126,24 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         });
       },
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant DashboardShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialProfileSection != widget.initialProfileSection) {
+      _applyInitialProfileSection(widget.initialProfileSection);
+    }
+  }
+
+  void _applyInitialProfileSection(ProfileModuleSection? section) {
+    if (section == null) {
+      return;
+    }
+    _profileSection = section;
+    _selectedIndex = section == ProfileModuleSection.evolutionMirror
+        ? _mirrorIndex
+        : _profileIndex;
   }
 
   @override
