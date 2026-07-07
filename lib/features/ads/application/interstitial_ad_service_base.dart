@@ -7,6 +7,8 @@ enum InterstitialTrigger {
   trailCompletion(AdPlacementContext.trailCompletion),
   readingSavedExit(AdPlacementContext.readingSavedExit),
   ritualCompletedExit(AdPlacementContext.ritualCompletedExit),
+  futureMessageScheduledExit(AdPlacementContext.futureMessageScheduledExit),
+  futureMessageReadExit(AdPlacementContext.futureMessageReadExit),
   timelineExit(AdPlacementContext.timelineExit),
   readingVariationMilestone(AdPlacementContext.readingVariationMilestone);
 
@@ -22,6 +24,8 @@ class InterstitialPlacementConfig {
     return switch (trigger) {
       InterstitialTrigger.ritualCompletedExit => true,
       InterstitialTrigger.trailCompletion => true,
+      InterstitialTrigger.futureMessageScheduledExit => true,
+      InterstitialTrigger.futureMessageReadExit => true,
       InterstitialTrigger.readingSavedExit => false,
       InterstitialTrigger.timelineExit => false,
       InterstitialTrigger.readingVariationMilestone => false,

@@ -2,6 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/presentation/future_message_delivery_label.dart';
@@ -63,6 +66,7 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   DateTime? _specificDate;
   int? _selectedMessageId;
   bool _isSubmitting = false;
+  final Set<int> _readExitInterstitialMessageIds = {};
 
   @override
   void initState() {
@@ -123,6 +127,9 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
         icon: Icons.mark_email_read_rounded,
       );
       setState(() => _selectedMessageId = created.id);
+      await _maybeShowFutureMessageInterstitial(
+        InterstitialTrigger.futureMessageScheduledExit,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -189,7 +196,8 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
               if (_selectedMessageId != null) ...[
                 _FutureMessageDetailPanel(
                   messageId: _selectedMessageId!,
-                  onClose: () => setState(() => _selectedMessageId = null),
+                  onClose: _closeSelectedMessage,
+                  onMarkedRead: _handleMessageMarkedRead,
                 ),
                 const SizedBox(height: 16),
               ],
@@ -275,6 +283,43 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
       return;
     }
     context.go('/home?profileSection=plans');
+  }
+
+  Future<void> _closeSelectedMessage(FutureMessage message) async {
+    if (mounted) {
+      setState(() => _selectedMessageId = null);
+    }
+    if (message.isDelivered) {
+      await _maybeShowReadExitInterstitial(message.id);
+    }
+  }
+
+  Future<void> _handleMessageMarkedRead(FutureMessage message) {
+    return _maybeShowReadExitInterstitial(message.id);
+  }
+
+  Future<void> _maybeShowReadExitInterstitial(int messageId) async {
+    if (!_readExitInterstitialMessageIds.add(messageId)) {
+      return;
+    }
+    await _maybeShowFutureMessageInterstitial(
+      InterstitialTrigger.futureMessageReadExit,
+    );
+  }
+
+  Future<void> _maybeShowFutureMessageInterstitial(
+    InterstitialTrigger trigger,
+  ) async {
+    final session = () {
+      try {
+        return ref.read(authControllerProvider).asData?.value;
+      } catch (_) {
+        return null;
+      }
+    }();
+    await ref
+        .read(interstitialAdServiceProvider)
+        .maybeShow(trigger: trigger, session: session);
   }
 
   String _friendlyError(Object error) {
@@ -601,10 +646,12 @@ class _FutureMessageDetailPanel extends ConsumerWidget {
   const _FutureMessageDetailPanel({
     required this.messageId,
     required this.onClose,
+    required this.onMarkedRead,
   });
 
   final int messageId;
-  final VoidCallback onClose;
+  final Future<void> Function(FutureMessage message) onClose;
+  final Future<void> Function(FutureMessage message) onMarkedRead;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -629,7 +676,7 @@ class _FutureMessageDetailPanel extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: onClose,
+                    onPressed: () => onClose(message),
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],
@@ -680,9 +727,12 @@ class _FutureMessageDetailPanel extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
                   child: TextButton.icon(
-                    onPressed: () => ref
-                        .read(futureMessageControllerProvider.notifier)
-                        .markRead(message.id),
+                    onPressed: () async {
+                      final updated = await ref
+                          .read(futureMessageControllerProvider.notifier)
+                          .markRead(message.id);
+                      await onMarkedRead(updated);
+                    },
                     icon: const Icon(Icons.done_all_rounded),
                     label: const Text('Marcar como lida'),
                   ),

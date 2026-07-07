@@ -66,6 +66,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   ProviderSubscription<int>? _careRecommendationSubscription;
   String? _startupWarmupUserId;
   String? _interstitialPreloadUserId;
+  DateTime? _interstitialPreloadAttemptedAt;
   VoidCallback? _spacesInternalBackAction;
   bool _resendingEmailVerification = false;
   bool _refreshingEmailVerification = false;
@@ -77,6 +78,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   static const _profileIndex = 4;
   static const _mentorIndex = 5;
   static const _adminIndex = 6;
+  static const _interstitialPreloadThrottle = Duration(minutes: 2);
 
   @override
   void initState() {
@@ -1045,12 +1047,18 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   }
 
   void _preloadInterstitialForFreeUser(AuthSession? session) {
-    if (session == null ||
-        session.isPremium ||
-        _interstitialPreloadUserId == session.userId) {
+    if (session == null || session.isPremium) {
+      return;
+    }
+    final now = DateTime.now();
+    final lastAttempt = _interstitialPreloadAttemptedAt;
+    if (_interstitialPreloadUserId == session.userId &&
+        lastAttempt != null &&
+        now.difference(lastAttempt) < _interstitialPreloadThrottle) {
       return;
     }
     _interstitialPreloadUserId = session.userId;
+    _interstitialPreloadAttemptedAt = now;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;

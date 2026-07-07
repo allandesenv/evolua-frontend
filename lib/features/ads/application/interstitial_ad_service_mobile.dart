@@ -61,7 +61,7 @@ class MobileInterstitialAdService implements InterstitialAdService {
           _ad = null;
           debugInterstitial(
             'failedToLoad code=${error.code} domain=${error.domain} '
-            'message=${error.message} responseInfo=${error.responseInfo}',
+            'message=${error.message}',
           );
         },
       ),
@@ -83,7 +83,7 @@ class MobileInterstitialAdService implements InterstitialAdService {
       return false;
     }
     if (isAdFreeSession(currentSession)) {
-      debugInterstitial('skippedForPremium');
+      debugInterstitial('skippedForPremium trigger=${trigger.name}');
       return false;
     }
     if (!InterstitialPlacementConfig.isEnabled(trigger)) {
@@ -107,13 +107,15 @@ class MobileInterstitialAdService implements InterstitialAdService {
       now: DateTime.now(),
     );
     if (!decision.allowed) {
-      debugInterstitial('skippedByCooldown reason=${decision.reason}');
+      debugInterstitial(
+        'skippedByCooldown trigger=${trigger.name} reason=${decision.reason}',
+      );
       return false;
     }
 
     final readyAd = _ad;
     if (readyAd == null || _isShowing) {
-      debugInterstitial('skippedNoAdReady');
+      debugInterstitial('skippedNoAdReady trigger=${trigger.name}');
       unawaited(preload());
       return false;
     }
@@ -124,10 +126,10 @@ class MobileInterstitialAdService implements InterstitialAdService {
 
     readyAd.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
-        debugInterstitial('shown');
+        debugInterstitial('shown trigger=${trigger.name}');
       },
       onAdDismissedFullScreenContent: (ad) {
-        debugInterstitial('dismissed');
+        debugInterstitial('dismissed trigger=${trigger.name}');
         ad.dispose();
         if (!completer.isCompleted) {
           completer.complete(true);

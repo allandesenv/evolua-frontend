@@ -42,7 +42,7 @@ void main() {
     expect(adUnitId, 'ca-app-pub-3940256099942544/4411468910');
   });
 
-  test('policy allows interstitial only in v1 completion exits', () {
+  test('policy allows interstitial only in explicit safe exits', () {
     expect(
       InterstitialPlacementConfig.isEnabled(
         InterstitialTrigger.ritualCompletedExit,
@@ -60,6 +60,18 @@ void main() {
         InterstitialTrigger.readingSavedExit,
       ),
       isFalse,
+    );
+    expect(
+      InterstitialPlacementConfig.isEnabled(
+        InterstitialTrigger.futureMessageScheduledExit,
+      ),
+      isTrue,
+    );
+    expect(
+      InterstitialPlacementConfig.isEnabled(
+        InterstitialTrigger.futureMessageReadExit,
+      ),
+      isTrue,
     );
     expect(
       InterstitialPlacementConfig.isEnabled(
@@ -90,6 +102,33 @@ void main() {
       AdPlacementPolicy.canShow(
         format: AdFormat.interstitial,
         context: AdPlacementContext.readingSavedExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.futureMessageScheduledExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.futureMessageReadExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.futureMessages,
         premium: false,
         interstitialEnabled: true,
       ),
