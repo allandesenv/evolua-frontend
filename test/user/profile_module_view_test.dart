@@ -1757,6 +1757,42 @@ void main() {
     expect(find.text('Quero ler'), findsOneWidget);
   });
 
+  testWidgets('mirror previous-self card hides technical trigger labels', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+
+    await _pumpEvolutionMirror(
+      tester,
+      premium: true,
+      checkInRepository: _FakeCheckInRepository(items: _evolutionCheckIns()),
+      futureMessageRepository: _FakeFutureMessageRepository(
+        deliveredItems: [
+          FutureMessage(
+            id: 89,
+            title: 'Carta para mim mesmo',
+            body: 'Texto',
+            bodyPreview: '',
+            triggerType: 'SPECIFIC_DATE',
+            triggerConfig: const {'date': '2026-07-07'},
+            triggerLabel: 'SPECIFIC_DATE',
+            status: 'DELIVERED',
+            createdContext: const {'mood': 'calma', 'energyLevel': 7},
+            deliveredContext: const {'mood': 'presenca', 'energyLevel': 8},
+            createdAt: DateTime(2026, 6, 1),
+            scheduledFor: DateTime.utc(2026, 7, 7),
+            deliveredAt: DateTime(2026, 7, 7),
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('Entrega em 07/07/2026'), findsOneWidget);
+    expect(find.text('SPECIFIC_DATE'), findsNothing);
+  });
+
   testWidgets('renders evolution mirror milestones with rich progress data', (
     tester,
   ) async {
