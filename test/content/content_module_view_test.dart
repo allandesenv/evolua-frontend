@@ -672,6 +672,51 @@ void main() {
       expect(trailRepository.savedResponses, isEmpty);
     });
 
+    testWidgets(
+      'journey renders completed step immediately from action result',
+      (tester) async {
+        await _setCompactSurface(tester);
+        final trailRepository = _FakeTrailRepository(
+          completeStepJourneyBuilder: _journeyAfterFirstStep,
+        );
+
+        await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+        await tester.pumpAndSettle();
+
+        expect(find.text('0% da trilha'), findsOneWidget);
+        expect(find.text('50% da trilha'), findsNothing);
+
+        await tester.ensureVisible(find.text('Concluir etapa atual'));
+        await tester.tap(find.text('Concluir etapa atual'));
+        await tester.pumpAndSettle();
+
+        expect(trailRepository.completeStepCallCount, 1);
+        expect(find.text('50% da trilha'), findsOneWidget);
+        expect(find.text('1/2 etapas'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'unchanged step completion result keeps current visual journey',
+      (tester) async {
+        await _setCompactSurface(tester);
+        final trailRepository = _FakeTrailRepository();
+
+        await tester.pumpWidget(_testApp(trailRepository: trailRepository));
+        await tester.pumpAndSettle();
+
+        expect(find.text('0% da trilha'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Concluir etapa atual'));
+        await tester.tap(find.text('Concluir etapa atual'));
+        await tester.pumpAndSettle();
+
+        expect(trailRepository.completeStepCallCount, 1);
+        expect(find.text('0% da trilha'), findsOneWidget);
+        expect(find.text('50% da trilha'), findsNothing);
+      },
+    );
+
     testWidgets('step completion snackbar names released next step', (
       tester,
     ) async {
