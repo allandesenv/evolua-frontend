@@ -15,6 +15,7 @@ import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/presentation/future_message_delivery_label.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/features/subscription/presentation/widgets/subscription_module_view.dart';
 import 'package:evolua_frontend/features/user/application/accessibility_preferences_controller.dart';
@@ -2908,11 +2909,11 @@ class _FutureMessageTimelineCard extends StatelessWidget {
             label: message.isDelivered ? 'Quando chegou' : 'Entrega',
             value: message.isDelivered
                 ? _contextLabel(deliveredMood, deliveredEnergy)
-                : message.triggerLabel,
+                : futureMessageDeliveryLabel(message),
           ),
           Text(
             message.bodyPreview.isEmpty
-                ? message.triggerLabel
+                ? futureMessageDeliveryLabel(message)
                 : message.bodyPreview,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,

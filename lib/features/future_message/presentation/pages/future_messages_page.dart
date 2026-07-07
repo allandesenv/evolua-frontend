@@ -4,6 +4,7 @@ import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
+import 'package:evolua_frontend/features/future_message/presentation/future_message_delivery_label.dart';
 import 'package:evolua_frontend/features/ads/presentation/widgets/monetization_prompt.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -14,9 +15,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class FutureMessagesPage extends StatelessWidget {
-  const FutureMessagesPage({super.key, this.initialMessageId});
+  const FutureMessagesPage({
+    super.key,
+    this.initialMessageId,
+    this.onOpenPremium,
+  });
 
   final int? initialMessageId;
+  final VoidCallback? onOpenPremium;
 
   @override
   Widget build(BuildContext context) {
@@ -27,16 +33,24 @@ class FutureMessagesPage extends StatelessWidget {
           horizontal: ResponsiveBreakpoints.pagePadding(context),
           vertical: 16,
         ),
-        child: FutureMessagesView(initialMessageId: initialMessageId),
+        child: FutureMessagesView(
+          initialMessageId: initialMessageId,
+          onOpenPremium: onOpenPremium,
+        ),
       ),
     );
   }
 }
 
 class FutureMessagesView extends ConsumerStatefulWidget {
-  const FutureMessagesView({super.key, this.initialMessageId});
+  const FutureMessagesView({
+    super.key,
+    this.initialMessageId,
+    this.onOpenPremium,
+  });
 
   final int? initialMessageId;
+  final VoidCallback? onOpenPremium;
 
   @override
   ConsumerState<FutureMessagesView> createState() => _FutureMessagesViewState();
@@ -212,16 +226,16 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
                   if (subscription?.premium == true || activeCount < 3) {
                     return const SizedBox.shrink();
                   }
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 16),
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
                     child: SoftPremiumPrompt(
                       title: 'Cartas ilimitadas no Premium',
                       message:
                           'Você já tem 3 cartas ativas no plano gratuito. Suas cartas continuam guardadas e serão entregues no momento certo.',
                       benefit:
                           'Premium libera cartas ilimitadas para você conversar com versões futuras de si mesmo sem apagar nada.',
-                      onOpenPremium: null,
-                      primaryLabel: 'Ver Premium no menu do perfil',
+                      onOpenPremium: _openPremium,
+                      primaryLabel: 'Assinar Premium',
                     ),
                   );
                 },
@@ -264,6 +278,15 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
     final month = value.month.toString().padLeft(2, '0');
     final day = value.day.toString().padLeft(2, '0');
     return '${value.year}-$month-$day';
+  }
+
+  void _openPremium() {
+    final callback = widget.onOpenPremium;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    context.go('/home?profileSection=plans');
   }
 
   String _friendlyError(Object error) {
@@ -609,7 +632,7 @@ class _MessageListPanel extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                item.triggerLabel,
+                                futureMessageDeliveryLabel(item),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
@@ -760,7 +783,7 @@ class _TimelineLine extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             message.deliveredAt == null
-                ? 'Entrega: ${message.triggerLabel}.'
+                ? 'Entrega: ${futureMessageDeliveryLabel(message)}.'
                 : 'Hoje: ${deliveredMood == null || deliveredMood.isEmpty ? 'novo contexto emocional' : deliveredMood}.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),

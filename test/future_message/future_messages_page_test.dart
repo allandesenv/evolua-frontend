@@ -3,6 +3,7 @@ import 'package:evolua_frontend/features/future_message/application/future_messa
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
 import 'package:evolua_frontend/features/future_message/domain/repositories/future_message_repository.dart';
+import 'package:evolua_frontend/features/future_message/presentation/future_message_delivery_label.dart';
 import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/subscription/application/subscription_controller.dart';
 import 'package:evolua_frontend/features/subscription/domain/entities/subscription_record.dart';
@@ -12,6 +13,55 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'delivery label preserves specific local date and hides internal enums',
+    () {
+      final label = futureMessageDeliveryLabel(
+        FutureMessage(
+          id: 1,
+          title: 'Carta',
+          body: 'Texto',
+          bodyPreview: 'Texto',
+          triggerType: 'SPECIFIC_DATE',
+          triggerConfig: const {'date': '2026-07-07'},
+          triggerLabel: 'SPECIFIC_DATE',
+          status: 'SCHEDULED',
+          createdContext: const {},
+          deliveredContext: const {},
+          createdAt: DateTime(2026, 6, 1),
+          scheduledFor: DateTime.utc(2026, 7, 7),
+        ),
+      );
+
+      expect(label, 'Entrega em 07/07/2026');
+      expect(label, isNot(contains('SPECIFIC_DATE')));
+    },
+  );
+
+  test(
+    'delivery label falls back without exposing unsupported after-days enum',
+    () {
+      final label = futureMessageDeliveryLabel(
+        FutureMessage(
+          id: 1,
+          title: 'Carta',
+          body: 'Texto',
+          bodyPreview: 'Texto',
+          triggerType: 'AFTER_DAYS',
+          triggerConfig: const {'days': 2},
+          triggerLabel: 'AFTER_DAYS',
+          status: 'SCHEDULED',
+          createdContext: const {},
+          deliveredContext: const {},
+          createdAt: DateTime(2026, 6, 1),
+        ),
+      );
+
+      expect(label, 'Entrega programada');
+      expect(label, isNot(contains('AFTER_DAYS')));
+    },
+  );
+
   testWidgets('future message free text fields capitalize sentences', (
     tester,
   ) async {
@@ -38,14 +88,102 @@ void main() {
       everyElement(TextCapitalization.sentences),
     );
   });
+
+  testWidgets(
+    'scheduled list renders friendly delivery label without extra calls',
+    (tester) async {
+      final repository = _FakeFutureMessageRepository(
+        listItems: [
+          FutureMessage(
+            id: 7,
+            title: 'Carta para mim mesmo',
+            body: 'Texto',
+            bodyPreview: 'Texto',
+            triggerType: 'SPECIFIC_DATE',
+            triggerConfig: const {'date': '2026-07-07'},
+            triggerLabel: 'SPECIFIC_DATE',
+            status: 'SCHEDULED',
+            createdContext: const {},
+            deliveredContext: const {},
+            createdAt: DateTime(2026, 6, 1),
+            scheduledFor: DateTime.utc(2026, 7, 7),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            futureMessageRepositoryProvider.overrideWithValue(repository),
+            subscriptionRepositoryProvider.overrideWithValue(
+              _FakeSubscriptionRepository(),
+            ),
+          ],
+          child: const MaterialApp(home: FutureMessagesPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entrega em 07/07/2026'), findsOneWidget);
+      expect(find.text('SPECIFIC_DATE'), findsNothing);
+      expect(repository.listCalls, 1);
+      expect(repository.deliveredCalls, 1);
+      expect(repository.readySummaryCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'premium prompt exposes subscribe action without extra requests',
+    (tester) async {
+      var openedPremium = false;
+      final repository = _FakeFutureMessageRepository(
+        listItems: [
+          _scheduledMessage(1),
+          _scheduledMessage(2),
+          _scheduledMessage(3),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            futureMessageRepositoryProvider.overrideWithValue(repository),
+            subscriptionRepositoryProvider.overrideWithValue(
+              _FakeSubscriptionRepository(),
+            ),
+          ],
+          child: MaterialApp(
+            home: FutureMessagesPage(onOpenPremium: () => openedPremium = true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assinar Premium'), findsOneWidget);
+      await tester.ensureVisible(find.text('Assinar Premium'));
+      await tester.tap(find.text('Assinar Premium'));
+      await tester.pump();
+
+      expect(openedPremium, isTrue);
+      expect(repository.listCalls, 1);
+      expect(repository.deliveredCalls, 1);
+      expect(repository.readySummaryCalls, 0);
+    },
+  );
 }
 
 class _FakeFutureMessageRepository implements FutureMessageRepository {
+  _FakeFutureMessageRepository({this.listItems = const []});
+
+  final List<FutureMessage> listItems;
+  int listCalls = 0;
+  int deliveredCalls = 0;
+  int readySummaryCalls = 0;
+
   @override
   Future<PaginatedResponse<FutureMessage>> delivered({
     required int page,
     required int size,
   }) async {
+    deliveredCalls += 1;
     return PaginatedResponse.empty(page: page, size: size);
   }
 
@@ -55,11 +193,16 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
     required int size,
     List<String>? statuses,
   }) async {
-    return PaginatedResponse.empty(page: page, size: size);
+    listCalls += 1;
+    return PaginatedResponse<FutureMessage>.empty(
+      page: page,
+      size: size,
+    ).copyWith(items: listItems);
   }
 
   @override
   Future<FutureMessageReadySummary> readySummary() async {
+    readySummaryCalls += 1;
     return const FutureMessageReadySummary.empty();
   }
 
@@ -97,6 +240,23 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
   Future<FutureMessage> react(int id, String reaction) {
     throw UnimplementedError();
   }
+}
+
+FutureMessage _scheduledMessage(int id) {
+  return FutureMessage(
+    id: id,
+    title: 'Carta $id',
+    body: 'Texto',
+    bodyPreview: 'Texto',
+    triggerType: 'AFTER_DAYS',
+    triggerConfig: const {'days': 30},
+    triggerLabel: 'AFTER_DAYS',
+    status: 'SCHEDULED',
+    createdContext: const {},
+    deliveredContext: const {},
+    createdAt: DateTime(2026, 6, 1),
+    scheduledFor: DateTime(2026, 7, 1),
+  );
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {
