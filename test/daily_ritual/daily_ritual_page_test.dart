@@ -27,6 +27,9 @@ void main() {
     await tester.tap(find.text('Começar agora'));
     await tester.pumpAndSettle();
 
+    expect(interstitial.calls, ['preload']);
+    expect(interstitial.maybeShowCalls, 0);
+
     expect(
       tester.widget<TextField>(find.byType(TextField)).textCapitalization,
       TextCapitalization.sentences,
@@ -47,15 +50,15 @@ void main() {
     expect(find.text('calmo'), findsOneWidget);
     expect(find.text('clareza'), findsOneWidget);
     expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
-    expect(interstitial.preloadCalls, 1);
+    expect(interstitial.preloadCalls, 2);
     expect(interstitial.maybeShowCalls, 0);
 
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(interstitial.preloadCalls, 1);
+    expect(interstitial.preloadCalls, 2);
     expect(find.text('pausar antes de reagir'), findsOneWidget);
-    expect(interstitial.preloadCalls, 1);
+    expect(interstitial.preloadCalls, 2);
     expect(interstitial.maybeShowCalls, 0);
   });
 

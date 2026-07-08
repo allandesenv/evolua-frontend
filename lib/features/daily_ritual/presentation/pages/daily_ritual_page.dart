@@ -64,6 +64,7 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
   final _answers = List.generate(4, (_) => TextEditingController());
   int _step = -1;
   bool _isSubmitting = false;
+  bool _hasPreloadedInterstitialForManualFlow = false;
 
   bool get _isEvening => widget.type == DailyRitualType.evening;
 
@@ -115,6 +116,19 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
       message: 'Escreva sua resposta antes de continuar.',
       icon: Icons.edit_note_rounded,
     );
+  }
+
+  void _preloadInterstitialForManualFlow() {
+    if (_hasPreloadedInterstitialForManualFlow) {
+      return;
+    }
+    _hasPreloadedInterstitialForManualFlow = true;
+    unawaited(ref.read(interstitialAdServiceProvider).preload());
+  }
+
+  void _startManualFlow() {
+    _preloadInterstitialForManualFlow();
+    setState(() => _step = 0);
   }
 
   Future<void> _nextStep(AppLocalizations l10n) async {
@@ -184,7 +198,7 @@ class _DailyRitualViewState extends ConsumerState<DailyRitualView> {
           return _DailyRitualIntro(
             copy: copy,
             l10n: l10n,
-            onStart: () => setState(() => _step = 0),
+            onStart: _startManualFlow,
             onSkip: () => context.go('/home'),
           );
         }
