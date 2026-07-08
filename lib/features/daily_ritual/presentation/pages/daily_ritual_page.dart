@@ -377,14 +377,25 @@ class _DailyRitualFlow extends StatelessWidget {
   }
 }
 
-class _DailyRitualResult extends ConsumerWidget {
+class _DailyRitualResult extends ConsumerStatefulWidget {
   const _DailyRitualResult({required this.copy, required this.ritual});
 
   final _DailyRitualCopy copy;
   final DailyRitual ritual;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DailyRitualResult> createState() => _DailyRitualResultState();
+}
+
+class _DailyRitualResultState extends ConsumerState<_DailyRitualResult> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ref.read(interstitialAdServiceProvider).preload());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     return PrimaryPanel(
       padding: const EdgeInsets.all(24),
@@ -392,7 +403,7 @@ class _DailyRitualResult extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            copy.resultTitle,
+            widget.copy.resultTitle,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: context.evoluaColors.textPrimary,
               fontWeight: FontWeight.w900,
@@ -400,22 +411,25 @@ class _DailyRitualResult extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _RitualIntentionHighlight(
-            title: copy.resultCarryTitle,
-            intention: ritual.intention,
+            title: widget.copy.resultCarryTitle,
+            intention: widget.ritual.intention,
           ),
           const SizedBox(height: 16),
           _ResultRow(
             label: l10n.dailyRitualEmotionalState,
-            value: ritual.emotionalState,
+            value: widget.ritual.emotionalState,
           ),
-          _ResultRow(label: l10n.dailyRitualDayNeed, value: ritual.dayNeed),
+          _ResultRow(
+            label: l10n.dailyRitualDayNeed,
+            value: widget.ritual.dayNeed,
+          ),
           _ResultRow(
             label: l10n.dailyRitualChosenIntention,
-            value: ritual.intention,
+            value: widget.ritual.intention,
           ),
           _ResultRow(
             label: l10n.dailyRitualChosenMicroAction,
-            value: ritual.microAction,
+            value: widget.ritual.microAction,
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
