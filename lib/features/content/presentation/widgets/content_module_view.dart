@@ -529,6 +529,31 @@ class _CurrentJourneyPanel extends ConsumerStatefulWidget {
 
 class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
   bool _isActing = false;
+  TrailJourney? _optimisticJourney;
+  bool _hasPreloadedInterstitialForCompletion = false;
+
+  @override
+  void didUpdateWidget(covariant _CurrentJourneyPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.trail.id != widget.trail.id) {
+      _optimisticJourney = null;
+      _hasPreloadedInterstitialForCompletion = false;
+    }
+  }
+
+  void _preloadInterstitialForCompletion(TrailJourney journey) {
+    if (_hasPreloadedInterstitialForCompletion ||
+        !_shouldPreloadInterstitialForJourneyCompletion(journey)) {
+      return;
+    }
+    _hasPreloadedInterstitialForCompletion = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(ref.read(interstitialAdServiceProvider).preload());
+    });
+  }
 
   Future<void> _runJourneyAction(TrailJourney journey) async {
     if (_isActing) {
@@ -544,13 +569,19 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
     try {
       final actions = ref.read(trailJourneyActionProvider);
       if (!journey.isStarted) {
-        await actions.start(journey.trail.id);
+        final updatedJourney = await actions.start(journey.trail.id);
+        if (mounted) {
+          setState(() => _optimisticJourney = updatedJourney);
+        }
       } else if (journey.nextStep != null &&
           !_isJourneyEffectivelyCompleted(journey)) {
         final updatedJourney = await actions.completeStep(
           journey.trail.id,
           journey.nextStep!.index,
         );
+        if (mounted) {
+          setState(() => _optimisticJourney = updatedJourney);
+        }
         if (_isJourneyEffectivelyCompleted(updatedJourney)) {
           await ref
               .read(interstitialAdServiceProvider)
@@ -589,13 +620,20 @@ class _CurrentJourneyPanelState extends ConsumerState<_CurrentJourneyPanel> {
     final journeyState = ref.watch(trailJourneyProvider(widget.trail.id));
 
     return journeyState.when(
-      data: (journey) => _VisualJourneyPanel(
-        journey: journey,
-        isActing: _isActing,
-        onOpenCatalog: widget.onOpenCatalog,
-        onOpenMentor: widget.onOpenMentor,
-        onPrimaryAction: () => _runJourneyAction(journey),
-      ),
+      data: (journey) {
+        final visibleJourney = _visibleJourneyForProvider(
+          providerJourney: journey,
+          optimisticJourney: _optimisticJourney,
+        );
+        _preloadInterstitialForCompletion(visibleJourney);
+        return _VisualJourneyPanel(
+          journey: visibleJourney,
+          isActing: _isActing,
+          onOpenCatalog: widget.onOpenCatalog,
+          onOpenMentor: widget.onOpenMentor,
+          onPrimaryAction: () => _runJourneyAction(visibleJourney),
+        );
+      },
       error: (_, _) => PrimaryPanel(
         child: _ContentErrorState(
           onRetry: () => ref.invalidate(trailJourneyProvider(widget.trail.id)),
@@ -624,6 +662,31 @@ class _CatalogJourneyPanel extends ConsumerStatefulWidget {
 
 class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
   bool _isActing = false;
+  TrailJourney? _optimisticJourney;
+  bool _hasPreloadedInterstitialForCompletion = false;
+
+  @override
+  void didUpdateWidget(covariant _CatalogJourneyPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.trailId != widget.trailId) {
+      _optimisticJourney = null;
+      _hasPreloadedInterstitialForCompletion = false;
+    }
+  }
+
+  void _preloadInterstitialForCompletion(TrailJourney journey) {
+    if (_hasPreloadedInterstitialForCompletion ||
+        !_shouldPreloadInterstitialForJourneyCompletion(journey)) {
+      return;
+    }
+    _hasPreloadedInterstitialForCompletion = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(ref.read(interstitialAdServiceProvider).preload());
+    });
+  }
 
   Future<void> _runJourneyAction(TrailJourney journey) async {
     if (_isActing) {
@@ -639,12 +702,18 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
     try {
       final actions = ref.read(trailJourneyActionProvider);
       if (!journey.isStarted) {
-        await actions.start(journey.trail.id);
+        final updatedJourney = await actions.start(journey.trail.id);
+        if (mounted) {
+          setState(() => _optimisticJourney = updatedJourney);
+        }
       } else if (journey.nextStep != null) {
         final updatedJourney = await actions.completeStep(
           journey.trail.id,
           journey.nextStep!.index,
         );
+        if (mounted) {
+          setState(() => _optimisticJourney = updatedJourney);
+        }
         if (_isJourneyEffectivelyCompleted(updatedJourney)) {
           await ref
               .read(interstitialAdServiceProvider)
@@ -683,14 +752,21 @@ class _CatalogJourneyPanelState extends ConsumerState<_CatalogJourneyPanel> {
     final journeyState = ref.watch(trailJourneyProvider(widget.trailId));
 
     return journeyState.when(
-      data: (journey) => _VisualJourneyPanel(
-        journey: journey,
-        isActing: _isActing,
-        isCatalogTrail: true,
-        onBackToCatalog: widget.onBack,
-        onOpenMentor: widget.onOpenMentor,
-        onPrimaryAction: () => _runJourneyAction(journey),
-      ),
+      data: (journey) {
+        final visibleJourney = _visibleJourneyForProvider(
+          providerJourney: journey,
+          optimisticJourney: _optimisticJourney,
+        );
+        _preloadInterstitialForCompletion(visibleJourney);
+        return _VisualJourneyPanel(
+          journey: visibleJourney,
+          isActing: _isActing,
+          isCatalogTrail: true,
+          onBackToCatalog: widget.onBack,
+          onOpenMentor: widget.onOpenMentor,
+          onPrimaryAction: () => _runJourneyAction(visibleJourney),
+        );
+      },
       error: (_, _) => PrimaryPanel(
         child: _ContentErrorState(
           onRetry: () => ref.invalidate(trailJourneyProvider(widget.trailId)),
@@ -2494,6 +2570,46 @@ bool _isJourneyEffectivelyCompleted(TrailJourney journey) {
   return journey.isCompleted ||
       (journey.steps.isNotEmpty &&
           journey.steps.every((step) => step.isCompleted));
+}
+
+bool _shouldPreloadInterstitialForJourneyCompletion(TrailJourney journey) {
+  return journey.steps.isNotEmpty &&
+      journey.nextStep != null &&
+      !_isJourneyEffectivelyCompleted(journey);
+}
+
+TrailJourney _visibleJourneyForProvider({
+  required TrailJourney providerJourney,
+  required TrailJourney? optimisticJourney,
+}) {
+  final optimistic = optimisticJourney;
+  if (optimistic == null || optimistic.trail.id != providerJourney.trail.id) {
+    return providerJourney;
+  }
+  if (_isJourneyAtLeastAsAdvanced(optimistic, providerJourney)) {
+    return optimistic;
+  }
+  return providerJourney;
+}
+
+bool _isJourneyAtLeastAsAdvanced(TrailJourney candidate, TrailJourney current) {
+  final candidateCompleted = _isJourneyEffectivelyCompleted(candidate);
+  final currentCompleted = _isJourneyEffectivelyCompleted(current);
+  if (candidateCompleted != currentCompleted) {
+    return candidateCompleted;
+  }
+
+  if (candidate.completedSteps != current.completedSteps) {
+    return candidate.completedSteps > current.completedSteps;
+  }
+
+  if (candidate.progressPercent != current.progressPercent) {
+    return candidate.progressPercent > current.progressPercent;
+  }
+
+  final candidateStepIndex = candidate.progress?.currentStepIndex ?? -1;
+  final currentStepIndex = current.progress?.currentStepIndex ?? -1;
+  return candidateStepIndex >= currentStepIndex;
 }
 
 SnackBar _journeyStepCompletedSnackBar(TrailJourney journey) {

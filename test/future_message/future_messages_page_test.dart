@@ -1,4 +1,7 @@
 import 'package:evolua_frontend/core/network/paginated_response.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message_ready_summary.dart';
@@ -62,7 +65,7 @@ void main() {
     },
   );
 
-  testWidgets('future message free text fields capitalize sentences', (
+  testWidgets('future message composer keeps only message text field', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -74,6 +77,9 @@ void main() {
           subscriptionRepositoryProvider.overrideWithValue(
             _FakeSubscriptionRepository(),
           ),
+          interstitialAdServiceProvider.overrideWithValue(
+            _FakeInterstitialAdService(),
+          ),
         ],
         child: const MaterialApp(home: FutureMessagesPage()),
       ),
@@ -82,11 +88,55 @@ void main() {
 
     final fields = tester.widgetList<TextField>(find.byType(TextField));
 
-    expect(fields, hasLength(4));
+    expect(fields, hasLength(1));
     expect(
       fields.map((field) => field.textCapitalization),
       everyElement(TextCapitalization.sentences),
     );
+    expect(find.text('Sua mensagem'), findsOneWidget);
+    expect(
+      find.text('O que voce gostaria de lembrar no futuro?'),
+      findsNothing,
+    );
+    expect(find.text('O que voce esta sentindo agora?'), findsNothing);
+    expect(
+      find.text('O que voce espera de voce daqui a 30 dias?'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('creating future message sends only body prompt fields null', (
+    tester,
+  ) async {
+    final repository = _FakeFutureMessageRepository();
+    final interstitial = _FakeInterstitialAdService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          futureMessageRepositoryProvider.overrideWithValue(repository),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          interstitialAdServiceProvider.overrideWithValue(interstitial),
+        ],
+        child: const MaterialApp(home: FutureMessagesPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Uma carta simples.');
+    await tester.ensureVisible(find.text('Guardar mensagem'));
+    await tester.tap(find.text('Guardar mensagem'));
+    await tester.pumpAndSettle();
+
+    expect(repository.createCalls, 1);
+    expect(repository.lastDraft?.body, 'Uma carta simples.');
+    expect(repository.lastDraft?.promptRemember, isNull);
+    expect(repository.lastDraft?.promptFeeling, isNull);
+    expect(repository.lastDraft?.promptHope, isNull);
+    expect(interstitial.triggers, [
+      InterstitialTrigger.futureMessageScheduledExit,
+    ]);
   });
 
   testWidgets(
@@ -116,6 +166,9 @@ void main() {
             futureMessageRepositoryProvider.overrideWithValue(repository),
             subscriptionRepositoryProvider.overrideWithValue(
               _FakeSubscriptionRepository(),
+            ),
+            interstitialAdServiceProvider.overrideWithValue(
+              _FakeInterstitialAdService(),
             ),
           ],
           child: const MaterialApp(home: FutureMessagesPage()),
@@ -149,6 +202,9 @@ void main() {
             subscriptionRepositoryProvider.overrideWithValue(
               _FakeSubscriptionRepository(),
             ),
+            interstitialAdServiceProvider.overrideWithValue(
+              _FakeInterstitialAdService(),
+            ),
           ],
           child: MaterialApp(
             home: FutureMessagesPage(onOpenPremium: () => openedPremium = true),
@@ -168,15 +224,95 @@ void main() {
       expect(repository.readySummaryCalls, 0);
     },
   );
+
+  testWidgets('closing delivered message shows read-exit interstitial once', (
+    tester,
+  ) async {
+    final message = _deliveredMessage(9);
+    final repository = _FakeFutureMessageRepository(
+      deliveredItems: [message],
+      getItems: {message.id: message},
+    );
+    final interstitial = _FakeInterstitialAdService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          futureMessageRepositoryProvider.overrideWithValue(repository),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          interstitialAdServiceProvider.overrideWithValue(interstitial),
+        ],
+        child: MaterialApp(
+          home: FutureMessagesPage(initialMessageId: message.id),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(interstitial.triggers, isEmpty);
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(interstitial.triggers, [InterstitialTrigger.futureMessageReadExit]);
+  });
+
+  testWidgets('mark read and close do not duplicate read-exit interstitial', (
+    tester,
+  ) async {
+    final message = _deliveredMessage(10);
+    final repository = _FakeFutureMessageRepository(
+      deliveredItems: [message],
+      getItems: {message.id: message},
+    );
+    final interstitial = _FakeInterstitialAdService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          futureMessageRepositoryProvider.overrideWithValue(repository),
+          subscriptionRepositoryProvider.overrideWithValue(
+            _FakeSubscriptionRepository(),
+          ),
+          interstitialAdServiceProvider.overrideWithValue(interstitial),
+        ],
+        child: MaterialApp(
+          home: FutureMessagesPage(initialMessageId: message.id),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Marcar como lida'));
+    await tester.tap(find.text('Marcar como lida'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byIcon(Icons.close_rounded));
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(repository.markReadCalls, 1);
+    expect(interstitial.triggers, [InterstitialTrigger.futureMessageReadExit]);
+  });
 }
 
 class _FakeFutureMessageRepository implements FutureMessageRepository {
-  _FakeFutureMessageRepository({this.listItems = const []});
+  _FakeFutureMessageRepository({
+    this.listItems = const [],
+    this.deliveredItems = const [],
+    this.getItems = const {},
+  });
 
   final List<FutureMessage> listItems;
+  final List<FutureMessage> deliveredItems;
+  final Map<int, FutureMessage> getItems;
   int listCalls = 0;
   int deliveredCalls = 0;
   int readySummaryCalls = 0;
+  int createCalls = 0;
+  int markReadCalls = 0;
+  FutureMessageDraft? lastDraft;
 
   @override
   Future<PaginatedResponse<FutureMessage>> delivered({
@@ -184,7 +320,10 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
     required int size,
   }) async {
     deliveredCalls += 1;
-    return PaginatedResponse.empty(page: page, size: size);
+    return PaginatedResponse<FutureMessage>.empty(
+      page: page,
+      size: size,
+    ).copyWith(items: deliveredItems);
   }
 
   @override
@@ -211,6 +350,8 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
 
   @override
   Future<FutureMessage> create(FutureMessageDraft draft) async {
+    createCalls += 1;
+    lastDraft = draft;
     return FutureMessage(
       id: 1,
       title: draft.title,
@@ -228,12 +369,16 @@ class _FakeFutureMessageRepository implements FutureMessageRepository {
 
   @override
   Future<FutureMessage> get(int id) {
-    throw UnimplementedError();
+    return Future.value(getItems[id] ?? _scheduledMessage(id));
   }
 
   @override
   Future<FutureMessage> markRead(int id) {
-    throw UnimplementedError();
+    markReadCalls += 1;
+    final message = getItems[id] ?? _deliveredMessage(id);
+    return Future.value(
+      message.copyWith(status: 'READ', readAt: DateTime(2026, 6, 2)),
+    );
   }
 
   @override
@@ -257,6 +402,49 @@ FutureMessage _scheduledMessage(int id) {
     createdAt: DateTime(2026, 6, 1),
     scheduledFor: DateTime(2026, 7, 1),
   );
+}
+
+FutureMessage _deliveredMessage(int id) {
+  return FutureMessage(
+    id: id,
+    title: 'Carta $id',
+    body: 'Texto entregue',
+    bodyPreview: 'Texto entregue',
+    triggerType: 'AFTER_DAYS',
+    triggerConfig: const {'days': 30},
+    triggerLabel: 'AFTER_DAYS',
+    status: 'DELIVERED',
+    createdContext: const {},
+    deliveredContext: const {},
+    createdAt: DateTime(2026, 6, 1),
+    scheduledFor: DateTime(2026, 7, 1),
+    deliveredAt: DateTime(2026, 7, 1),
+  );
+}
+
+class _FakeInterstitialAdService implements InterstitialAdService {
+  final List<InterstitialTrigger> triggers = [];
+  int preloadCalls = 0;
+
+  @override
+  Future<void> preload() async {
+    preloadCalls += 1;
+  }
+
+  @override
+  Future<bool> maybeShow({
+    required InterstitialTrigger trigger,
+    required AuthSession? session,
+  }) async {
+    triggers.add(trigger);
+    return false;
+  }
+
+  @override
+  Future<void> recordRewardedAdShown({AuthSession? session}) async {}
+
+  @override
+  void dispose() {}
 }
 
 class _FakeSubscriptionRepository implements SubscriptionRepository {

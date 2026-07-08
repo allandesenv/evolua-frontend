@@ -11,6 +11,8 @@ enum AdPlacementContext {
   trailCompletion,
   readingSavedExit,
   ritualCompletedExit,
+  futureMessageScheduledExit,
+  futureMessageReadExit,
   timelineExit,
   readingVariationMilestone,
   negativeCheckIn,
@@ -82,6 +84,8 @@ class AdPlacementPolicy {
   static const _interstitialContexts = {
     AdPlacementContext.trailCompletion,
     AdPlacementContext.ritualCompletedExit,
+    AdPlacementContext.futureMessageScheduledExit,
+    AdPlacementContext.futureMessageReadExit,
   };
 
   static const _nativeContexts = {

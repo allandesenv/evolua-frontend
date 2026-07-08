@@ -1,3 +1,6 @@
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_controller.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/repositories/daily_ritual_repository.dart';
@@ -6,12 +9,16 @@ import 'package:evolua_frontend/shared/presentation/widgets/evolua_async_button.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   testWidgets('completes morning ritual flow and shows result', (tester) async {
     final repository = _FakeDailyRitualRepository();
+    final interstitial = _FakeInterstitialAdService();
 
-    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpWidget(
+      _testApp(repository, interstitialAdService: interstitial),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Ritual do Dia'), findsOneWidget);
@@ -19,6 +26,9 @@ void main() {
 
     await tester.tap(find.text('Começar agora'));
     await tester.pumpAndSettle();
+
+    expect(interstitial.calls, ['preload']);
+    expect(interstitial.maybeShowCalls, 0);
 
     expect(
       tester.widget<TextField>(find.byType(TextField)).textCapitalization,
@@ -40,16 +50,28 @@ void main() {
     expect(find.text('calmo'), findsOneWidget);
     expect(find.text('clareza'), findsOneWidget);
     expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
+    expect(interstitial.preloadCalls, 2);
+    expect(interstitial.maybeShowCalls, 0);
+
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(interstitial.preloadCalls, 2);
     expect(find.text('pausar antes de reagir'), findsOneWidget);
+    expect(interstitial.preloadCalls, 2);
+    expect(interstitial.maybeShowCalls, 0);
   });
 
   testWidgets('shows existing evening closing in read-only mode', (
     tester,
   ) async {
+    final interstitial = _FakeInterstitialAdService();
+
     await tester.pumpWidget(
       _testApp(
         _FakeDailyRitualRepository(evening: _ritual(DailyRitualType.evening)),
         type: DailyRitualType.evening,
+        interstitialAdService: interstitial,
       ),
     );
     await tester.pumpAndSettle();
@@ -60,6 +82,50 @@ void main() {
     expect(find.text('Começar agora'), findsNothing);
     expect(find.text('Intenção escolhida'), findsOneWidget);
     expect(find.text('Microação escolhida'), findsOneWidget);
+  });
+
+  testWidgets('preloads once for existing evening result', (tester) async {
+    final interstitial = _FakeInterstitialAdService();
+
+    await tester.pumpWidget(
+      _testApp(
+        _FakeDailyRitualRepository(evening: _ritual(DailyRitualType.evening)),
+        type: DailyRitualType.evening,
+        interstitialAdService: interstitial,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('agir com calma'), findsAtLeastNWidgets(1));
+    expect(interstitial.preloadCalls, 1);
+    expect(interstitial.maybeShowCalls, 0);
+  });
+
+  testWidgets('back home shows interstitial once after preloading result', (
+    tester,
+  ) async {
+    final interstitial = _FakeInterstitialAdService();
+
+    await tester.pumpWidget(
+      _testApp(
+        _FakeDailyRitualRepository(evening: _ritual(DailyRitualType.evening)),
+        type: DailyRitualType.evening,
+        interstitialAdService: interstitial,
+        useRouter: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(interstitial.calls, ['preload']);
+    expect(find.text('Home reached'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.home_rounded));
+    await tester.pumpAndSettle();
+
+    expect(interstitial.maybeShowCalls, 1);
+    expect(interstitial.triggers, [InterstitialTrigger.ritualCompletedExit]);
+    expect(interstitial.calls, ['preload', 'maybeShow']);
+    expect(find.text('Home reached'), findsOneWidget);
   });
 
   testWidgets('morning continue starts disabled and enables with valid text', (
@@ -153,15 +219,74 @@ EvoluaAsyncButton _ritualActionButton(WidgetTester tester) {
 Widget _testApp(
   DailyRitualRepository repository, {
   String type = DailyRitualType.morning,
+  InterstitialAdService? interstitialAdService,
+  bool useRouter = false,
 }) {
-  return ProviderScope(
-    overrides: [dailyRitualRepositoryProvider.overrideWithValue(repository)],
-    child: MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(child: DailyRitualView(type: type)),
-      ),
+  final overrides = [
+    dailyRitualRepositoryProvider.overrideWithValue(repository),
+    interstitialAdServiceProvider.overrideWithValue(
+      interstitialAdService ?? _FakeInterstitialAdService(),
     ),
+  ];
+
+  Widget dailyRitual() {
+    return Scaffold(
+      body: SingleChildScrollView(child: DailyRitualView(type: type)),
+    );
+  }
+
+  if (useRouter) {
+    final router = GoRouter(
+      initialLocation: '/daily-ritual',
+      routes: [
+        GoRoute(path: '/daily-ritual', builder: (_, _) => dailyRitual()),
+        GoRoute(
+          path: '/home',
+          builder: (_, _) => const Scaffold(body: Text('Home reached')),
+        ),
+      ],
+    );
+
+    return ProviderScope(
+      overrides: overrides,
+      child: MaterialApp.router(routerConfig: router),
+    );
+  }
+
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp(home: dailyRitual()),
   );
+}
+
+class _FakeInterstitialAdService implements InterstitialAdService {
+  int preloadCalls = 0;
+  int maybeShowCalls = 0;
+  final calls = <String>[];
+  final triggers = <InterstitialTrigger>[];
+
+  @override
+  Future<void> preload() async {
+    preloadCalls++;
+    calls.add('preload');
+  }
+
+  @override
+  Future<bool> maybeShow({
+    required InterstitialTrigger trigger,
+    required AuthSession? session,
+  }) async {
+    maybeShowCalls++;
+    triggers.add(trigger);
+    calls.add('maybeShow');
+    return false;
+  }
+
+  @override
+  Future<void> recordRewardedAdShown({AuthSession? session}) async {}
+
+  @override
+  void dispose() {}
 }
 
 class _FakeDailyRitualRepository implements DailyRitualRepository {

@@ -636,7 +636,6 @@ class _HomeHubViewState extends ConsumerState<HomeHubView> {
           isGeneratingFromCheckIn: _isGeneratingDailyRitualFromCheckIn,
           checkInLabel: checkInButtonLabel,
           onCheckIn: openCheckInFromHome,
-          gateExtraCheckIn: shouldGateExtraCheckInToday,
           onGenerateFromCheckIn: todayCheckIn == null
               ? null
               : () => _createDailyRitualFromCheckIn(todayCheckIn.id),
@@ -760,7 +759,6 @@ class _DailyJourneyCard extends StatelessWidget {
     required this.isGeneratingFromCheckIn,
     required this.checkInLabel,
     required this.onCheckIn,
-    required this.gateExtraCheckIn,
     required this.onGenerateFromCheckIn,
     required this.onOpenDailyRitual,
     required this.onOpenNextStep,
@@ -776,7 +774,6 @@ class _DailyJourneyCard extends StatelessWidget {
   final bool isGeneratingFromCheckIn;
   final String checkInLabel;
   final VoidCallback onCheckIn;
-  final bool gateExtraCheckIn;
   final VoidCallback? onGenerateFromCheckIn;
   final ValueChanged<String> onOpenDailyRitual;
   final VoidCallback onOpenNextStep;
@@ -794,7 +791,6 @@ class _DailyJourneyCard extends StatelessWidget {
       todayCheckIn: todayCheckIn,
       checkInLabel: checkInLabel,
       onCheckIn: onCheckIn,
-      gateExtraCheckIn: gateExtraCheckIn,
       onGenerateFromCheckIn: onGenerateFromCheckIn,
       onOpenDailyRitual: onOpenDailyRitual,
       onOpenNextStep: onOpenNextStep,
@@ -901,6 +897,18 @@ class _DailyJourneyCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ),
+      if (model.manualAction != null)
+        TextButton.icon(
+          onPressed: isLoading || isGeneratingFromCheckIn
+              ? null
+              : model.manualAction,
+          icon: Icon(model.manualIcon),
+          label: Text(
+            model.manualLabel!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
     ];
 
     if (!compact) {
@@ -999,6 +1007,9 @@ class _DailyJourneyCardModel {
     required this.secondaryLabel,
     required this.secondaryIcon,
     required this.secondaryAction,
+    this.manualLabel,
+    this.manualIcon = Icons.edit_note_rounded,
+    this.manualAction,
     this.ritual,
   });
 
@@ -1010,6 +1021,9 @@ class _DailyJourneyCardModel {
   final String secondaryLabel;
   final IconData secondaryIcon;
   final VoidCallback secondaryAction;
+  final String? manualLabel;
+  final IconData manualIcon;
+  final VoidCallback? manualAction;
   final DailyRitual? ritual;
 
   static _DailyJourneyCardModel from({
@@ -1021,7 +1035,6 @@ class _DailyJourneyCardModel {
     required CheckIn? todayCheckIn,
     required String checkInLabel,
     required VoidCallback onCheckIn,
-    required bool gateExtraCheckIn,
     required VoidCallback? onGenerateFromCheckIn,
     required ValueChanged<String> onOpenDailyRitual,
     required VoidCallback onOpenNextStep,
@@ -1095,13 +1108,12 @@ class _DailyJourneyCardModel {
         primaryLabel: 'Gerar com meu check-in',
         primaryIcon: Icons.auto_awesome_rounded,
         primaryAction: onGenerateFromCheckIn,
-        secondaryLabel: gateExtraCheckIn ? checkInLabel : 'Criar manualmente',
-        secondaryIcon: gateExtraCheckIn
-            ? Icons.favorite_rounded
-            : Icons.edit_note_rounded,
-        secondaryAction: gateExtraCheckIn
-            ? onCheckIn
-            : () => onOpenDailyRitual(DailyRitualType.morning),
+        secondaryLabel: checkInLabel,
+        secondaryIcon: Icons.favorite_rounded,
+        secondaryAction: onCheckIn,
+        manualLabel: 'Criar manualmente',
+        manualIcon: Icons.edit_note_rounded,
+        manualAction: () => onOpenDailyRitual(DailyRitualType.morning),
       );
     }
 
