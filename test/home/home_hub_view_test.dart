@@ -1490,13 +1490,14 @@ void main() {
       tester,
     ) async {
       String? openedType;
+      final checkIns = _FakeCheckInRepository(
+        items: [_testCheckIn(id: 41, createdAt: DateTime(2026, 5, 7, 9))],
+      );
 
       await tester.pumpWidget(
         _testApp(
           now: DateTime(2026, 5, 7, 15),
-          checkInRepository: _FakeCheckInRepository(
-            items: [_testCheckIn(id: 41, createdAt: DateTime(2026, 5, 7, 9))],
-          ),
+          checkInRepository: checkIns,
           onOpenDailyRitual: (type) => openedType = type,
         ),
       );
@@ -1511,6 +1512,16 @@ void main() {
       );
       expect(find.text('Gerar com meu check-in'), findsOneWidget);
       expect(find.text('Novo check-in'), findsOneWidget);
+      expect(find.text('Criar manualmente'), findsOneWidget);
+      expect(checkIns.ritualTypes, isEmpty);
+
+      await tester.tap(find.text('Criar manualmente'));
+      await tester.pumpAndSettle();
+
+      expect(openedType, DailyRitualType.morning);
+      expect(checkIns.ritualTypes, isEmpty);
+
+      openedType = null;
 
       await tester.tap(find.text('Novo check-in'));
       await tester.pumpAndSettle();

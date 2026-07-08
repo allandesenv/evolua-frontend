@@ -84,7 +84,7 @@ void main() {
     );
   });
 
-  test('keeps banners neutral and interstitial limited to v1 exits', () {
+  test('keeps banners neutral and interstitial limited to safe exits', () {
     expect(
       AdPlacementPolicy.canShow(
         format: AdFormat.banner,
@@ -127,6 +127,33 @@ void main() {
         interstitialEnabled: true,
       ),
       isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.futureMessageScheduledExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.futureMessageReadExit,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      AdPlacementPolicy.canShow(
+        format: AdFormat.interstitial,
+        context: AdPlacementContext.futureMessages,
+        premium: false,
+        interstitialEnabled: true,
+      ),
+      isFalse,
     );
     expect(
       AdPlacementPolicy.canShow(

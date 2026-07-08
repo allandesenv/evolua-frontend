@@ -2,6 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/layout/responsive_breakpoints.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/future_message/application/future_message_controller.dart';
 import 'package:evolua_frontend/features/future_message/domain/entities/future_message.dart';
 import 'package:evolua_frontend/features/future_message/presentation/future_message_delivery_label.dart';
@@ -58,14 +61,12 @@ class FutureMessagesView extends ConsumerStatefulWidget {
 
 class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   final _bodyController = TextEditingController();
-  final _rememberController = TextEditingController();
-  final _feelingController = TextEditingController();
-  final _hopeController = TextEditingController();
   String _triggerType = 'AFTER_DAYS';
   int _afterDays = 30;
   DateTime? _specificDate;
   int? _selectedMessageId;
   bool _isSubmitting = false;
+  final Set<int> _readExitInterstitialMessageIds = {};
 
   @override
   void initState() {
@@ -76,9 +77,6 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
   @override
   void dispose() {
     _bodyController.dispose();
-    _rememberController.dispose();
-    _feelingController.dispose();
-    _hopeController.dispose();
     super.dispose();
   }
 
@@ -112,9 +110,9 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
             FutureMessageDraft(
               title: 'Carta para mim mesmo',
               body: _bodyController.text.trim(),
-              promptRemember: _rememberController.text.trim(),
-              promptFeeling: _feelingController.text.trim(),
-              promptHope: _hopeController.text.trim(),
+              promptRemember: null,
+              promptFeeling: null,
+              promptHope: null,
               triggerType: _triggerType,
               triggerConfig: _triggerConfig(),
             ),
@@ -123,15 +121,15 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
         return;
       }
       _bodyController.clear();
-      _rememberController.clear();
-      _feelingController.clear();
-      _hopeController.clear();
       AppSnackBar.show(
         context,
         message: 'Sua carta foi guardada para o momento certo.',
         icon: Icons.mark_email_read_rounded,
       );
       setState(() => _selectedMessageId = created.id);
+      await _maybeShowFutureMessageInterstitial(
+        InterstitialTrigger.futureMessageScheduledExit,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -198,15 +196,13 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
               if (_selectedMessageId != null) ...[
                 _FutureMessageDetailPanel(
                   messageId: _selectedMessageId!,
-                  onClose: () => setState(() => _selectedMessageId = null),
+                  onClose: _closeSelectedMessage,
+                  onMarkedRead: _handleMessageMarkedRead,
                 ),
                 const SizedBox(height: 16),
               ],
               _FutureMessageComposer(
                 bodyController: _bodyController,
-                rememberController: _rememberController,
-                feelingController: _feelingController,
-                hopeController: _hopeController,
                 triggerType: _triggerType,
                 afterDays: _afterDays,
                 specificDate: _specificDate,
@@ -289,6 +285,43 @@ class _FutureMessagesViewState extends ConsumerState<FutureMessagesView> {
     context.go('/home?profileSection=plans');
   }
 
+  Future<void> _closeSelectedMessage(FutureMessage message) async {
+    if (mounted) {
+      setState(() => _selectedMessageId = null);
+    }
+    if (message.isDelivered) {
+      await _maybeShowReadExitInterstitial(message.id);
+    }
+  }
+
+  Future<void> _handleMessageMarkedRead(FutureMessage message) {
+    return _maybeShowReadExitInterstitial(message.id);
+  }
+
+  Future<void> _maybeShowReadExitInterstitial(int messageId) async {
+    if (!_readExitInterstitialMessageIds.add(messageId)) {
+      return;
+    }
+    await _maybeShowFutureMessageInterstitial(
+      InterstitialTrigger.futureMessageReadExit,
+    );
+  }
+
+  Future<void> _maybeShowFutureMessageInterstitial(
+    InterstitialTrigger trigger,
+  ) async {
+    final session = () {
+      try {
+        return ref.read(authControllerProvider).asData?.value;
+      } catch (_) {
+        return null;
+      }
+    }();
+    await ref
+        .read(interstitialAdServiceProvider)
+        .maybeShow(trigger: trigger, session: session);
+  }
+
   String _friendlyError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -345,9 +378,6 @@ class _FutureMessagesHeader extends StatelessWidget {
 class _FutureMessageComposer extends StatelessWidget {
   const _FutureMessageComposer({
     required this.bodyController,
-    required this.rememberController,
-    required this.feelingController,
-    required this.hopeController,
     required this.triggerType,
     required this.afterDays,
     required this.specificDate,
@@ -359,9 +389,6 @@ class _FutureMessageComposer extends StatelessWidget {
   });
 
   final TextEditingController bodyController;
-  final TextEditingController rememberController;
-  final TextEditingController feelingController;
-  final TextEditingController hopeController;
   final String triggerType;
   final int afterDays;
   final DateTime? specificDate;
@@ -387,21 +414,6 @@ class _FutureMessageComposer extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          _GuidedQuestionField(
-            controller: rememberController,
-            label: 'O que voce gostaria de lembrar no futuro?',
-          ),
-          const SizedBox(height: 12),
-          _GuidedQuestionField(
-            controller: feelingController,
-            label: 'O que voce esta sentindo agora?',
-          ),
-          const SizedBox(height: 12),
-          _GuidedQuestionField(
-            controller: hopeController,
-            label: 'O que voce espera de voce daqui a 30 dias?',
-          ),
-          const SizedBox(height: 14),
           TextField(
             controller: bodyController,
             textCapitalization: TextCapitalization.sentences,
@@ -514,27 +526,6 @@ class _FutureMessageComposer extends StatelessWidget {
     final day = value.day.toString().padLeft(2, '0');
     final month = value.month.toString().padLeft(2, '0');
     return '$day/$month/${value.year}';
-  }
-}
-
-class _GuidedQuestionField extends StatelessWidget {
-  const _GuidedQuestionField({required this.controller, required this.label});
-
-  final TextEditingController controller;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      textCapitalization: TextCapitalization.sentences,
-      maxLines: 2,
-      decoration: InputDecoration(
-        labelText: label,
-        alignLabelWithHint: true,
-        prefixIcon: const Icon(Icons.psychology_alt_rounded),
-      ),
-    );
   }
 }
 
@@ -655,10 +646,12 @@ class _FutureMessageDetailPanel extends ConsumerWidget {
   const _FutureMessageDetailPanel({
     required this.messageId,
     required this.onClose,
+    required this.onMarkedRead,
   });
 
   final int messageId;
-  final VoidCallback onClose;
+  final Future<void> Function(FutureMessage message) onClose;
+  final Future<void> Function(FutureMessage message) onMarkedRead;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -683,7 +676,7 @@ class _FutureMessageDetailPanel extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: onClose,
+                    onPressed: () => onClose(message),
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],
@@ -734,9 +727,12 @@ class _FutureMessageDetailPanel extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
                   child: TextButton.icon(
-                    onPressed: () => ref
-                        .read(futureMessageControllerProvider.notifier)
-                        .markRead(message.id),
+                    onPressed: () async {
+                      final updated = await ref
+                          .read(futureMessageControllerProvider.notifier)
+                          .markRead(message.id);
+                      await onMarkedRead(updated);
+                    },
                     icon: const Icon(Icons.done_all_rounded),
                     label: const Text('Marcar como lida'),
                   ),

@@ -1254,6 +1254,30 @@ void main() {
     expect(find.textContaining('Você está no plano Essencial'), findsNothing);
   });
 
+  testWidgets('dashboard applies updated initial profile section', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'evolua.auth.session': jsonEncode(_testSession().toJson()),
+    });
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_dashboardShell());
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('plano Essencial'), findsNothing);
+
+    await tester.pumpWidget(
+      _dashboardShell(
+        initialProfileSection: ProfileModuleSection.plansSubscriptions,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('plano Essencial'), findsOneWidget);
+  });
+
   testWidgets('avatar menu opens evolution mirror section', (tester) async {
     SharedPreferences.setMockInitialValues({
       'evolua.auth.session': jsonEncode(_testSession().toJson()),
@@ -2359,6 +2383,7 @@ Future<void> _pumpEvolutionMirror(
 
 Widget _dashboardShell({
   Size size = const Size(390, 900),
+  ProfileModuleSection? initialProfileSection,
   TrailRepository? trailRepository,
   CheckInRepository? checkInRepository,
   SubscriptionRepository? subscriptionRepository,
@@ -2413,7 +2438,9 @@ Widget _dashboardShell({
       theme: AppTheme.dark(),
       home: MediaQuery(
         data: MediaQueryData(size: size),
-        child: const Scaffold(body: DashboardShell()),
+        child: Scaffold(
+          body: DashboardShell(initialProfileSection: initialProfileSection),
+        ),
       ),
     ),
   );

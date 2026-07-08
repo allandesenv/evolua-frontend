@@ -161,6 +161,10 @@ class AppConfig {
   static const adMobIosInterstitialTestAdUnitId =
       'ca-app-pub-3940256099942544/4411468910';
 
+  static const adMobInterstitialDiagnosticsEnabled = bool.fromEnvironment(
+    'EVOLUA_ADMOB_INTERSTITIAL_DIAGNOSTICS_ENABLED',
+  );
+
   static bool get adMobUseTestAds {
     if (const bool.hasEnvironment('EVOLUA_ADMOB_USE_TEST_ADS')) {
       return const bool.fromEnvironment('EVOLUA_ADMOB_USE_TEST_ADS');
