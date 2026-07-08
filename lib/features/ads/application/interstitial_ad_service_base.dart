@@ -1,3 +1,4 @@
+import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/features/ads/application/ad_placement_policy.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:flutter/foundation.dart';
@@ -77,26 +78,6 @@ class InterstitialFrequencyCap {
     final nextActions = actions + 1;
     await preferences.setInt('$prefix.actions', nextActions);
 
-    if (nextActions < minActionsBetweenShows) {
-      return const InterstitialFrequencyDecision.blocked('frequency cap');
-    }
-
-    final count = preferences.getInt('$prefix.daily_count') ?? 0;
-    if (count >= maxPerDay) {
-      return const InterstitialFrequencyDecision.blocked('frequency cap');
-    }
-
-    final lastShown = _readMillis(preferences, '$prefix.last_shown_at');
-    if (lastShown != null && now.difference(lastShown) < minInterval) {
-      return const InterstitialFrequencyDecision.blocked('frequency cap');
-    }
-
-    final lastRewarded = _readMillis(preferences, '$prefix.last_rewarded_at');
-    if (lastRewarded != null &&
-        now.difference(lastRewarded) < rewardedCooldown) {
-      return const InterstitialFrequencyDecision.blocked('rewarded recente');
-    }
-
     return const InterstitialFrequencyDecision.allowed();
   }
 
@@ -153,11 +134,6 @@ class InterstitialFrequencyCap {
     return '';
   }
 
-  DateTime? _readMillis(SharedPreferences preferences, String key) {
-    final value = preferences.getInt(key);
-    return value == null ? null : DateTime.fromMillisecondsSinceEpoch(value);
-  }
-
   String _prefix(String userId) => 'evolua.interstitial.$userId';
 
   String _dateKey(DateTime value) {
@@ -185,7 +161,7 @@ class InterstitialFrequencyDecision {
 }
 
 void debugInterstitial(String message) {
-  if (!kReleaseMode) {
+  if (!kReleaseMode || AppConfig.adMobInterstitialDiagnosticsEnabled) {
     debugPrint('Evolua interstitial $message');
   }
 }

@@ -175,10 +175,13 @@ void main() {
     );
   });
 
-  test('frequency cap allows first v1 action', () async {
+  test('frequency cap always allows configured interstitial points', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    const cap = InterstitialFrequencyCap();
+    const cap = InterstitialFrequencyCap(
+      maxPerDay: 0,
+      minActionsBetweenShows: 3,
+    );
     final now = DateTime(2026, 6, 8, 10);
 
     final decision = await cap.checkAndRecordAction(
@@ -188,14 +191,20 @@ void main() {
     );
 
     expect(decision.allowed, isTrue);
+    expect(decision.reason, isNull);
   });
 
   test(
-    'frequency cap blocks five-minute cooldown, recent rewarded, and daily max',
+    'frequency cap does not block cooldown, rewarded, daily max, or actions',
     () async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
-      const cap = InterstitialFrequencyCap();
+      const cap = InterstitialFrequencyCap(
+        minInterval: Duration(hours: 1),
+        rewardedCooldown: Duration(hours: 1),
+        maxPerDay: 1,
+        minActionsBetweenShows: 3,
+      );
       final now = DateTime(2026, 6, 8, 10);
 
       final first = await cap.checkAndRecordAction(
@@ -214,8 +223,8 @@ void main() {
         userId: 'free-user',
         now: now.add(const Duration(minutes: 4)),
       );
-      expect(blockedByCooldown.allowed, isFalse);
-      expect(blockedByCooldown.reason, 'frequency cap');
+      expect(blockedByCooldown.allowed, isTrue);
+      expect(blockedByCooldown.reason, isNull);
 
       await cap.recordRewarded(
         preferences: preferences,
@@ -228,8 +237,8 @@ void main() {
         now: now.add(const Duration(minutes: 7)),
       );
 
-      expect(blockedByRewarded.allowed, isFalse);
-      expect(blockedByRewarded.reason, 'rewarded recente');
+      expect(blockedByRewarded.allowed, isTrue);
+      expect(blockedByRewarded.reason, isNull);
 
       final later = now.add(const Duration(minutes: 20));
       for (var i = 0; i < 2; i++) {
@@ -252,8 +261,8 @@ void main() {
         now: later.add(const Duration(hours: 1)),
       );
 
-      expect(dailyMax.allowed, isFalse);
-      expect(dailyMax.reason, 'frequency cap');
+      expect(dailyMax.allowed, isTrue);
+      expect(dailyMax.reason, isNull);
     },
   );
 
@@ -401,7 +410,7 @@ void main() {
     expect(loader.calls, 0);
   });
 
-  test('frequency cap blocks before loading an ad', () async {
+  test('frequency settings do not block loading an ad', () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     final loader = _FakeInterstitialLoader();
@@ -411,13 +420,18 @@ void main() {
       frequencyCap: const InterstitialFrequencyCap(maxPerDay: 0),
     );
 
-    final shown = await service.maybeShow(
+    final shown = service.maybeShow(
       trigger: InterstitialTrigger.trailCompletion,
       session: _freeSession,
     );
 
-    expect(shown, isFalse);
-    expect(loader.calls, 0);
+    await loader.waitForCalls(1);
+    loader.completeLoaded(_FakeInterstitialAdHandle());
+
+    expect(await shown, isTrue);
+    await loader.waitForCalls(2);
+    loader.completeFailed();
+    expect(loader.calls, 2);
   });
 }
 

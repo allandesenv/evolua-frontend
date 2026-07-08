@@ -62,20 +62,20 @@ class MobileInterstitialAdService implements InterstitialAdService {
     required AuthSession? session,
   }) async {
     if (!_platformSupported) {
-      debugInterstitial('skippedUnsupportedPlatform');
+      debugInterstitial('unsupportedPlatform');
       return false;
     }
     final currentSession = session;
     if (currentSession == null) {
-      debugInterstitial('skippedMissingSession');
+      debugInterstitial('missingSession');
       return false;
     }
     if (isAdFreeSession(currentSession)) {
-      debugInterstitial('skippedForPremium trigger=${trigger.name}');
+      debugInterstitial('premium trigger=${trigger.name}');
       return false;
     }
     if (!InterstitialPlacementConfig.isEnabled(trigger)) {
-      debugInterstitial('skippedDisabledPlacement trigger=${trigger.name}');
+      debugInterstitial('disabledPlacement trigger=${trigger.name}');
       return false;
     }
     if (!AdPlacementPolicy.canShow(
@@ -84,20 +84,7 @@ class MobileInterstitialAdService implements InterstitialAdService {
       premium: isAdFreeSession(currentSession),
       interstitialEnabled: true,
     )) {
-      debugInterstitial('skippedDisabledPlacement trigger=${trigger.name}');
-      return false;
-    }
-
-    final preferences = await _preferencesReader();
-    final decision = await _frequencyCap.checkAndRecordAction(
-      preferences: preferences,
-      userId: currentSession.userId,
-      now: DateTime.now(),
-    );
-    if (!decision.allowed) {
-      debugInterstitial(
-        'skippedByCooldown trigger=${trigger.name} reason=${decision.reason}',
-      );
+      debugInterstitial('disabledPlacement trigger=${trigger.name}');
       return false;
     }
 
@@ -115,7 +102,7 @@ class MobileInterstitialAdService implements InterstitialAdService {
       );
       readyAd = _ad;
       if (!loaded || readyAd == null || _isShowing) {
-        debugInterstitial('skippedNoAdReady trigger=${trigger.name}');
+        debugInterstitial('noAdReady trigger=${trigger.name}');
         unawaited(preload());
         return false;
       }
@@ -138,7 +125,7 @@ class MobileInterstitialAdService implements InterstitialAdService {
       },
       onFailedToShow: (error) {
         debugInterstitial(
-          'failed to show code=${error.code} domain=${error.domain} '
+          'failedToShow code=${error.code} domain=${error.domain} '
           'message=${error.message}',
         );
         readyAd?.dispose();
@@ -158,11 +145,16 @@ class MobileInterstitialAdService implements InterstitialAdService {
         },
       );
       if (shown) {
-        await _frequencyCap.recordShown(
-          preferences: preferences,
-          userId: currentSession.userId,
-          now: DateTime.now(),
-        );
+        try {
+          final preferences = await _preferencesReader();
+          await _frequencyCap.recordShown(
+            preferences: preferences,
+            userId: currentSession.userId,
+            now: DateTime.now(),
+          );
+        } catch (error) {
+          debugInterstitial('recordShownFailed errorType=${error.runtimeType}');
+        }
       }
       return shown;
     } finally {
@@ -205,7 +197,7 @@ class MobileInterstitialAdService implements InterstitialAdService {
 
     final adUnitId = _adUnitId;
     if (adUnitId.trim().isEmpty) {
-      debugInterstitial('skippedMissingAdUnit');
+      debugInterstitial('missingAdUnit');
       return Future.value(false);
     }
 
