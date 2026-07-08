@@ -5,6 +5,8 @@ import 'package:evolua_frontend/core/network/paginated_response.dart';
 import 'package:evolua_frontend/core/theme/app_colors.dart';
 import 'package:evolua_frontend/core/theme/app_theme.dart';
 import 'package:evolua_frontend/core/theme/evolua_theme_colors.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service.dart';
+import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service.dart';
 import 'package:evolua_frontend/features/ads/application/rewarded_ad_service_base.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
@@ -30,6 +32,7 @@ import 'package:evolua_frontend/shared/presentation/widgets/app_skeletons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -673,6 +676,81 @@ void main() {
     });
 
     testWidgets(
+      'current journey preloads before trail completion interstitial',
+      (tester) async {
+        await _setCompactSurface(tester);
+        final interstitial = _FakeInterstitialAdService();
+        final trailRepository = _FakeTrailRepository(
+          completeStepJourneyBuilder: _completedByStepsJourney,
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            trailRepository: trailRepository,
+            interstitialAdService: interstitial,
+            useRouter: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(interstitial.preloadCalls, 1);
+        expect(interstitial.maybeShowCalls, 0);
+
+        await tester.ensureVisible(find.text('Concluir etapa atual'));
+        await tester.tap(find.text('Concluir etapa atual'));
+        await tester.pumpAndSettle();
+
+        expect(trailRepository.completeStepCallCount, 1);
+        expect(interstitial.preloadCalls, 1);
+        expect(interstitial.maybeShowCalls, 1);
+        expect(interstitial.triggers, [InterstitialTrigger.trailCompletion]);
+        expect(interstitial.calls, ['preload', 'maybeShow']);
+        expect(find.text('Home reached'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'catalog journey preloads before trail completion interstitial',
+      (tester) async {
+        await _setCompactSurface(tester);
+        final interstitial = _FakeInterstitialAdService();
+        final trailRepository = _FakeTrailRepository(
+          completeStepJourneyBuilder: _completedByStepsJourney,
+        );
+
+        await tester.pumpWidget(
+          _testApp(
+            section: ContentModuleSection.catalog,
+            trailRepository: trailRepository,
+            interstitialAdService: interstitial,
+            useRouter: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(interstitial.preloadCalls, 0);
+
+        await tester.ensureVisible(find.text('Ver caminho'));
+        await tester.tap(find.text('Ver caminho'));
+        await tester.pumpAndSettle();
+
+        expect(interstitial.preloadCalls, 1);
+        expect(interstitial.maybeShowCalls, 0);
+
+        await tester.ensureVisible(find.text('Concluir etapa atual'));
+        await tester.tap(find.text('Concluir etapa atual'));
+        await tester.pumpAndSettle();
+
+        expect(trailRepository.completeStepCallCount, 1);
+        expect(interstitial.preloadCalls, 1);
+        expect(interstitial.maybeShowCalls, 1);
+        expect(interstitial.triggers, [InterstitialTrigger.trailCompletion]);
+        expect(interstitial.calls, ['preload', 'maybeShow']);
+        expect(find.text('Home reached'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'journey renders completed step immediately from action result',
       (tester) async {
         await _setCompactSurface(tester);
@@ -1295,10 +1373,15 @@ Widget _testApp({
   TrailRepository? trailRepository,
   SubscriptionRepository? subscriptionRepository,
   RewardedAdService? rewardedAdService,
+  InterstitialAdService? interstitialAdService,
   VoidCallback? onOpenPremium,
   Map<String, Object> initialPreferences = const {},
+  bool useRouter = false,
 }) {
   SharedPreferences.setMockInitialValues(initialPreferences);
+  final effectiveInterstitialAdService =
+      interstitialAdService ?? _FakeInterstitialAdService();
+  final appTheme = theme ?? AppTheme.dark();
 
   return ProviderScope(
     overrides: [
@@ -1314,20 +1397,79 @@ Widget _testApp({
       profileRepositoryProvider.overrideWithValue(_FakeProfileRepository()),
       if (rewardedAdService != null)
         rewardedAdServiceProvider.overrideWithValue(rewardedAdService),
-    ],
-    child: MaterialApp(
-      theme: theme ?? AppTheme.dark(),
-      home: Scaffold(
-        body: SizedBox.expand(
-          child: ContentModuleView(
-            section: section,
-            showSectionChips: true,
-            onOpenPremium: onOpenPremium,
-          ),
-        ),
+      interstitialAdServiceProvider.overrideWithValue(
+        effectiveInterstitialAdService,
       ),
-    ),
+    ],
+    child: useRouter
+        ? MaterialApp.router(
+            theme: appTheme,
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => Scaffold(
+                    body: SizedBox.expand(
+                      child: ContentModuleView(
+                        section: section,
+                        showSectionChips: true,
+                        onOpenPremium: onOpenPremium,
+                      ),
+                    ),
+                  ),
+                ),
+                GoRoute(
+                  path: '/home',
+                  builder: (context, state) =>
+                      const Scaffold(body: Text('Home reached')),
+                ),
+              ],
+            ),
+          )
+        : MaterialApp(
+            theme: appTheme,
+            home: Scaffold(
+              body: SizedBox.expand(
+                child: ContentModuleView(
+                  section: section,
+                  showSectionChips: true,
+                  onOpenPremium: onOpenPremium,
+                ),
+              ),
+            ),
+          ),
   );
+}
+
+class _FakeInterstitialAdService implements InterstitialAdService {
+  int preloadCalls = 0;
+  int maybeShowCalls = 0;
+  final calls = <String>[];
+  final triggers = <InterstitialTrigger>[];
+  bool maybeShowResult = false;
+
+  @override
+  Future<void> preload() async {
+    preloadCalls++;
+    calls.add('preload');
+  }
+
+  @override
+  Future<bool> maybeShow({
+    required InterstitialTrigger trigger,
+    required AuthSession? session,
+  }) async {
+    maybeShowCalls++;
+    triggers.add(trigger);
+    calls.add('maybeShow');
+    return maybeShowResult;
+  }
+
+  @override
+  Future<void> recordRewardedAdShown({AuthSession? session}) async {}
+
+  @override
+  void dispose() {}
 }
 
 class _FakeAuthController extends AuthController {
