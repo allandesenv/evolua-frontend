@@ -23,49 +23,37 @@ class MobileInterstitialAdService implements InterstitialAdService {
   MobileInterstitialAdService({
     required Future<SharedPreferencesLike> Function() preferencesReader,
     InterstitialFrequencyCap frequencyCap = const InterstitialFrequencyCap(),
+    @visibleForTesting InterstitialAdLoader? adLoader,
+    @visibleForTesting bool? platformSupported,
+    @visibleForTesting String? adUnitId,
+    @visibleForTesting bool? useTestAds,
+    @visibleForTesting Duration readyTimeout = const Duration(seconds: 3),
+    @visibleForTesting Duration showTimeout = const Duration(seconds: 8),
   }) : _preferencesReader = preferencesReader,
-       _frequencyCap = frequencyCap;
+       _frequencyCap = frequencyCap,
+       _adLoader = adLoader ?? _loadMobileInterstitialAd,
+       _platformSupportedOverride = platformSupported,
+       _adUnitIdOverride = adUnitId,
+       _useTestAdsOverride = useTestAds,
+       _readyTimeout = readyTimeout,
+       _showTimeout = showTimeout;
 
   final Future<SharedPreferencesLike> Function() _preferencesReader;
   final InterstitialFrequencyCap _frequencyCap;
+  final InterstitialAdLoader _adLoader;
+  final bool? _platformSupportedOverride;
+  final String? _adUnitIdOverride;
+  final bool? _useTestAdsOverride;
+  final Duration _readyTimeout;
+  final Duration _showTimeout;
 
-  InterstitialAd? _ad;
-  bool _isLoading = false;
+  InterstitialAdHandle? _ad;
+  Future<bool>? _loadFuture;
   bool _isShowing = false;
 
   @override
   Future<void> preload() async {
-    if (_ad != null || _isLoading || _isShowing || !_platformSupported) {
-      return;
-    }
-    final adUnitId = _adUnitId;
-    if (adUnitId.trim().isEmpty) {
-      debugInterstitial('skippedMissingAdUnit');
-      return;
-    }
-
-    _isLoading = true;
-    debugInterstitial('loadStarted');
-    await adMobInitializationService.ensureInitialized();
-    await InterstitialAd.load(
-      adUnitId: adUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _isLoading = false;
-          _ad = ad;
-          debugInterstitial('loaded');
-        },
-        onAdFailedToLoad: (error) {
-          _isLoading = false;
-          _ad = null;
-          debugInterstitial(
-            'failedToLoad code=${error.code} domain=${error.domain} '
-            'message=${error.message}',
-          );
-        },
-      ),
-    );
+    await _ensureLoaded();
   }
 
   @override
@@ -113,34 +101,47 @@ class MobileInterstitialAdService implements InterstitialAdService {
       return false;
     }
 
-    final readyAd = _ad;
+    var readyAd = _ad;
     if (readyAd == null || _isShowing) {
-      debugInterstitial('skippedNoAdReady trigger=${trigger.name}');
-      unawaited(preload());
-      return false;
+      debugInterstitial('waitingForReadyAd trigger=${trigger.name}');
+      final loaded = await _ensureLoaded().timeout(
+        _readyTimeout,
+        onTimeout: () {
+          debugInterstitial(
+            'readyTimeout trigger=${trigger.name} timeout=${_readyTimeout.inMilliseconds}ms',
+          );
+          return false;
+        },
+      );
+      readyAd = _ad;
+      if (!loaded || readyAd == null || _isShowing) {
+        debugInterstitial('skippedNoAdReady trigger=${trigger.name}');
+        unawaited(preload());
+        return false;
+      }
     }
 
     _ad = null;
     _isShowing = true;
     final completer = Completer<bool>();
 
-    readyAd.fullScreenContentCallback = FullScreenContentCallback(
-      onAdShowedFullScreenContent: (ad) {
+    readyAd.setCallbacks(
+      onShown: () {
         debugInterstitial('shown trigger=${trigger.name}');
       },
-      onAdDismissedFullScreenContent: (ad) {
+      onDismissed: () {
         debugInterstitial('dismissed trigger=${trigger.name}');
-        ad.dispose();
+        readyAd?.dispose();
         if (!completer.isCompleted) {
           completer.complete(true);
         }
       },
-      onAdFailedToShowFullScreenContent: (ad, error) {
+      onFailedToShow: (error) {
         debugInterstitial(
           'failed to show code=${error.code} domain=${error.domain} '
           'message=${error.message}',
         );
-        ad.dispose();
+        readyAd?.dispose();
         if (!completer.isCompleted) {
           completer.complete(false);
         }
@@ -150,9 +151,9 @@ class MobileInterstitialAdService implements InterstitialAdService {
     try {
       readyAd.show();
       final shown = await completer.future.timeout(
-        const Duration(seconds: 8),
+        _showTimeout,
         onTimeout: () {
-          debugInterstitial('timeout');
+          debugInterstitial('timeout trigger=${trigger.name}');
           return false;
         },
       );
@@ -190,7 +191,85 @@ class MobileInterstitialAdService implements InterstitialAdService {
     _ad = null;
   }
 
-  bool get _platformSupported => Platform.isAndroid || Platform.isIOS;
+  Future<bool> _ensureLoaded() {
+    if (_ad != null) {
+      return Future.value(true);
+    }
+    if (_isShowing || !_platformSupported) {
+      return Future.value(false);
+    }
+    final existing = _loadFuture;
+    if (existing != null) {
+      return existing;
+    }
+
+    final adUnitId = _adUnitId;
+    if (adUnitId.trim().isEmpty) {
+      debugInterstitial('skippedMissingAdUnit');
+      return Future.value(false);
+    }
+
+    final future = _load(adUnitId);
+    _loadFuture = future;
+    unawaited(
+      future.whenComplete(() {
+        if (identical(_loadFuture, future)) {
+          _loadFuture = null;
+        }
+      }),
+    );
+    return future;
+  }
+
+  Future<bool> _load(String adUnitId) async {
+    debugInterstitial(
+      'loadStarted platform=$_platformLabel usingTestAds=$_useTestAds '
+      'adUnit=${_maskAdUnitId(adUnitId)}',
+    );
+    try {
+      final result = await _adLoader(adUnitId);
+      if (result.ad != null) {
+        _ad = result.ad;
+        debugInterstitial(
+          'loaded platform=$_platformLabel usingTestAds=$_useTestAds '
+          'adUnit=${_maskAdUnitId(adUnitId)}',
+        );
+        return true;
+      }
+      final error = result.error;
+      if (error != null) {
+        debugInterstitial(
+          'failedToLoad code=${error.code} domain=${error.domain} '
+          'message=${error.message} adUnit=${_maskAdUnitId(adUnitId)}',
+        );
+      } else {
+        debugInterstitial('failedToLoad adUnit=${_maskAdUnitId(adUnitId)}');
+      }
+      return false;
+    } catch (error) {
+      debugInterstitial(
+        'failedToLoad errorType=${error.runtimeType} '
+        'adUnit=${_maskAdUnitId(adUnitId)}',
+      );
+      return false;
+    }
+  }
+
+  bool get _platformSupported =>
+      _platformSupportedOverride ?? (Platform.isAndroid || Platform.isIOS);
+
+  String get _platformLabel {
+    if (_platformSupportedOverride != null) {
+      return _platformSupportedOverride ? 'test-mobile' : 'unsupported';
+    }
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+    return 'unsupported';
+  }
 
   @visibleForTesting
   static bool isAdFreeSession(AuthSession session) {
@@ -206,12 +285,18 @@ class MobileInterstitialAdService implements InterstitialAdService {
   }
 
   String get _adUnitId {
+    final override = _adUnitIdOverride;
+    if (override != null) {
+      return override;
+    }
     return adUnitIdFor(
       isAndroid: Platform.isAndroid,
       isIOS: Platform.isIOS,
-      useTestAds: AppConfig.adMobUseTestAds,
+      useTestAds: _useTestAds,
     );
   }
+
+  bool get _useTestAds => _useTestAdsOverride ?? AppConfig.adMobUseTestAds;
 
   @visibleForTesting
   static String adUnitIdFor({
@@ -232,3 +317,138 @@ class MobileInterstitialAdService implements InterstitialAdService {
 }
 
 typedef SharedPreferencesLike = SharedPreferences;
+
+typedef InterstitialAdLoader =
+    Future<InterstitialAdLoadResult> Function(String adUnitId);
+
+abstract class InterstitialAdHandle {
+  void setCallbacks({
+    required VoidCallback onShown,
+    required VoidCallback onDismissed,
+    required void Function(InterstitialAdErrorInfo error) onFailedToShow,
+  });
+
+  void show();
+
+  void dispose();
+}
+
+class InterstitialAdLoadResult {
+  const InterstitialAdLoadResult.loaded(this.ad) : error = null;
+
+  const InterstitialAdLoadResult.failed(this.error) : ad = null;
+
+  final InterstitialAdHandle? ad;
+  final InterstitialAdErrorInfo? error;
+}
+
+class InterstitialAdErrorInfo {
+  const InterstitialAdErrorInfo({
+    required this.code,
+    required this.domain,
+    required this.message,
+  });
+
+  final int code;
+  final String domain;
+  final String message;
+
+  factory InterstitialAdErrorInfo.fromLoadAdError(LoadAdError error) {
+    return InterstitialAdErrorInfo(
+      code: error.code,
+      domain: error.domain,
+      message: error.message,
+    );
+  }
+
+  factory InterstitialAdErrorInfo.fromAdError(AdError error) {
+    return InterstitialAdErrorInfo(
+      code: error.code,
+      domain: error.domain,
+      message: error.message,
+    );
+  }
+}
+
+Future<InterstitialAdLoadResult> _loadMobileInterstitialAd(
+  String adUnitId,
+) async {
+  final completer = Completer<InterstitialAdLoadResult>();
+  try {
+    await adMobInitializationService.ensureInitialized();
+    await InterstitialAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (!completer.isCompleted) {
+            completer.complete(
+              InterstitialAdLoadResult.loaded(_MobileInterstitialAdHandle(ad)),
+            );
+          }
+        },
+        onAdFailedToLoad: (error) {
+          if (!completer.isCompleted) {
+            completer.complete(
+              InterstitialAdLoadResult.failed(
+                InterstitialAdErrorInfo.fromLoadAdError(error),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  } catch (error) {
+    if (!completer.isCompleted) {
+      completer.complete(
+        InterstitialAdLoadResult.failed(
+          InterstitialAdErrorInfo(
+            code: -1,
+            domain: 'exception',
+            message: error.runtimeType.toString(),
+          ),
+        ),
+      );
+    }
+  }
+  return completer.future;
+}
+
+class _MobileInterstitialAdHandle implements InterstitialAdHandle {
+  _MobileInterstitialAdHandle(this._ad);
+
+  final InterstitialAd _ad;
+
+  @override
+  void setCallbacks({
+    required VoidCallback onShown,
+    required VoidCallback onDismissed,
+    required void Function(InterstitialAdErrorInfo error) onFailedToShow,
+  }) {
+    _ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (_) => onShown(),
+      onAdDismissedFullScreenContent: (_) => onDismissed(),
+      onAdFailedToShowFullScreenContent: (_, error) {
+        onFailedToShow(InterstitialAdErrorInfo.fromAdError(error));
+      },
+    );
+  }
+
+  @override
+  void show() {
+    _ad.show();
+  }
+
+  @override
+  void dispose() {
+    _ad.dispose();
+  }
+}
+
+String _maskAdUnitId(String adUnitId) {
+  final trimmed = adUnitId.trim();
+  if (trimmed.length <= 8) {
+    return '***';
+  }
+  return '${trimmed.substring(0, 8)}...${trimmed.substring(trimmed.length - 4)}';
+}

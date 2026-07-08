@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:evolua_frontend/features/ads/application/ad_placement_policy.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_base.dart';
 import 'package:evolua_frontend/features/ads/application/interstitial_ad_service_mobile.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -285,4 +288,221 @@ void main() {
       isFalse,
     );
   });
+
+  test('preload and maybeShow share a single pending load', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final loader = _FakeInterstitialLoader();
+    final service = _testService(preferences: preferences, loader: loader.call);
+
+    final preload = service.preload();
+    final shown = service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: _freeSession,
+    );
+
+    expect(loader.calls, 1);
+    loader.completeLoaded(_FakeInterstitialAdHandle());
+
+    await preload;
+    expect(await shown, isTrue);
+    await loader.waitForCalls(2);
+    loader.completeFailed();
+    expect(loader.calls, 2);
+  });
+
+  test('maybeShow loads missing ad within timeout and shows it', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final loader = _FakeInterstitialLoader();
+    final handle = _FakeInterstitialAdHandle();
+    final service = _testService(preferences: preferences, loader: loader.call);
+
+    final shown = service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: _freeSession,
+    );
+    await loader.waitForCalls(1);
+    loader.completeLoaded(handle);
+
+    expect(await shown, isTrue);
+    await loader.waitForCalls(2);
+    loader.completeFailed();
+    expect(loader.calls, 2);
+    expect(handle.showCalls, 1);
+  });
+
+  test('maybeShow returns false when load fails without throwing', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final loader = _FakeInterstitialLoader();
+    final service = _testService(preferences: preferences, loader: loader.call);
+
+    final shown = service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: _freeSession,
+    );
+    await loader.waitForCalls(1);
+    loader.completeFailed();
+
+    expect(await shown, isFalse);
+    await loader.waitForCalls(2);
+    loader.completeFailed();
+    expect(loader.calls, 2);
+  });
+
+  test('maybeShow returns false when load times out safely', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final loader = _FakeInterstitialLoader();
+    final service = _testService(
+      preferences: preferences,
+      loader: loader.call,
+      readyTimeout: const Duration(milliseconds: 1),
+    );
+
+    final shown = await service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: _freeSession,
+    );
+
+    expect(shown, isFalse);
+    expect(loader.calls, 1);
+    loader.completeFailed();
+  });
+
+  test('premium and founder sessions block before loading an ad', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final loader = _FakeInterstitialLoader();
+    final service = _testService(preferences: preferences, loader: loader.call);
+
+    final premiumShown = await service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: const AuthSession(
+        userId: 'premium-user',
+        email: 'premium@evolua.test',
+        roles: ['ROLE_PREMIUM'],
+        accessToken: 'token',
+      ),
+    );
+    final founderShown = await service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: const AuthSession(
+        userId: 'founder-user',
+        email: 'founder@evolua.test',
+        roles: ['ROLE_FOUNDER'],
+        accessToken: 'token',
+      ),
+    );
+
+    expect(premiumShown, isFalse);
+    expect(founderShown, isFalse);
+    expect(loader.calls, 0);
+  });
+
+  test('frequency cap blocks before loading an ad', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final loader = _FakeInterstitialLoader();
+    final service = _testService(
+      preferences: preferences,
+      loader: loader.call,
+      frequencyCap: const InterstitialFrequencyCap(maxPerDay: 0),
+    );
+
+    final shown = await service.maybeShow(
+      trigger: InterstitialTrigger.trailCompletion,
+      session: _freeSession,
+    );
+
+    expect(shown, isFalse);
+    expect(loader.calls, 0);
+  });
+}
+
+const _freeSession = AuthSession(
+  userId: 'free-user',
+  email: 'free@evolua.test',
+  roles: ['ROLE_USER'],
+  accessToken: 'token',
+);
+
+MobileInterstitialAdService _testService({
+  required SharedPreferences preferences,
+  required InterstitialAdLoader loader,
+  InterstitialFrequencyCap frequencyCap = const InterstitialFrequencyCap(),
+  Duration readyTimeout = const Duration(seconds: 3),
+}) {
+  return MobileInterstitialAdService(
+    preferencesReader: () async => preferences,
+    frequencyCap: frequencyCap,
+    adLoader: loader,
+    platformSupported: true,
+    adUnitId: 'ca-app-pub-test/interstitial',
+    useTestAds: false,
+    readyTimeout: readyTimeout,
+    showTimeout: const Duration(milliseconds: 50),
+  );
+}
+
+class _FakeInterstitialLoader {
+  int calls = 0;
+  final List<Completer<InterstitialAdLoadResult>> _pending = [];
+
+  Future<InterstitialAdLoadResult> call(String adUnitId) {
+    calls += 1;
+    final completer = Completer<InterstitialAdLoadResult>();
+    _pending.add(completer);
+    return completer.future;
+  }
+
+  Future<void> waitForCalls(int expectedCalls) async {
+    while (calls < expectedCalls) {
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+
+  void completeLoaded(_FakeInterstitialAdHandle handle) {
+    final completer = _pending.removeAt(0);
+    completer.complete(InterstitialAdLoadResult.loaded(handle));
+  }
+
+  void completeFailed() {
+    final completer = _pending.removeAt(0);
+    completer.complete(
+      const InterstitialAdLoadResult.failed(
+        InterstitialAdErrorInfo(code: 3, domain: 'test', message: 'no fill'),
+      ),
+    );
+  }
+}
+
+class _FakeInterstitialAdHandle implements InterstitialAdHandle {
+  int showCalls = 0;
+  int disposeCalls = 0;
+  VoidCallback? _onShown;
+  VoidCallback? _onDismissed;
+
+  @override
+  void setCallbacks({
+    required VoidCallback onShown,
+    required VoidCallback onDismissed,
+    required void Function(InterstitialAdErrorInfo error) onFailedToShow,
+  }) {
+    _onShown = onShown;
+    _onDismissed = onDismissed;
+  }
+
+  @override
+  void show() {
+    showCalls += 1;
+    _onShown?.call();
+    _onDismissed?.call();
+  }
+
+  @override
+  void dispose() {
+    disposeCalls += 1;
+  }
 }
