@@ -105,8 +105,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Novo ritual recebido do seu terapeuta.'),
+            SnackBar(
+              content: Text(context.l10n.dashboardCareRitualReceived),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -343,7 +343,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       }
       AppSnackBar.show(
         context,
-        message: 'Enviamos um novo e-mail de confirmacao.',
+        message: context.l10n.dashboardEmailVerificationSent,
         icon: Icons.mark_email_read_rounded,
       );
     } catch (error) {
@@ -372,7 +372,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         }
       }
     }
-    return 'Nao conseguimos reenviar agora. Tente novamente em instantes.';
+    return context.l10n.dashboardEmailVerificationResendError;
   }
 
   Future<void> _refreshEmailVerificationStatus() async {
@@ -390,8 +390,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       AppSnackBar.show(
         context,
         message: refreshed?.emailVerified == true
-            ? 'E-mail confirmado. Obrigado!'
-            : 'Ainda nao identificamos a confirmacao. Confira seu e-mail e tente novamente.',
+            ? context.l10n.dashboardEmailVerificationConfirmed
+            : context.l10n.dashboardEmailVerificationStillPending,
         icon: refreshed?.emailVerified == true
             ? Icons.verified_rounded
             : Icons.info_outline_rounded,

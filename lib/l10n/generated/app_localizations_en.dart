@@ -79,6 +79,74 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authCustomGenderHint => 'Write it your way';
 
   @override
+  String get authValidationEmailRequired => 'Enter your email.';
+
+  @override
+  String authValidationEmailMaxLength(Object maxLength) {
+    return 'Use an email with up to $maxLength characters.';
+  }
+
+  @override
+  String get authValidationEmailInvalid => 'Use a valid email.';
+
+  @override
+  String get authValidationPasswordRequired => 'Enter your password.';
+
+  @override
+  String authValidationPasswordMinLength(Object minLength) {
+    return 'The password must have at least $minLength characters.';
+  }
+
+  @override
+  String authValidationPasswordMaxLength(Object maxLength) {
+    return 'Use a password with up to $maxLength characters.';
+  }
+
+  @override
+  String get authValidationConfirmPasswordRequired => 'Confirm your password.';
+
+  @override
+  String get authValidationPasswordsDoNotMatch => 'The passwords do not match.';
+
+  @override
+  String get authValidationDisplayNameRequired => 'Enter your name.';
+
+  @override
+  String authValidationDisplayNameMinLength(Object minLength) {
+    return 'Enter a name with at least $minLength characters.';
+  }
+
+  @override
+  String authValidationDisplayNameMaxLength(Object maxLength) {
+    return 'Enter a name with up to $maxLength characters.';
+  }
+
+  @override
+  String get authValidationDisplayNameLettersOnly =>
+      'Use only letters, spaces, and accents in the name.';
+
+  @override
+  String get authValidationBirthDateRequired => 'Enter your birth date.';
+
+  @override
+  String get authValidationBirthDateFormat =>
+      'Use a valid date in dd/mm/yyyy format.';
+
+  @override
+  String get authValidationBirthDateInvalid => 'Enter a valid birth date.';
+
+  @override
+  String authValidationMinimumAge(Object minimumAge) {
+    return 'You must be at least $minimumAge years old to create an account.';
+  }
+
+  @override
+  String get authValidationGenderRequired => 'Select a gender option.';
+
+  @override
+  String get authValidationCustomGenderRequired => 'Enter how you identify.';
+
+  @override
   String get authEmailLabel => 'Email';
 
   @override
@@ -151,6 +219,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonRetry => 'Try again';
+
+  @override
+  String get routerBootErrorTitle => 'We could not start Evolua right now.';
+
+  @override
+  String get routerBootErrorBody =>
+      'Check your connection and try again in a moment.';
+
+  @override
+  String get routerNotFoundTitle => 'We could not find this page.';
+
+  @override
+  String get routerNotFoundBody =>
+      'The link may have changed or may no longer be available.';
+
+  @override
+  String get routerBackToEvolua => 'Back to Evolua';
+
+  @override
+  String get dashboardCareRitualReceived =>
+      'New ritual received from your therapist.';
+
+  @override
+  String get dashboardCareGuidanceReceived =>
+      'New guidance from your therapist.';
+
+  @override
+  String get dashboardEmailVerificationSent =>
+      'We sent a new confirmation email.';
+
+  @override
+  String get dashboardEmailVerificationResendError =>
+      'We could not resend it right now. Try again in a moment.';
+
+  @override
+  String get dashboardEmailVerificationConfirmed =>
+      'Email confirmed. Thank you!';
+
+  @override
+  String get dashboardEmailVerificationStillPending =>
+      'We have not detected the confirmation yet. Check your email and try again.';
 
   @override
   String get commonRefresh => 'Refresh';
@@ -1072,6 +1181,74 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   String get authCustomGenderHint => 'Write it your way';
 
   @override
+  String get authValidationEmailRequired => 'Enter your email.';
+
+  @override
+  String authValidationEmailMaxLength(Object maxLength) {
+    return 'Use an email with up to $maxLength characters.';
+  }
+
+  @override
+  String get authValidationEmailInvalid => 'Use a valid email.';
+
+  @override
+  String get authValidationPasswordRequired => 'Enter your password.';
+
+  @override
+  String authValidationPasswordMinLength(Object minLength) {
+    return 'The password must have at least $minLength characters.';
+  }
+
+  @override
+  String authValidationPasswordMaxLength(Object maxLength) {
+    return 'Use a password with up to $maxLength characters.';
+  }
+
+  @override
+  String get authValidationConfirmPasswordRequired => 'Confirm your password.';
+
+  @override
+  String get authValidationPasswordsDoNotMatch => 'The passwords do not match.';
+
+  @override
+  String get authValidationDisplayNameRequired => 'Enter your name.';
+
+  @override
+  String authValidationDisplayNameMinLength(Object minLength) {
+    return 'Enter a name with at least $minLength characters.';
+  }
+
+  @override
+  String authValidationDisplayNameMaxLength(Object maxLength) {
+    return 'Enter a name with up to $maxLength characters.';
+  }
+
+  @override
+  String get authValidationDisplayNameLettersOnly =>
+      'Use only letters, spaces, and accents in the name.';
+
+  @override
+  String get authValidationBirthDateRequired => 'Enter your birth date.';
+
+  @override
+  String get authValidationBirthDateFormat =>
+      'Use a valid date in dd/mm/yyyy format.';
+
+  @override
+  String get authValidationBirthDateInvalid => 'Enter a valid birth date.';
+
+  @override
+  String authValidationMinimumAge(Object minimumAge) {
+    return 'You must be at least $minimumAge years old to create an account.';
+  }
+
+  @override
+  String get authValidationGenderRequired => 'Select a gender option.';
+
+  @override
+  String get authValidationCustomGenderRequired => 'Enter how you identify.';
+
+  @override
   String get authEmailLabel => 'Email';
 
   @override
@@ -1144,6 +1321,47 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
 
   @override
   String get commonRetry => 'Try again';
+
+  @override
+  String get routerBootErrorTitle => 'We could not start Evolua right now.';
+
+  @override
+  String get routerBootErrorBody =>
+      'Check your connection and try again in a moment.';
+
+  @override
+  String get routerNotFoundTitle => 'We could not find this page.';
+
+  @override
+  String get routerNotFoundBody =>
+      'The link may have changed or may no longer be available.';
+
+  @override
+  String get routerBackToEvolua => 'Back to Evolua';
+
+  @override
+  String get dashboardCareRitualReceived =>
+      'New ritual received from your therapist.';
+
+  @override
+  String get dashboardCareGuidanceReceived =>
+      'New guidance from your therapist.';
+
+  @override
+  String get dashboardEmailVerificationSent =>
+      'We sent a new confirmation email.';
+
+  @override
+  String get dashboardEmailVerificationResendError =>
+      'We could not resend it right now. Try again in a moment.';
+
+  @override
+  String get dashboardEmailVerificationConfirmed =>
+      'Email confirmed. Thank you!';
+
+  @override
+  String get dashboardEmailVerificationStillPending =>
+      'We have not detected the confirmation yet. Check your email and try again.';
 
   @override
   String get commonRefresh => 'Refresh';

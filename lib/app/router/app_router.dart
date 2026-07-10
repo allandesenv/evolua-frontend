@@ -14,6 +14,7 @@ import 'package:evolua_frontend/features/emotional/presentation/pages/consciousn
 import 'package:evolua_frontend/features/future_message/presentation/pages/future_messages_page.dart';
 import 'package:evolua_frontend/features/home/presentation/pages/home_page.dart';
 import 'package:evolua_frontend/features/subscription/presentation/pages/billing_return_page.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:flutter/material.dart';
@@ -233,7 +234,7 @@ class _AuthBootPage extends ConsumerWidget {
               const SizedBox(height: 28),
               if (hasBootError) ...[
                 Text(
-                  'Nao conseguimos iniciar o Evolua agora.',
+                  context.l10n.routerBootErrorTitle,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Colors.white,
@@ -242,7 +243,7 @@ class _AuthBootPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Verifique sua conexao e tente novamente em instantes.',
+                  context.l10n.routerBootErrorBody,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.white70,
@@ -252,7 +253,7 @@ class _AuthBootPage extends ConsumerWidget {
                 const SizedBox(height: 22),
                 FilledButton(
                   onPressed: () => ref.invalidate(authControllerProvider),
-                  child: const Text('Tentar novamente'),
+                  child: Text(context.l10n.commonRetry),
                 ),
               ] else
                 const SizedBox(
@@ -285,7 +286,7 @@ class _RouteNotFoundPage extends StatelessWidget {
               const EvoluaLogo(variant: EvoluaLogoVariant.sidebar),
               const SizedBox(height: 28),
               Text(
-                'Nao encontramos esta pagina.',
+                context.l10n.routerNotFoundTitle,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
@@ -294,7 +295,7 @@ class _RouteNotFoundPage extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'O link pode ter mudado ou nao estar mais disponivel.',
+                context.l10n.routerNotFoundBody,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.white70,
@@ -305,7 +306,7 @@ class _RouteNotFoundPage extends StatelessWidget {
               FilledButton(
                 onPressed: () =>
                     context.go(isAuthenticated ? '/home' : '/auth'),
-                child: const Text('Voltar para o Evolua'),
+                child: Text(context.l10n.routerBackToEvolua),
               ),
             ],
           ),

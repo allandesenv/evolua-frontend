@@ -5,6 +5,7 @@ import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/app_update/application/app_update_platform.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -24,6 +25,18 @@ final appVersionDioProvider = Provider<Dio>((ref) {
   attachHttpInstrumentation(
     dio,
     recorder: ref.read(httpInstrumentationRecorderProvider),
+  );
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final preferences = await ref.read(sharedPreferencesProvider.future);
+        options.headers['Accept-Language'] = effectiveAppLanguageTag(
+          preference: preferences.getString(localePreferenceStorageKey),
+          systemLocale: PlatformDispatcher.instance.locale,
+        );
+        handler.next(options);
+      },
+    ),
   );
   return dio;
 });

@@ -22,6 +22,54 @@
   "authGenderCustom": "Personalizado",
   "authCustomGenderLabel": "Como você se identifica",
   "authCustomGenderHint": "Escreva do seu jeito",
+  "authValidationEmailRequired": "Informe seu e-mail.",
+  "authValidationEmailMaxLength": "Use um e-mail com até {maxLength} caracteres.",
+  "@authValidationEmailMaxLength": {
+    "placeholders": {
+      "maxLength": {}
+    }
+  },
+  "authValidationEmailInvalid": "Use um e-mail válido.",
+  "authValidationPasswordRequired": "Informe sua senha.",
+  "authValidationPasswordMinLength": "A senha deve ter ao menos {minLength} caracteres.",
+  "@authValidationPasswordMinLength": {
+    "placeholders": {
+      "minLength": {}
+    }
+  },
+  "authValidationPasswordMaxLength": "Use uma senha com até {maxLength} caracteres.",
+  "@authValidationPasswordMaxLength": {
+    "placeholders": {
+      "maxLength": {}
+    }
+  },
+  "authValidationConfirmPasswordRequired": "Confirme sua senha.",
+  "authValidationPasswordsDoNotMatch": "As senhas não conferem.",
+  "authValidationDisplayNameRequired": "Informe seu nome.",
+  "authValidationDisplayNameMinLength": "Informe um nome com ao menos {minLength} caracteres.",
+  "@authValidationDisplayNameMinLength": {
+    "placeholders": {
+      "minLength": {}
+    }
+  },
+  "authValidationDisplayNameMaxLength": "Informe um nome com até {maxLength} caracteres.",
+  "@authValidationDisplayNameMaxLength": {
+    "placeholders": {
+      "maxLength": {}
+    }
+  },
+  "authValidationDisplayNameLettersOnly": "Use apenas letras, espaços e acentos no nome.",
+  "authValidationBirthDateRequired": "Informe sua data de nascimento.",
+  "authValidationBirthDateFormat": "Use uma data válida no formato dd/mm/aaaa.",
+  "authValidationBirthDateInvalid": "Informe uma data de nascimento válida.",
+  "authValidationMinimumAge": "Você precisa ter pelo menos {minimumAge} anos para criar conta.",
+  "@authValidationMinimumAge": {
+    "placeholders": {
+      "minimumAge": {}
+    }
+  },
+  "authValidationGenderRequired": "Selecione uma opção de gênero.",
+  "authValidationCustomGenderRequired": "Informe como você se identifica.",
   "authEmailLabel": "E-mail",
   "authEmailHint": "voce@evolua.app",
   "authPasswordLabel": "Senha",
@@ -45,6 +93,17 @@
   "commonSending": "Enviando...",
   "commonSend": "Enviar",
   "commonRetry": "Tentar novamente",
+  "routerBootErrorTitle": "Não conseguimos iniciar o Evolua agora.",
+  "routerBootErrorBody": "Verifique sua conexão e tente novamente em instantes.",
+  "routerNotFoundTitle": "Não encontramos esta página.",
+  "routerNotFoundBody": "O link pode ter mudado ou não estar mais disponível.",
+  "routerBackToEvolua": "Voltar para o Evolua",
+  "dashboardCareRitualReceived": "Novo ritual recebido do seu terapeuta.",
+  "dashboardCareGuidanceReceived": "Nova orientação do seu terapeuta.",
+  "dashboardEmailVerificationSent": "Enviamos um novo e-mail de confirmação.",
+  "dashboardEmailVerificationResendError": "Não conseguimos reenviar agora. Tente novamente em instantes.",
+  "dashboardEmailVerificationConfirmed": "E-mail confirmado. Obrigado!",
+  "dashboardEmailVerificationStillPending": "Ainda não identificamos a confirmação. Confira seu e-mail e tente novamente.",
   "commonRefresh": "Atualizar",
   "commonBack": "Voltar",
   "commonNext": "Próximo",

@@ -29,6 +29,19 @@ enum LocalePreference {
   }
 }
 
+String effectiveAppLanguageTag({
+  required String? preference,
+  required Locale systemLocale,
+}) {
+  final localePreference = LocalePreference.fromStorage(preference);
+  return switch (localePreference) {
+    LocalePreference.ptBr => 'pt-BR',
+    LocalePreference.enUs => 'en-US',
+    LocalePreference.system =>
+      systemLocale.languageCode.toLowerCase() == 'en' ? 'en-US' : 'pt-BR',
+  };
+}
+
 final localeControllerProvider =
     AsyncNotifierProvider<LocaleController, LocalePreference>(
       LocaleController.new,
