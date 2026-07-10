@@ -1,3 +1,5 @@
+import 'package:evolua_frontend/l10n/generated/app_localizations.dart';
+
 const minimumSignupAge = 13;
 const maxEmailLength = 254;
 const minPasswordLength = 6;
@@ -23,19 +25,19 @@ String normalizeDisplayName(String value) {
   return value.trim().replaceAll(RegExp(r'\s+'), ' ');
 }
 
-String? validateEmail(String? value) {
+String? validateEmail(String? value, AppLocalizations l10n) {
   final email = normalizeEmail(value ?? '');
 
   if (email.isEmpty) {
-    return 'Informe seu e-mail.';
+    return l10n.authValidationEmailRequired;
   }
 
   if (email.length > maxEmailLength) {
-    return 'Use um e-mail com até $maxEmailLength caracteres.';
+    return l10n.authValidationEmailMaxLength(maxEmailLength);
   }
 
   if ('@'.allMatches(email).length != 1) {
-    return 'Use um e-mail válido.';
+    return l10n.authValidationEmailInvalid;
   }
 
   final parts = email.split('@');
@@ -43,69 +45,73 @@ String? validateEmail(String? value) {
   final domain = parts.last;
 
   if (local.isEmpty || domain.isEmpty || !domain.contains('.')) {
-    return 'Use um e-mail válido.';
+    return l10n.authValidationEmailInvalid;
   }
 
   final localPattern = RegExp(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$");
   final domainPattern = RegExp(r'^(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$');
 
   if (!localPattern.hasMatch(local) || !domainPattern.hasMatch(domain)) {
-    return 'Use um e-mail válido.';
+    return l10n.authValidationEmailInvalid;
   }
 
   return null;
 }
 
-String? validatePassword(String? value) {
+String? validatePassword(String? value, AppLocalizations l10n) {
   final password = value ?? '';
 
   if (password.trim().isEmpty) {
-    return 'Informe sua senha.';
+    return l10n.authValidationPasswordRequired;
   }
 
   if (password.length < minPasswordLength) {
-    return 'A senha deve ter ao menos $minPasswordLength caracteres.';
+    return l10n.authValidationPasswordMinLength(minPasswordLength);
   }
 
   if (password.length > maxPasswordLength) {
-    return 'Use uma senha com até $maxPasswordLength caracteres.';
+    return l10n.authValidationPasswordMaxLength(maxPasswordLength);
   }
 
   return null;
 }
 
-String? validateConfirmPassword(String? value, String password) {
+String? validateConfirmPassword(
+  String? value,
+  String password,
+  AppLocalizations l10n,
+) {
   final confirmation = value ?? '';
 
   if (confirmation.isEmpty) {
-    return 'Confirme sua senha.';
+    return l10n.authValidationConfirmPasswordRequired;
   }
 
   if (confirmation != password) {
-    return 'As senhas não conferem.';
+    return l10n.authValidationPasswordsDoNotMatch;
   }
 
   return null;
 }
 
-String? validateDisplayName(String? value) {
+String? validateDisplayName(String? value, AppLocalizations l10n) {
   final name = normalizeDisplayName(value ?? '');
 
   if (name.isEmpty) {
-    return 'Informe seu nome.';
+    return l10n.authValidationDisplayNameRequired;
   }
 
   if (name.length < minDisplayNameLength) {
-    return 'Informe um nome com ao menos $minDisplayNameLength caracteres.';
+    return l10n.authValidationDisplayNameMinLength(minDisplayNameLength);
   }
 
   if (name.length > maxDisplayNameLength) {
-    return 'Informe um nome com até $maxDisplayNameLength caracteres.';
+    return l10n.authValidationDisplayNameMaxLength(maxDisplayNameLength);
   }
 
   final namePattern = RegExp(r'^[A-Za-zÀ-ÖØ-öø-ÿ ]+$');
   if (!namePattern.hasMatch(name)) {
-    return 'Use apenas letras, espaços e acentos no nome.';
+    return l10n.authValidationDisplayNameLettersOnly;
   }
 
   return null;
@@ -136,30 +142,38 @@ String formatBirthDate(DateTime value) {
   return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
 
-String? validateBirthDateText(String? value, {DateTime? now}) {
+String? validateBirthDateText(
+  String? value,
+  AppLocalizations l10n, {
+  DateTime? now,
+}) {
   final raw = (value ?? '').trim();
   if (raw.isEmpty) {
-    return 'Informe sua data de nascimento.';
+    return l10n.authValidationBirthDateRequired;
   }
 
   final parsed = parseBirthDateText(raw);
   if (parsed == null) {
-    return 'Use uma data válida no formato dd/mm/aaaa.';
+    return l10n.authValidationBirthDateFormat;
   }
 
-  return validateBirthDate(parsed, now: now);
+  return validateBirthDate(parsed, l10n, now: now);
 }
 
-String? validateBirthDate(DateTime? value, {DateTime? now}) {
+String? validateBirthDate(
+  DateTime? value,
+  AppLocalizations l10n, {
+  DateTime? now,
+}) {
   if (value == null) {
-    return 'Informe sua data de nascimento.';
+    return l10n.authValidationBirthDateRequired;
   }
 
   final today = _dateOnly(now ?? DateTime.now());
   final birthDate = _dateOnly(value);
 
   if (birthDate.isAfter(today)) {
-    return 'Informe uma data de nascimento válida.';
+    return l10n.authValidationBirthDateInvalid;
   }
 
   final minimumDate = DateTime(
@@ -168,15 +182,15 @@ String? validateBirthDate(DateTime? value, {DateTime? now}) {
     today.day,
   );
   if (birthDate.isAfter(minimumDate)) {
-    return 'Você precisa ter pelo menos $minimumSignupAge anos para criar conta.';
+    return l10n.authValidationMinimumAge(minimumSignupAge);
   }
 
   return null;
 }
 
-String? validateGender(String? value) {
+String? validateGender(String? value, AppLocalizations l10n) {
   if (value == null || value.isEmpty || !validGenderValues.contains(value)) {
-    return 'Selecione uma opção de gênero.';
+    return l10n.authValidationGenderRequired;
   }
 
   return null;
@@ -185,13 +199,14 @@ String? validateGender(String? value) {
 String? validateCustomGender({
   required String selectedGender,
   required String? customGender,
+  required AppLocalizations l10n,
 }) {
   if (selectedGender != genderCustom) {
     return null;
   }
 
   if ((customGender ?? '').trim().isEmpty) {
-    return 'Informe como você se identifica.';
+    return l10n.authValidationCustomGenderRequired;
   }
 
   return null;

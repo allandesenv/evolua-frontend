@@ -148,7 +148,10 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       setState(() {
         _birthDate = selected;
         _birthDateController.text = formatBirthDate(selected);
-        _birthDateError = validateBirthDateText(_birthDateController.text);
+        _birthDateError = validateBirthDateText(
+          _birthDateController.text,
+          context.l10n,
+        );
       });
     }
   }
@@ -156,7 +159,7 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
   void _handleProfileBirthDateChanged(String value) {
     setState(() {
       _birthDate = parseBirthDateText(value);
-      _birthDateError = validateBirthDateText(value);
+      _birthDateError = validateBirthDateText(value, context.l10n);
     });
   }
 
@@ -165,11 +168,16 @@ class _ProfileModuleViewState extends ConsumerState<ProfileModuleView> {
       return;
     }
     _birthDate = parseBirthDateText(_birthDateController.text);
-    _birthDateError = validateBirthDateText(_birthDateController.text);
+    _birthDateError = validateBirthDateText(
+      _birthDateController.text,
+      context.l10n,
+    );
     if (!_formKey.currentState!.validate() || _birthDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_birthDateError ?? 'Informe sua data de nascimento.'),
+          content: Text(
+            _birthDateError ?? context.l10n.authValidationBirthDateRequired,
+          ),
         ),
       );
       return;
@@ -1629,7 +1637,7 @@ class _OverviewSection extends StatelessWidget {
                 labelText: 'Nome',
                 prefixIcon: Icon(Icons.badge_rounded),
               ),
-              validator: validateDisplayName,
+              validator: (value) => validateDisplayName(value, context.l10n),
             ),
             const SizedBox(height: 16),
             TextFormField(

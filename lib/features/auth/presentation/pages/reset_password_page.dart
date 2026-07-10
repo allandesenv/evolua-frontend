@@ -146,7 +146,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                 ),
               ),
             ),
-            validator: validatePassword,
+            validator: (value) => validatePassword(value, context.l10n),
           ),
           const SizedBox(height: 14),
           TextFormField(
@@ -157,7 +157,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
               prefixIcon: const Icon(Icons.lock_outline_rounded),
             ),
             validator: (value) {
-              final passwordError = validatePassword(value);
+              final passwordError = validatePassword(value, context.l10n);
               if (passwordError != null) {
                 return passwordError;
               }

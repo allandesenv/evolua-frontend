@@ -218,7 +218,10 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       _submitted = true;
       if (_isRegisterMode) {
         _birthDate = parseBirthDateText(_birthDateController.text);
-        _birthDateError = validateBirthDateText(_birthDateController.text);
+        _birthDateError = validateBirthDateText(
+          _birthDateController.text,
+          context.l10n,
+        );
       } else {
         _birthDateError = null;
       }
@@ -270,8 +273,9 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   }
 
   void _focusFirstInvalidField() {
+    final l10n = context.l10n;
     if (_isRegisterMode &&
-        validateDisplayName(_displayNameController.text) != null) {
+        validateDisplayName(_displayNameController.text, l10n) != null) {
       _displayNameFocusNode.requestFocus();
       return;
     }
@@ -281,12 +285,12 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
       return;
     }
 
-    if (validateEmail(_emailController.text) != null) {
+    if (validateEmail(_emailController.text, l10n) != null) {
       _emailFocusNode.requestFocus();
       return;
     }
 
-    if (validatePassword(_passwordController.text) != null) {
+    if (validatePassword(_passwordController.text, l10n) != null) {
       _passwordFocusNode.requestFocus();
       return;
     }
@@ -295,6 +299,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         validateConfirmPassword(
               _confirmPasswordController.text,
               _passwordController.text,
+              l10n,
             ) !=
             null) {
       _confirmPasswordFocusNode.requestFocus();
@@ -305,6 +310,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         validateCustomGender(
               selectedGender: _gender,
               customGender: _customGenderController.text,
+              l10n: l10n,
             ) !=
             null) {
       _customGenderFocusNode.requestFocus();
@@ -371,7 +377,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
         _birthDate = selected;
         _birthDateController.text = formatBirthDate(selected);
         _birthDateError = _submitted
-            ? validateBirthDateText(_birthDateController.text)
+            ? validateBirthDateText(_birthDateController.text, context.l10n)
             : null;
       });
     }
@@ -380,7 +386,9 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
   void _handleBirthDateChanged(String value) {
     setState(() {
       _birthDate = parseBirthDateText(value);
-      _birthDateError = _submitted ? validateBirthDateText(value) : null;
+      _birthDateError = _submitted
+          ? validateBirthDateText(value, context.l10n)
+          : null;
     });
   }
 
@@ -487,7 +495,8 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                             hintText: l10n.authDisplayNameHint,
                             prefixIcon: const Icon(Icons.badge_rounded),
                           ),
-                          validator: validateDisplayName,
+                          validator: (value) =>
+                              validateDisplayName(value, l10n),
                         ),
                         SizedBox(height: compact ? 12 : 14),
                         TextFormField(
@@ -537,7 +546,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                               child: Text(l10n.authGenderCustom),
                             ),
                           ],
-                          validator: validateGender,
+                          validator: (value) => validateGender(value, l10n),
                           onChanged: isLoading
                               ? null
                               : (value) {
@@ -558,6 +567,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                             validator: (value) => validateCustomGender(
                               selectedGender: _gender,
                               customGender: value,
+                              l10n: l10n,
                             ),
                           ),
                         ],
@@ -575,7 +585,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           hintText: l10n.authEmailHint,
                           prefixIcon: const Icon(Icons.alternate_email_rounded),
                         ),
-                        validator: validateEmail,
+                        validator: (value) => validateEmail(value, l10n),
                       ),
                       SizedBox(height: compact ? 12 : 14),
                       TextFormField(
@@ -611,7 +621,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                             ),
                           ),
                         ),
-                        validator: validatePassword,
+                        validator: (value) => validatePassword(value, l10n),
                       ),
                       if (_isRegisterMode) ...[
                         SizedBox(height: compact ? 12 : 14),
@@ -631,6 +641,7 @@ class _AuthFormCardState extends ConsumerState<AuthFormCard> {
                           validator: (value) => validateConfirmPassword(
                             value,
                             _passwordController.text,
+                            l10n,
                           ),
                         ),
                       ],
@@ -818,7 +829,7 @@ class _ForgotPasswordDialogState extends ConsumerState<_ForgotPasswordDialog> {
                 labelText: l10n.authEmailLabel,
                 prefixIcon: const Icon(Icons.alternate_email_rounded),
               ),
-              validator: validateEmail,
+              validator: (value) => validateEmail(value, l10n),
               onFieldSubmitted: _isSending ? null : (_) => _submit(),
             ),
             if (_sent) ...[

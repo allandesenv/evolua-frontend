@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/authenticated_dio_provider.dart';
@@ -8,6 +9,7 @@ import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +18,46 @@ const _sessionStorageKey = 'evolua.auth.session';
 const _localePreferenceStorageKey = 'evolua.locale_preference.v1';
 
 void main() {
+  group('effective app language tag', () {
+    test('resolves explicit, system, and invalid preferences', () {
+      expect(
+        effectiveAppLanguageTag(
+          preference: 'pt-BR',
+          systemLocale: const Locale('en', 'US'),
+        ),
+        'pt-BR',
+      );
+      expect(
+        effectiveAppLanguageTag(
+          preference: 'en-US',
+          systemLocale: const Locale('pt', 'BR'),
+        ),
+        'en-US',
+      );
+      expect(
+        effectiveAppLanguageTag(
+          preference: 'system',
+          systemLocale: const Locale('en', 'GB'),
+        ),
+        'en-US',
+      );
+      expect(
+        effectiveAppLanguageTag(
+          preference: 'system',
+          systemLocale: const Locale('pt', 'BR'),
+        ),
+        'pt-BR',
+      );
+      expect(
+        effectiveAppLanguageTag(
+          preference: 'fr-FR',
+          systemLocale: const Locale('en', 'US'),
+        ),
+        'pt-BR',
+      );
+    });
+  });
+
   group('AuthController refresh', () {
     test(
       'renews expired session during boot when refresh token is valid',

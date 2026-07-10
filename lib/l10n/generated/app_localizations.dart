@@ -232,6 +232,114 @@ abstract class AppLocalizations {
   /// **'Escreva do seu jeito'**
   String get authCustomGenderHint;
 
+  /// No description provided for @authValidationEmailRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe seu e-mail.'**
+  String get authValidationEmailRequired;
+
+  /// No description provided for @authValidationEmailMaxLength.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use um e-mail com até {maxLength} caracteres.'**
+  String authValidationEmailMaxLength(Object maxLength);
+
+  /// No description provided for @authValidationEmailInvalid.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use um e-mail válido.'**
+  String get authValidationEmailInvalid;
+
+  /// No description provided for @authValidationPasswordRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe sua senha.'**
+  String get authValidationPasswordRequired;
+
+  /// No description provided for @authValidationPasswordMinLength.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'A senha deve ter ao menos {minLength} caracteres.'**
+  String authValidationPasswordMinLength(Object minLength);
+
+  /// No description provided for @authValidationPasswordMaxLength.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use uma senha com até {maxLength} caracteres.'**
+  String authValidationPasswordMaxLength(Object maxLength);
+
+  /// No description provided for @authValidationConfirmPasswordRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirme sua senha.'**
+  String get authValidationConfirmPasswordRequired;
+
+  /// No description provided for @authValidationPasswordsDoNotMatch.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'As senhas não conferem.'**
+  String get authValidationPasswordsDoNotMatch;
+
+  /// No description provided for @authValidationDisplayNameRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe seu nome.'**
+  String get authValidationDisplayNameRequired;
+
+  /// No description provided for @authValidationDisplayNameMinLength.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe um nome com ao menos {minLength} caracteres.'**
+  String authValidationDisplayNameMinLength(Object minLength);
+
+  /// No description provided for @authValidationDisplayNameMaxLength.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe um nome com até {maxLength} caracteres.'**
+  String authValidationDisplayNameMaxLength(Object maxLength);
+
+  /// No description provided for @authValidationDisplayNameLettersOnly.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use apenas letras, espaços e acentos no nome.'**
+  String get authValidationDisplayNameLettersOnly;
+
+  /// No description provided for @authValidationBirthDateRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe sua data de nascimento.'**
+  String get authValidationBirthDateRequired;
+
+  /// No description provided for @authValidationBirthDateFormat.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Use uma data válida no formato dd/mm/aaaa.'**
+  String get authValidationBirthDateFormat;
+
+  /// No description provided for @authValidationBirthDateInvalid.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe uma data de nascimento válida.'**
+  String get authValidationBirthDateInvalid;
+
+  /// No description provided for @authValidationMinimumAge.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Você precisa ter pelo menos {minimumAge} anos para criar conta.'**
+  String authValidationMinimumAge(Object minimumAge);
+
+  /// No description provided for @authValidationGenderRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Selecione uma opção de gênero.'**
+  String get authValidationGenderRequired;
+
+  /// No description provided for @authValidationCustomGenderRequired.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Informe como você se identifica.'**
+  String get authValidationCustomGenderRequired;
+
   /// No description provided for @authEmailLabel.
   ///
   /// In pt_BR, this message translates to:
@@ -369,6 +477,72 @@ abstract class AppLocalizations {
   /// In pt_BR, this message translates to:
   /// **'Tentar novamente'**
   String get commonRetry;
+
+  /// No description provided for @routerBootErrorTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos iniciar o Evolua agora.'**
+  String get routerBootErrorTitle;
+
+  /// No description provided for @routerBootErrorBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Verifique sua conexão e tente novamente em instantes.'**
+  String get routerBootErrorBody;
+
+  /// No description provided for @routerNotFoundTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não encontramos esta página.'**
+  String get routerNotFoundTitle;
+
+  /// No description provided for @routerNotFoundBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O link pode ter mudado ou não estar mais disponível.'**
+  String get routerNotFoundBody;
+
+  /// No description provided for @routerBackToEvolua.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Voltar para o Evolua'**
+  String get routerBackToEvolua;
+
+  /// No description provided for @dashboardCareRitualReceived.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Novo ritual recebido do seu terapeuta.'**
+  String get dashboardCareRitualReceived;
+
+  /// No description provided for @dashboardCareGuidanceReceived.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nova orientação do seu terapeuta.'**
+  String get dashboardCareGuidanceReceived;
+
+  /// No description provided for @dashboardEmailVerificationSent.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Enviamos um novo e-mail de confirmação.'**
+  String get dashboardEmailVerificationSent;
+
+  /// No description provided for @dashboardEmailVerificationResendError.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos reenviar agora. Tente novamente em instantes.'**
+  String get dashboardEmailVerificationResendError;
+
+  /// No description provided for @dashboardEmailVerificationConfirmed.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'E-mail confirmado. Obrigado!'**
+  String get dashboardEmailVerificationConfirmed;
+
+  /// No description provided for @dashboardEmailVerificationStillPending.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ainda não identificamos a confirmação. Confira seu e-mail e tente novamente.'**
+  String get dashboardEmailVerificationStillPending;
 
   /// No description provided for @commonRefresh.
   ///
