@@ -149,8 +149,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     if (!available) {
       AppSnackBar.show(
         context,
-        message:
-            'O microfone não está disponível agora. Você pode continuar digitando.',
+        message: context.l10n.checkInMicrophoneUnavailable,
         icon: Icons.mic_off_rounded,
       );
       return;
@@ -198,8 +197,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     setState(() => _isListeningReflection = false);
     AppSnackBar.show(
       context,
-      message:
-          'Não foi possível transcrever agora. Você pode continuar digitando.',
+      message: context.l10n.checkInSpeechTranscriptionUnavailable,
       icon: Icons.mic_off_rounded,
     );
   }
@@ -241,8 +239,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         if (mounted) {
           AppSnackBar.show(
             context,
-            message:
-                'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.',
+            message: context.l10n.checkInSaveTimeout,
             icon: Icons.favorite_border_rounded,
           );
         }
@@ -263,7 +260,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           final result = _submitErrorResult(error);
           AppSnackBar.show(
             context,
-            message: _submitErrorMessage(result, fallbackError: error),
+            message: _submitErrorMessage(
+              result,
+              context.l10n,
+              fallbackError: error,
+            ),
             icon: Icons.favorite_border_rounded,
           );
           return result;
@@ -289,7 +290,11 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         final result = _submitErrorResult(asyncState.error);
         AppSnackBar.show(
           context,
-          message: _submitErrorMessage(result, fallbackError: asyncState.error),
+          message: _submitErrorMessage(
+            result,
+            context.l10n,
+            fallbackError: asyncState.error,
+          ),
           icon: Icons.favorite_border_rounded,
         );
         return result;
@@ -306,8 +311,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       if (insight?.quotaLimited == true) {
         AppSnackBar.show(
           context,
-          message:
-              'Check-in salvo. Você já pode continuar; a leitura aprofundada pode ser liberada depois.',
+          message: context.l10n.checkInSavedDeepReadingLater,
           icon: Icons.check_circle_outline_rounded,
         );
         await _maybeInviteDailyReminder();
@@ -348,18 +352,16 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     final accepted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Lembrete leve pela manhã'),
-        content: const Text(
-          'Quer receber um lembrete leve pela manhã para cuidar do seu momento?',
-        ),
+        title: Text(context.l10n.checkInReminderMorningTitle),
+        content: Text(context.l10n.checkInReminderMorningMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Agora não'),
+            child: Text(context.l10n.checkInNotNow),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Ativar lembrete'),
+            child: Text(context.l10n.checkInReminderEnable),
           ),
         ],
       ),
@@ -384,8 +386,8 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     AppSnackBar.show(
       context,
       message: enabled
-          ? 'Lembrete diário ativado para 08:00.'
-          : 'Não conseguimos ativar o lembrete sem permissão de notificação.',
+          ? context.l10n.checkInReminderEnabled
+          : context.l10n.checkInReminderPermissionDenied,
       icon: enabled
           ? Icons.notifications_active_rounded
           : Icons.notifications_off_outlined,
@@ -415,12 +417,12 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
       useRootNavigator: true,
       barrierDismissible: true,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Não foi possível confirmar o anúncio'),
+        title: Text(context.l10n.checkInRewardConfirmTitle),
         content: Text(message),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Entendi'),
+            child: Text(context.l10n.commonUnderstood),
           ),
         ],
       ),
@@ -446,6 +448,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     var rewardLoading = false;
     var autoSubmitLoading = false;
     RewardedAdResult? rewardFailure;
+    final l10n = context.l10n;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -455,9 +458,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           final currentRewardFailure = rewardFailure;
           final sheetMessage = currentRewardFailure == null
               ? (rewardedAdAvailable
-                    ? 'Você já fez seu check-in gratuito de hoje. Para registrar outro momento, assista a um anúncio ou continue sem limites com o Premium.'
-                    : 'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.')
-              : _rewardFailureMessage(currentRewardFailure);
+                    ? l10n.checkInExtraAvailableMessage
+                    : l10n.checkInExtraUnavailableMessage)
+              : _rewardFailureMessage(currentRewardFailure, l10n);
           return SafeArea(
             top: false,
             child: Padding(
@@ -472,10 +475,10 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
                   child: RewardedAdPrompt(
-                    title: _rewardPromptTitle(rewardFailure),
+                    title: _rewardPromptTitle(rewardFailure, l10n),
                     message: sheetMessage,
                     rewardLabel: rewardFailure == null && rewardedAdAvailable
-                        ? 'Assistir anúncio libera mais um check-in hoje.'
+                        ? l10n.checkInExtraRewardLabel
                         : '',
                     rewardedAdAvailable: rewardedAdAvailable,
                     isRewardLoading: rewardLoading || autoSubmitLoading,
@@ -500,7 +503,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                                 if (mounted) {
                                   AppSnackBar.show(
                                     context,
-                                    message: 'Check-in salvo com carinho.',
+                                    message: l10n.checkInSavedWithCare,
                                     icon: Icons.check_circle_outline_rounded,
                                   );
                                 }
@@ -570,7 +573,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                               if (mounted) {
                                 AppSnackBar.show(
                                   context,
-                                  message: 'Check-in salvo com carinho.',
+                                  message: l10n.checkInSavedWithCare,
                                   icon: Icons.check_circle_outline_rounded,
                                 );
                               }
@@ -588,8 +591,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                                     .rewardConfirmedButStillBlocked) {
                               AppSnackBar.show(
                                 context,
-                                message:
-                                    'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.',
+                                message: l10n.checkInRewardReceivedButBlocked,
                                 icon: Icons.info_outline_rounded,
                               );
                             } else if (saved ==
@@ -601,13 +603,13 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                     watchLabel:
                         rewardFailure ==
                             RewardedAdResult.rewardConfirmedButAccessDenied
-                        ? 'Tentar salvar novamente'
+                        ? l10n.checkInRewardTrySaveAgain
                         : rewardFailure == null
-                        ? 'Assistir anúncio'
-                        : 'Tentar novamente',
+                        ? l10n.checkInRewardWatchAd
+                        : l10n.checkInRewardTryAgain,
                     loadingLabel: autoSubmitLoading
-                        ? 'Confirmando recompensa'
-                        : 'Abrindo anúncio',
+                        ? l10n.checkInRewardConfirming
+                        : l10n.checkInRewardOpeningAd,
                     onOpenPremium: () {
                       if (rewardLoading || autoSubmitLoading) {
                         return;
@@ -615,14 +617,14 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
                       Navigator.of(sheetContext).pop();
                       widget.onOpenPremium?.call();
                     },
-                    premiumLabel: 'Ver Premium',
+                    premiumLabel: l10n.checkInRewardPremium,
                     onSecondary: () {
                       if (rewardLoading || autoSubmitLoading) {
                         return;
                       }
                       Navigator.of(sheetContext).pop();
                     },
-                    secondaryLabel: 'Agora não',
+                    secondaryLabel: l10n.checkInNotNow,
                   ),
                 ),
               ),
@@ -633,34 +635,33 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
     );
   }
 
-  String _rewardFailureMessage(RewardedAdResult result) {
+  String _rewardFailureMessage(RewardedAdResult result, AppLocalizations l10n) {
     return switch (result) {
       RewardedAdResult.noFill ||
       RewardedAdResult.loadFailed ||
       RewardedAdResult.showFailed ||
-      RewardedAdResult.unsupported =>
-        'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, volte amanhã para seu check-in gratuito ou continue sem anúncios com o Premium.',
-      RewardedAdResult.timeout =>
-        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente salvar novamente em alguns segundos.',
+      RewardedAdResult.unsupported => l10n.checkInRewardLoadUnavailableMessage,
+      RewardedAdResult.timeout => l10n.checkInRewardConfirmationPendingMessage,
       RewardedAdResult.dismissedWithoutReward =>
-        'Para liberar mais um check-in hoje, é preciso concluir o anúncio até receber a recompensa.',
+        l10n.checkInRewardDismissedMessage,
       RewardedAdResult.rewardConfirmedButAccessDenied =>
-        'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente salvar novamente em alguns segundos.',
-      RewardedAdResult.rewarded => 'Anúncio confirmado.',
+        l10n.checkInRewardConfirmationPendingMessage,
+      RewardedAdResult.rewarded => l10n.checkInRewardConfirmedMessage,
     };
   }
 
-  String _rewardPromptTitle(RewardedAdResult? result) {
+  String _rewardPromptTitle(RewardedAdResult? result, AppLocalizations l10n) {
     return switch (result) {
       RewardedAdResult.noFill ||
       RewardedAdResult.loadFailed ||
       RewardedAdResult.showFailed ||
-      RewardedAdResult.unsupported => 'Nenhum anúncio disponível agora',
-      RewardedAdResult.timeout => 'Confirmação em andamento',
-      RewardedAdResult.dismissedWithoutReward => 'Anúncio não concluído',
+      RewardedAdResult.unsupported => l10n.checkInRewardNoAdAvailableTitle,
+      RewardedAdResult.timeout => l10n.checkInRewardConfirmationInProgressTitle,
+      RewardedAdResult.dismissedWithoutReward =>
+        l10n.checkInRewardAdNotCompletedTitle,
       RewardedAdResult.rewardConfirmedButAccessDenied =>
-        'Confirmação em andamento',
-      RewardedAdResult.rewarded || null => 'Desbloquear novo check-in hoje',
+        l10n.checkInRewardConfirmationInProgressTitle,
+      RewardedAdResult.rewarded || null => l10n.checkInRewardUnlockTitle,
     };
   }
 
@@ -909,15 +910,15 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   }
 
   String _submitErrorMessage(
-    _CheckInSubmitResult result, {
+    _CheckInSubmitResult result,
+    AppLocalizations l10n, {
     Object? fallbackError,
   }) {
     return switch (result) {
-      _CheckInSubmitResult.networkError =>
-        'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.',
+      _CheckInSubmitResult.networkError => l10n.checkInSaveTimeout,
       _CheckInSubmitResult.serverError => _errorMessage(fallbackError),
       _CheckInSubmitResult.rewardConfirmedButStillBlocked =>
-        'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.',
+        l10n.checkInRewardReceivedButBlocked,
       _CheckInSubmitResult.success || _CheckInSubmitResult.limitReached => '',
       _CheckInSubmitResult.unknownError => _errorMessage(fallbackError),
     };
@@ -1058,8 +1059,8 @@ class _CheckInBriefingCard extends StatelessWidget {
               prefixIcon: const Icon(Icons.edit_note_rounded),
               suffixIcon: IconButton(
                 tooltip: isListeningReflection
-                    ? 'Parar ditado'
-                    : 'Usar microfone',
+                    ? l10n.checkInStopDictationTooltip
+                    : l10n.checkInUseMicrophoneTooltip,
                 onPressed: isLoading ? null : onToggleReflectionDictation,
                 icon: Icon(
                   isListeningReflection

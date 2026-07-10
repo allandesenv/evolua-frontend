@@ -544,6 +544,336 @@ abstract class AppLocalizations {
   /// **'Ainda não identificamos a confirmação. Confira seu e-mail e tente novamente.'**
   String get dashboardEmailVerificationStillPending;
 
+  /// No description provided for @appUpdateRecommendedTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nova versão disponível'**
+  String get appUpdateRecommendedTitle;
+
+  /// No description provided for @appUpdateRecommendedFallbackMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Atualize o Evolua para receber melhorias, correções e uma experiência mais estável.'**
+  String get appUpdateRecommendedFallbackMessage;
+
+  /// No description provided for @appUpdateRequiredTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Atualização necessária'**
+  String get appUpdateRequiredTitle;
+
+  /// No description provided for @appUpdateRequiredFallbackMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Esta versão do Evolua ficou incompatível com melhorias importantes de segurança e estabilidade. Atualize para continuar.'**
+  String get appUpdateRequiredFallbackMessage;
+
+  /// No description provided for @appUpdateDismiss.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Agora não'**
+  String get appUpdateDismiss;
+
+  /// No description provided for @appUpdateAction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Atualizar'**
+  String get appUpdateAction;
+
+  /// No description provided for @appUpdateGooglePlayAction.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Atualizar na Google Play'**
+  String get appUpdateGooglePlayAction;
+
+  /// No description provided for @dashboardCareRecommendationReceived.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nova orientação do seu terapeuta.'**
+  String get dashboardCareRecommendationReceived;
+
+  /// No description provided for @dashboardMainNavigationSemantic.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Navegação principal'**
+  String get dashboardMainNavigationSemantic;
+
+  /// No description provided for @dashboardSidebarMenuSemantic.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Menu lateral'**
+  String get dashboardSidebarMenuSemantic;
+
+  /// No description provided for @dashboardAuthenticatedHeaderSemantic.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Cabeçalho da área autenticada'**
+  String get dashboardAuthenticatedHeaderSemantic;
+
+  /// No description provided for @dashboardMentorTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Mentor Evolua'**
+  String get dashboardMentorTitle;
+
+  /// No description provided for @dashboardEmailVerificationNotice.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirme seu e-mail para manter sua conta mais segura.'**
+  String get dashboardEmailVerificationNotice;
+
+  /// No description provided for @dashboardEmailVerificationResend.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Reenviar e-mail'**
+  String get dashboardEmailVerificationResend;
+
+  /// No description provided for @dashboardEmailVerificationRefreshing.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Atualizando...'**
+  String get dashboardEmailVerificationRefreshing;
+
+  /// No description provided for @dashboardEmailVerificationAlreadyConfirmed.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Já confirmei'**
+  String get dashboardEmailVerificationAlreadyConfirmed;
+
+  /// No description provided for @dashboardCheckingCheckIn.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Verificando check-in'**
+  String get dashboardCheckingCheckIn;
+
+  /// No description provided for @accountOpenMenuTooltip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Abrir menu da conta'**
+  String get accountOpenMenuTooltip;
+
+  /// No description provided for @accountConnectTherapist.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Conectar Terapeuta'**
+  String get accountConnectTherapist;
+
+  /// No description provided for @accountHelpSupport.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ajuda e suporte'**
+  String get accountHelpSupport;
+
+  /// No description provided for @accountDisplayAccessibility.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Tela e acessibilidade'**
+  String get accountDisplayAccessibility;
+
+  /// No description provided for @accountFeedback.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Dar feedback'**
+  String get accountFeedback;
+
+  /// No description provided for @accountFallbackEmail.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'você@evolua.app'**
+  String get accountFallbackEmail;
+
+  /// No description provided for @commonUnderstood.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Entendi'**
+  String get commonUnderstood;
+
+  /// No description provided for @checkInMicrophoneUnavailable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O microfone não está disponível agora. Você pode continuar digitando.'**
+  String get checkInMicrophoneUnavailable;
+
+  /// No description provided for @checkInSpeechTranscriptionUnavailable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível transcrever agora. Você pode continuar digitando.'**
+  String get checkInSpeechTranscriptionUnavailable;
+
+  /// No description provided for @checkInSaveTimeout.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu check-in não foi salvo. Verifique sua conexão e tente novamente.'**
+  String get checkInSaveTimeout;
+
+  /// No description provided for @checkInSavedDeepReadingLater.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Check-in salvo. Você já pode continuar; a leitura aprofundada pode ser liberada depois.'**
+  String get checkInSavedDeepReadingLater;
+
+  /// No description provided for @checkInReminderMorningTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Lembrete leve pela manhã'**
+  String get checkInReminderMorningTitle;
+
+  /// No description provided for @checkInReminderMorningMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Quer receber um lembrete leve pela manhã para cuidar do seu momento?'**
+  String get checkInReminderMorningMessage;
+
+  /// No description provided for @checkInReminderEnable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ativar lembrete'**
+  String get checkInReminderEnable;
+
+  /// No description provided for @checkInReminderEnabled.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Lembrete diário ativado para 08:00.'**
+  String get checkInReminderEnabled;
+
+  /// No description provided for @checkInReminderPermissionDenied.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos ativar o lembrete sem permissão de notificação.'**
+  String get checkInReminderPermissionDenied;
+
+  /// No description provided for @checkInRewardConfirmTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não foi possível confirmar o anúncio'**
+  String get checkInRewardConfirmTitle;
+
+  /// No description provided for @checkInExtraAvailableMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Você já fez seu check-in gratuito de hoje. Para registrar outro momento, assista a um anúncio ou continue sem limites com o Premium.'**
+  String get checkInExtraAvailableMessage;
+
+  /// No description provided for @checkInExtraUnavailableMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Você já usou o desbloqueio por anúncio de hoje. Para registrar outro check-in agora, veja o Premium ou volte amanhã.'**
+  String get checkInExtraUnavailableMessage;
+
+  /// No description provided for @checkInExtraRewardLabel.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Assistir anúncio libera mais um check-in hoje.'**
+  String get checkInExtraRewardLabel;
+
+  /// No description provided for @checkInSavedWithCare.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Check-in salvo com carinho.'**
+  String get checkInSavedWithCare;
+
+  /// No description provided for @checkInRewardReceivedButBlocked.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Recebemos a recompensa, mas não conseguimos liberar este check-in agora. Tente novamente em instantes.'**
+  String get checkInRewardReceivedButBlocked;
+
+  /// No description provided for @checkInRewardTrySaveAgain.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Tentar salvar novamente'**
+  String get checkInRewardTrySaveAgain;
+
+  /// No description provided for @checkInRewardWatchAd.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Assistir anúncio'**
+  String get checkInRewardWatchAd;
+
+  /// No description provided for @checkInRewardTryAgain.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Tentar novamente'**
+  String get checkInRewardTryAgain;
+
+  /// No description provided for @checkInRewardConfirming.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirmando recompensa'**
+  String get checkInRewardConfirming;
+
+  /// No description provided for @checkInRewardOpeningAd.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Abrindo anúncio'**
+  String get checkInRewardOpeningAd;
+
+  /// No description provided for @checkInRewardPremium.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ver Premium'**
+  String get checkInRewardPremium;
+
+  /// No description provided for @checkInRewardNoAdAvailableTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Nenhum anúncio disponível agora'**
+  String get checkInRewardNoAdAvailableTitle;
+
+  /// No description provided for @checkInRewardConfirmationInProgressTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Confirmação em andamento'**
+  String get checkInRewardConfirmationInProgressTitle;
+
+  /// No description provided for @checkInRewardAdNotCompletedTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Anúncio não concluído'**
+  String get checkInRewardAdNotCompletedTitle;
+
+  /// No description provided for @checkInRewardUnlockTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Desbloquear novo check-in hoje'**
+  String get checkInRewardUnlockTitle;
+
+  /// No description provided for @checkInRewardLoadUnavailableMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Não conseguimos carregar um anúncio neste momento. Tente novamente em alguns instantes, volte amanhã para seu check-in gratuito ou continue sem anúncios com o Premium.'**
+  String get checkInRewardLoadUnavailableMessage;
+
+  /// No description provided for @checkInRewardConfirmationPendingMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Recebemos a conclusão do anúncio, mas ainda estamos confirmando a liberação. Tente salvar novamente em alguns segundos.'**
+  String get checkInRewardConfirmationPendingMessage;
+
+  /// No description provided for @checkInRewardDismissedMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Para liberar mais um check-in hoje, é preciso concluir o anúncio até receber a recompensa.'**
+  String get checkInRewardDismissedMessage;
+
+  /// No description provided for @checkInRewardConfirmedMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Anúncio confirmado.'**
+  String get checkInRewardConfirmedMessage;
+
+  /// No description provided for @checkInStopDictationTooltip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Parar ditado'**
+  String get checkInStopDictationTooltip;
+
+  /// No description provided for @checkInUseMicrophoneTooltip.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Usar microfone'**
+  String get checkInUseMicrophoneTooltip;
+
   /// No description provided for @commonRefresh.
   ///
   /// In pt_BR, this message translates to:
