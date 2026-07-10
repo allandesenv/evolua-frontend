@@ -262,6 +262,191 @@ class AppLocalizationsEn extends AppLocalizations {
       'We have not detected the confirmation yet. Check your email and try again.';
 
   @override
+  String get appUpdateRecommendedTitle => 'New version available';
+
+  @override
+  String get appUpdateRecommendedFallbackMessage =>
+      'Update Evolua to receive improvements, fixes, and a more stable experience.';
+
+  @override
+  String get appUpdateRequiredTitle => 'Update required';
+
+  @override
+  String get appUpdateRequiredFallbackMessage =>
+      'This version of Evolua is no longer compatible with important security and stability improvements. Update to continue.';
+
+  @override
+  String get appUpdateDismiss => 'Not now';
+
+  @override
+  String get appUpdateAction => 'Update';
+
+  @override
+  String get appUpdateGooglePlayAction => 'Update on Google Play';
+
+  @override
+  String get dashboardCareRecommendationReceived =>
+      'New guidance from your therapist.';
+
+  @override
+  String get dashboardMainNavigationSemantic => 'Main navigation';
+
+  @override
+  String get dashboardSidebarMenuSemantic => 'Side menu';
+
+  @override
+  String get dashboardAuthenticatedHeaderSemantic =>
+      'Authenticated area header';
+
+  @override
+  String get dashboardMentorTitle => 'Evolua Mentor';
+
+  @override
+  String get dashboardEmailVerificationNotice =>
+      'Confirm your email to keep your account safer.';
+
+  @override
+  String get dashboardEmailVerificationResend => 'Resend email';
+
+  @override
+  String get dashboardEmailVerificationRefreshing => 'Updating...';
+
+  @override
+  String get dashboardEmailVerificationAlreadyConfirmed =>
+      'I already confirmed';
+
+  @override
+  String get dashboardCheckingCheckIn => 'Checking check-in';
+
+  @override
+  String get accountOpenMenuTooltip => 'Open account menu';
+
+  @override
+  String get accountConnectTherapist => 'Connect Therapist';
+
+  @override
+  String get accountHelpSupport => 'Help and support';
+
+  @override
+  String get accountDisplayAccessibility => 'Display and accessibility';
+
+  @override
+  String get accountFeedback => 'Give feedback';
+
+  @override
+  String get accountFallbackEmail => 'you@evolua.app';
+
+  @override
+  String get commonUnderstood => 'Got it';
+
+  @override
+  String get checkInMicrophoneUnavailable =>
+      'The microphone is not available right now. You can keep typing.';
+
+  @override
+  String get checkInSpeechTranscriptionUnavailable =>
+      'We could not transcribe right now. You can keep typing.';
+
+  @override
+  String get checkInSaveTimeout =>
+      'Your check-in was not saved. Check your connection and try again.';
+
+  @override
+  String get checkInSavedDeepReadingLater =>
+      'Check-in saved. You can continue; the deep reading can be unlocked later.';
+
+  @override
+  String get checkInReminderMorningTitle => 'Gentle morning reminder';
+
+  @override
+  String get checkInReminderMorningMessage =>
+      'Would you like a gentle morning reminder to care for your moment?';
+
+  @override
+  String get checkInReminderEnable => 'Enable reminder';
+
+  @override
+  String get checkInReminderEnabled => 'Daily reminder enabled for 08:00.';
+
+  @override
+  String get checkInReminderPermissionDenied =>
+      'We could not enable the reminder without notification permission.';
+
+  @override
+  String get checkInRewardConfirmTitle => 'We could not confirm the ad';
+
+  @override
+  String get checkInExtraAvailableMessage =>
+      'You have already used today\'s free check-in. To record another moment, watch an ad or continue without limits with Premium.';
+
+  @override
+  String get checkInExtraUnavailableMessage =>
+      'You have already used today\'s ad unlock. To record another check-in now, see Premium or come back tomorrow.';
+
+  @override
+  String get checkInExtraRewardLabel =>
+      'Watching an ad unlocks one more check-in today.';
+
+  @override
+  String get checkInSavedWithCare => 'Check-in saved with care.';
+
+  @override
+  String get checkInRewardReceivedButBlocked =>
+      'We received the reward, but could not unlock this check-in right now. Try again in a moment.';
+
+  @override
+  String get checkInRewardTrySaveAgain => 'Try saving again';
+
+  @override
+  String get checkInRewardWatchAd => 'Watch ad';
+
+  @override
+  String get checkInRewardTryAgain => 'Try again';
+
+  @override
+  String get checkInRewardConfirming => 'Confirming reward';
+
+  @override
+  String get checkInRewardOpeningAd => 'Opening ad';
+
+  @override
+  String get checkInRewardPremium => 'See Premium';
+
+  @override
+  String get checkInRewardNoAdAvailableTitle => 'No ad available right now';
+
+  @override
+  String get checkInRewardConfirmationInProgressTitle =>
+      'Confirmation in progress';
+
+  @override
+  String get checkInRewardAdNotCompletedTitle => 'Ad not completed';
+
+  @override
+  String get checkInRewardUnlockTitle => 'Unlock another check-in today';
+
+  @override
+  String get checkInRewardLoadUnavailableMessage =>
+      'We could not load an ad right now. Try again in a moment, come back tomorrow for your free check-in, or continue ad-free with Premium.';
+
+  @override
+  String get checkInRewardConfirmationPendingMessage =>
+      'We received the ad completion, but we are still confirming the unlock. Try saving again in a few seconds.';
+
+  @override
+  String get checkInRewardDismissedMessage =>
+      'To unlock one more check-in today, you need to complete the ad until you receive the reward.';
+
+  @override
+  String get checkInRewardConfirmedMessage => 'Ad confirmed.';
+
+  @override
+  String get checkInStopDictationTooltip => 'Stop dictation';
+
+  @override
+  String get checkInUseMicrophoneTooltip => 'Use microphone';
+
+  @override
   String get commonRefresh => 'Refresh';
 
   @override
@@ -1362,6 +1547,191 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   @override
   String get dashboardEmailVerificationStillPending =>
       'We have not detected the confirmation yet. Check your email and try again.';
+
+  @override
+  String get appUpdateRecommendedTitle => 'New version available';
+
+  @override
+  String get appUpdateRecommendedFallbackMessage =>
+      'Update Evolua to receive improvements, fixes, and a more stable experience.';
+
+  @override
+  String get appUpdateRequiredTitle => 'Update required';
+
+  @override
+  String get appUpdateRequiredFallbackMessage =>
+      'This version of Evolua is no longer compatible with important security and stability improvements. Update to continue.';
+
+  @override
+  String get appUpdateDismiss => 'Not now';
+
+  @override
+  String get appUpdateAction => 'Update';
+
+  @override
+  String get appUpdateGooglePlayAction => 'Update on Google Play';
+
+  @override
+  String get dashboardCareRecommendationReceived =>
+      'New guidance from your therapist.';
+
+  @override
+  String get dashboardMainNavigationSemantic => 'Main navigation';
+
+  @override
+  String get dashboardSidebarMenuSemantic => 'Side menu';
+
+  @override
+  String get dashboardAuthenticatedHeaderSemantic =>
+      'Authenticated area header';
+
+  @override
+  String get dashboardMentorTitle => 'Evolua Mentor';
+
+  @override
+  String get dashboardEmailVerificationNotice =>
+      'Confirm your email to keep your account safer.';
+
+  @override
+  String get dashboardEmailVerificationResend => 'Resend email';
+
+  @override
+  String get dashboardEmailVerificationRefreshing => 'Updating...';
+
+  @override
+  String get dashboardEmailVerificationAlreadyConfirmed =>
+      'I already confirmed';
+
+  @override
+  String get dashboardCheckingCheckIn => 'Checking check-in';
+
+  @override
+  String get accountOpenMenuTooltip => 'Open account menu';
+
+  @override
+  String get accountConnectTherapist => 'Connect Therapist';
+
+  @override
+  String get accountHelpSupport => 'Help and support';
+
+  @override
+  String get accountDisplayAccessibility => 'Display and accessibility';
+
+  @override
+  String get accountFeedback => 'Give feedback';
+
+  @override
+  String get accountFallbackEmail => 'you@evolua.app';
+
+  @override
+  String get commonUnderstood => 'Got it';
+
+  @override
+  String get checkInMicrophoneUnavailable =>
+      'The microphone is not available right now. You can keep typing.';
+
+  @override
+  String get checkInSpeechTranscriptionUnavailable =>
+      'We could not transcribe right now. You can keep typing.';
+
+  @override
+  String get checkInSaveTimeout =>
+      'Your check-in was not saved. Check your connection and try again.';
+
+  @override
+  String get checkInSavedDeepReadingLater =>
+      'Check-in saved. You can continue; the deep reading can be unlocked later.';
+
+  @override
+  String get checkInReminderMorningTitle => 'Gentle morning reminder';
+
+  @override
+  String get checkInReminderMorningMessage =>
+      'Would you like a gentle morning reminder to care for your moment?';
+
+  @override
+  String get checkInReminderEnable => 'Enable reminder';
+
+  @override
+  String get checkInReminderEnabled => 'Daily reminder enabled for 08:00.';
+
+  @override
+  String get checkInReminderPermissionDenied =>
+      'We could not enable the reminder without notification permission.';
+
+  @override
+  String get checkInRewardConfirmTitle => 'We could not confirm the ad';
+
+  @override
+  String get checkInExtraAvailableMessage =>
+      'You have already used today\'s free check-in. To record another moment, watch an ad or continue without limits with Premium.';
+
+  @override
+  String get checkInExtraUnavailableMessage =>
+      'You have already used today\'s ad unlock. To record another check-in now, see Premium or come back tomorrow.';
+
+  @override
+  String get checkInExtraRewardLabel =>
+      'Watching an ad unlocks one more check-in today.';
+
+  @override
+  String get checkInSavedWithCare => 'Check-in saved with care.';
+
+  @override
+  String get checkInRewardReceivedButBlocked =>
+      'We received the reward, but could not unlock this check-in right now. Try again in a moment.';
+
+  @override
+  String get checkInRewardTrySaveAgain => 'Try saving again';
+
+  @override
+  String get checkInRewardWatchAd => 'Watch ad';
+
+  @override
+  String get checkInRewardTryAgain => 'Try again';
+
+  @override
+  String get checkInRewardConfirming => 'Confirming reward';
+
+  @override
+  String get checkInRewardOpeningAd => 'Opening ad';
+
+  @override
+  String get checkInRewardPremium => 'See Premium';
+
+  @override
+  String get checkInRewardNoAdAvailableTitle => 'No ad available right now';
+
+  @override
+  String get checkInRewardConfirmationInProgressTitle =>
+      'Confirmation in progress';
+
+  @override
+  String get checkInRewardAdNotCompletedTitle => 'Ad not completed';
+
+  @override
+  String get checkInRewardUnlockTitle => 'Unlock another check-in today';
+
+  @override
+  String get checkInRewardLoadUnavailableMessage =>
+      'We could not load an ad right now. Try again in a moment, come back tomorrow for your free check-in, or continue ad-free with Premium.';
+
+  @override
+  String get checkInRewardConfirmationPendingMessage =>
+      'We received the ad completion, but we are still confirming the unlock. Try saving again in a few seconds.';
+
+  @override
+  String get checkInRewardDismissedMessage =>
+      'To unlock one more check-in today, you need to complete the ad until you receive the reward.';
+
+  @override
+  String get checkInRewardConfirmedMessage => 'Ad confirmed.';
+
+  @override
+  String get checkInStopDictationTooltip => 'Stop dictation';
+
+  @override
+  String get checkInUseMicrophoneTooltip => 'Use microphone';
 
   @override
   String get commonRefresh => 'Refresh';

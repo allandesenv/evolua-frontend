@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:evolua_frontend/features/app_update/application/app_update_route_state.dart';
 import 'package:evolua_frontend/features/app_update/application/app_update_service.dart';
 import 'package:evolua_frontend/features/app_update/application/app_version_status_controller.dart';
+import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/evolua_logo.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:flutter/material.dart';
@@ -146,7 +147,7 @@ class RecommendedUpdateCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Nova versão disponível',
+              context.l10n.appUpdateRecommendedTitle,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
@@ -154,7 +155,7 @@ class RecommendedUpdateCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               status.message.isEmpty
-                  ? 'Atualize o Evolua para receber melhorias, correções e uma experiência mais estável.'
+                  ? context.l10n.appUpdateRecommendedFallbackMessage
                   : status.message,
             ),
             const SizedBox(height: 14),
@@ -164,7 +165,7 @@ class RecommendedUpdateCard extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: updating ? null : onDismiss,
-                  child: const Text('Agora não'),
+                  child: Text(context.l10n.appUpdateDismiss),
                 ),
                 FilledButton(
                   onPressed: updating ? null : onUpdate,
@@ -174,7 +175,7 @@ class RecommendedUpdateCard extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Atualizar'),
+                      : Text(context.l10n.appUpdateAction),
                 ),
               ],
             ),
@@ -226,7 +227,7 @@ class _RequiredUpdateScreenState extends ConsumerState<RequiredUpdateScreen> {
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'Atualização necessária',
+                  context.l10n.appUpdateRequiredTitle,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -234,7 +235,7 @@ class _RequiredUpdateScreenState extends ConsumerState<RequiredUpdateScreen> {
                 const SizedBox(height: 12),
                 Text(
                   widget.status.message.isEmpty
-                      ? 'Esta versão do Evolua ficou incompatível com melhorias importantes de segurança e estabilidade. Atualize para continuar.'
+                      ? context.l10n.appUpdateRequiredFallbackMessage
                       : widget.status.message,
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
@@ -247,7 +248,7 @@ class _RequiredUpdateScreenState extends ConsumerState<RequiredUpdateScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Atualizar na Google Play'),
+                      : Text(context.l10n.appUpdateGooglePlayAction),
                 ),
               ],
             ),

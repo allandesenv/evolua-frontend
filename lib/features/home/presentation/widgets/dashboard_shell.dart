@@ -120,8 +120,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Nova orientação do seu terapeuta.'),
+            SnackBar(
+              content: Text(context.l10n.dashboardCareRecommendationReceived),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -835,7 +835,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                       horizontal: 6,
                       vertical: 4,
                     ),
-                    semanticLabel: 'Navegação principal',
+                    semanticLabel: context.l10n.dashboardMainNavigationSemantic,
                     child: NavigationBar(
                       selectedIndex: _selectedIndex >= destinations.length
                           ? 0
@@ -870,7 +870,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           height: constraints.maxHeight,
                           child: PrimaryPanel(
                             padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                            semanticLabel: 'Menu lateral',
+                            semanticLabel:
+                                context.l10n.dashboardSidebarMenuSemantic,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1277,7 +1278,7 @@ class _DashboardContent extends ConsumerWidget {
               horizontal: compact ? 16 : 18,
               vertical: 10,
             ),
-            semanticLabel: 'Cabeçalho da área autenticada',
+            semanticLabel: context.l10n.dashboardAuthenticatedHeaderSemantic,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -1373,7 +1374,7 @@ class _DashboardContent extends ConsumerWidget {
       2 => l10n.navSpaces,
       3 => l10n.navMirror,
       4 => l10n.navProfile,
-      5 => 'Mentor Evolua',
+      5 => l10n.dashboardMentorTitle,
       6 => switch (adminSection) {
         AdminPanelSection.overview => l10n.navAdminPanel,
         AdminPanelSection.trails => l10n.adminTrailsTitle,
@@ -1544,7 +1545,7 @@ class _EmailVerificationNotice extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Text(
-              'Confirme seu e-mail para manter sua conta mais segura.',
+              context.l10n.dashboardEmailVerificationNotice,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colors.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -1553,11 +1554,19 @@ class _EmailVerificationNotice extends StatelessWidget {
           ),
           TextButton(
             onPressed: busy ? null : () => unawaited(onResend()),
-            child: Text(resending ? 'Enviando...' : 'Reenviar e-mail'),
+            child: Text(
+              resending
+                  ? context.l10n.commonSending
+                  : context.l10n.dashboardEmailVerificationResend,
+            ),
           ),
           OutlinedButton(
             onPressed: busy ? null : () => unawaited(onRefresh()),
-            child: Text(refreshing ? 'Atualizando...' : 'Ja confirmei'),
+            child: Text(
+              refreshing
+                  ? context.l10n.dashboardEmailVerificationRefreshing
+                  : context.l10n.dashboardEmailVerificationAlreadyConfirmed,
+            ),
           ),
         ],
       ),
@@ -1689,7 +1698,7 @@ class _CheckInHeaderButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final tooltip = isLoading
-        ? 'Verificando check-in'
+        ? l10n.dashboardCheckingCheckIn
         : l10n.homeDailyDayPrimary;
     return IconButton(
       tooltip: tooltip,
@@ -1758,10 +1767,10 @@ class _AccountMenuButton extends StatelessWidget {
         session?.email.split('@').first ??
         l10n.navProfile;
     final avatarUrl = profile?.avatarUrl ?? session?.avatarUrl;
-    final email = session?.email ?? 'você@evolua.app';
+    final email = session?.email ?? l10n.accountFallbackEmail;
 
     return PopupMenuButton<_AccountMenuAction>(
-      tooltip: 'Abrir menu da conta',
+      tooltip: l10n.accountOpenMenuTooltip,
       color: context.evoluaColors.surfaceStrong,
       offset: const Offset(0, 14),
       itemBuilder: (context) => [
@@ -1837,11 +1846,11 @@ class _AccountMenuButton extends StatelessWidget {
             label: l10n.avatarFutureMessages,
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.careShare,
           child: _MenuLabel(
             icon: Icons.health_and_safety_outlined,
-            label: 'Conectar Terapeuta',
+            label: l10n.accountConnectTherapist,
           ),
         ),
         if (onOpenAdminPanel != null) ...[
@@ -1854,25 +1863,25 @@ class _AccountMenuButton extends StatelessWidget {
             ),
           ),
         ],
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.help,
           child: _MenuLabel(
             icon: Icons.help_outline_rounded,
-            label: 'Ajuda e suporte',
+            label: l10n.accountHelpSupport,
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.accessibility,
           child: _MenuLabel(
             icon: Icons.dark_mode_rounded,
-            label: 'Tela e acessibilidade',
+            label: l10n.accountDisplayAccessibility,
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _AccountMenuAction.feedback,
           child: _MenuLabel(
             icon: Icons.feedback_outlined,
-            label: 'Dar feedback',
+            label: l10n.accountFeedback,
           ),
         ),
         const PopupMenuDivider(),
