@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/config/app_config.dart';
 import 'package:evolua_frontend/core/network/api_payload_parser.dart';
 import 'package:evolua_frontend/core/network/http_instrumentation.dart';
+import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/care/application/care_claim_secret_reader.dart';
 import 'package:evolua_frontend/features/care/application/care_crypto_service.dart';
 import 'package:evolua_frontend/features/care/domain/entities/care_encrypted_payload.dart';
 import 'package:evolua_frontend/features/daily_ritual/domain/entities/daily_ritual.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
@@ -167,6 +170,7 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
         headers: const {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Accept-Language': 'pt-BR',
         },
         extra: const {httpInstrumentationOriginExtraKey: 'care_claim'},
       ),
@@ -174,6 +178,18 @@ class CareClaimController extends AsyncNotifier<CareClaimState> {
     attachHttpInstrumentation(
       _dio,
       recorder: ref.read(httpInstrumentationRecorderProvider),
+    );
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final preferences = await ref.read(sharedPreferencesProvider.future);
+          options.headers['Accept-Language'] = effectiveAppLanguageTag(
+            preference: preferences.getString(localePreferenceStorageKey),
+            systemLocale: PlatformDispatcher.instance.locale,
+          );
+          handler.next(options);
+        },
+      ),
     );
 
     final link = CareClaimLink.fromUri(Uri.base);

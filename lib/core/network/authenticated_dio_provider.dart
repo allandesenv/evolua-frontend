@@ -1,11 +1,11 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/http_instrumentation.dart';
 import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-const _localePreferenceStorageKey = 'evolua.locale_preference.v1';
 
 final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
   final session = ref.watch(authControllerProvider).asData?.value;
@@ -43,8 +43,9 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
           handler.next(options);
           return;
         }
-        options.headers['Accept-Language'] = _aiLanguageTag(
-          preferences.getString(_localePreferenceStorageKey),
+        options.headers['Accept-Language'] = effectiveAppLanguageTag(
+          preference: preferences.getString(localePreferenceStorageKey),
+          systemLocale: PlatformDispatcher.instance.locale,
         );
         final currentSession =
             ref.read(authControllerProvider).asData?.value ?? session;
@@ -104,14 +105,6 @@ final authenticatedDioProvider = Provider.family<Dio, String>((ref, baseUrl) {
 
   return dio;
 });
-
-String _aiLanguageTag(String? preference) {
-  return switch (preference) {
-    'en-US' => 'en-US',
-    'pt-BR' => 'pt-BR',
-    _ => 'pt-BR',
-  };
-}
 
 String _utf8ResponseDecoder(
   List<int> responseBytes,

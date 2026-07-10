@@ -9,6 +9,7 @@ import 'package:evolua_frontend/features/auth/data/repositories/auth_repository_
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/auth/domain/repositories/auth_repository.dart';
 import 'package:evolua_frontend/features/user/application/profile_controller.dart';
+import 'package:evolua_frontend/l10n/locale_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -36,6 +37,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
       headers: const {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Accept-Language': 'pt-BR',
       },
       extra: const {httpInstrumentationOriginExtraKey: 'auth'},
     ),
@@ -44,6 +46,27 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   attachHttpInstrumentation(
     dio,
     recorder: ref.read(httpInstrumentationRecorderProvider),
+  );
+
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        if (!ref.mounted) {
+          handler.next(options);
+          return;
+        }
+        final preferences = await ref.read(sharedPreferencesProvider.future);
+        if (!ref.mounted) {
+          handler.next(options);
+          return;
+        }
+        options.headers['Accept-Language'] = effectiveAppLanguageTag(
+          preference: preferences.getString(localePreferenceStorageKey),
+          systemLocale: PlatformDispatcher.instance.locale,
+        );
+        handler.next(options);
+      },
+    ),
   );
 
   return AuthRepositoryImpl(dio);

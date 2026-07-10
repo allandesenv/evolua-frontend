@@ -22,6 +22,54 @@
   "authGenderCustom": "Custom",
   "authCustomGenderLabel": "How do you identify?",
   "authCustomGenderHint": "Write it your way",
+  "authValidationEmailRequired": "Enter your email.",
+  "authValidationEmailMaxLength": "Use an email with up to {maxLength} characters.",
+  "@authValidationEmailMaxLength": {
+    "placeholders": {
+      "maxLength": {}
+    }
+  },
+  "authValidationEmailInvalid": "Use a valid email.",
+  "authValidationPasswordRequired": "Enter your password.",
+  "authValidationPasswordMinLength": "The password must have at least {minLength} characters.",
+  "@authValidationPasswordMinLength": {
+    "placeholders": {
+      "minLength": {}
+    }
+  },
+  "authValidationPasswordMaxLength": "Use a password with up to {maxLength} characters.",
+  "@authValidationPasswordMaxLength": {
+    "placeholders": {
+      "maxLength": {}
+    }
+  },
+  "authValidationConfirmPasswordRequired": "Confirm your password.",
+  "authValidationPasswordsDoNotMatch": "The passwords do not match.",
+  "authValidationDisplayNameRequired": "Enter your name.",
+  "authValidationDisplayNameMinLength": "Enter a name with at least {minLength} characters.",
+  "@authValidationDisplayNameMinLength": {
+    "placeholders": {
+      "minLength": {}
+    }
+  },
+  "authValidationDisplayNameMaxLength": "Enter a name with up to {maxLength} characters.",
+  "@authValidationDisplayNameMaxLength": {
+    "placeholders": {
+      "maxLength": {}
+    }
+  },
+  "authValidationDisplayNameLettersOnly": "Use only letters, spaces, and accents in the name.",
+  "authValidationBirthDateRequired": "Enter your birth date.",
+  "authValidationBirthDateFormat": "Use a valid date in dd/mm/yyyy format.",
+  "authValidationBirthDateInvalid": "Enter a valid birth date.",
+  "authValidationMinimumAge": "You must be at least {minimumAge} years old to create an account.",
+  "@authValidationMinimumAge": {
+    "placeholders": {
+      "minimumAge": {}
+    }
+  },
+  "authValidationGenderRequired": "Select a gender option.",
+  "authValidationCustomGenderRequired": "Enter how you identify.",
   "authEmailLabel": "Email",
   "authEmailHint": "you@evolua.app",
   "authPasswordLabel": "Password",
@@ -45,6 +93,17 @@
   "commonSending": "Sending...",
   "commonSend": "Send",
   "commonRetry": "Try again",
+  "routerBootErrorTitle": "We could not start Evolua right now.",
+  "routerBootErrorBody": "Check your connection and try again in a moment.",
+  "routerNotFoundTitle": "We could not find this page.",
+  "routerNotFoundBody": "The link may have changed or may no longer be available.",
+  "routerBackToEvolua": "Back to Evolua",
+  "dashboardCareRitualReceived": "New ritual received from your therapist.",
+  "dashboardCareGuidanceReceived": "New guidance from your therapist.",
+  "dashboardEmailVerificationSent": "We sent a new confirmation email.",
+  "dashboardEmailVerificationResendError": "We could not resend it right now. Try again in a moment.",
+  "dashboardEmailVerificationConfirmed": "Email confirmed. Thank you!",
+  "dashboardEmailVerificationStillPending": "We have not detected the confirmation yet. Check your email and try again.",
   "commonRefresh": "Refresh",
   "commonBack": "Back",
   "commonNext": "Next",
