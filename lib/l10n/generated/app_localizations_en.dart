@@ -373,6 +373,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'We could not enable the reminder without notification permission.';
 
   @override
+  String get checkInEvolutionReminderTitle =>
+      'Want to keep your growth on track?';
+
+  @override
+  String get checkInEvolutionReminderMessage =>
+      'Evolua can send gentle reminders so you don’t forget your check-in, continue your trails, and revisit your Weekly Mirror.';
+
+  @override
+  String get checkInEvolutionReminderEnable => 'Enable reminders';
+
+  @override
+  String get checkInEvolutionReminderEnabled => 'Reminders enabled.';
+
+  @override
+  String get checkInEvolutionReminderPermissionDenied =>
+      'No problem. You can enable reminders later in Settings.';
+
+  @override
   String get checkInRewardConfirmTitle => 'We could not confirm the ad';
 
   @override
@@ -1658,6 +1676,24 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   @override
   String get checkInReminderPermissionDenied =>
       'We could not enable the reminder without notification permission.';
+
+  @override
+  String get checkInEvolutionReminderTitle =>
+      'Want to keep your growth on track?';
+
+  @override
+  String get checkInEvolutionReminderMessage =>
+      'Evolua can send gentle reminders so you don’t forget your check-in, continue your trails, and revisit your Weekly Mirror.';
+
+  @override
+  String get checkInEvolutionReminderEnable => 'Enable reminders';
+
+  @override
+  String get checkInEvolutionReminderEnabled => 'Reminders enabled.';
+
+  @override
+  String get checkInEvolutionReminderPermissionDenied =>
+      'No problem. You can enable reminders later in Settings.';
 
   @override
   String get checkInRewardConfirmTitle => 'We could not confirm the ad';

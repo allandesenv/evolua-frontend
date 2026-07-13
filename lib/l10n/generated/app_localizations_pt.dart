@@ -375,6 +375,24 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não conseguimos ativar o lembrete sem permissão de notificação.';
 
   @override
+  String get checkInEvolutionReminderTitle =>
+      'Quer manter sua evolução em dia?';
+
+  @override
+  String get checkInEvolutionReminderMessage =>
+      'O Evolua pode te enviar lembretes leves para não esquecer seu check-in, continuar suas trilhas e rever seu Espelho da Semana.';
+
+  @override
+  String get checkInEvolutionReminderEnable => 'Ativar lembretes';
+
+  @override
+  String get checkInEvolutionReminderEnabled => 'Lembretes ativados.';
+
+  @override
+  String get checkInEvolutionReminderPermissionDenied =>
+      'Tudo bem. Você pode ativar os lembretes depois em Configurações.';
+
+  @override
   String get checkInRewardConfirmTitle =>
       'Não foi possível confirmar o anúncio';
 
@@ -1670,6 +1688,24 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get checkInReminderPermissionDenied =>
       'Não conseguimos ativar o lembrete sem permissão de notificação.';
+
+  @override
+  String get checkInEvolutionReminderTitle =>
+      'Quer manter sua evolução em dia?';
+
+  @override
+  String get checkInEvolutionReminderMessage =>
+      'O Evolua pode te enviar lembretes leves para não esquecer seu check-in, continuar suas trilhas e rever seu Espelho da Semana.';
+
+  @override
+  String get checkInEvolutionReminderEnable => 'Ativar lembretes';
+
+  @override
+  String get checkInEvolutionReminderEnabled => 'Lembretes ativados.';
+
+  @override
+  String get checkInEvolutionReminderPermissionDenied =>
+      'Tudo bem. Você pode ativar os lembretes depois em Configurações.';
 
   @override
   String get checkInRewardConfirmTitle =>
