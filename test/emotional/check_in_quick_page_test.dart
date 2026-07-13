@@ -339,7 +339,7 @@ void main() {
       expect(completed, isTrue);
     });
 
-    testWidgets('invites daily reminder after first compact check-in', (
+    testWidgets('does not invite daily reminder after compact check-in', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues({});
@@ -366,18 +366,16 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.textContaining('lembrete leve'), findsOneWidget);
-
-      await tester.tap(find.text('Ativar lembrete'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
-      expect(scheduler.permissionRequests, 1);
-      expect(scheduler.scheduledTimes, ['08:00']);
+      expect(find.textContaining('lembrete leve'), findsNothing);
+      expect(find.text('Ativar lembrete'), findsNothing);
+      expect(scheduler.permissionRequests, 0);
+      expect(scheduler.scheduledTimes, isEmpty);
       expect(completed, isTrue);
     });
 
-    testWidgets('dismisses daily reminder invite only once', (tester) async {
+    testWidgets('check-in success does not mark reminder prompt answered', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
       final scheduler = _FakeDailyReminderScheduler();
@@ -396,15 +394,10 @@ void main() {
       await tester.tap(find.text('Fazer check-in'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.text('Agora não').last);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
 
+      expect(find.textContaining('lembrete leve'), findsNothing);
       expect(scheduler.scheduledTimes, isEmpty);
-      expect(
-        preferences.getString(dailyCheckInReminderStorageKey),
-        contains('"promptAnswered":true'),
-      );
+      expect(preferences.getString(dailyCheckInReminderStorageKey), isNull);
     });
 
     testWidgets(

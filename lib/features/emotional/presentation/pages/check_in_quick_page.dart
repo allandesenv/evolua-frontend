@@ -11,7 +11,6 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/application/check_in_speech_transcription_service.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
-import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/l10n/generated/app_localizations.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
@@ -314,7 +313,6 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
           message: context.l10n.checkInSavedDeepReadingLater,
           icon: Icons.check_circle_outline_rounded,
         );
-        await _maybeInviteDailyReminder();
         widget.onCompleted?.call();
         return _CheckInSubmitResult.success;
       }
@@ -325,7 +323,6 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
             : context.l10n.checkInSavedSnack,
         icon: Icons.check_circle_outline_rounded,
       );
-      await _maybeInviteDailyReminder();
       widget.onCompleted?.call();
       return _CheckInSubmitResult.success;
     } finally {
@@ -333,65 +330,6 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         setState(() => _isSubmitting = false);
       }
     }
-  }
-
-  Future<void> _maybeInviteDailyReminder() async {
-    if (!mounted || !ResponsiveBreakpoints.isCompact(context)) {
-      return;
-    }
-    final reminder = await ref.read(
-      dailyCheckInReminderControllerProvider.future,
-    );
-    if (!mounted) {
-      return;
-    }
-    if (reminder.promptAnswered || reminder.enabled) {
-      return;
-    }
-
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(context.l10n.checkInReminderMorningTitle),
-        content: Text(context.l10n.checkInReminderMorningMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(context.l10n.checkInNotNow),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(context.l10n.checkInReminderEnable),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || accepted == null) {
-      return;
-    }
-
-    if (!accepted) {
-      await ref
-          .read(dailyCheckInReminderControllerProvider.notifier)
-          .dismissPrompt();
-      return;
-    }
-
-    final enabled = await ref
-        .read(dailyCheckInReminderControllerProvider.notifier)
-        .requestPermissionAndEnable();
-    if (!mounted) {
-      return;
-    }
-    AppSnackBar.show(
-      context,
-      message: enabled
-          ? context.l10n.checkInReminderEnabled
-          : context.l10n.checkInReminderPermissionDenied,
-      icon: enabled
-          ? Icons.notifications_active_rounded
-          : Icons.notifications_off_outlined,
-    );
   }
 
   Future<void> _showRewardConfirmationProblemMessage() async {

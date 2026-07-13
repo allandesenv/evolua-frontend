@@ -87,14 +87,15 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     _reminderTapSubscription = ref.listenManual(
       dailyCheckInReminderTapProvider,
       (previous, next) {
-        if (next.asData?.value != dailyCheckInReminderPayload) {
+        final payload = next.asData?.value;
+        if (payload == null) {
           return;
         }
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) {
             return;
           }
-          unawaited(_openHomeFromReminderNotification());
+          unawaited(_openFromEngagementNotification(payload));
         });
       },
     );
@@ -578,6 +579,18 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     } finally {
       _openingReminderCheckIn = false;
     }
+  }
+
+  Future<void> _openFromEngagementNotification(String payload) async {
+    final route = engagementRouteFromPayload(payload);
+    if (route == '/home') {
+      await _openHomeFromReminderNotification();
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    GoRouter.maybeOf(context)?.go(route);
   }
 
   void _showHomeFromReminderNotification() {
