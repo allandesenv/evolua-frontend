@@ -363,6 +363,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Would you like a gentle morning reminder to care for your moment?';
 
   @override
+  String get engagementTrailResumeTitle => 'Your trail is waiting';
+
+  @override
+  String get engagementTrailResumeBody =>
+      'Take one small step in your growth today.';
+
+  @override
+  String get engagementWeeklyMirrorTitle => 'Your Weekly Mirror is ready';
+
+  @override
+  String get engagementWeeklyMirrorBody =>
+      'See small signs of your growth from the last few days.';
+
+  @override
   String get checkInReminderEnable => 'Enable reminder';
 
   @override
@@ -1666,6 +1680,20 @@ class AppLocalizationsEnUs extends AppLocalizationsEn {
   @override
   String get checkInReminderMorningMessage =>
       'Would you like a gentle morning reminder to care for your moment?';
+
+  @override
+  String get engagementTrailResumeTitle => 'Your trail is waiting';
+
+  @override
+  String get engagementTrailResumeBody =>
+      'Take one small step in your growth today.';
+
+  @override
+  String get engagementWeeklyMirrorTitle => 'Your Weekly Mirror is ready';
+
+  @override
+  String get engagementWeeklyMirrorBody =>
+      'See small signs of your growth from the last few days.';
 
   @override
   String get checkInReminderEnable => 'Enable reminder';

@@ -5,6 +5,7 @@ import 'package:evolua_frontend/features/auth/application/auth_controller.dart';
 import 'package:evolua_frontend/features/auth/domain/entities/auth_session.dart';
 import 'package:evolua_frontend/features/content/application/trail_controller.dart';
 import 'package:evolua_frontend/features/emotional/application/check_in_controller.dart';
+import 'package:evolua_frontend/features/notification/application/engagement_notification_planner.dart';
 import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,6 +108,16 @@ class AppStartupController {
           session,
           generation,
           () => _ref.read(currentJourneyTrailProvider.future),
+        ),
+      ),
+      () => _guarded(
+        'engagement notifications planner',
+        () => _runIfSessionCurrent(
+          session,
+          generation,
+          () => _ref
+              .read(engagementNotificationPlannerProvider)
+              .evaluateAfterWarmUp(session),
         ),
       ),
     ];

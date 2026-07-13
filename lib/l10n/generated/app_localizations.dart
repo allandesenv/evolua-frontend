@@ -724,6 +724,30 @@ abstract class AppLocalizations {
   /// **'Quer receber um lembrete leve pela manhã para cuidar do seu momento?'**
   String get checkInReminderMorningMessage;
 
+  /// No description provided for @engagementTrailResumeTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Sua trilha continua te esperando'**
+  String get engagementTrailResumeTitle;
+
+  /// No description provided for @engagementTrailResumeBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Dê mais um pequeno passo na sua evolução hoje.'**
+  String get engagementTrailResumeBody;
+
+  /// No description provided for @engagementWeeklyMirrorTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Seu Espelho da Semana está pronto'**
+  String get engagementWeeklyMirrorTitle;
+
+  /// No description provided for @engagementWeeklyMirrorBody.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Veja pequenos sinais da sua evolução nos últimos dias.'**
+  String get engagementWeeklyMirrorBody;
+
   /// No description provided for @checkInReminderEnable.
   ///
   /// In pt_BR, this message translates to:

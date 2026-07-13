@@ -10,6 +10,7 @@ import 'package:evolua_frontend/features/daily_ritual/application/daily_ritual_c
 import 'package:evolua_frontend/features/emotional/data/repositories/check_in_repository_impl.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/repositories/check_in_repository.dart';
+import 'package:evolua_frontend/features/notification/application/engagement_notification_planner.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -295,6 +296,11 @@ class CheckInController extends AsyncNotifier<CheckInHistoryState> {
         ),
       );
       _resumeInsightPollingFromState();
+      unawaited(
+        ref
+            .read(engagementNotificationPlannerProvider)
+            .onCheckInCreated(latest ?? created),
+      );
     } catch (error, stackTrace) {
       if (previous != null) {
         state = AsyncData(_copyState(previous, isCreatingCheckIn: false));
