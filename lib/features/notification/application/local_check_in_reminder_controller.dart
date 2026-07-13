@@ -479,6 +479,36 @@ class DailyCheckInReminderController
     return allowed;
   }
 
+  Future<bool>
+  requestPermissionAndEnableInitialEngagementNotifications() async {
+    final current = state.value ?? await _load();
+    state = AsyncData(current);
+    final allowed = await ref
+        .read(dailyCheckInReminderSchedulerProvider)
+        .requestPermission();
+    final updated = current.copyWith(enabled: allowed, promptAnswered: true);
+    await _save(updated);
+    await _saveEngagementPreferences(
+      EngagementNotificationPreferences(
+        enabled: allowed,
+        categories: {
+          for (final type in EngagementNotificationType.values) type: false,
+          EngagementNotificationType.dailyCheckIn: allowed,
+          EngagementNotificationType.trailResume: allowed,
+          EngagementNotificationType.weeklyMirror: allowed,
+        },
+      ),
+    );
+    if (allowed) {
+      await _schedule(updated);
+    } else {
+      await ref.read(dailyCheckInReminderSchedulerProvider).cancel();
+      await ref.read(engagementNotificationSchedulerProvider).cancelAll();
+    }
+    state = AsyncData(updated);
+    return allowed;
+  }
+
   Future<void> dismissPrompt() async {
     final current = state.value ?? await _load();
     final updated = current.copyWith(promptAnswered: true);

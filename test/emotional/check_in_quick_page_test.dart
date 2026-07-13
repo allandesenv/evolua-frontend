@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:evolua_frontend/core/network/paginated_response.dart';
@@ -339,7 +340,7 @@ void main() {
       expect(completed, isTrue);
     });
 
-    testWidgets('does not invite daily reminder after compact check-in', (
+    testWidgets('invites evolution reminders after successful check-in', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues({});
@@ -366,25 +367,132 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.textContaining('lembrete leve'), findsNothing);
-      expect(find.text('Ativar lembrete'), findsNothing);
+      expect(find.text('Quer manter sua evolução em dia?'), findsOneWidget);
+      expect(find.text('Ativar lembretes'), findsOneWidget);
       expect(scheduler.permissionRequests, 0);
       expect(scheduler.scheduledTimes, isEmpty);
+      expect(completed, isFalse);
+
+      await tester.tap(find.text('Agora não').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(scheduler.permissionRequests, 0);
       expect(completed, isTrue);
+      expect(
+        preferences.getString(dailyCheckInReminderStorageKey),
+        contains('"promptAnswered":true'),
+      );
     });
 
-    testWidgets('check-in success does not mark reminder prompt answered', (
+    testWidgets('accepting reminder invite enables initial reminders', (
       tester,
     ) async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
       final scheduler = _FakeDailyReminderScheduler();
+      final engagementScheduler = _FakeEngagementScheduler();
+      var completed = false;
       tester.view.physicalSize = const Size(390, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
+
+      await tester.pumpWidget(
+        _testApp(
+          sharedPreferences: preferences,
+          reminderScheduler: scheduler,
+          engagementScheduler: engagementScheduler,
+          onCompleted: () => completed = true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      await tester.tap(find.text('Ativar lembretes'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(scheduler.permissionRequests, 1);
+      expect(scheduler.scheduledTimes, ['08:00']);
+      expect(find.text('Lembretes ativados.'), findsOneWidget);
+      expect(completed, isTrue);
+      final engagementRaw = preferences.getString(
+        engagementNotificationPreferencesStorageKey,
+      );
+      expect(engagementRaw, contains('"dailyCheckIn":true'));
+      expect(engagementRaw, contains('"trailResume":true'));
+      expect(engagementRaw, contains('"weeklyMirror":true'));
+      expect(engagementRaw, contains('"futureMessageReady":false'));
+    });
+
+    testWidgets('denied reminder permission keeps reminders disabled', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeDailyReminderScheduler(permissionGranted: false);
+      final engagementScheduler = _FakeEngagementScheduler();
+      tester.view.physicalSize = const Size(390, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        _testApp(
+          sharedPreferences: preferences,
+          reminderScheduler: scheduler,
+          engagementScheduler: engagementScheduler,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('Ativar lembretes'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(scheduler.permissionRequests, 1);
+      expect(scheduler.scheduledTimes, isEmpty);
+      expect(scheduler.cancelCount, 1);
+      expect(engagementScheduler.cancelAllCount, 1);
+      expect(
+        find.text(
+          'Tudo bem. Você pode ativar os lembretes depois em Configurações.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        preferences.getString(dailyCheckInReminderStorageKey),
+        contains('"enabled":false'),
+      );
+      expect(
+        preferences.getString(dailyCheckInReminderStorageKey),
+        contains('"promptAnswered":true'),
+      );
+    });
+
+    testWidgets('does not invite when reminder prompt was already answered', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        dailyCheckInReminderStorageKey: jsonEncode(
+          DailyCheckInReminderPreferences.defaults()
+              .copyWith(promptAnswered: true)
+              .toJson(),
+        ),
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeDailyReminderScheduler();
 
       await tester.pumpWidget(
         _testApp(sharedPreferences: preferences, reminderScheduler: scheduler),
@@ -395,9 +503,34 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(find.textContaining('lembrete leve'), findsNothing);
-      expect(scheduler.scheduledTimes, isEmpty);
-      expect(preferences.getString(dailyCheckInReminderStorageKey), isNull);
+      expect(find.text('Quer manter sua evolução em dia?'), findsNothing);
+      expect(scheduler.permissionRequests, 0);
+    });
+
+    testWidgets('does not invite when reminders are already enabled', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        dailyCheckInReminderStorageKey: jsonEncode(
+          DailyCheckInReminderPreferences.defaults()
+              .copyWith(enabled: true, promptAnswered: true)
+              .toJson(),
+        ),
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeDailyReminderScheduler();
+
+      await tester.pumpWidget(
+        _testApp(sharedPreferences: preferences, reminderScheduler: scheduler),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Fazer check-in'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Quer manter sua evolução em dia?'), findsNothing);
+      expect(scheduler.permissionRequests, 0);
     });
 
     testWidgets(
@@ -884,12 +1017,22 @@ Widget _testApp({
   RewardedAdService? rewardedAdService,
   SubscriptionRepository? subscriptionRepository,
   DailyCheckInReminderScheduler? reminderScheduler,
+  EngagementNotificationScheduler? engagementScheduler,
   SharedPreferences? sharedPreferences,
   CheckInSpeechTranscriptionService? speechService,
   VoidCallback? onCompleted,
   VoidCallback? onCancel,
   VoidCallback? onOpenPremium,
 }) {
+  if (sharedPreferences == null) {
+    SharedPreferences.setMockInitialValues({
+      dailyCheckInReminderStorageKey: jsonEncode(
+        DailyCheckInReminderPreferences.defaults()
+            .copyWith(promptAnswered: true)
+            .toJson(),
+      ),
+    });
+  }
   return ProviderScope(
     overrides: [
       if (sharedPreferences != null)
@@ -911,6 +1054,10 @@ Widget _testApp({
       if (reminderScheduler != null)
         dailyCheckInReminderSchedulerProvider.overrideWithValue(
           reminderScheduler,
+        ),
+      if (engagementScheduler != null)
+        engagementNotificationSchedulerProvider.overrideWithValue(
+          engagementScheduler,
         ),
       if (speechService != null)
         checkInSpeechTranscriptionServiceProvider.overrideWithValue(
@@ -954,11 +1101,17 @@ class _FakeCurrentSubscriptionController extends CurrentSubscriptionController {
 }
 
 class _FakeDailyReminderScheduler implements DailyCheckInReminderScheduler {
+  _FakeDailyReminderScheduler({this.permissionGranted = true});
+
+  final bool permissionGranted;
   int permissionRequests = 0;
+  int cancelCount = 0;
   final List<String> scheduledTimes = [];
 
   @override
-  Future<void> cancel() async {}
+  Future<void> cancel() async {
+    cancelCount++;
+  }
 
   @override
   Future<bool> consumePendingCheckInPayload() async => false;
@@ -966,7 +1119,7 @@ class _FakeDailyReminderScheduler implements DailyCheckInReminderScheduler {
   @override
   Future<bool> requestPermission() async {
     permissionRequests++;
-    return true;
+    return permissionGranted;
   }
 
   @override
@@ -980,6 +1133,27 @@ class _FakeDailyReminderScheduler implements DailyCheckInReminderScheduler {
     scheduledTimes.add(
       '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
     );
+  }
+}
+
+class _FakeEngagementScheduler implements EngagementNotificationScheduler {
+  int cancelAllCount = 0;
+  final cancelled = <EngagementNotificationType>[];
+  final scheduled = <EngagementNotificationCandidate>[];
+
+  @override
+  Future<void> cancel(EngagementNotificationType type) async {
+    cancelled.add(type);
+  }
+
+  @override
+  Future<void> cancelAll() async {
+    cancelAllCount++;
+  }
+
+  @override
+  Future<void> schedule(EngagementNotificationCandidate candidate) async {
+    scheduled.add(candidate);
   }
 }
 
