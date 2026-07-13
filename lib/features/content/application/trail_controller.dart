@@ -15,6 +15,7 @@ import 'package:evolua_frontend/features/content/domain/entities/trail_step.dart
 import 'package:evolua_frontend/features/content/domain/entities/trail_step_response.dart';
 import 'package:evolua_frontend/features/content/domain/entities/trail_summary.dart';
 import 'package:evolua_frontend/features/content/domain/repositories/trail_repository.dart';
+import 'package:evolua_frontend/features/notification/application/engagement_notification_planner.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final trailRepositoryProvider = Provider<TrailRepository>((ref) {
@@ -153,6 +154,11 @@ class TrailJourneyActions {
     _ref.invalidate(currentJourneyTrailProvider);
     _ref.invalidate(inProgressTrailJourneysProvider);
     await invalidateTrailCatalogCacheForCurrentUser(_ref);
+    unawaited(
+      _ref
+          .read(engagementNotificationPlannerProvider)
+          .onTrailJourneyChanged(journey),
+    );
     return journey;
   }
 
@@ -164,6 +170,11 @@ class TrailJourneyActions {
     _ref.invalidate(currentJourneyTrailProvider);
     _ref.invalidate(inProgressTrailJourneysProvider);
     await invalidateTrailCatalogCacheForCurrentUser(_ref);
+    unawaited(
+      _ref
+          .read(engagementNotificationPlannerProvider)
+          .onTrailJourneyChanged(journey),
+    );
     return journey;
   }
 
@@ -185,6 +196,11 @@ class TrailJourneyActions {
     _ref.invalidate(currentJourneyTrailProvider);
     _ref.invalidate(inProgressTrailJourneysProvider);
     await invalidateTrailCatalogCacheForCurrentUser(_ref);
+    unawaited(
+      _ref
+          .read(engagementNotificationPlannerProvider)
+          .onTrailJourneyChanged(journey),
+    );
     return journey;
   }
 
