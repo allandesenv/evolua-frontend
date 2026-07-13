@@ -23,6 +23,8 @@ const engagementNotificationPreferencesStorageKey =
     'evolua.engagement_notifications.preferences.v1';
 const engagementNotificationFatigueStorageKey =
     'evolua.engagement_notifications.fatigue.v1';
+const engagementNotificationScheduleStateStorageKey =
+    'evolua.engagement_notifications.schedule_state.v1';
 
 enum EngagementNotificationType {
   dailyCheckIn(
@@ -593,6 +595,17 @@ class DailyCheckInReminderController
     await ref.read(engagementNotificationSchedulerProvider).schedule(candidate);
     await _saveFatigueState(fatigue.record(candidate.type, currentTime));
     return true;
+  }
+
+  Future<void> rescheduleDailyCheckInAfterSuccessfulCheckIn(
+    DateTime checkInAt,
+  ) async {
+    final current = state.value ?? await _load();
+    if (!current.enabled) {
+      return;
+    }
+    await _schedule(current);
+    state = AsyncData(current);
   }
 
   Future<DailyCheckInReminderPreferences> _load() async {

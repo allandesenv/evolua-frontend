@@ -365,6 +365,20 @@ class AppLocalizationsPt extends AppLocalizations {
       'Quer receber um lembrete leve pela manhã para cuidar do seu momento?';
 
   @override
+  String get engagementTrailResumeTitle => 'Sua trilha continua te esperando';
+
+  @override
+  String get engagementTrailResumeBody =>
+      'Dê mais um pequeno passo na sua evolução hoje.';
+
+  @override
+  String get engagementWeeklyMirrorTitle => 'Seu Espelho da Semana está pronto';
+
+  @override
+  String get engagementWeeklyMirrorBody =>
+      'Veja pequenos sinais da sua evolução nos últimos dias.';
+
+  @override
   String get checkInReminderEnable => 'Ativar lembrete';
 
   @override
@@ -1678,6 +1692,20 @@ class AppLocalizationsPtBr extends AppLocalizationsPt {
   @override
   String get checkInReminderMorningMessage =>
       'Quer receber um lembrete leve pela manhã para cuidar do seu momento?';
+
+  @override
+  String get engagementTrailResumeTitle => 'Sua trilha continua te esperando';
+
+  @override
+  String get engagementTrailResumeBody =>
+      'Dê mais um pequeno passo na sua evolução hoje.';
+
+  @override
+  String get engagementWeeklyMirrorTitle => 'Seu Espelho da Semana está pronto';
+
+  @override
+  String get engagementWeeklyMirrorBody =>
+      'Veja pequenos sinais da sua evolução nos últimos dias.';
 
   @override
   String get checkInReminderEnable => 'Ativar lembrete';
