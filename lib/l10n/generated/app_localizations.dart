@@ -742,6 +742,36 @@ abstract class AppLocalizations {
   /// **'Não conseguimos ativar o lembrete sem permissão de notificação.'**
   String get checkInReminderPermissionDenied;
 
+  /// No description provided for @checkInEvolutionReminderTitle.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Quer manter sua evolução em dia?'**
+  String get checkInEvolutionReminderTitle;
+
+  /// No description provided for @checkInEvolutionReminderMessage.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'O Evolua pode te enviar lembretes leves para não esquecer seu check-in, continuar suas trilhas e rever seu Espelho da Semana.'**
+  String get checkInEvolutionReminderMessage;
+
+  /// No description provided for @checkInEvolutionReminderEnable.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Ativar lembretes'**
+  String get checkInEvolutionReminderEnable;
+
+  /// No description provided for @checkInEvolutionReminderEnabled.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Lembretes ativados.'**
+  String get checkInEvolutionReminderEnabled;
+
+  /// No description provided for @checkInEvolutionReminderPermissionDenied.
+  ///
+  /// In pt_BR, this message translates to:
+  /// **'Tudo bem. Você pode ativar os lembretes depois em Configurações.'**
+  String get checkInEvolutionReminderPermissionDenied;
+
   /// No description provided for @checkInRewardConfirmTitle.
   ///
   /// In pt_BR, this message translates to:

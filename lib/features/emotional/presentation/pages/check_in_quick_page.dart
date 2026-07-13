@@ -11,11 +11,13 @@ import 'package:evolua_frontend/features/emotional/application/check_in_controll
 import 'package:evolua_frontend/features/emotional/application/check_in_speech_transcription_service.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in.dart';
 import 'package:evolua_frontend/features/emotional/domain/entities/check_in_ai_insight.dart';
+import 'package:evolua_frontend/features/notification/application/local_check_in_reminder_controller.dart';
 import 'package:evolua_frontend/l10n/app_l10n.dart';
 import 'package:evolua_frontend/l10n/generated/app_localizations.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/app_snackbar.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/gradient_scaffold.dart';
 import 'package:evolua_frontend/shared/presentation/widgets/primary_panel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -96,6 +98,7 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
   bool _isSubmitting = false;
   bool _isRewardLoading = false;
   bool _isListeningReflection = false;
+  bool _isEvolutionReminderDialogOpen = false;
   String _dictationBaseText = '';
   late final CheckInSpeechTranscriptionService _speechService;
 
@@ -301,17 +304,20 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
 
       _reflectionController.clear();
       _otherMoodController.clear();
-      final insight = ref
+      final latestCreatedCheckIn = ref
           .read(checkInControllerProvider)
           .asData
           ?.value
-          .latestCreatedCheckIn
-          ?.aiInsight;
+          .latestCreatedCheckIn;
+      final insight = latestCreatedCheckIn?.aiInsight;
       if (insight?.quotaLimited == true) {
         AppSnackBar.show(
           context,
           message: context.l10n.checkInSavedDeepReadingLater,
           icon: Icons.check_circle_outline_rounded,
+        );
+        await _maybeInviteEvolutionReminders(
+          checkInSaved: latestCreatedCheckIn != null,
         );
         widget.onCompleted?.call();
         return _CheckInSubmitResult.success;
@@ -323,6 +329,9 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
             : context.l10n.checkInSavedSnack,
         icon: Icons.check_circle_outline_rounded,
       );
+      await _maybeInviteEvolutionReminders(
+        checkInSaved: latestCreatedCheckIn != null,
+      );
       widget.onCompleted?.call();
       return _CheckInSubmitResult.success;
     } finally {
@@ -330,6 +339,78 @@ class _CheckInQuickViewState extends ConsumerState<CheckInQuickView> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _maybeInviteEvolutionReminders({
+    required bool checkInSaved,
+  }) async {
+    if (!mounted ||
+        kIsWeb ||
+        !checkInSaved ||
+        _isRewardLoading ||
+        _isEvolutionReminderDialogOpen) {
+      return;
+    }
+    final reminder = await ref.read(
+      dailyCheckInReminderControllerProvider.future,
+    );
+    if (!mounted ||
+        kIsWeb ||
+        _isRewardLoading ||
+        reminder.promptAnswered ||
+        reminder.enabled) {
+      return;
+    }
+
+    _isEvolutionReminderDialogOpen = true;
+    final bool? accepted;
+    try {
+      accepted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(context.l10n.checkInEvolutionReminderTitle),
+          content: Text(context.l10n.checkInEvolutionReminderMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(context.l10n.checkInNotNow),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(context.l10n.checkInEvolutionReminderEnable),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _isEvolutionReminderDialogOpen = false;
+    }
+    if (!mounted || accepted == null) {
+      return;
+    }
+
+    if (!accepted) {
+      await ref
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .dismissPrompt();
+      return;
+    }
+
+    final enabled = await ref
+        .read(dailyCheckInReminderControllerProvider.notifier)
+        .requestPermissionAndEnableInitialEngagementNotifications();
+    if (!mounted) {
+      return;
+    }
+    AppSnackBar.show(
+      context,
+      message: enabled
+          ? context.l10n.checkInEvolutionReminderEnabled
+          : context.l10n.checkInEvolutionReminderPermissionDenied,
+      icon: enabled
+          ? Icons.notifications_active_rounded
+          : Icons.notifications_off_outlined,
+    );
   }
 
   Future<void> _showRewardConfirmationProblemMessage() async {

@@ -46,6 +46,111 @@ void main() {
       expect(scheduler.permissionRequests, 1);
       expect(scheduler.scheduledTimes, ['08:00']);
       expect(engagementScheduler.cancelAllCount, 0);
+      final engagement = await container
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .engagementPreferences();
+      expect(engagement.enabled, isTrue);
+      expect(
+        engagement.isEnabled(EngagementNotificationType.dailyCheckIn),
+        isTrue,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.trailResume),
+        isFalse,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.weeklyMirror),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'initial engagement activation enables only safe starting categories',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeReminderScheduler(permissionGranted: true);
+      final engagementScheduler = _FakeEngagementScheduler();
+      final container = _container(preferences, scheduler, engagementScheduler);
+      addTearDown(container.dispose);
+
+      final enabled = await container
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .requestPermissionAndEnableInitialEngagementNotifications();
+      final reminder = container
+          .read(dailyCheckInReminderControllerProvider)
+          .value;
+      final engagement = await container
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .engagementPreferences();
+
+      expect(enabled, isTrue);
+      expect(reminder?.enabled, isTrue);
+      expect(reminder?.promptAnswered, isTrue);
+      expect(scheduler.permissionRequests, 1);
+      expect(scheduler.scheduledTimes, ['08:00']);
+      expect(engagement.enabled, isTrue);
+      expect(
+        engagement.isEnabled(EngagementNotificationType.dailyCheckIn),
+        isTrue,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.trailResume),
+        isTrue,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.weeklyMirror),
+        isTrue,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.futureMessageReady),
+        isFalse,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.morningRitual),
+        isFalse,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.eveningRitual),
+        isFalse,
+      );
+      expect(
+        engagement.isEnabled(EngagementNotificationType.gentleComeback),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'initial engagement activation denied disables every category and cancels',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final scheduler = _FakeReminderScheduler(permissionGranted: false);
+      final engagementScheduler = _FakeEngagementScheduler();
+      final container = _container(preferences, scheduler, engagementScheduler);
+      addTearDown(container.dispose);
+
+      final enabled = await container
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .requestPermissionAndEnableInitialEngagementNotifications();
+      final reminder = container
+          .read(dailyCheckInReminderControllerProvider)
+          .value;
+      final engagement = await container
+          .read(dailyCheckInReminderControllerProvider.notifier)
+          .engagementPreferences();
+
+      expect(enabled, isFalse);
+      expect(reminder?.enabled, isFalse);
+      expect(reminder?.promptAnswered, isTrue);
+      expect(scheduler.cancelCount, 1);
+      expect(engagementScheduler.cancelAllCount, 1);
+      expect(engagement.enabled, isFalse);
+      for (final type in EngagementNotificationType.values) {
+        expect(engagement.isEnabled(type), isFalse);
+      }
     },
   );
 
