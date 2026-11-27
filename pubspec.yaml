@@ -1,7 +1,7 @@
 name: evolua_frontend
 description: "Frontend Flutter do Evolua para Android, iOS e Web."
 publish_to: 'none'
-version: 1.0.2+40
+version: 1.0.2+43
 
 environment:
   sdk: ^3.10.4
@@ -34,7 +34,8 @@ dependencies:
   gma_mediation_applovin: ^2.6.1
   gma_mediation_unity: ^1.8.0
   gma_mediation_ironsource: ^2.4.1
-  in_app_purchase: ^3.2.3
+  in_app_purchase: 3.3.0
+  in_app_purchase_android: 0.5.0
   flutter_tts: ^4.2.5
   youtube_player_iframe: ^5.2.2
   youtube_player_flutter: 9.1.3

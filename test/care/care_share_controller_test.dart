@@ -339,7 +339,7 @@ Future<CareRecommendationEnvelope> _encryptedRecommendation({
         contentType: 'application/pdf',
       ),
     ],
-    createdAt: DateTime(2026, 5, 27, 10),
+    createdAt: DateTime.now(),
     therapistLabel: 'Terapeuta',
   );
 }
