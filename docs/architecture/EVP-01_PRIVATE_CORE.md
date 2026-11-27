@@ -1,0 +1,48 @@
+# EVP-01 — Evolua Private Core / contrato de arquitetura
+**Status:** direção de produto aprovada pelo mantenedor em 27/11/2026 BRT. Implementação e tecnologias específicas dependem dos gates descritos aqui. WIP: EVP-01A. Issue #165.
+**Princípio:** privacidade por padrão, compartilhamento por escolha. Meta R$0/mês de hospedagem própria para núcleo privado; não garantia de custo de toda a operação.
+
+## 1. Autoridade, limites e fatos
+- Frontend oficial Flutter/Riverpod: evolua-frontend; API oficial Spring Boot: evolua-api; legado evolua fora do escopo. Preservar AGENTS.md.
+- Git consultado em 27/11: main 0fd1d5c1e64216b25ecc0d8b0c2e5197b46a9832 (pubspec 1.0.2+42); developer 8040060fb05084e2c402ba641309a13c72901eb0 (+42); hotfix/play-billing-8-from-v40-20261023 5ec9ca9ca59f3440b164c356f3ab6fa9d481f409 (+40). Sem tags/releases encontradas; GitHub Actions consultadas eram Pages, não publicação Android. Comparação hotfix...main retornou ahead 166/behind 0; não concluir identidade do AAB a partir disso. VersionCode pode ser sobrescrito no build. Autoridade Play = NÃO CONFIRMADA.
+- Branch docs/evp-01-private-core parte de main **somente para documentação**, não determina base de implementação.
+- Hotfix auditada: CheckInRepositoryImpl POST /v1/check-ins envia mood/reflection/energyLevel; AuthRepositoryImpl.exchangeGoogleCode POST /v1/public/auth/google/exchange; CommunityRepositoryImpl /v1/communities e join/leave; SocialPostRepositoryImpl /v1/posts CRUD; ChatMessageRepositoryImpl /v1/messages. SocialModuleView inicia publicação PUBLIC. CareCryptoService AES-256-GCM/HKDF; pubspec contém cryptography, secure storage, notificações locais. API AiService fallback heurístico; provider em produção não confirmado.
+- Antes de código: confirmar autoridade, mapa completo de providers/contratos e chamadas implícitas, threat model, versões, dependências e comportamento de Android/iOS/Web. Não copiar dados reais em QA.
+
+## 2. Decisão de arquitetura
+**Private:** domínio/repositórios locais, perfil, check-ins, Espelho, reflexões, Mentor, trilhas/progresso, rituais, cartas, lembretes e preferências pessoais. Banco local cifrado. Sem envio automático, fallback HTTP, SDK social dependente de contexto emocional, nem dependência da disponibilidade de rede. Conteúdo público embarcado e atualizações opcionais.
+**Identity:** Google OAuth obrigatório como opção preservada; perfil local alternativo. Proposta de SDK Google nativo + Firebase Auth; primeira vinculação online, desbloqueio posterior offline separado, sem usar token/ID Google como chave criptográfica. Não armazenar segredo OAuth no app. Vincular identidade por issuer/subject verificado e prova de conta antiga, não só por e-mail; troca de perfil não mistura dados; bloquear/invalidar operações antigas. Exclusão/desvinculação da identidade online não apaga diário automaticamente. Preservar package, certificados Play App Signing, OAuth clients/deep links. Testar fluxos cancelamento, revogação, expiração, perda de conta, troca de usuário, retorno offline, atualização do app. Não confundir perfil local desbloqueado com sessão social autenticada. Avaliar requisitos Apple para login alternativo.
+**Connect:** Firebase Auth + Firestore Spark como primeira opção, sem Blaze/faturamento; alternativa Supabase Free/RLS. Apenas identidade social mínima, alias/avatares escolhidos, comunidades curadas, posts explícitos, reações, denúncias e bloqueios. E-mail/Google ID não públicos. Sem sincronização do cofre. Cotas e regras do fornecedor devem ser revalidadas antes de implantação; quota/rede indisponível afeta só social. Sem afirmar custo zero garantido, anonimato absoluto ou E2EE em comunidade moderável. Firestore rules deny-by-default, autorização membership/roles/ownership/schema, App Check complementar, Emulator tests, abuse/rate limits e moderação humana; se não houver mecanismo efetivo, não lançar UGC. Evitar cache persistente de conteúdo social sensível não cifrado; limpar estado na troca de usuário. Somente ações confirmadas podem publicar; prévia de destinatário/visibilidade, cópia independente do diário. Desfazer/excluir no serviço não apaga cópias externas. Chat privado, grupos, mídia, E2EE de círculos e notificações push ficam para etapa posterior com protocolo estabelecido e projeto de abuso/custo; não retirar recursos existentes sem plano de transição.
+**Care:** troca seletiva de arquivos autenticados e cifrados, destinatário verificado, prévia, confirmação explícita, retorno de orientações/rituais; sem revogação fictícia e sem sincronização do diário. Definir interoperabilidade do profissional antes de release; acesso legado preservado até migração.
+
+## 3. Segurança, desempenho e dados
+- Spike SQLCipher/SQLite ou alternativa revisada; chave aleatória por perfil, armazenamento protegido pelo Keystore/Keychain, senha longa, biometria opcional; backup portátil versionado autenticado (AES-256-GCM candidato, Argon2id candidato). Não implementar primitiva própria. Chaves distintas por finalidade, nonces seguros, parâmetros KDF calibrados, reautenticação, proteção contra restore parcial/corrompido/sobrescrita, atomicidade e rollback. Sem dados/chaves/senhas em logs, analytics, crash reports, arquivos temporários não cifrados ou backup automático desprotegido. Excluir conteúdo do backup automático SO; testar aparelhos comprometidos/limites sem prometer proteção absoluta. Sem recuperação mágica por Google/e-mail. Exportar apenas cifrado, destino controlado pelo usuário, explicar perda de credencial e backup; exclusão local e remota distintas.
+- Baseline antes de otimizar: profile/release no moto g86 5G; startup frio/quente, desbloqueio/KDF, gravação, primeira página de histórico com 10 mil registros sintéticos, frames, memória, tráfego; medir p50/p95, condições e versão. Metas candidatas p95 Home após desbloqueio <=2s, gravação <=150ms sem IA, histórico inicial <=200ms, orçamento 16,7ms/frame em 60Hz. KDF em worker apenas quando necessário; chave sessão em memória, transações incrementais, índice/paginação, análise incremental, SDK social lazy, listeners limitados; não reduzir segurança para bater meta. Não declarar PASS sem execução.
+- Motor local Dart: portar regras heurísticas testadas, contextualização e padrões individuais; mostrar incerteza/correlação sem diagnóstico, assistência humana em crise, revisão de conteúdo. LLM embarcado opcional após benchmark/avaliação; sem API keys no cliente ou fallback nuvem de conteúdo privado.
+- Central de privacidade: local de armazenamento, acesso, backup, compartilhamento, conexões, exportação e exclusão. Informação clara sobre dados compartilhados, limites e retenção. LGPD e políticas lojas exigem revisão específica, não alegar conformidade automática.
+- Monetização: preservar assinantes e benefícios; check-in essencial, recuperação/exportação/exclusão não dependem de anúncio; sem segmentação emocional, sem anúncios em contexto de crise identificada; SDK isolado; SSV e verificação segura de compras requerem projeto comercial separado. Não ativar/cobrar/mudar planos até aprovação.
+
+## 4. Roadmap e critérios de aceite
+| Etapa | Entrega e gate |
+|---|---|
+| EVP-01A | Autoridade de produção + inventário de rede/dados/auth/social/billing + threat model + baseline planejada. |
+| EVP-01B | Branch de implementação a partir da autoridade verificada, Draft PR, spike de banco/chaves e testes sintéticos, revisão de dependências. |
+| EVP-02 | Identidade Google + acesso local, isolamento, backup/restore, exclusão, falhas e recuperação. |
+| EVP-03 | Check-in vertical offline, histórico, Espelho, nenhuma transmissão privada; desempenho medido. |
+| EVP-04 | Inteligência local, trilhas, rituais, cartas, notificações, segurança emocional. |
+| EVP-05 | Connect moderável e Care, monetização isolada; testes Auth/Rules, cotas, rede e isolamento. |
+| EVP-06 | Migração autenticada/idempotente, verificação de integridade, backup antes da confirmação, assinantes e histórico social, atualização legal, Android físico, paridade iOS/Web explicitada, rollout e retirada controlada do backend. |
+
+## 5. Método operacional (sem Codex)
+GitHub-first, 1 WIP, ler AGENTS + issue/PR + HEAD + evidências. Scripts completos versionados; uma linha PowerShell de execução com SHA fixado, preflight, allowlist e logs; falha imprime etapa/tipo/linha/erro e próxima ação. Reutilizar GREEN se escopo e evidência compatíveis; testes afetados primeiro e regressão de release quando indicada. Sem harness Unity obrigatório. Nunca reset/clean/stash/force-push ou sobrescrever worktree suja. Nenhuma merge/release/ativação online/desligamento do Railway/Supabase/apagamento de dados reais/alteração de segredos sem GO. Sem dados reais antes dos gates. Preservar histórico e evidências.
+**Próxima ação:** confirmar Play Console produção (versionCode + versionName + evidência de build/commit se houver); confrontar AAB/logs locais; confirmar base. Não pedir credenciais ou dados pessoais. Não instalar/desinstalar app de produção para esta auditoria.
+**Estado:** DOCS_ONLY; AUTHORITY=UNCONFIRMED; CODE=NOT_STARTED; TESTS=NOT_RUN; PERFORMANCE=NOT_MEASURED; REAL_DATA=NO_GO; MIGRATION=NO_GO; RELEASE=NO_GO; BACKEND_SHUTDOWN=NO_GO.
+
+## Referências de validação
+- Issue #165 e comentário 7229378597; Ofensiva ADR-004 e CONTINUITY_WORKFLOW (referência de processo, não prova de segurança).
+- https://firebase.google.com/docs/auth/flutter/federated-auth
+- https://firebase.google.com/docs/firestore/quotas
+- https://firebase.google.com/docs/projects/billing/firebase-pricing-plans
+- https://support.google.com/googleplay/android-developer/answer/9876937
+- https://docs.flutter.dev/perf/best-practices
+- https://mas.owasp.org/MASVS/
