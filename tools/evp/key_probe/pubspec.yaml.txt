@@ -1,0 +1,17 @@
+name: evp_key_probe
+description: Synthetic Android Keystore and KDF feasibility.
+publish_to: none
+version: 0.0.1+1
+environment:
+  sdk: ^3.10.4
+dependencies:
+  flutter:
+    sdk: flutter
+  cryptography: 2.9.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true
