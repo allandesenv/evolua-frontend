@@ -1,0 +1,16 @@
+name: evp_native_db_probe
+description: Synthetic SQLCipher vendor-native feasibility.
+publish_to: none
+version: 0.0.1+1
+environment:
+  sdk: ^3.10.4
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true

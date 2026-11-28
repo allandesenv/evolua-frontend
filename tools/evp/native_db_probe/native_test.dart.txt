@@ -1,0 +1,28 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('official native SQLCipher version and non-destructive opening',
+      (tester) async {
+    expect(const bool.fromEnvironment('dart.vm.profile'), isTrue);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    final report = await const MethodChannel('evp/native_db_probe')
+        .invokeMapMethod<String, dynamic>('runSyntheticProbe');
+    expect(report, isNotNull);
+    final result = report!;
+    expect(result['CIPHER_VERSION'], '4.20.0');
+    for (final name in [
+      'ENCRYPTED_FILE', 'WRONG_KEY_READONLY_UNCHANGED', 'RECOVERY_INTEGRITY',
+      'MISSING_NO_CREATE', 'ORIGINAL_UNCHANGED',
+    ]) {
+      expect(result[name], 'PASS', reason: name);
+    }
+    for (final entry in result.entries) {
+      debugPrint('EVP_F2_${entry.key}=${entry.value}');
+    }
+    debugPrint('EVP_F2_NATIVE_CHECKS=PASS');
+  });
+}

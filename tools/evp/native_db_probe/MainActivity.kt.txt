@@ -1,0 +1,129 @@
+package br.com.zenithit.evpqa.evp_native_db_probe
+
+import android.database.sqlite.SQLiteException
+import net.zetetic.database.DatabaseErrorHandler
+import net.zetetic.database.sqlcipher.SQLiteDatabase
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.security.MessageDigest
+import java.security.SecureRandom
+
+class MainActivity : FlutterActivity() {
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "evp/native_db_probe")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "runSyntheticProbe") {
+                    result.notImplemented()
+                } else {
+                    Thread {
+                        try {
+                            val report = runProbe()
+                            runOnUiThread { result.success(report) }
+                        } catch (error: Exception) {
+                            runOnUiThread { result.error("NATIVE_DB_PROBE_FAILED", error.javaClass.simpleName, null) }
+                        }
+                    }.start()
+                }
+            }
+    }
+
+    // Explicit non-destructive corruption policy. No default delete handler,
+    // migration hook, or create flag when opening an existing database.
+    private val preserveFile = DatabaseErrorHandler { _, _ -> }
+    private fun open(file: File, key: ByteArray, flags: Int): SQLiteDatabase =
+        SQLiteDatabase.openDatabase(file.absolutePath, key.copyOf(), null, flags, preserveFile, null)
+
+    private fun values(db: SQLiteDatabase, sql: String): List<String> {
+        val rows = mutableListOf<String>()
+        db.rawQuery(sql, emptyArray<String>()).use { cursor ->
+            while (cursor.moveToNext()) rows.add(cursor.getString(0))
+        }
+        return rows
+    }
+
+    private fun verify(db: SQLiteDatabase) {
+        check(values(db, "PRAGMA integrity_check") == listOf("ok"))
+        check(values(db, "PRAGMA cipher_integrity_check").isEmpty())
+    }
+
+    private fun sha(file: File): ByteArray =
+        MessageDigest.getInstance("SHA-256").digest(file.readBytes())
+
+    private fun runProbe(): Map<String, Any> {
+        System.loadLibrary("sqlcipher")
+        val directory = File.createTempFile("evp-native-", ".tmp", noBackupFilesDir)
+        check(directory.delete() && directory.mkdir())
+        val key = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val wrong = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val file = File(directory, "probe.db")
+        val report = linkedMapOf<String, Any>()
+        try {
+            val db = open(file, key, SQLiteDatabase.CREATE_IF_NECESSARY)
+            try {
+                val version = values(db, "PRAGMA cipher_version").single()
+                check(version.startsWith("4.20.0"))
+                report["CIPHER_VERSION"] = version.substringBefore(' ')
+                report["SQLITE_VERSION"] = values(db, "SELECT sqlite_version()").single()
+                db.execSQL("CREATE TABLE records(id INTEGER PRIMARY KEY, body TEXT NOT NULL)")
+                db.beginTransaction()
+                try {
+                    for (i in 0 until 1000) {
+                        db.execSQL("INSERT INTO records(id,body) VALUES(?,?)",
+                            arrayOf<Any>(i, "EVP_SYNTHETIC_NATIVE_MARKER"))
+                    }
+                    db.setTransactionSuccessful()
+                } finally { db.endTransaction() }
+                check(values(db, "SELECT count(*) FROM records").single() == "1000")
+                verify(db)
+            } finally { db.close() }
+            val originalHash = sha(file)
+            check(!file.readBytes().toString(Charsets.ISO_8859_1).contains("EVP_SYNTHETIC_NATIVE_MARKER"))
+            report["ENCRYPTED_FILE"] = "PASS"
+
+            val copy = File(directory, "wrong-key.db")
+            file.copyTo(copy)
+            val before = sha(copy)
+            var rejected = false
+            try {
+                val invalid = open(copy, wrong, SQLiteDatabase.OPEN_READONLY)
+                try { values(invalid, "SELECT count(*) FROM records") } finally { invalid.close() }
+            } catch (_: SQLiteException) { rejected = true }
+            check(rejected)
+            check(copy.isFile && sha(copy).contentEquals(before))
+            report["WRONG_KEY_READONLY_UNCHANGED"] = "PASS"
+
+            val recovered = open(copy, key, SQLiteDatabase.OPEN_READONLY)
+            try {
+                check(values(recovered, "SELECT count(*) FROM records").single() == "1000")
+                verify(recovered)
+            } finally { recovered.close() }
+            check(sha(copy).contentEquals(before))
+            report["RECOVERY_INTEGRITY"] = "PASS"
+
+            val missing = File(directory, "missing.db")
+            var absentRejected = false
+            try {
+                val invalid = open(missing, key, SQLiteDatabase.OPEN_READONLY)
+                invalid.close()
+            } catch (_: SQLiteException) { absentRejected = true }
+            check(absentRejected && !missing.exists())
+            report["MISSING_NO_CREATE"] = "PASS"
+
+            val original = open(file, key, SQLiteDatabase.OPEN_READONLY)
+            try {
+                verify(original)
+                check(values(original, "SELECT count(*) FROM records").single() == "1000")
+            } finally { original.close() }
+            check(sha(file).contentEquals(originalHash))
+            report["ORIGINAL_UNCHANGED"] = "PASS"
+            return report
+        } finally {
+            key.fill(0)
+            wrong.fill(0)
+            check(directory.deleteRecursively())
+        }
+    }
+}
