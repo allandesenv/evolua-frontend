@@ -120,7 +120,7 @@ class PrivateStoreChannel(context: Context, messenger: BinaryMessenger) {
                     opened.execSQL("INSERT INTO private_meta(singleton,profile_id) VALUES(1,?)", arrayOf<Any>(profile))
                     opened.execSQL("CREATE TABLE private_records(id TEXT PRIMARY KEY NOT NULL, created_at INTEGER NOT NULL CHECK(created_at>=0), body TEXT NOT NULL)")
                     opened.execSQL("CREATE INDEX private_records_order ON private_records(created_at DESC,id DESC)")
-                    opened.setVersion(1)
+                    opened.execSQL("PRAGMA user_version = 1")
                     opened.setTransactionSuccessful()
                 } finally { opened.endTransaction() }
             }

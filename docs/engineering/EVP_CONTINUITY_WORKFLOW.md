@@ -19,3 +19,8 @@ Status: instrução explícita do mantenedor, 27/11/2026. Issue #165; Draft #166
 
 ## Estado inicial
 EVP-01A: local recovery PASS, public content review complete. Remote release/production-v43-billing8-public and feat/evp-private-core not yet present at verification. Executor public baseline pending local execution; only after receipt and remote SHA verification start implementation Draft PR targeting recovered public authority. Production and backend unchanged.
+
+## Guardas aprendidas em EVP-02A
+- Launcher sempre valida sintaxe do executor PowerShell antes de executar. Em falha de comando nativo, imprimir diagnósticos do compilador/Gradle com contexto e localização do log, além do erro de saída; não exigir nova compilação apenas para obter a causa. Preservar logs e checkpoints de build.
+- Relatório Gradle deve corresponder ao modo e target-platform do artefato auditado. Validadores compostos devem mostrar condições individuais, nunca mascarar dependências não resolvidas.
+- Em falha de compilação após testes/análise GREEN, verificar evidências e arquivos/lock da preparação existente, sincronizar apenas fonte afetada autorizada, retomar build focal e teste do APK pré-compilado. Não recriar projeto, rodar pub get ou repetir GREEN sem necessidade demonstrada. Registrar hashes de evidências e fonte original antes de sobrescrever exclusivamente a cópia QA autorizada.
