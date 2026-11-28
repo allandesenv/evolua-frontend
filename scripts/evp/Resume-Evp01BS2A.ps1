@@ -6,8 +6,9 @@ $base='cd3538073cae1c769aec4b71742f3c9af606ae83'
 $branch='feat/evp-private-core'
 $previous=Join-Path $Root '_evidence\evp01b-s2a-20261127-211727-021'
 $probe=Join-Path $previous 'evp_cipher_probe'
-$evidence=Join-Path $Root ('_evidence\evp01b-s2a-r1-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
-$paths=@('docs/engineering/EVP-01B_S2A_R1_BUILD_SPLIT.md','tools/evp/sqlcipher_probe/driver.dart.txt','scripts/evp/Resume-Evp01BS2A.ps1')
+$evidence=Join-Path $Root ('_evidence\evp01b-s2a-r2-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+$r1='2b47f087a3916e0f843d1ae3f80948d97a10f9f5'
+$paths=@('docs/engineering/EVP-01B_S2A_R1_BUILD_SPLIT.md','tools/evp/sqlcipher_probe/driver.dart.txt','scripts/evp/Resume-Evp01BS2A.ps1','docs/engineering/EVP-01B_S2A_R2_HOST_WAIT.md')
 function GitChecked([string[]]$ArgsList) {
     $result=& git -C $repo @ArgsList
     if($LASTEXITCODE -ne 0){throw "Git failed: $($ArgsList[0]) EXITCODE=$LASTEXITCODE"}
@@ -38,11 +39,99 @@ try {
     Clean
     Get-Command flutter -ErrorAction Stop | Out-Null
     $before=GitChecked @('rev-parse','HEAD')
-    if($before -ne $base -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
+    if($before -ne $base -and $before -ne $r1 -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
     New-Item -ItemType Directory -Path $evidence -Force | Out-Null
     $stage='GRADLE_HOST_PREFLIGHT'
-    $wrappers=@(Get-CimInstance Win32_Process | Where-Object {$_.Name -match '^java(w)?\.exe$' -and $_.CommandLine -match 'org\.gradle\.wrapper\.GradleWrapperMain'})
-    if($wrappers.Count){throw ('Active Gradle wrapper PIDs: '+(($wrappers | Select-Object -ExpandProperty ProcessId) -join ',')+'; allow existing build to finish before resuming')}
+    function Get-ActiveWrappers {
+        @(Get-CimInstance Win32_Process | Where-Object {$_.Name -match '^java(w)?\.exe
+    $stage='ANDROID_DEVICE_PREFLIGHT'
+    $raw=& flutter devices --machine
+    if($LASTEXITCODE -ne 0){throw 'flutter devices failed'}
+    $devices=@(($raw -join [Environment]::NewLine | ConvertFrom-Json) | Where-Object {$_.targetPlatform -like 'android-*' -and $_.emulator -eq $false -and $_.isSupported -ne $false})
+    if($devices.Count -ne 1){throw 'Connect exactly one supported physical Android device via USB with debugging authorized'}
+    $device=$devices[0].id
+    Write-Host "DEVICE_NAME=$($devices[0].name)"
+    $stage='FETCH_AND_ALLOWLIST'
+    GitChecked @('fetch','origin',"refs/heads/$branch") | Out-Host
+    if((GitChecked @('rev-parse','FETCH_HEAD')) -ne $TargetSha){throw 'Remote HEAD differs from target'}
+    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $r1){throw 'Unexpected target parent'}
+    if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$base,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
+    if($before -ne $TargetSha){GitChecked @('merge','--ff-only',$TargetSha) | Out-Host}
+    if((GitChecked @('rev-parse','HEAD')) -ne $TargetSha){throw 'Sync mismatch'}
+    Clean
+    $stage='REUSE_VERIFIED_PROBE'
+    $templates=Join-Path $repo 'tools\evp\sqlcipher_probe'
+    SameFile (Join-Path $templates 'pubspec.yaml.txt') (Join-Path $probe 'pubspec.yaml')
+    SameFile (Join-Path $templates 'native_test.dart.txt') (Join-Path $probe 'integration_test\native_test.dart')
+    SameFile (Join-Path $previous 'probe-pubspec.lock') (Join-Path $probe 'pubspec.lock')
+    if(!(Select-String -LiteralPath (Join-Path $previous 'probe-analyze.log') -SimpleMatch 'No issues found!')){throw 'Prior analyze success marker missing'}
+    $gradle=Join-Path $probe 'android\app\build.gradle.kts'
+    if(!(Select-String -LiteralPath $gradle -Pattern 'applicationId\s*=\s*"br\.com\.zenithit\.evpqa\.evp_cipher_probe"')){throw 'Unexpected probe application ID'}
+    $driverFolder=Join-Path $probe 'test_driver'
+    if(!(Test-Path -LiteralPath $driverFolder)){New-Item -ItemType Directory -Path $driverFolder | Out-Null}
+    $driver=Join-Path $driverFolder 'integration_test.dart'
+    if(!(Test-Path -LiteralPath $driver)){Copy-Item -LiteralPath (Join-Path $templates 'driver.dart.txt') -Destination $driver}
+    SameFile (Join-Path $templates 'driver.dart.txt') $driver
+    Write-Host 'PRIOR_PREPARATION=GREEN_REUSED; S1=GREEN_REUSED'
+    Push-Location -LiteralPath $probe
+    try {
+        $stage='PROBE_APK_BUILD'
+        if(@(Get-ActiveWrappers).Count){throw 'Another Gradle wrapper started after host preflight; concurrent build prevented'}
+        Write-Host "ETAPA=$stage"
+        $timer=[Diagnostics.Stopwatch]::StartNew()
+        FlutterChecked @('build','apk','--debug','--no-pub','--target=integration_test/native_test.dart') 'probe-build.log'
+        $timer.Stop()
+        $buildSeconds=[math]::Round($timer.Elapsed.TotalSeconds,1)
+        $apk=Join-Path $probe 'build\app\outputs\flutter-apk\app-debug.apk'
+        if(!(Test-Path -LiteralPath $apk -PathType Leaf)){throw 'APK missing after successful build'}
+        $apkHash=(Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash
+        Write-Host "APK_SHA256=$apkHash"
+        Write-Host "BUILD_SECONDS=$buildSeconds"
+        SameFile (Join-Path $previous 'probe-pubspec.lock') (Join-Path $probe 'pubspec.lock')
+        $stage='PROBE_PREBUILT_DEVICE_TEST'
+        Write-Host "ETAPA=$stage"
+        FlutterChecked @('drive','--debug','--no-pub','--driver=test_driver/integration_test.dart','--target=integration_test/native_test.dart',("--use-application-binary="+$apk),'-d',$device,'--timeout=600') 'probe-drive.log'
+        if((Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash -ne $apkHash){throw 'APK changed during device execution'}
+        $log=Join-Path $evidence 'probe-drive.log'
+        if(!(Select-String -LiteralPath $log -SimpleMatch 'EVP_S2_NATIVE_CHECKS=PASS')){throw 'Native completion marker missing; inspect drive log'}
+        if(!(Select-String -LiteralPath $log -SimpleMatch 'All tests passed')){throw 'Driver success marker missing; inspect drive log'}
+        $metrics=@(Select-String -LiteralPath $log -Pattern 'EVP_S2_[A-Z0-9_]+=[^ ]+' -AllMatches | ForEach-Object {$_.Matches.Value})
+    } finally {Pop-Location}
+    Clean
+    $result=@('VERDICT=PASS_EVP01B_S2A_NATIVE_PROBE',"HEAD=$TargetSha",'S1=GREEN_REUSED','PREPARATION=GREEN_REUSED','MODE=DEBUG_OBSERVATIONAL',"APK_SHA256=$apkHash","BUILD_SECONDS=$buildSeconds",'PRODUCTION_BUILD=NOT_RUN','PRODUCTION=UNCHANGED','RELEASE=NO_GO')+$metrics
+    $result | Set-Content -LiteralPath (Join-Path $evidence 'RESULTADO.txt') -Encoding UTF8
+    $result | Out-Host
+    Write-Host "RESULTADO=$evidence\RESULTADO.txt"
+} catch {
+    $result=@('VERDICT=NO_GO',"ETAPA=$stage","ERRO=$($_.Exception.Message)","LINHA=$($_.InvocationInfo.ScriptLineNumber)",'NEXT=Send output and relevant sanitized log; preserve evidence and do not reset/clean/retry blindly')
+    if(Test-Path -LiteralPath $evidence){$result | Set-Content -LiteralPath (Join-Path $evidence 'RESULTADO.txt') -Encoding UTF8}
+    $result | Out-Host
+    throw
+}
+ -and $_.CommandLine -match 'org\.gradle\.wrapper\.GradleWrapperMain'})
+    }
+    $hostWait=[Diagnostics.Stopwatch]::StartNew()
+    $hostLog=Join-Path $evidence 'gradle-host-wait.log'
+    $lastReport=-30
+    $wrappers=@(Get-ActiveWrappers)
+    while($wrappers.Count) {
+        $elapsed=[int]$hostWait.Elapsed.TotalSeconds
+        if($elapsed-$lastReport -ge 30) {
+            foreach($wrapper in $wrappers) {
+                $proc=Get-Process -Id $wrapper.ProcessId -ErrorAction SilentlyContinue
+                $ownership='UNKNOWN_OR_OTHER'
+                if($wrapper.CommandLine -and $wrapper.CommandLine.Replace('/','\').IndexOf($probe,[StringComparison]::OrdinalIgnoreCase) -ge 0){$ownership='PROBE_PATH_MATCH'}
+                $cpu=if($proc){[math]::Round($proc.CPU,2)}else{'EXITED'}
+                $line="GRADLE_WAIT_SECONDS=$elapsed PID=$($wrapper.ProcessId) PARENT=$($wrapper.ParentProcessId) OWNER=$ownership CPU_SECONDS=$cpu"
+                $line | Tee-Object -FilePath $hostLog -Append | Out-Host
+            }
+            $lastReport=$elapsed
+        }
+        if($elapsed -ge 600){throw 'Gradle wrapper still active after bounded wait. Inspect gradle-host-wait.log; no process was terminated. Do not start a concurrent build.'}
+        Start-Sleep -Seconds 5
+        $wrappers=@(Get-ActiveWrappers)
+    }
+    Write-Host "GRADLE_HOST_READY=PASS WAIT_SECONDS=$([int]$hostWait.Elapsed.TotalSeconds)"
     $stage='ANDROID_DEVICE_PREFLIGHT'
     $raw=& flutter devices --machine
     if($LASTEXITCODE -ne 0){throw 'flutter devices failed'}
