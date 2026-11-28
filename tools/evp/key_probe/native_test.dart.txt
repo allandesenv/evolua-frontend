@@ -1,0 +1,60 @@
+import 'dart:isolate';
+import 'dart:math';
+
+import 'package:cryptography/cryptography.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+
+Future<int> sampleKdf() async {
+  final random = Random.secure();
+  final salt = List<int>.generate(16, (_) => random.nextInt(256));
+  final watch = Stopwatch()..start();
+  final result = await Isolate.run(() async {
+    final kdf = Argon2id(memory: 19456, iterations: 2, parallelism: 1, hashLength: 32);
+    final key = await kdf.deriveKeyFromPassword(
+        password: 'synthetic KDF benchmark phrase', nonce: salt);
+    final bytes = await key.extractBytes();
+    final length = bytes.length;
+    return length;
+  });
+  watch.stop();
+  expect(result, 32);
+  return watch.elapsedMicroseconds;
+}
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('native Keystore and worker KDF feasibility', (tester) async {
+    expect(const bool.fromEnvironment('dart.vm.profile'), isTrue);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    const channel = MethodChannel('evp/key_probe');
+    final report = await channel.invokeMapMethod<String, dynamic>('runSyntheticProbe');
+    expect(report, isNotNull);
+    for (final name in [
+      'NON_EXPORTABLE', 'FRESH_IV', 'RELOAD_AND_UNWRAP', 'WRONG_ALIAS',
+      'WRONG_CONTEXT', 'TAMPER', 'MISSING_KEY_FAIL_CLOSED',
+      'NO_BACKUP_DIRECTORY', 'ALLOW_BACKUP_DISABLED',
+    ]) {
+      expect(report![name], 'PASS', reason: name);
+    }
+    expect(report!['KEY_BITS'], 256);
+    expect(report['HARDWARE_BACKED'], isA<bool>());
+    expect(report['OS_AUTH_REQUIRED'], isFalse);
+    for (final entry in report.entries) {
+      debugPrint('EVP_S3B_${entry.key}=${entry.value}');
+    }
+    final cold = await sampleKdf();
+    final samples = <int>[];
+    for (var i = 0; i < 10; i++) {
+      samples.add(await sampleKdf());
+    }
+    samples.sort();
+    debugPrint('EVP_S3B_KDF_COLD_US=$cold');
+    debugPrint('EVP_S3B_KDF_N=${samples.length}');
+    debugPrint('EVP_S3B_KDF_P50_US=${samples[4]}');
+    debugPrint('EVP_S3B_KDF_P95_US=${samples.last}');
+    debugPrint('EVP_S3B_NATIVE_CHECKS=PASS');
+  });
+}

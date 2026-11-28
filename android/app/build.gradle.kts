@@ -47,7 +47,13 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
+        // EVP F4: native channel remains unavailable in every app build.
+        buildConfigField("boolean", "EVP_PRIVATE_CORE_ENABLED", "false")
         applicationId = "br.com.zenithit.evolua"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -92,4 +98,8 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("net.zetetic:sqlcipher-android:4.20.0") {
+        version { strictly("4.20.0") }
+    }
+    implementation("androidx.sqlite:sqlite:2.7.0")
 }

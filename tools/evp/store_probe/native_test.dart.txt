@@ -1,0 +1,120 @@
+import 'dart:math';
+
+import 'package:cryptography/cryptography.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+
+import 'package:evp_store_probe/private_key_envelope.dart';
+import 'package:evp_store_probe/private_store.dart';
+
+String profileId() {
+  final random = Random.secure();
+  return 'qa-${List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
+}
+
+PrivateRecord record(int index) => PrivateRecord(
+    id: 'r${index.toString().padLeft(6, '0')}', createdAt: index,
+    body: 'EVP_SYNTHETIC_RECORD');
+
+int p95(List<int> values) {
+  values.sort();
+  return values[(values.length * .95).ceil() - 1];
+}
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('real private store component: isolation, transactions and latency',
+      (tester) async {
+    expect(const bool.fromEnvironment('dart.vm.profile'), isTrue);
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    const store = PrivateStore(enabled: true);
+    const keys = PrivateKeyEnvelopeService();
+    final a = profileId();
+    final b = profileId();
+    final absent = profileId();
+    final original = keys.generateDek();
+    final wrong = SecretKeyData.random(length: 32);
+    final other = keys.generateDek();
+    PrivateStoreSession? active;
+    try {
+      final envelope = await keys.wrap(dek: original, credential: 'synthetic credential',
+          profileId: a, purpose: PrivateKeyPurpose.local);
+      final dek = await keys.unwrap(envelope: envelope, credential: 'synthetic credential',
+          profileId: a, purpose: PrivateKeyPurpose.local);
+      try {
+        await expectLater(store.open(absent, dek), throwsA(isA<PlatformException>()));
+        final session = await store.create(a, dek);
+        active = session;
+        await expectLater(store.open(b, other), throwsA(isA<PlatformException>()));
+        final seed = Stopwatch()..start();
+        for (var start = 0; start < 10000; start += 100) {
+          await session.insertBatch(List.generate(100, (i) => record(start + i)));
+        }
+        seed.stop();
+        final writes = <int>[];
+        final reads = <int>[];
+        for (var i = 10000; i < 10050; i++) {
+          final write = Stopwatch()..start();
+          await session.insertBatch([record(i)]);
+          writes.add(write.elapsedMicroseconds);
+          final read = Stopwatch()..start();
+          final rows = await session.page();
+          reads.add(read.elapsedMicroseconds);
+          expect(rows.length, 30);
+          expect(rows.first.id, record(i).id);
+        }
+        final write95 = p95(writes);
+        final read95 = p95(reads);
+        debugPrint('EVP_F4_SEED_10000_US=${seed.elapsedMicroseconds}');
+        debugPrint('EVP_F4_WRITE_P95_US=$write95');
+        debugPrint('EVP_F4_PAGE_P95_US=$read95');
+        final first = await session.page();
+        final second = await session.page(before: first.last);
+        expect(second.first.createdAt, first.last.createdAt - 1);
+        expect(first.map((r) => r.id).toSet().intersection(second.map((r) => r.id).toSet()), isEmpty);
+        debugPrint('EVP_F4_PAGINATION=PASS');
+
+        await expectLater(session.insertBatch([record(20000), record(10049)]),
+            throwsA(isA<PlatformException>()));
+        expect((await session.page()).first.id, record(10049).id);
+        debugPrint('EVP_F4_TRANSACTION_ROLLBACK=PASS');
+        await session.close();
+        active = null;
+        await expectLater(session.page(), throwsStateError);
+        await expectLater(store.create(a, dek), throwsA(isA<PlatformException>()));
+        await expectLater(store.open(a, wrong), throwsA(isA<PlatformException>()));
+        final reopened = await store.open(a, dek);
+        active = reopened;
+        expect((await reopened.page()).first.id, record(10049).id);
+        await reopened.close();
+        active = null;
+        final isolated = await store.create(b, other);
+        active = isolated;
+        expect(await isolated.page(), isEmpty);
+        await isolated.insertBatch([record(42)]);
+        await isolated.close();
+        active = null;
+        final finalA = await store.open(a, dek);
+        active = finalA;
+        expect((await finalA.page()).first.id, record(10049).id);
+        await finalA.close();
+        active = null;
+        debugPrint('EVP_F4_PROFILE_ISOLATION=PASS');
+        debugPrint('EVP_F4_NO_RECREATE_WRONG_KEY_RECOVERY=PASS');
+        debugPrint('EVP_F4_SESSION_INVALIDATION=PASS');
+        expect(write95, lessThanOrEqualTo(150000));
+        expect(read95, lessThanOrEqualTo(200000));
+        debugPrint('EVP_F4_NATIVE_CHECKS=PASS');
+      } finally {
+        await active?.close();
+        dek.destroy();
+      }
+    } finally {
+      original.destroy();
+      wrong.destroy();
+      other.destroy();
+    }
+  });
+}

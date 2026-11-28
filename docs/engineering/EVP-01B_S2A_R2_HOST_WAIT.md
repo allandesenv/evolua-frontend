@@ -1,0 +1,5 @@
+# EVP-01B-S2A-R2 — Bounded Gradle host recovery
+
+27/11/2026 BRT. R1 returned NO_GO at GRADLE_HOST_PREFLIGHT: active wrapper PID 3764. No second build or native test began; original S1 and preparation GREEN retained. The guard behaved correctly. It is not yet established whether PID 3764 is from the original probe or whether Gradle is stalled.
+
+R2 keeps the same R1 executor path and adds a bounded host wait of up to 600 seconds, polling wrappers every five seconds and printing PID, parent, probe-path attribution when visible and accumulated CPU every 30 seconds. Unknown attribution is not permission to terminate. No automatic stop, no deletion, no cache reset. If wrappers exit, continue in the same invocation with the existing verified scratch project and prebuilt APK flow. If not, stop with a local diagnostic receipt, preserving logs and all work. A second guard immediately before build checks for newly started wrappers. Local HEAD may still be cd35380 (R1 stopped before sync), R1, or exact R2. Cumulative allowlist anchored at cd35380, R2 parent pinned to R1. Native test and dependency lock unchanged. No new tests run in publication. Release NO_GO.

@@ -1,0 +1,149 @@
+package br.com.zenithit.evpqa.evp_key_probe
+
+import android.content.pm.ApplicationInfo
+import android.os.Build
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
+import android.security.keystore.KeyProperties
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.security.KeyStore
+import java.security.SecureRandom
+import java.util.UUID
+import javax.crypto.AEADBadTagException
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+
+class MainActivity : FlutterActivity() {
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "evp/key_probe")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "runSyntheticProbe") {
+                    result.notImplemented()
+                } else {
+                    Thread {
+                        try {
+                            val report = runProbe()
+                            runOnUiThread { result.success(report) }
+                        } catch (error: Exception) {
+                            // No credentials, key material or file paths in the reply.
+                            runOnUiThread { result.error("KEY_PROBE_FAILED", error.javaClass.simpleName, null) }
+                        }
+                    }.start()
+                }
+            }
+    }
+
+    private fun store(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+
+    private fun create(alias: String): SecretKey {
+        check(!store().containsAlias(alias))
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder(alias,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setKeySize(256)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setRandomizedEncryptionRequired(true)
+            // Synthetic capability check only; not an authenticated production key.
+            .setUserAuthenticationRequired(false)
+            .build())
+        return generator.generateKey()
+    }
+
+    private fun existing(alias: String): SecretKey? = store().getKey(alias, null) as? SecretKey
+
+    private data class Wrapped(val iv: ByteArray, val ciphertext: ByteArray)
+
+    private fun seal(key: SecretKey, data: ByteArray, aad: ByteArray): Wrapped {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        cipher.updateAAD(aad)
+        return Wrapped(cipher.iv, cipher.doFinal(data))
+    }
+
+    private fun open(key: SecretKey, box: Wrapped, aad: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, box.iv))
+        cipher.updateAAD(aad)
+        return cipher.doFinal(box.ciphertext)
+    }
+
+    private fun rejects(action: () -> ByteArray): Boolean {
+        return try {
+            action().fill(0)
+            false
+        } catch (_: AEADBadTagException) {
+            true
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun runProbe(): Map<String, Any> {
+        val suffix = UUID.randomUUID().toString()
+        val aliasA = "evp-synthetic-a-$suffix"
+        val aliasB = "evp-synthetic-b-$suffix"
+        val dek = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val aad = "evp-synthetic-profile-a-v1".toByteArray(Charsets.UTF_8)
+        val directory = File(noBackupFilesDir, "evp-$suffix")
+        val report = linkedMapOf<String, Any>()
+        try {
+            val a = create(aliasA)
+            val b = create(aliasB)
+            check(a.encoded == null && b.encoded == null)
+            report["NON_EXPORTABLE"] = "PASS"
+            val info = SecretKeyFactory.getInstance(a.algorithm, "AndroidKeyStore")
+                .getKeySpec(a, KeyInfo::class.java) as KeyInfo
+            check(info.keySize == 256)
+            report["KEY_BITS"] = info.keySize
+            report["HARDWARE_BACKED"] = info.isInsideSecureHardware
+            if (Build.VERSION.SDK_INT >= 31) report["SECURITY_LEVEL"] = info.securityLevel
+            report["OS_AUTH_REQUIRED"] = info.isUserAuthenticationRequired
+
+            val first = seal(a, dek, aad)
+            val second = seal(a, dek, aad)
+            check(first.iv.size == 12 && !first.iv.contentEquals(second.iv))
+            report["FRESH_IV"] = "PASS"
+
+            check(directory.mkdirs())
+            val file = File(directory, "wrapped.bin")
+            file.writeBytes(first.iv + first.ciphertext)
+            val saved = file.readBytes()
+            check(saved.size == 60)
+            val persisted = Wrapped(saved.copyOfRange(0, 12), saved.copyOfRange(12, saved.size))
+            val loaded = checkNotNull(existing(aliasA))
+            val clear = open(loaded, persisted, aad)
+            try { check(clear.contentEquals(dek)) } finally { clear.fill(0) }
+            report["RELOAD_AND_UNWRAP"] = "PASS"
+
+            check(rejects { open(b, persisted, aad) })
+            report["WRONG_ALIAS"] = "PASS"
+            check(rejects { open(loaded, persisted, "evp-synthetic-profile-b-v1".toByteArray()) })
+            report["WRONG_CONTEXT"] = "PASS"
+            val changed = persisted.ciphertext.copyOf()
+            changed[0] = (changed[0].toInt() xor 1).toByte()
+            check(rejects { open(loaded, Wrapped(persisted.iv, changed), aad) })
+            report["TAMPER"] = "PASS"
+            store().deleteEntry(aliasA)
+            check(existing(aliasA) == null && !store().containsAlias(aliasA))
+            report["MISSING_KEY_FAIL_CLOSED"] = "PASS"
+            check(applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP == 0)
+            check(file.canonicalFile.parentFile == directory.canonicalFile)
+            check(directory.canonicalFile.parentFile == noBackupFilesDir.canonicalFile)
+            report["NO_BACKUP_DIRECTORY"] = "PASS"
+            report["ALLOW_BACKUP_DISABLED"] = "PASS"
+            return report
+        } finally {
+            dek.fill(0)
+            store().deleteEntry(aliasA)
+            store().deleteEntry(aliasB)
+            check(!directory.exists() || directory.deleteRecursively())
+        }
+    }
+}

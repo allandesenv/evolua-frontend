@@ -1,0 +1,147 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
+
+String freshPassphrase() {
+  final random = Random.secure();
+  return base64UrlEncode(List<int>.generate(32, (_) => random.nextInt(256)));
+}
+
+bool containsBytes(List<int> bytes, List<int> pattern) {
+  for (var i = 0; i + pattern.length <= bytes.length; i++) {
+    var matches = true;
+    for (var j = 0; j < pattern.length; j++) {
+      if (bytes[i + j] != pattern[j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return true;
+  }
+  return false;
+}
+
+void reportSamples(String name, List<int> samples) {
+  samples.sort();
+  int percentile(double p) => samples[(samples.length * p).ceil() - 1];
+  debugPrint('EVP_S2_${name}_N=${samples.length}');
+  debugPrint('EVP_S2_${name}_P50_US=${percentile(0.50)}');
+  debugPrint('EVP_S2_${name}_P95_US=${percentile(0.95)}');
+}
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('encrypted native database survives reopen and rejects wrong key',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    final parent = await Directory(await getDatabasesPath()).create(recursive: true);
+    final folder = await parent.createTemp('evp-synthetic-');
+    final path = '${folder.path}/probe.db';
+    final marker = 'EVP_SYNTHETIC_MARKER_01B_S2_NOT_REAL';
+    final content = List.filled(4, marker).join(' ');
+    final passphrase = freshPassphrase();
+    Database? active;
+    try {
+      final watch = Stopwatch()..start();
+      final db = await openDatabase(path,
+          password: passphrase, singleInstance: false);
+      active = db;
+      debugPrint('EVP_S2_OPEN_US=${watch.elapsedMicroseconds}');
+      final cipher = await db.rawQuery('PRAGMA cipher_version');
+      expect(cipher, isNotEmpty);
+      final version = cipher.first.values.first.toString();
+      expect(version, startsWith('4.'));
+      debugPrint('EVP_S2_CIPHER_VERSION=$version');
+      await db.execute(
+          'CREATE TABLE records (id INTEGER PRIMARY KEY, created_at INTEGER NOT NULL, body TEXT NOT NULL)');
+      await db.execute(
+          'CREATE INDEX records_order ON records(created_at DESC, id DESC)');
+      watch.reset();
+      await db.transaction((txn) async {
+        for (var start = 0; start < 10000; start += 500) {
+          final batch = txn.batch();
+          for (var i = start; i < start + 500; i++) {
+            batch.insert('records', {'id': i, 'created_at': i, 'body': content});
+          }
+          await batch.commit(noResult: true);
+        }
+      });
+      debugPrint('EVP_S2_SEED_10000_US=${watch.elapsedMicroseconds}');
+      expect(Sqflite.firstIntValue(await db.rawQuery('SELECT count(*) FROM records')), 10000);
+      final writes = <int>[];
+      final reads = <int>[];
+      for (var i = 10000; i < 10050; i++) {
+        watch.reset();
+        await db.insert('records', {'id': i, 'created_at': i, 'body': content});
+        writes.add(watch.elapsedMicroseconds);
+        watch.reset();
+        final rows = await db.query('records',
+            orderBy: 'created_at DESC, id DESC', limit: 30);
+        reads.add(watch.elapsedMicroseconds);
+        expect(rows.length, 30);
+        expect(rows.first['id'], i);
+      }
+      reportSamples('WRITE', writes);
+      reportSamples('FIRST_PAGE', reads);
+      await expectLater(
+          db.transaction((txn) async {
+            await txn.insert('records',
+                {'id': 20000, 'created_at': 20000, 'body': content});
+            throw StateError('synthetic rollback');
+          }),
+          throwsA(isA<StateError>()));
+      expect(Sqflite.firstIntValue(await db.rawQuery('SELECT count(*) FROM records')), 10050);
+      for (final suffix in ['', '-wal', '-journal', '-shm']) {
+        final file = File('$path$suffix');
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          expect(containsBytes(bytes, utf8.encode(marker)), isFalse);
+          if (suffix.isEmpty) {
+            expect(bytes.length, greaterThan(16));
+            expect(containsBytes(bytes.sublist(0, 16),
+                utf8.encode('SQLite format 3\u0000')), isFalse);
+          }
+        }
+      }
+      await db.close();
+      active = null;
+      final size = await File(path).length();
+      debugPrint('EVP_S2_DATABASE_BYTES=$size');
+      watch.reset();
+      final reopened = await openDatabase(path,
+          password: passphrase, singleInstance: false);
+      active = reopened;
+      final row = await reopened.query('records', where: 'id = ?', whereArgs: [10049]);
+      expect(row.single['body'], content);
+      expect(Sqflite.firstIntValue(await reopened.rawQuery('SELECT count(*) FROM records')), 10050);
+      debugPrint('EVP_S2_REOPEN_AND_READ_US=${watch.elapsedMicroseconds}');
+      await reopened.close();
+      active = null;
+      final wrongPath = '${folder.path}/wrong-key-copy.db';
+      await File(path).copy(wrongPath);
+      await expectLater(() async {
+        final wrong = await openDatabase(wrongPath,
+            password: freshPassphrase(), singleInstance: false);
+        try {
+          await wrong.rawQuery('SELECT count(*) FROM records');
+        } finally {
+          await wrong.close();
+        }
+      }(), throwsA(isA<DatabaseException>()));
+      final finalDb = await openDatabase(path,
+          password: passphrase, singleInstance: false);
+      active = finalDb;
+      expect(Sqflite.firstIntValue(await finalDb.rawQuery('SELECT count(*) FROM records')), 10050);
+      debugPrint('EVP_S2_NATIVE_CHECKS=PASS');
+    } finally {
+      await active?.close();
+      await folder.delete(recursive: true);
+    }
+  });
+}
