@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-import '../lib/private_key_envelope.dart';
-import '../lib/private_store.dart';
+import 'package:evp_store_probe/private_key_envelope.dart';
+import 'package:evp_store_probe/private_store.dart';
 
 String profileId() {
   final random = Random.secure();

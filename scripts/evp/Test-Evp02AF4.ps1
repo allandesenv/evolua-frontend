@@ -107,7 +107,8 @@ try {
     $stage='FETCH_AND_ALLOWLIST'
     GitChecked @('fetch','origin',"refs/heads/$branch") | Out-Host
     if((GitChecked @('rev-parse','FETCH_HEAD')) -ne $TargetSha){throw 'Remote HEAD differs from target'}
-    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $base){throw 'Unexpected target parent'}
+    $prepared='2277cacab4a6967fff30bfeba8f3ec4f4ee44ed7'
+    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $prepared -or (GitChecked @('rev-parse',($prepared+'^'))) -ne $base){throw 'Unexpected target ancestry'}
     if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$base,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
     if($before -ne $TargetSha){GitChecked @('merge','--ff-only',$TargetSha) | Out-Host}
     if((GitChecked @('rev-parse','HEAD')) -ne $TargetSha){throw 'Sync mismatch'}
