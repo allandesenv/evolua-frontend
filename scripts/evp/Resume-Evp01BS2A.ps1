@@ -5,11 +5,12 @@ $repo=Join-Path $Root 'evolua-private-core'
 $base='cd3538073cae1c769aec4b71742f3c9af606ae83'
 $r1='2b47f087a3916e0f843d1ae3f80948d97a10f9f5'
 $r2='4d8ded65a80b5a8e100177bec21ee734556d3386'
+$r3='86156677dbe93b7532853ef95a86cb4297bb26d2'
 $branch='feat/evp-private-core'
 $previous=Join-Path $Root '_evidence\evp01b-s2a-20261127-211727-021'
 $probe=Join-Path $previous 'evp_cipher_probe'
-$evidence=Join-Path $Root ('_evidence\evp01b-s2a-r3-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
-$paths=@('docs/engineering/EVP-01B_S2A_R1_BUILD_SPLIT.md','tools/evp/sqlcipher_probe/driver.dart.txt','scripts/evp/Resume-Evp01BS2A.ps1','docs/engineering/EVP-01B_S2A_R2_HOST_WAIT.md','docs/engineering/EVP-01B_S2A_R3_PARSER_GUARD.md')
+$evidence=Join-Path $Root ('_evidence\evp01b-s2a-r4-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+$paths=@('docs/engineering/EVP-01B_S2A_R1_BUILD_SPLIT.md','tools/evp/sqlcipher_probe/driver.dart.txt','scripts/evp/Resume-Evp01BS2A.ps1','docs/engineering/EVP-01B_S2A_R2_HOST_WAIT.md','docs/engineering/EVP-01B_S2A_R3_PARSER_GUARD.md','docs/engineering/EVP-01B_S2A_R4_DISK_PREFLIGHT.md')
 function GitChecked([string[]]$ArgsList) {
     $result=& git -C $repo @ArgsList
     if($LASTEXITCODE -ne 0){throw "Git failed: $($ArgsList[0]) EXITCODE=$LASTEXITCODE"}
@@ -21,6 +22,32 @@ function Clean {
 function SameFile([string]$A,[string]$B) {
     if(!(Test-Path -LiteralPath $A -PathType Leaf) -or !(Test-Path -LiteralPath $B -PathType Leaf)){throw 'Required preserved file missing'}
     if((Get-FileHash -LiteralPath $A -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $B -Algorithm SHA256).Hash){throw "Preserved file differs: $A"}
+}
+function Assert-DiskCapacity {
+    $gradleHome=if($env:GRADLE_USER_HOME){$env:GRADLE_USER_HOME}else{Join-Path $HOME '.gradle'}
+    $pubHome=if($env:PUB_CACHE){$env:PUB_CACHE}else{Join-Path $env:LOCALAPPDATA 'Pub\Cache'}
+    $sdkHome=if($env:ANDROID_HOME){$env:ANDROID_HOME}elseif($env:ANDROID_SDK_ROOT){$env:ANDROID_SDK_ROOT}else{Join-Path $env:LOCALAPPDATA 'Android\sdk'}
+    $locations=@(
+        @{Role='PROBE';Path=$probe;MinimumGiB=12}
+        @{Role='TEMP';Path=[IO.Path]::GetTempPath();MinimumGiB=12}
+        @{Role='GRADLE';Path=$gradleHome;MinimumGiB=12}
+        @{Role='PUB';Path=$pubHome;MinimumGiB=4}
+        @{Role='ANDROID_SDK';Path=$sdkHome;MinimumGiB=4}
+    )
+    $shortfalls=@()
+    foreach($location in $locations) {
+        $volume=[IO.Path]::GetPathRoot([IO.Path]::GetFullPath($location.Path))
+        $drive=[IO.DriveInfo]::new($volume)
+        if(!$drive.IsReady){throw "Drive not ready: $volume"}
+        $free=$drive.AvailableFreeSpace
+        $freeGiB=[math]::Round($free/1GB,2)
+        $minBytes=$location.MinimumGiB*1GB
+        $line="DISK_ROLE=$($location.Role) VOLUME=$volume FREE_GIB=$freeGiB MIN_GIB=$($location.MinimumGiB)"
+        $line | Tee-Object -FilePath (Join-Path $evidence 'disk-preflight.log') -Append | Out-Host
+        if($free -lt $minBytes){$shortfalls+=("$($location.Role): $volume $freeGiB GiB free")}
+    }
+    if($shortfalls.Count){throw ('Insufficient disk capacity: '+($shortfalls -join '; ')+'. Free space without deleting the probe or evidence; recommend 20 GiB on build volumes.')}
+    Write-Host 'DISK_PREFLIGHT=PASS'
 }
 function FlutterChecked([string[]]$ArgsList,[string]$Log) {
     $old=$ErrorActionPreference
@@ -40,8 +67,10 @@ try {
     Clean
     Get-Command flutter -ErrorAction Stop | Out-Null
     $before=GitChecked @('rev-parse','HEAD')
-    if($before -ne $base -and $before -ne $r1 -and $before -ne $r2 -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
+    if($before -ne $base -and $before -ne $r1 -and $before -ne $r2 -and $before -ne $r3 -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
     New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+    $stage='DISK_PREFLIGHT'
+    Assert-DiskCapacity
     $stage='GRADLE_HOST_PREFLIGHT'
     function Get-ActiveWrappers {
         @(Get-CimInstance Win32_Process | Where-Object {
@@ -83,7 +112,7 @@ try {
     $stage='FETCH_AND_ALLOWLIST'
     GitChecked @('fetch','origin',"refs/heads/$branch") | Out-Host
     if((GitChecked @('rev-parse','FETCH_HEAD')) -ne $TargetSha){throw 'Remote HEAD differs from target'}
-    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $r2){throw 'Unexpected target parent'}
+    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $r3){throw 'Unexpected target parent'}
     if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$base,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
     if($before -ne $TargetSha){GitChecked @('merge','--ff-only',$TargetSha) | Out-Host}
     if((GitChecked @('rev-parse','HEAD')) -ne $TargetSha){throw 'Sync mismatch'}
@@ -104,6 +133,8 @@ try {
     Write-Host 'PRIOR_PREPARATION=GREEN_REUSED; S1=GREEN_REUSED'
     Push-Location -LiteralPath $probe
     try {
+        $stage='DISK_PREFLIGHT_BEFORE_BUILD'
+        Assert-DiskCapacity
         $stage='PROBE_APK_BUILD'
         if(@(Get-ActiveWrappers).Count){throw 'Another Gradle wrapper started after host preflight; concurrent build prevented'}
         Write-Host "ETAPA=$stage"
