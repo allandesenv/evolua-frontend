@@ -83,8 +83,8 @@ void main() {
       'not json',
       '[1,2]',
       'null',
-      '{"v":1,' + envelope.encode().substring(1),
-      ' ' + envelope.encode(),
+      '{"v":1,${envelope.encode().substring(1)}',
+      ' ${envelope.encode()}',
     ]) {
       expect(() => PrivateKeyEnvelope.decode(invalid), throwsFormatException);
     }
