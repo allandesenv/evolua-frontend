@@ -3,12 +3,13 @@ $ErrorActionPreference='Stop'
 $stage='PREFLIGHT'
 $repo=Join-Path $Root 'evolua-private-core'
 $base='b1e1eb9219361412f05cfb59f199f6e4a6a0f016'
+$f3='0377de61c2f77490485dbaebb35a6d28e39b9759'
 $branch='feat/evp-private-core'
 $prior=Join-Path $Root '_evidence\evp02a-f2-20261127-235902-332'
 $probe=Join-Path $prior 'evp_native_db_probe'
-$evidence=Join-Path $Root ('_evidence\evp02a-f3-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+$evidence=Join-Path $Root ('_evidence\evp02a-f3-r1-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 $expectedApk='5A034F976A0B9D5A4D0F15C039EE4754E051F6B8A311193BD03FBC5ACCEA3678'
-$paths=@('docs/engineering/EVP-02A_F3_ADOPTION_GATE.md','scripts/evp/Test-Evp02AF3.ps1')
+$paths=@('docs/engineering/EVP-02A_F3_R1_GRAPH_REVIEW.md','scripts/evp/Test-Evp02AF3.ps1')
 function GitChecked([string[]]$ArgsList) {
     $result=& git -C $repo @ArgsList
     if($LASTEXITCODE -ne 0){throw "Git failed: $($ArgsList[0]) EXITCODE=$LASTEXITCODE"}
@@ -41,15 +42,29 @@ try {
     if((GitChecked @('remote','get-url','origin')) -notmatch '^(https://github\.com/|git@github\.com:)allandesenv/evolua-frontend(\.git)?$'){throw 'Wrong origin'}
     Clean
     $before=GitChecked @('rev-parse','HEAD')
-    if($before -ne $base -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
+    if($before -ne $f3 -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
     New-Item -ItemType Directory -Path $evidence -Force | Out-Null
     $stage='FETCH_AND_ALLOWLIST'
     GitChecked @('fetch','origin',"refs/heads/$branch") | Out-Host
     if((GitChecked @('rev-parse','FETCH_HEAD')) -ne $TargetSha){throw 'Remote HEAD differs from target'}
-    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $base){throw 'Unexpected parent'}
-    if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$base,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
+    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $f3){throw 'Unexpected parent'}
+    if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$f3,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
     if($before -ne $TargetSha){GitChecked @('merge','--ff-only',$TargetSha) | Out-Host}
     Clean
+    $stage='PRIOR_F3_EVIDENCE'
+    $previous=@(Get-ChildItem -LiteralPath (Join-Path $Root '_evidence') -Directory -Filter 'evp02a-f3-*' | Where-Object {$_.Name -match '^evp02a-f3-\d{8}-\d{6}-\d{3}$'} | Sort-Object Name -Descending | Select-Object -First 1)
+    if($previous.Count -ne 1){throw 'Original F3 evidence directory not found'}
+    $oldFolder=$previous[0].FullName
+    $oldReceipt=@(Get-Content -LiteralPath (Join-Path $oldFolder 'RESULTADO.txt'))
+    if($oldReceipt -notcontains 'ETAPA=OFFLINE_DEPENDENCY_GRAPH' -or $oldReceipt -notcontains 'ERRO=Dependency graph requires review'){throw 'Original F3 receipt does not match the reported failure'}
+    $graphFile=Join-Path $oldFolder 'profile-runtime-dependencies.log'
+    $elfFile=Join-Path $oldFolder 'elf-alignment.log'
+    $zipFile=Join-Path $oldFolder 'zipalign.log'
+    $graphHash=(Get-FileHash -LiteralPath $graphFile -Algorithm SHA256).Hash
+    $elfHash=(Get-FileHash -LiteralPath $elfFile -Algorithm SHA256).Hash
+    $zipHash=(Get-FileHash -LiteralPath $zipFile -Algorithm SHA256).Hash
+    Write-Host "PRIOR_F3=$($previous[0].Name)"
+    Write-Host "GRAPH_SHA256=$graphHash"
     $stage='F2_EVIDENCE'
     $receipt=Join-Path $prior 'RESULTADO.txt'
     $lines=@(Get-Content -LiteralPath $receipt)
@@ -83,53 +98,63 @@ try {
         $metrics+=("AAR_ARM64_LIB_SHA256="+(EntryHash $aarEntry))
         $metrics+=("APK_ARM64_LIB_SHA256="+(EntryHash $apkEntry))
         $libs=@($archive.Entries | Where-Object {$_.FullName -match '^lib/(arm64-v8a|x86_64)/[^/]+\.so$'})
+        $elfLines=@(Get-Content -LiteralPath $elfFile)
+        if(!$libs.Count -or $elfLines.Count -ne $libs.Count){throw 'Prior ELF evidence count mismatch'}
         foreach($lib in $libs){
-            $stream=$lib.Open()
-            $mem=[IO.MemoryStream]::new()
-            try {
-                $stream.CopyTo($mem);$mem.Position=0
-                $reader=[IO.BinaryReader]::new($mem)
-                $ident=$reader.ReadBytes(16)
-                if($ident.Length -ne 16 -or $ident[0] -ne 127 -or $ident[1] -ne 69 -or $ident[2] -ne 76 -or $ident[3] -ne 70 -or $ident[4] -ne 2 -or $ident[5] -ne 1){throw 'Expected ELF64 little-endian'}
-                $mem.Position=32;$phoff=$reader.ReadUInt64()
-                $mem.Position=54;$phsize=$reader.ReadUInt16();$phnum=$reader.ReadUInt16()
-                if($phsize -lt 56 -or $phnum -eq 0 -or ($phoff+([uint64]$phsize*$phnum)) -gt $mem.Length){throw 'Invalid ELF headers'}
-                $loads=0;$minAlign=[uint64]::MaxValue;$ok=$true
-                for($i=0;$i -lt $phnum;$i++){
-                    $mem.Position=[long]($phoff+([uint64]$i*$phsize))
-                    if($reader.ReadUInt32() -ne 1){continue}
-                    $loads++;$null=$reader.ReadUInt32()
-                    $offset=$reader.ReadUInt64();$vaddr=$reader.ReadUInt64()
-                    $null=$reader.ReadUInt64();$null=$reader.ReadUInt64();$null=$reader.ReadUInt64()
-                    $align=$reader.ReadUInt64()
-                    if($align -lt $minAlign){$minAlign=$align}
-                    if($align -lt 16384 -or ($offset % 16384) -ne ($vaddr % 16384)){$ok=$false}
-                }
-                $line="ELF=$($lib.FullName) LOADS=$loads MIN_ALIGN=$minAlign STATUS=$(if($ok -and $loads){'PASS'}else{'FAIL'})"
-                $line | Tee-Object -FilePath (Join-Path $evidence 'elf-alignment.log') -Append | Out-Host
-                $metrics+=$line
-                if(!$ok -or !$loads){throw 'ELF alignment failed'}
-            } finally {$stream.Dispose();$mem.Dispose()}
+            $pattern='^ELF='+[regex]::Escape($lib.FullName)+' LOADS=[1-9]\d* MIN_ALIGN=\d+ STATUS=PASS$'
+            $matched=@($elfLines | Where-Object {$_ -match $pattern})
+            if($matched.Count -ne 1){throw "Prior ELF PASS missing for $($lib.FullName)"}
+            $metrics+=$matched[0]
         }
     } finally {$archive.Dispose();$aarArchive.Dispose()}
-    $stage='ZIP_ALIGNMENT'
-    $sdk=if($env:ANDROID_HOME){$env:ANDROID_HOME}elseif($env:ANDROID_SDK_ROOT){$env:ANDROID_SDK_ROOT}else{Join-Path $env:LOCALAPPDATA 'Android\sdk'}
-    $zipalign=@(Get-ChildItem -LiteralPath (Join-Path $sdk 'build-tools') -Directory | Where-Object {$_.Name -match '^\d+\.\d+\.\d+$' -and [version]$_.Name -ge [version]'35.0.0'} | Sort-Object {[version]$_.Name} -Descending | ForEach-Object {Join-Path $_.FullName 'zipalign.exe'} | Where-Object {Test-Path -LiteralPath $_} | Select-Object -First 1)
-    if(!$zipalign.Count){throw 'zipalign >=35 unavailable'}
-    NativeLog $zipalign[0] @('-c','-P','16','-v','4',$apk) 'zipalign.log'
-    Write-Host 'ZIPALIGN=PASS'
-    $stage='OFFLINE_DEPENDENCY_GRAPH'
-    $wrappers=@(Get-CimInstance Win32_Process | Where-Object {($_.Name -eq 'java.exe' -or $_.Name -eq 'javaw.exe') -and $_.CommandLine -match 'org\.gradle\.wrapper\.GradleWrapperMain'})
-    if($wrappers.Count){throw 'Active Gradle wrapper; dependency report not started'}
-    Push-Location -LiteralPath (Join-Path $probe 'android')
-    try {
-        NativeLog (Join-Path (Get-Location).Path 'gradlew.bat') @('--offline','--console=plain',':app:dependencies','--configuration','profileRuntimeClasspath') 'profile-runtime-dependencies.log'
-    } finally {Pop-Location}
-    $graph=Get-Content -LiteralPath (Join-Path $evidence 'profile-runtime-dependencies.log') -Raw
-    if($graph -notmatch 'net\.zetetic:sqlcipher-android:4\.20\.0' -or $graph -match 'net\.zetetic:sqlcipher-android:4\.20\.0\s+->\s+(?!4\.20\.0\b)' -or $graph -match 'FAILED'){throw 'Dependency graph requires review'}
+    $stage='REUSE_ZIP_ALIGNMENT'
+    if(!(Select-String -LiteralPath $zipFile -SimpleMatch 'Verification successful')){throw 'Prior zipalign success marker not found'}
+    Write-Host 'ELF_ALIGNMENT=GREEN_REUSED'
+    Write-Host 'ZIPALIGN=GREEN_REUSED'
+    $stage='OFFLINE_DEPENDENCY_GRAPH_REVIEW'
+    $graphLines=@(Get-Content -LiteralPath $graphFile)
+    if(!@($graphLines | Where-Object {$_ -match '^\s*BUILD SUCCESSFUL\b'}).Count){throw 'Prior Gradle success marker missing'}
+    $vendorLines=@($graphLines | Where-Object {$_ -match 'net\.zetetic:sqlcipher-android(?=[:\s]|$)'})
+    $unresolved=@($graphLines | Where-Object {$_ -match '\bFAILED\b'})
+    $androidxLines=@($graphLines | Where-Object {$_ -match 'androidx\.sqlite:sqlite(?=[:\s]|$)'})
+    $versions=@()
+    $issues=@()
+    Write-Host 'SQLCIPHER_GRAPH_LINES_BEGIN'
+    $vendorLines | Out-Host
+    Write-Host 'SQLCIPHER_GRAPH_LINES_END'
+    Write-Host 'ANDROIDX_SQLITE_GRAPH_LINES_BEGIN'
+    $androidxLines | Out-Host
+    Write-Host 'ANDROIDX_SQLITE_GRAPH_LINES_END'
+    Write-Host "FAILED_WORD_LINES=$($unresolved.Count)"
+    $unresolved | Out-Host
+    # Only ignore clearly non-dependency informational lines. Unclassified
+    # FAILED text is blocked rather than silently discarded.
+    $failedDependencies=@($unresolved | Where-Object {$_ -match '^\s*[|\\+ ]*[-]+\s+\S.*\bFAILED\b'})
+    $unclassified=@($unresolved | Where-Object {$_ -notmatch '^\s*[|\\+ ]*[-]+\s+\S.*\bFAILED\b'})
+    foreach($line in $vendorLines){
+        if($line -match '\(c\)\s*(\(\*\))?\s*$'){continue}
+        if($line -match 'net\.zetetic:sqlcipher-android:(?<requested>[^\s]+)(?:\s+->\s+(?<selected>[^\s]+))?'){
+            $selected=if($Matches['selected']){$Matches['selected']}else{$Matches['requested']}
+            $versions+=$selected
+        } else {$issues+='SQLCIPHER_COORDINATE_UNPARSED'}
+    }
+    $versions=@($versions | Sort-Object -Unique)
+    Write-Host "SQLCIPHER_SELECTED_VERSIONS=$($versions -join ',')"
+    Write-Host "UNRESOLVED_DEPENDENCIES=$($failedDependencies.Count)"
+    Write-Host "UNCLASSIFIED_FAILED_LINES=$($unclassified.Count)"
+    if($versions.Count -ne 1 -or $versions[0] -ne '4.20.0'){$issues+='SQLCIPHER_VERSION_NOT_CONFIRMED'}
+    if($failedDependencies.Count){$issues+='UNRESOLVED_DEPENDENCIES'}
+    if($unclassified.Count){$issues+='UNCLASSIFIED_FAILED_TEXT'}
+    if($issues.Count){
+        $issues=@($issues|Sort-Object -Unique)
+        Write-Host "GRAPH_REVIEW_REASONS=$($issues -join ',')"
+        @('GRAPH_REVIEW_REASONS='+($issues -join ','),'SQLCIPHER_SELECTED_VERSIONS='+($versions -join ','),'UNRESOLVED_DEPENDENCIES='+$failedDependencies.Count,'UNCLASSIFIED_FAILED_LINES='+$unclassified.Count)+$vendorLines+$androidxLines+$unresolved | Set-Content -LiteralPath (Join-Path $evidence 'graph-diagnostics.log') -Encoding UTF8
+        throw ('Dependency graph requires review: '+($issues -join ','))
+    }
+    Write-Host 'OFFLINE_GRAPH=GREEN_REUSED_REVIEWED'
     if((Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash -ne $expectedApk){throw 'APK modified'}
     Clean
-    $result=@('VERDICT=PASS_EVP02A_F3_ARTIFACT_GATE',"HEAD=$TargetSha",'F2=GREEN_REUSED',"F2_RECEIPT_SHA256=$receiptHash","APK_SHA256=$expectedApk","AAR_SHA256=$aarHash",'ZIPALIGN=PASS','ELF_ALIGNMENT=PASS','OFFLINE_GRAPH=CAPTURED','BUILD=NOT_RUN','DEVICE_TEST=NOT_RUN','PRODUCTION=UNCHANGED','ADOPTION=AWAITING_EXPLICIT_GO','RELEASE=NO_GO')+$metrics
+    $result=@('VERDICT=PASS_EVP02A_F3_ARTIFACT_GATE',"HEAD=$TargetSha",'F2=GREEN_REUSED',"F2_RECEIPT_SHA256=$receiptHash","APK_SHA256=$expectedApk","AAR_SHA256=$aarHash",'ZIPALIGN=GREEN_REUSED','ELF_ALIGNMENT=GREEN_REUSED','OFFLINE_GRAPH=GREEN_REUSED_REVIEWED',"GRAPH_SHA256=$graphHash","ELF_LOG_SHA256=$elfHash","ZIP_LOG_SHA256=$zipHash",'SQLCIPHER_SELECTED_VERSION=4.20.0','GRADLE=NOT_RUN','BUILD=NOT_RUN','DEVICE_TEST=NOT_RUN','PRODUCTION=UNCHANGED','ADOPTION=AWAITING_EXPLICIT_GO','RELEASE=NO_GO')+$metrics
     $result | Set-Content -LiteralPath (Join-Path $evidence 'RESULTADO.txt') -Encoding UTF8
     $result | Out-Host
     Write-Host "RESULTADO=$evidence\RESULTADO.txt"
@@ -137,5 +162,6 @@ try {
     $result=@('VERDICT=NO_GO',"ETAPA=$stage","ERRO=$($_.Exception.Message)","LINHA=$($_.InvocationInfo.ScriptLineNumber)",'NEXT=Send receipt; preserve F2 evidence; no reset/clean/build retry')
     if(Test-Path -LiteralPath $evidence){$result | Set-Content -LiteralPath (Join-Path $evidence 'RESULTADO.txt') -Encoding UTF8}
     $result | Out-Host
+    Write-Host "RESULTADO=$evidence\RESULTADO.txt"
     throw
 }
