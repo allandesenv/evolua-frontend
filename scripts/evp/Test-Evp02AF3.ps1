@@ -4,12 +4,13 @@ $stage='PREFLIGHT'
 $repo=Join-Path $Root 'evolua-private-core'
 $base='b1e1eb9219361412f05cfb59f199f6e4a6a0f016'
 $f3='0377de61c2f77490485dbaebb35a6d28e39b9759'
+$r1='9660a6c3e8eb1e4296818c57daf56cc6b57997cd'
 $branch='feat/evp-private-core'
 $prior=Join-Path $Root '_evidence\evp02a-f2-20261127-235902-332'
 $probe=Join-Path $prior 'evp_native_db_probe'
-$evidence=Join-Path $Root ('_evidence\evp02a-f3-r1-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+$evidence=Join-Path $Root ('_evidence\evp02a-f3-r2-'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 $expectedApk='5A034F976A0B9D5A4D0F15C039EE4754E051F6B8A311193BD03FBC5ACCEA3678'
-$paths=@('docs/engineering/EVP-02A_F3_R1_GRAPH_REVIEW.md','scripts/evp/Test-Evp02AF3.ps1')
+$paths=@('docs/engineering/EVP-02A_F3_R2_ARM64_GRAPH.md','scripts/evp/Test-Evp02AF3.ps1')
 function GitChecked([string[]]$ArgsList) {
     $result=& git -C $repo @ArgsList
     if($LASTEXITCODE -ne 0){throw "Git failed: $($ArgsList[0]) EXITCODE=$LASTEXITCODE"}
@@ -42,19 +43,20 @@ try {
     if((GitChecked @('remote','get-url','origin')) -notmatch '^(https://github\.com/|git@github\.com:)allandesenv/evolua-frontend(\.git)?$'){throw 'Wrong origin'}
     Clean
     $before=GitChecked @('rev-parse','HEAD')
-    if($before -ne $f3 -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
+    if($before -ne $r1 -and $before -ne $TargetSha){throw 'Unexpected local HEAD'}
     New-Item -ItemType Directory -Path $evidence -Force | Out-Null
     $stage='FETCH_AND_ALLOWLIST'
     GitChecked @('fetch','origin',"refs/heads/$branch") | Out-Host
     if((GitChecked @('rev-parse','FETCH_HEAD')) -ne $TargetSha){throw 'Remote HEAD differs from target'}
-    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $f3){throw 'Unexpected parent'}
-    if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$f3,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
+    if((GitChecked @('rev-parse',($TargetSha+'^'))) -ne $r1){throw 'Unexpected parent'}
+    if(@(Compare-Object @($paths|Sort-Object) @(GitChecked @('diff','--name-only',$r1,$TargetSha)|Sort-Object)).Count){throw 'Allowlist mismatch'}
     if($before -ne $TargetSha){GitChecked @('merge','--ff-only',$TargetSha) | Out-Host}
     Clean
     $stage='PRIOR_F3_EVIDENCE'
-    $previous=@(Get-ChildItem -LiteralPath (Join-Path $Root '_evidence') -Directory -Filter 'evp02a-f3-*' | Where-Object {$_.Name -match '^evp02a-f3-\d{8}-\d{6}-\d{3}$'} | Sort-Object Name -Descending | Select-Object -First 1)
-    if($previous.Count -ne 1){throw 'Original F3 evidence directory not found'}
-    $oldFolder=$previous[0].FullName
+    $oldFolder=Join-Path $Root '_evidence\evp02a-f3-20261128-000458-424'
+    $r1Folder=Join-Path $Root '_evidence\evp02a-f3-r1-20261128-000816-450'
+    $r1Receipt=@(Get-Content -LiteralPath (Join-Path $r1Folder 'RESULTADO.txt'))
+    if($r1Receipt -notcontains 'ETAPA=OFFLINE_DEPENDENCY_GRAPH_REVIEW' -or $r1Receipt -notcontains 'ERRO=Dependency graph requires review: UNRESOLVED_DEPENDENCIES'){throw 'R1 receipt mismatch'}
     $oldReceipt=@(Get-Content -LiteralPath (Join-Path $oldFolder 'RESULTADO.txt'))
     if($oldReceipt -notcontains 'ETAPA=OFFLINE_DEPENDENCY_GRAPH' -or $oldReceipt -notcontains 'ERRO=Dependency graph requires review'){throw 'Original F3 receipt does not match the reported failure'}
     $graphFile=Join-Path $oldFolder 'profile-runtime-dependencies.log'
@@ -63,7 +65,16 @@ try {
     $graphHash=(Get-FileHash -LiteralPath $graphFile -Algorithm SHA256).Hash
     $elfHash=(Get-FileHash -LiteralPath $elfFile -Algorithm SHA256).Hash
     $zipHash=(Get-FileHash -LiteralPath $zipFile -Algorithm SHA256).Hash
-    Write-Host "PRIOR_F3=$($previous[0].Name)"
+    if($graphHash -ne '7806E2388892320E2CF822F51B7A0E22029479548EE108C3D7D050927770D233'){throw 'Original graph hash mismatch'}
+    $oldFailed=@(Get-Content -LiteralPath $graphFile | Where-Object {$_ -match '\bFAILED\b'})
+    $expectedFailed=@(
+        '^\s*\+--- io\.flutter:armeabi_v7a_profile:1\.0\.0-1527ae0ec577a4ef50e65f6fefcfc1326707d9bf FAILED\s*$',
+        '^\s*\+--- io\.flutter:x86_64_profile:1\.0\.0-1527ae0ec577a4ef50e65f6fefcfc1326707d9bf FAILED\s*$'
+    )
+    if($oldFailed.Count -ne 2){throw 'Original graph failure count changed'}
+    foreach($pattern in $expectedFailed){if(@($oldFailed | Where-Object {$_ -match $pattern}).Count -ne 1){throw 'Original graph ABI failure mismatch'}}
+    Write-Host 'PRIOR_F3_GRAPH=VERIFIED'
+    Write-Host 'R1_GRAPH_DIAGNOSIS=OTHER_ABI_PROFILE_ARTIFACTS'
     Write-Host "GRAPH_SHA256=$graphHash"
     $stage='F2_EVIDENCE'
     $receipt=Join-Path $prior 'RESULTADO.txt'
@@ -86,6 +97,7 @@ try {
     $aars=@(Get-ChildItem -LiteralPath $cache -Recurse -File -Filter 'sqlcipher-android-4.20.0.aar')
     if($aars.Count -ne 1){throw 'Expected exactly one cached vendor AAR'}
     $aarHash=(Get-FileHash -LiteralPath $aars[0].FullName -Algorithm SHA256).Hash
+    if($aarHash -ne '1E57857ADFD29E2F5DDB4686E1E5EC6659920220D4BF182FDB5EF085B5577100'){throw 'AAR hash changed since R1'}
     Write-Host "AAR_SHA256=$aarHash"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $aarArchive=[IO.Compression.ZipFile]::OpenRead($aars[0].FullName)
@@ -97,6 +109,9 @@ try {
         if(!$aarEntry -or !$apkEntry){throw 'ARM64 SQLCipher missing'}
         $metrics+=("AAR_ARM64_LIB_SHA256="+(EntryHash $aarEntry))
         $metrics+=("APK_ARM64_LIB_SHA256="+(EntryHash $apkEntry))
+        $flutterAbis=@($archive.Entries | Where-Object {$_.FullName -match '^lib/[^/]+/libflutter\.so$'} | ForEach-Object {$_.FullName})
+        if($flutterAbis.Count -ne 1 -or $flutterAbis[0] -ne 'lib/arm64-v8a/libflutter.so'){throw 'APK Flutter engine ABI differs from ARM64-only scope'}
+        Write-Host 'APK_FLUTTER_ABI=arm64-v8a'
         $libs=@($archive.Entries | Where-Object {$_.FullName -match '^lib/(arm64-v8a|x86_64)/[^/]+\.so$'})
         $elfLines=@(Get-Content -LiteralPath $elfFile)
         if(!$libs.Count -or $elfLines.Count -ne $libs.Count){throw 'Prior ELF evidence count mismatch'}
@@ -111,14 +126,29 @@ try {
     if(!(Select-String -LiteralPath $zipFile -SimpleMatch 'Verification successful')){throw 'Prior zipalign success marker not found'}
     Write-Host 'ELF_ALIGNMENT=GREEN_REUSED'
     Write-Host 'ZIPALIGN=GREEN_REUSED'
-    $stage='OFFLINE_DEPENDENCY_GRAPH_REVIEW'
-    $graphLines=@(Get-Content -LiteralPath $graphFile)
+    $stage='OFFLINE_ARM64_DEPENDENCY_GRAPH'
+    $wrappers=@(Get-CimInstance Win32_Process | Where-Object {($_.Name -eq 'java.exe' -or $_.Name -eq 'javaw.exe') -and $_.CommandLine -match 'org\.gradle\.wrapper\.GradleWrapperMain'})
+    if($wrappers.Count){throw 'Active Gradle wrapper; report not started'}
+    Push-Location -LiteralPath (Join-Path $probe 'android')
+    try {
+        NativeLog (Join-Path (Get-Location).Path 'gradlew.bat') @('--offline','--console=plain','-Ptarget-platform=android-arm64',':app:dependencies','--configuration','profileRuntimeClasspath') 'profile-arm64-runtime-dependencies.log'
+    } finally {Pop-Location}
+    $scopedGraph=Join-Path $evidence 'profile-arm64-runtime-dependencies.log'
+    $scopedGraphHash=(Get-FileHash -LiteralPath $scopedGraph -Algorithm SHA256).Hash
+    $stage='OFFLINE_ARM64_GRAPH_REVIEW'
+    $graphLines=@(Get-Content -LiteralPath $scopedGraph)
     if(!@($graphLines | Where-Object {$_ -match '^\s*BUILD SUCCESSFUL\b'}).Count){throw 'Prior Gradle success marker missing'}
     $vendorLines=@($graphLines | Where-Object {$_ -match 'net\.zetetic:sqlcipher-android(?=[:\s]|$)'})
     $unresolved=@($graphLines | Where-Object {$_ -match '\bFAILED\b'})
     $androidxLines=@($graphLines | Where-Object {$_ -match 'androidx\.sqlite:sqlite(?=[:\s]|$)'})
     $versions=@()
     $issues=@()
+    $engineLines=@($graphLines | Where-Object {$_ -match 'io\.flutter:(?:arm64_v8a|armeabi_v7a|x86_64)_profile:'})
+    $engineLines | Out-Host
+    if(!@($engineLines | Where-Object {$_ -match 'io\.flutter:arm64_v8a_profile:1\.0\.0-1527ae0ec577a4ef50e65f6fefcfc1326707d9bf(?:\s|$)'}).Count){$issues+='ARM64_ENGINE_NOT_CONFIRMED'}
+    if(@($engineLines | Where-Object {$_ -match 'io\.flutter:(?:armeabi_v7a|x86_64)_profile:'}).Count){$issues+='UNEXPECTED_OTHER_ABI_ENGINE'}
+    if(!@($androidxLines | Where-Object {$_ -match 'androidx\.sqlite:sqlite:2\.7\.0(?:\s|$)'}).Count){$issues+='ANDROIDX_SQLITE_NOT_CONFIRMED'}
+    if(@($androidxLines | Where-Object {$_ -match 'androidx\.sqlite:sqlite:[^\s]+\s+->\s+(?!2\.7\.0\b)'}).Count){$issues+='ANDROIDX_SQLITE_VERSION_CHANGED'}
     Write-Host 'SQLCIPHER_GRAPH_LINES_BEGIN'
     $vendorLines | Out-Host
     Write-Host 'SQLCIPHER_GRAPH_LINES_END'
@@ -151,10 +181,10 @@ try {
         @('GRAPH_REVIEW_REASONS='+($issues -join ','),'SQLCIPHER_SELECTED_VERSIONS='+($versions -join ','),'UNRESOLVED_DEPENDENCIES='+$failedDependencies.Count,'UNCLASSIFIED_FAILED_LINES='+$unclassified.Count)+$vendorLines+$androidxLines+$unresolved | Set-Content -LiteralPath (Join-Path $evidence 'graph-diagnostics.log') -Encoding UTF8
         throw ('Dependency graph requires review: '+($issues -join ','))
     }
-    Write-Host 'OFFLINE_GRAPH=GREEN_REUSED_REVIEWED'
+    Write-Host 'OFFLINE_GRAPH=PASS_ARM64_SCOPED'
     if((Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash -ne $expectedApk){throw 'APK modified'}
     Clean
-    $result=@('VERDICT=PASS_EVP02A_F3_ARTIFACT_GATE',"HEAD=$TargetSha",'F2=GREEN_REUSED',"F2_RECEIPT_SHA256=$receiptHash","APK_SHA256=$expectedApk","AAR_SHA256=$aarHash",'ZIPALIGN=GREEN_REUSED','ELF_ALIGNMENT=GREEN_REUSED','OFFLINE_GRAPH=GREEN_REUSED_REVIEWED',"GRAPH_SHA256=$graphHash","ELF_LOG_SHA256=$elfHash","ZIP_LOG_SHA256=$zipHash",'SQLCIPHER_SELECTED_VERSION=4.20.0','GRADLE=NOT_RUN','BUILD=NOT_RUN','DEVICE_TEST=NOT_RUN','PRODUCTION=UNCHANGED','ADOPTION=AWAITING_EXPLICIT_GO','RELEASE=NO_GO')+$metrics
+    $result=@('VERDICT=PASS_EVP02A_F3_ARTIFACT_GATE',"HEAD=$TargetSha",'F2=GREEN_REUSED',"F2_RECEIPT_SHA256=$receiptHash","APK_SHA256=$expectedApk","AAR_SHA256=$aarHash",'ZIPALIGN=GREEN_REUSED','ELF_ALIGNMENT=GREEN_REUSED','OFFLINE_GRAPH=PASS_ARM64_SCOPED','GRAPH_SCOPE=PROFILE_ANDROID_ARM64',"ORIGINAL_GRAPH_SHA256=$graphHash","ARM64_GRAPH_SHA256=$scopedGraphHash","ELF_LOG_SHA256=$elfHash","ZIP_LOG_SHA256=$zipHash",'SQLCIPHER_SELECTED_VERSION=4.20.0','GRADLE=OFFLINE_REPORT_ONLY','OTHER_ABI_GRAPH=NOT_APPROVED','BUILD=NOT_RUN','DEVICE_TEST=NOT_RUN','PRODUCTION=UNCHANGED','ADOPTION=AWAITING_EXPLICIT_GO','RELEASE=NO_GO')+$metrics
     $result | Set-Content -LiteralPath (Join-Path $evidence 'RESULTADO.txt') -Encoding UTF8
     $result | Out-Host
     Write-Host "RESULTADO=$evidence\RESULTADO.txt"
